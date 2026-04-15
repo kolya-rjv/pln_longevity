@@ -1,0 +1,101 @@
+[
+  {
+    "nl": "What is the confidence level for RCT human evidence?",
+    "metta_query": "(evidence-confidence RCT_Human)",
+    "explanation": "Evaluates the evidence-confidence function for RCT_Human, returning its fixed confidence value of 1.0.",
+    "intent": "retrieval",
+    "requires_pln_inference": false,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "Apply a strength of 0.8 with replicated animal study evidence.",
+    "metta_query": "(apply-tv 0.8 AnimalStudies_Replicated)",
+    "explanation": "Constructs an STV with strength 0.8 and the confidence assigned to AnimalStudies_Replicated (0.65), yielding (stv 0.8 0.65).",
+    "intent": "retrieval",
+    "requires_pln_inference": false,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "Find all drugs that extend lifespan.",
+    "metta_query": "(match &self (Inheritance $drug LifespanExtender) $drug)",
+    "explanation": "Retrieves all atoms $drug where an Inheritance link asserts they are a LifespanExtender.",
+    "intent": "retrieval",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.7,
+    "warnings": ["LifespanExtender is a stub placeholder — will be fully defined once logical_predicates.metta is populated."]
+  },
+  {
+    "nl": "What is the truth value of Rapamycin extending lifespan?",
+    "metta_query": "(match &self (: (Inheritance Rapamycin LifespanExtender) (stv $s $c)) (stv $s $c))",
+    "explanation": "Looks up the STV (strength, confidence) attached to the Inheritance link between Rapamycin and LifespanExtender.",
+    "intent": "retrieval",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": ["LifespanExtender is a stub placeholder — will be fully defined once logical_predicates.metta is populated."]
+  },
+  {
+    "nl": "List all evidence categories with confidence above 0.7.",
+    "metta_query": "(match &self (= (evidence-confidence $e) $c) (if (> $c 0.7) (pair $e $c) (empty)))",
+    "explanation": "Iterates over all evidence-confidence definitions and returns only those with a confidence value greater than 0.7.",
+    "intent": "retrieval",
+    "requires_pln_inference": false,
+    "confidence_filter": 0.7,
+    "warnings": []
+  },
+  {
+    "nl": "Which evidence types have low confidence (below 0.5)?",
+    "metta_query": "(match &self (= (evidence-confidence $e) $c) (if (< $c 0.5) (pair $e $c) (empty)))",
+    "explanation": "Returns evidence categories whose assigned confidence value is below 0.5.",
+    "intent": "retrieval",
+    "requires_pln_inference": false,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "How certain are we about epidemiological studies?",
+    "metta_query": "(evidence-confidence Epidemiological)",
+    "explanation": "Looks up the confidence value assigned to Epidemiological evidence in the epistemic calibration (0.60).",
+    "intent": "retrieval",
+    "requires_pln_inference": false,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "What is PLN?",
+    "metta_query": "",
+    "explanation": "PLN (Probabilistic Logic Networks) is a formal logic framework for uncertain reasoning, used within OpenCog Hyperon. It represents beliefs as Simple Truth Values (STVs) carrying both a strength (degree of truth) and a confidence (amount of evidence).",
+    "intent": "clarification",
+    "requires_pln_inference": false,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "What effect does Ethanol have on Drosophila mojavensis?",
+    "metta_query": "(match &self\n  (, (UsesIntervention $exp Ethanol)\n     (UsesSpecies $exp Drosophila_mojavensis)\n     (AvgLifespanChangePercent $exp $change))\n  $change)",
+    "explanation": "Finds all experiment rows where Ethanol was used on Drosophila_mojavensis and returns the average lifespan change percentage for each. The `,` operator inside the single match call requires all three conditions to be satisfied simultaneously.",
+    "intent": "retrieval",
+    "requires_pln_inference": false,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "Show me all Rapamycin experiments on mice with their lifespan change and significance.",
+    "metta_query": "(match &self\n  (, (UsesIntervention $exp Rapamycin)\n     (UsesSpecies $exp Mus_musculus)\n     (AvgLifespanChangePercent $exp $change)\n     (AvgLifespanSignificance $exp $sig))\n  (pair $exp (pair $change $sig)))",
+    "explanation": "Retrieves every experiment testing Rapamycin on Mus_musculus, returning experiment ID, average lifespan change, and statistical significance. All conditions are listed inside a single `,` conjunction within one match call.",
+    "intent": "retrieval",
+    "requires_pln_inference": false,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "List all interventions tested on Caenorhabditis elegans.",
+    "metta_query": "(match &self\n  (, (UsesSpecies $exp Caenorhabditis_elegans)\n     (UsesIntervention $exp $drug))\n  $drug)",
+    "explanation": "Returns intervention names for all experiments targeting Caenorhabditis_elegans. Both conditions are conjuncted with `,` inside a single match.",
+    "intent": "retrieval",
+    "requires_pln_inference": false,
+    "confidence_filter": 0.0,
+    "warnings": []
+  }
+]

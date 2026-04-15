@@ -21,7 +21,7 @@
 (: HazardRatio    (-> Biomarker Outcome Atom))
 
 ;; 3. Structural & Grouping Logic
-(: Inheritance (-> Entity Type Atom))       ;; Connects discovered nouns to system_types
+(: Inheritance (-> Entity Entity Atom))     ;; Connects discovered nouns to system_types
 (: PartOf      (-> Entity Entity Atom))     ;; Composition (e.g., DNAmPAI1 PartOf GrimAge)
 (: SetLink     (-> Expression Atom))        ;; Grouping multiple targets
 (: AndLink     (-> Expression Atom))        ;; Logical AND
@@ -30,6 +30,23 @@
 (: Interaction (-> Intervention Intervention String Atom))
 (: Limitation  (-> Intervention String Atom))
 (: EnhancedBy  (-> Intervention Entity Atom))
+
+;; ==========================================
+;; EXPERIMENT / DATASET RECORD PREDICATES
+;; ==========================================
+
+(: UsesIntervention            (-> Experiment Intervention Atom))
+(: UsesSpecies                 (-> Experiment Taxon Atom))
+(: UsesStrain                  (-> Experiment Strain Atom))
+(: HasSex                      (-> Experiment Sex Atom))
+(: ReportedIn                  (-> Experiment Publication Atom))
+
+(: Dosage                      (-> Experiment Expression Atom))
+
+(: AvgLifespanChangePercent    (-> Experiment Number Atom))
+(: AvgLifespanSignificance     (-> Experiment SignificanceLabel Atom))
+(: MaxLifespanSignificance     (-> Experiment SignificanceLabel Atom))
+(: WeightChangeSignificance    (-> Experiment SignificanceLabel Atom))
 
 
 ;; ==========================================

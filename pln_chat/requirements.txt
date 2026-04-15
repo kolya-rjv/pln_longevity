@@ -1,0 +1,7 @@
+gradio>=4.0
+openai>=1.0
+pydantic>=2.0
+python-dotenv>=1.0
+pypdf>=4.0          # PDF text extraction for the Ontology Expander pipeline
+# Optional: uncomment when Hyperon runtime is available
+hyperon>=0.1

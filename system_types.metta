@@ -6,6 +6,18 @@
 (: Entity Type)
 
 ;; ==========================================
+;; 0. Core record / ETL types
+;; ==========================================
+
+(: Experiment Type)              ; one imported DrugAge row / study record
+(: Target Type)                  ; used by ExtendsMaxLifespan / DoesNotExtendMaxLifespan
+(: Expression Type)              ; used in signatures like Measure / SetLink / AndLink
+
+;; Optional but strongly recommended
+(: SignificanceLabel Type)       ; e.g., Significant, NonSignificant, Unreported
+(: MissingValue Type)            ; for ETL placeholders like Unreported / Unknown
+
+;; ==========================================
 ;; 1. Biological and Clinical Entities
 ;; ==========================================
 (: Biomarker Type)
