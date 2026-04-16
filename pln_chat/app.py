@@ -107,6 +107,13 @@ def chat(
         temperature=temperature,
     )
 
+    # ─── TEMPORARY DEBUG ───
+    print("=" * 60)
+    print("GENERATED METTA QUERY:")
+    print(repr(translation.metta_query))
+    print("=" * 60)
+    # ─── END DEBUG ─────────
+
     validation = validate(translation.metta_query, registry)  # uses parsed registry for symbol checks
 
     pln_result = run_query(

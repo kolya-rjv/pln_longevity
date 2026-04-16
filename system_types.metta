@@ -13,59 +13,67 @@
 (: Target Type)                  ; used by ExtendsMaxLifespan / DoesNotExtendMaxLifespan
 (: Expression Type)              ; used in signatures like Measure / SetLink / AndLink
 
-;; Optional but strongly recommended
-(: SignificanceLabel Type)       ; e.g., Significant, NonSignificant, Unreported
-(: MissingValue Type)            ; for ETL placeholders like Unreported / Unknown
+;; Significance labels (enumerated values)
+(: SignificanceLabel Type)
+(: Significant SignificanceLabel)
+(: NonSignificant SignificanceLabel)
+(: Unreported SignificanceLabel)
+
+;; Generic missing-value placeholder
+(: MissingValue Type)
+(: Unknown MissingValue)
 
 ;; ==========================================
 ;; 1. Biological and Clinical Entities
 ;; ==========================================
 (: Biomarker Type)
-(: EpigeneticClock Biomarker)
+(: EpigeneticClock Type)
+(Inheritance EpigeneticClock Biomarker)
+
 (: Pathway Type)                  ; e.g., mTOR pathway, Senescence
 (: Outcome Type)                  ; e.g., AllCauseMortality, CardiovascularEvent
-(: Demographic Type)              ; e.g., Male, OlderAdult
+(: Demographic Type)              ; e.g., OlderAdult
 (: Phenotype Type)                ; e.g., Lifespan, Healthspan
 
 ;; ==========================================
 ;; 2. Interventions
 ;; ==========================================
 (: Intervention Type)
-(: Pharmaceutical Intervention)
-(: Supplement Intervention)
-(: Lifestyle Intervention)        ; e.g., Exercise, Fasting
+(Inheritance Pharmaceutical Intervention)
+(Inheritance Supplement Intervention)
+(Inheritance Lifestyle Intervention)        ; e.g., Exercise, Fasting
 
 ;; ==========================================
 ;; 3. Taxonomy Hierarchy
 ;; ==========================================
 (: Taxon Type)
-(: Vertebrate Taxon)
-(: Invertebrate Taxon)
-(: Fungi Taxon)
-(: Protozoa Taxon)
-
-;; Make Species inherit from Taxon in the type system
-(: Species Taxon)
-(: Sex Type)
+(Inheritance Vertebrate Taxon)
+(Inheritance Invertebrate Taxon)
+(Inheritance Fungi Taxon)
+(Inheritance Protozoa Taxon)
 
 ;; ==========================================
-;; 4. Experimental & Protocol Context
+;; 4. Sex (enumerated values)
+;; ==========================================
+(: Sex Type)
+(: Male Sex)
+(: Female Sex)
+(: Mixed Sex)
+(: Hermaphrodite Sex)
+
+;; ==========================================
+;; 5. Experimental & Protocol Context
 ;; ==========================================
 (: TreatmentProtocol Type)
 (: Strain Type)
 
-;; Measurement wrappers
-(: Measure Type)                  ; Used for (Measure <Number> <Unit>)
-(: Unit Type)
-(: Route Type)
-(: Frequency Type)
-(: LifeStage Type)
-(: DurationEvent Type)
+;; NOTE: Measurement types (Measure, Unit, Route, Frequency,
+;; LifeStage, DurationEvent) are defined in measurement_types.metta.
+;; Do NOT duplicate them here.
 
 ;; ==========================================
-;; 5. Epistemic and Provenance Types
+;; 6. Epistemic and Provenance Types
 ;; ==========================================
 (: EvidenceCategory Type)         ; Used for TV calibration mapping
 (: SafetyCategory Type)
-(: Publication Type)              ; Allows linking protocols to specific papers (e.g., PMID_19587680)
-
+(: Publication Type)              ; e.g., PMID_19587680

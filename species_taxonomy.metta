@@ -1,7 +1,15 @@
 ;; ==========================================
 ;; SPECIES TAXONOMY (From DrugAge CSV)
-;; Uses native PLN 'Inheritance' for taxonomic subsumption
 ;; ==========================================
+;; Uses the user-defined Inheritance predicate (declared in
+;; logical_predicates.metta) for taxonomic subsumption that PLN
+;; deduction / induction rules can operate on.
+;;
+;; Convention:
+;;   (Inheritance <species> <higher-taxon>)
+;;
+;; Higher taxa (Vertebrate, Invertebrate, Fungi, Protozoa) are
+;; themselves placed under Taxon via Inheritance in system_types.metta.
 
 ;; ==== VERTEBRATES ====
 ;; Mammals

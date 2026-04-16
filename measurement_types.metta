@@ -1,11 +1,16 @@
 ;; ==========================================
 ;; MEASUREMENT & PROTOCOL TYPES
 ;; ==========================================
+;; This file is the single authority for all measurement-related types.
+;; Do not redeclare these in system_types.metta.
 
-;; Base metric wrapper
+;; Base metric constructor
+;; Usage: (Measure 14.0 ppm) -> Expression
 (: Measure (-> Number Unit Expression))
 
-;; Sub-types for the Protocol
+;; ------------------------------------------
+;; Type declarations
+;; ------------------------------------------
 (: Unit Type)
 (: Route Type)
 (: Frequency Type)
@@ -27,7 +32,7 @@
 (: Months Unit) (: Weeks Unit) (: Days Unit)
 
 ;; ------------------------------------------
-;; Enumerated Routes & Frequencies
+;; Enumerated Routes
 ;; ------------------------------------------
 (: Food Route)
 (: Water Route)
@@ -35,6 +40,9 @@
 (: Subcutaneous Route)
 (: OralGavage Route)
 
+;; ------------------------------------------
+;; Enumerated Frequencies
+;; ------------------------------------------
 (: Daily Frequency)
 (: Weekly Frequency)
 (: AlternateDays Frequency)
