@@ -18,9 +18,11 @@
 (Inheritance Mesocricetus_auratus Vertebrate)
 (Inheritance Canis_lupus_familiaris Vertebrate)
 
+
 ;; Fish
 (Inheritance Nothobranchius_furzeri Vertebrate)
 (Inheritance Nothobranchius_guentheri Vertebrate)
+(Inheritance Danio_rerio Vertebrate)
 
 ;; ==== INVERTEBRATES ====
 ;; Nematodes
@@ -59,3 +61,4 @@
 (Inheritance Saccharomyces_cerevisiae Fungi)
 (Inheritance Podospora_anserina Fungi)
 (Inheritance Paramecium_tetraurelia Protozoa)
+(Inheritance Schizosaccharomyces_pombe Fungi)
