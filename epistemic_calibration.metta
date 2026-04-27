@@ -47,3 +47,20 @@
 ;; Usage: (apply-tv 0.85 AnimalStudies_Replicated) -> (stv 0.85 0.65)
 (= (apply-tv $strength $evidence-type)
    (stv $strength (evidence-confidence $evidence-type)))
+
+;; ------------------------------------------
+;; SelectionBasis confidence mapping (GenAge)
+;; When a gene has multiple selection bases,
+;; PLN should use the maximum, not average.
+;; ------------------------------------------
+(: selection-basis-confidence (-> SelectionBasis Number))
+
+(= (selection-basis-confidence human)      0.85)
+(= (selection-basis-confidence human_link) 0.80)
+(= (selection-basis-confidence functional) 0.75)
+(= (selection-basis-confidence mammal)     0.65)
+(= (selection-basis-confidence model)      0.50)
+(= (selection-basis-confidence upstream)   0.40)
+(= (selection-basis-confidence downstream) 0.40)
+(= (selection-basis-confidence cell)       0.35)
+(= (selection-basis-confidence putative)   0.25)

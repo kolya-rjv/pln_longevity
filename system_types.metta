@@ -33,7 +33,9 @@
 (: Pathway Type)                  ; e.g., mTOR pathway, Senescence
 (: Outcome Type)                  ; e.g., AllCauseMortality, CardiovascularEvent
 (: Demographic Type)              ; e.g., OlderAdult
-(: Phenotype Type)                ; e.g., Lifespan, Healthspan
+(: Phenotype Type)
+(: Lifespan Phenotype)
+(: Healthspan Phenotype)
 
 ;; ==========================================
 ;; 2. Interventions
@@ -77,3 +79,26 @@
 (: EvidenceCategory Type)         ; Used for TV calibration mapping
 (: SafetyCategory Type)
 (: Publication Type)              ; e.g., PMID_19587680
+
+;; ==========================================
+;; 7. GENE TYPES (GenAge)
+;; ==========================================
+
+(: Gene Type)
+
+;; Record types — parallel to Experiment, not subtypes of Gene
+;; Connection to Gene goes through InvolvesGene predicate
+(: GeneticExperiment Type)
+(Inheritance GeneticExperiment Experiment)
+(: HumanAgingGene Type)
+
+(: SelectionBasis Type)
+(: mammal     SelectionBasis)
+(: model      SelectionBasis)
+(: cell       SelectionBasis)
+(: functional SelectionBasis)
+(: human      SelectionBasis)
+(: downstream SelectionBasis)
+(: putative   SelectionBasis)
+(: upstream   SelectionBasis)
+(: human_link SelectionBasis)

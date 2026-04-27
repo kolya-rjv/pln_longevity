@@ -122,3 +122,24 @@
 ;; (: OutperformsFor   (-> Atom Atom Atom Atom))
 ;; (: SexSpecificEffect (-> Atom Atom Atom Atom))
 ;; (: Note             (-> Atom String Atom))
+
+;; ==========================================
+;; 10. GENE PREDICATES (GenAge)
+;; ==========================================
+
+;; Atom as first arg — applies to both GeneticExperiment and HumanAgingGene
+(: InvolvesGene          (-> Atom Gene Atom))
+
+;; GeneticExperiment predicates
+;; HasLifespanEffect takes (Increases Lifespan) or (Decreases Lifespan)
+(: HasLifespanEffect     (-> GeneticExperiment Expression Atom))
+(: LifespanChangePercent (-> GeneticExperiment Number Atom))
+
+;; HumanAgingGene predicates
+(: HasSelectionBasis     (-> HumanAgingGene SelectionBasis Atom))
+
+;; Gene entity predicates
+(: GeneSymbol            (-> Gene String Atom))
+(: GeneName              (-> Gene String Atom))
+(: EntrezID              (-> Gene Number Atom))
+(: UniprotID             (-> Gene String Atom))
