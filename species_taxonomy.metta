@@ -1,7 +1,15 @@
 ;; ==========================================
 ;; SPECIES TAXONOMY (From DrugAge CSV)
-;; Uses native PLN 'Inheritance' for taxonomic subsumption
 ;; ==========================================
+;; Uses the user-defined Inheritance predicate (declared in
+;; logical_predicates.metta) for taxonomic subsumption that PLN
+;; deduction / induction rules can operate on.
+;;
+;; Convention:
+;;   (Inheritance <species> <higher-taxon>)
+;;
+;; Higher taxa (Vertebrate, Invertebrate, Fungi, Protozoa) are
+;; themselves placed under Taxon via Inheritance in system_types.metta.
 
 ;; ==== VERTEBRATES ====
 ;; Mammals
@@ -10,9 +18,11 @@
 (Inheritance Mesocricetus_auratus Vertebrate)
 (Inheritance Canis_lupus_familiaris Vertebrate)
 
+
 ;; Fish
 (Inheritance Nothobranchius_furzeri Vertebrate)
 (Inheritance Nothobranchius_guentheri Vertebrate)
+(Inheritance Danio_rerio Vertebrate)
 
 ;; ==== INVERTEBRATES ====
 ;; Nematodes
@@ -51,3 +61,4 @@
 (Inheritance Saccharomyces_cerevisiae Fungi)
 (Inheritance Podospora_anserina Fungi)
 (Inheritance Paramecium_tetraurelia Protozoa)
+(Inheritance Schizosaccharomyces_pombe Fungi)

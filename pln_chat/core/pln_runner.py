@@ -211,9 +211,15 @@ def _hyperon_run(
         try:
             metta = MeTTa()
             start = time.monotonic()
+            # ─── DEBUG ───
+            print("=" * 60)
+            print("FULL SCRIPT SENT TO METTA:")
+            print(full_script)
+            print("=" * 60)
+            # ─── END DEBUG ───
             raw: list[list] = metta.run(full_script)
             elapsed = int((time.monotonic() - start) * 1000)
-        except Exception as run_exc:  # noqa: BLE001
+        except Exception as run_exc:
             return PLNRunResult(status="error", mode="runtime", error=str(run_exc))
         finally:
             os.chdir(original_dir)

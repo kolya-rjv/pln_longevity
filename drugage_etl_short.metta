@@ -1,683 +1,683 @@
 ; Auto-generated DrugAge ETL
 
 ; row 0
-(Inheritance DrugAgeRow_0 Experiment)
+(InstanceOf DrugAgeRow_0 Experiment)
 (UsesIntervention DrugAgeRow_0 Ethanol)
 (UsesSpecies DrugAgeRow_0 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_0 A300)
 (HasSex DrugAgeRow_0 Male)
 (ReportedIn DrugAgeRow_0 PMID_13369)
-(Dosage DrugAgeRow_0 (Measure 4.0 %))
+(Dosage DrugAgeRow_0 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_0 81.29)
 (AvgLifespanSignificance DrugAgeRow_0 Unreported)
 (MaxLifespanSignificance DrugAgeRow_0 Unreported)
 (WeightChangeSignificance DrugAgeRow_0 Unreported)
 
 ; row 1
-(Inheritance DrugAgeRow_1 Experiment)
+(InstanceOf DrugAgeRow_1 Experiment)
 (UsesIntervention DrugAgeRow_1 Ethanol)
 (UsesSpecies DrugAgeRow_1 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_1 A300)
 (HasSex DrugAgeRow_1 Male)
 (ReportedIn DrugAgeRow_1 PMID_13369)
-(Dosage DrugAgeRow_1 (Measure 2.0 %))
+(Dosage DrugAgeRow_1 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_1 50.66)
 (AvgLifespanSignificance DrugAgeRow_1 Unreported)
 (MaxLifespanSignificance DrugAgeRow_1 Unreported)
 (WeightChangeSignificance DrugAgeRow_1 Unreported)
 
 ; row 2
-(Inheritance DrugAgeRow_2 Experiment)
+(InstanceOf DrugAgeRow_2 Experiment)
 (UsesIntervention DrugAgeRow_2 Ethanol)
 (UsesSpecies DrugAgeRow_2 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_2 A300)
 (HasSex DrugAgeRow_2 Female)
 (ReportedIn DrugAgeRow_2 PMID_13369)
-(Dosage DrugAgeRow_2 (Measure 4.0 %))
+(Dosage DrugAgeRow_2 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_2 71.03)
 (AvgLifespanSignificance DrugAgeRow_2 Unreported)
 (MaxLifespanSignificance DrugAgeRow_2 Unreported)
 (WeightChangeSignificance DrugAgeRow_2 Unreported)
 
 ; row 3
-(Inheritance DrugAgeRow_3 Experiment)
+(InstanceOf DrugAgeRow_3 Experiment)
 (UsesIntervention DrugAgeRow_3 Ethanol)
 (UsesSpecies DrugAgeRow_3 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_3 A300)
 (HasSex DrugAgeRow_3 Female)
 (ReportedIn DrugAgeRow_3 PMID_13369)
-(Dosage DrugAgeRow_3 (Measure 2.0 %))
+(Dosage DrugAgeRow_3 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_3 123.26)
 (AvgLifespanSignificance DrugAgeRow_3 Unreported)
 (MaxLifespanSignificance DrugAgeRow_3 Unreported)
 (WeightChangeSignificance DrugAgeRow_3 Unreported)
 
 ; row 4
-(Inheritance DrugAgeRow_4 Experiment)
+(InstanceOf DrugAgeRow_4 Experiment)
 (UsesIntervention DrugAgeRow_4 Ethanol)
 (UsesSpecies DrugAgeRow_4 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_4 A512d)
 (HasSex DrugAgeRow_4 Male)
 (ReportedIn DrugAgeRow_4 PMID_13369)
-(Dosage DrugAgeRow_4 (Measure 4.0 %))
+(Dosage DrugAgeRow_4 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_4 20.88)
 (AvgLifespanSignificance DrugAgeRow_4 Unreported)
 (MaxLifespanSignificance DrugAgeRow_4 Unreported)
 (WeightChangeSignificance DrugAgeRow_4 Unreported)
 
 ; row 5
-(Inheritance DrugAgeRow_5 Experiment)
+(InstanceOf DrugAgeRow_5 Experiment)
 (UsesIntervention DrugAgeRow_5 Ethanol)
 (UsesSpecies DrugAgeRow_5 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_5 A512d)
 (HasSex DrugAgeRow_5 Male)
 (ReportedIn DrugAgeRow_5 PMID_13369)
-(Dosage DrugAgeRow_5 (Measure 2.0 %))
+(Dosage DrugAgeRow_5 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_5 83.67)
 (AvgLifespanSignificance DrugAgeRow_5 Unreported)
 (MaxLifespanSignificance DrugAgeRow_5 Unreported)
 (WeightChangeSignificance DrugAgeRow_5 Unreported)
 
 ; row 6
-(Inheritance DrugAgeRow_6 Experiment)
+(InstanceOf DrugAgeRow_6 Experiment)
 (UsesIntervention DrugAgeRow_6 Ethanol)
 (UsesSpecies DrugAgeRow_6 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_6 A512d)
 (HasSex DrugAgeRow_6 Female)
 (ReportedIn DrugAgeRow_6 PMID_13369)
-(Dosage DrugAgeRow_6 (Measure 4.0 %))
+(Dosage DrugAgeRow_6 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_6 57.39)
 (AvgLifespanSignificance DrugAgeRow_6 Unreported)
 (MaxLifespanSignificance DrugAgeRow_6 Unreported)
 (WeightChangeSignificance DrugAgeRow_6 Unreported)
 
 ; row 7
-(Inheritance DrugAgeRow_7 Experiment)
+(InstanceOf DrugAgeRow_7 Experiment)
 (UsesIntervention DrugAgeRow_7 Ethanol)
 (UsesSpecies DrugAgeRow_7 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_7 A512d)
 (HasSex DrugAgeRow_7 Female)
 (ReportedIn DrugAgeRow_7 PMID_13369)
-(Dosage DrugAgeRow_7 (Measure 2.0 %))
+(Dosage DrugAgeRow_7 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_7 80.71)
 (AvgLifespanSignificance DrugAgeRow_7 Unreported)
 (MaxLifespanSignificance DrugAgeRow_7 Unreported)
 (WeightChangeSignificance DrugAgeRow_7 Unreported)
 
 ; row 8
-(Inheritance DrugAgeRow_8 Experiment)
+(InstanceOf DrugAgeRow_8 Experiment)
 (UsesIntervention DrugAgeRow_8 Ethanol)
 (UsesSpecies DrugAgeRow_8 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_8 A361)
 (HasSex DrugAgeRow_8 Male)
 (ReportedIn DrugAgeRow_8 PMID_13369)
-(Dosage DrugAgeRow_8 (Measure 4.0 %))
+(Dosage DrugAgeRow_8 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_8 37.39)
 (AvgLifespanSignificance DrugAgeRow_8 Unreported)
 (MaxLifespanSignificance DrugAgeRow_8 Unreported)
 (WeightChangeSignificance DrugAgeRow_8 Unreported)
 
 ; row 9
-(Inheritance DrugAgeRow_9 Experiment)
+(InstanceOf DrugAgeRow_9 Experiment)
 (UsesIntervention DrugAgeRow_9 Ethanol)
 (UsesSpecies DrugAgeRow_9 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_9 A361)
 (HasSex DrugAgeRow_9 Male)
 (ReportedIn DrugAgeRow_9 PMID_13369)
-(Dosage DrugAgeRow_9 (Measure 2.0 %))
+(Dosage DrugAgeRow_9 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_9 62.6)
 (AvgLifespanSignificance DrugAgeRow_9 Unreported)
 (MaxLifespanSignificance DrugAgeRow_9 Unreported)
 (WeightChangeSignificance DrugAgeRow_9 Unreported)
 
 ; row 10
-(Inheritance DrugAgeRow_10 Experiment)
+(InstanceOf DrugAgeRow_10 Experiment)
 (UsesIntervention DrugAgeRow_10 Ethanol)
 (UsesSpecies DrugAgeRow_10 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_10 A361)
 (HasSex DrugAgeRow_10 Female)
 (ReportedIn DrugAgeRow_10 PMID_13369)
-(Dosage DrugAgeRow_10 (Measure 4.0 %))
+(Dosage DrugAgeRow_10 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_10 119.56)
 (AvgLifespanSignificance DrugAgeRow_10 Unreported)
 (MaxLifespanSignificance DrugAgeRow_10 Unreported)
 (WeightChangeSignificance DrugAgeRow_10 Unreported)
 
 ; row 11
-(Inheritance DrugAgeRow_11 Experiment)
+(InstanceOf DrugAgeRow_11 Experiment)
 (UsesIntervention DrugAgeRow_11 Ethanol)
 (UsesSpecies DrugAgeRow_11 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_11 A361)
 (HasSex DrugAgeRow_11 Female)
 (ReportedIn DrugAgeRow_11 PMID_13369)
-(Dosage DrugAgeRow_11 (Measure 2.0 %))
+(Dosage DrugAgeRow_11 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_11 145.62)
 (AvgLifespanSignificance DrugAgeRow_11 Unreported)
 (MaxLifespanSignificance DrugAgeRow_11 Unreported)
 (WeightChangeSignificance DrugAgeRow_11 Unreported)
 
 ; row 12
-(Inheritance DrugAgeRow_12 Experiment)
+(InstanceOf DrugAgeRow_12 Experiment)
 (UsesIntervention DrugAgeRow_12 Ethanol)
 (UsesSpecies DrugAgeRow_12 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_12 A514)
 (HasSex DrugAgeRow_12 Male)
 (ReportedIn DrugAgeRow_12 PMID_13369)
-(Dosage DrugAgeRow_12 (Measure 4.0 %))
+(Dosage DrugAgeRow_12 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_12 70.77)
 (AvgLifespanSignificance DrugAgeRow_12 Unreported)
 (MaxLifespanSignificance DrugAgeRow_12 Unreported)
 (WeightChangeSignificance DrugAgeRow_12 Unreported)
 
 ; row 13
-(Inheritance DrugAgeRow_13 Experiment)
+(InstanceOf DrugAgeRow_13 Experiment)
 (UsesIntervention DrugAgeRow_13 Ethanol)
 (UsesSpecies DrugAgeRow_13 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_13 A514)
 (HasSex DrugAgeRow_13 Male)
 (ReportedIn DrugAgeRow_13 PMID_13369)
-(Dosage DrugAgeRow_13 (Measure 2.0 %))
+(Dosage DrugAgeRow_13 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_13 92.26)
 (AvgLifespanSignificance DrugAgeRow_13 Unreported)
 (MaxLifespanSignificance DrugAgeRow_13 Unreported)
 (WeightChangeSignificance DrugAgeRow_13 Unreported)
 
 ; row 14
-(Inheritance DrugAgeRow_14 Experiment)
+(InstanceOf DrugAgeRow_14 Experiment)
 (UsesIntervention DrugAgeRow_14 Ethanol)
 (UsesSpecies DrugAgeRow_14 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_14 A514)
 (HasSex DrugAgeRow_14 Female)
 (ReportedIn DrugAgeRow_14 PMID_13369)
-(Dosage DrugAgeRow_14 (Measure 4.0 %))
+(Dosage DrugAgeRow_14 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_14 124.24)
 (AvgLifespanSignificance DrugAgeRow_14 Unreported)
 (MaxLifespanSignificance DrugAgeRow_14 Unreported)
 (WeightChangeSignificance DrugAgeRow_14 Unreported)
 
 ; row 15
-(Inheritance DrugAgeRow_15 Experiment)
+(InstanceOf DrugAgeRow_15 Experiment)
 (UsesIntervention DrugAgeRow_15 Ethanol)
 (UsesSpecies DrugAgeRow_15 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_15 A514)
 (HasSex DrugAgeRow_15 Female)
 (ReportedIn DrugAgeRow_15 PMID_13369)
-(Dosage DrugAgeRow_15 (Measure 2.0 %))
+(Dosage DrugAgeRow_15 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_15 94.33)
 (AvgLifespanSignificance DrugAgeRow_15 Unreported)
 (MaxLifespanSignificance DrugAgeRow_15 Unreported)
 (WeightChangeSignificance DrugAgeRow_15 Unreported)
 
 ; row 16
-(Inheritance DrugAgeRow_16 Experiment)
+(InstanceOf DrugAgeRow_16 Experiment)
 (UsesIntervention DrugAgeRow_16 Ethanol)
 (UsesSpecies DrugAgeRow_16 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_16 A316b)
 (HasSex DrugAgeRow_16 Male)
 (ReportedIn DrugAgeRow_16 PMID_13369)
-(Dosage DrugAgeRow_16 (Measure 4.0 %))
+(Dosage DrugAgeRow_16 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_16 42.69)
 (AvgLifespanSignificance DrugAgeRow_16 Unreported)
 (MaxLifespanSignificance DrugAgeRow_16 Unreported)
 (WeightChangeSignificance DrugAgeRow_16 Unreported)
 
 ; row 17
-(Inheritance DrugAgeRow_17 Experiment)
+(InstanceOf DrugAgeRow_17 Experiment)
 (UsesIntervention DrugAgeRow_17 Ethanol)
 (UsesSpecies DrugAgeRow_17 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_17 A316b)
 (HasSex DrugAgeRow_17 Male)
 (ReportedIn DrugAgeRow_17 PMID_13369)
-(Dosage DrugAgeRow_17 (Measure 2.0 %))
+(Dosage DrugAgeRow_17 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_17 70.77)
 (AvgLifespanSignificance DrugAgeRow_17 Unreported)
 (MaxLifespanSignificance DrugAgeRow_17 Unreported)
 (WeightChangeSignificance DrugAgeRow_17 Unreported)
 
 ; row 18
-(Inheritance DrugAgeRow_18 Experiment)
+(InstanceOf DrugAgeRow_18 Experiment)
 (UsesIntervention DrugAgeRow_18 Ethanol)
 (UsesSpecies DrugAgeRow_18 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_18 A316b)
 (HasSex DrugAgeRow_18 Female)
 (ReportedIn DrugAgeRow_18 PMID_13369)
-(Dosage DrugAgeRow_18 (Measure 4.0 %))
+(Dosage DrugAgeRow_18 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_18 52.04)
 (AvgLifespanSignificance DrugAgeRow_18 Unreported)
 (MaxLifespanSignificance DrugAgeRow_18 Unreported)
 (WeightChangeSignificance DrugAgeRow_18 Unreported)
 
 ; row 19
-(Inheritance DrugAgeRow_19 Experiment)
+(InstanceOf DrugAgeRow_19 Experiment)
 (UsesIntervention DrugAgeRow_19 Ethanol)
 (UsesSpecies DrugAgeRow_19 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_19 A316b)
 (HasSex DrugAgeRow_19 Female)
 (ReportedIn DrugAgeRow_19 PMID_13369)
-(Dosage DrugAgeRow_19 (Measure 2.0 %))
+(Dosage DrugAgeRow_19 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_19 105.71)
 (AvgLifespanSignificance DrugAgeRow_19 Unreported)
 (MaxLifespanSignificance DrugAgeRow_19 Unreported)
 (WeightChangeSignificance DrugAgeRow_19 Unreported)
 
 ; row 20
-(Inheritance DrugAgeRow_20 Experiment)
+(InstanceOf DrugAgeRow_20 Experiment)
 (UsesIntervention DrugAgeRow_20 Ethanol)
 (UsesSpecies DrugAgeRow_20 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_20 A572)
 (HasSex DrugAgeRow_20 Male)
 (ReportedIn DrugAgeRow_20 PMID_13369)
-(Dosage DrugAgeRow_20 (Measure 4.0 %))
+(Dosage DrugAgeRow_20 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_20 55.38)
 (AvgLifespanSignificance DrugAgeRow_20 Unreported)
 (MaxLifespanSignificance DrugAgeRow_20 Unreported)
 (WeightChangeSignificance DrugAgeRow_20 Unreported)
 
 ; row 21
-(Inheritance DrugAgeRow_21 Experiment)
+(InstanceOf DrugAgeRow_21 Experiment)
 (UsesIntervention DrugAgeRow_21 Ethanol)
 (UsesSpecies DrugAgeRow_21 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_21 A572)
 (HasSex DrugAgeRow_21 Male)
 (ReportedIn DrugAgeRow_21 PMID_13369)
-(Dosage DrugAgeRow_21 (Measure 2.0 %))
+(Dosage DrugAgeRow_21 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_21 52.76)
 (AvgLifespanSignificance DrugAgeRow_21 Unreported)
 (MaxLifespanSignificance DrugAgeRow_21 Unreported)
 (WeightChangeSignificance DrugAgeRow_21 Unreported)
 
 ; row 22
-(Inheritance DrugAgeRow_22 Experiment)
+(InstanceOf DrugAgeRow_22 Experiment)
 (UsesIntervention DrugAgeRow_22 Ethanol)
 (UsesSpecies DrugAgeRow_22 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_22 A572)
 (HasSex DrugAgeRow_22 Female)
 (ReportedIn DrugAgeRow_22 PMID_13369)
-(Dosage DrugAgeRow_22 (Measure 4.0 %))
+(Dosage DrugAgeRow_22 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_22 74.94)
 (AvgLifespanSignificance DrugAgeRow_22 Unreported)
 (MaxLifespanSignificance DrugAgeRow_22 Unreported)
 (WeightChangeSignificance DrugAgeRow_22 Unreported)
 
 ; row 23
-(Inheritance DrugAgeRow_23 Experiment)
+(InstanceOf DrugAgeRow_23 Experiment)
 (UsesIntervention DrugAgeRow_23 Ethanol)
 (UsesSpecies DrugAgeRow_23 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_23 A572)
 (HasSex DrugAgeRow_23 Female)
 (ReportedIn DrugAgeRow_23 PMID_13369)
-(Dosage DrugAgeRow_23 (Measure 2.0 %))
+(Dosage DrugAgeRow_23 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_23 103.88)
 (AvgLifespanSignificance DrugAgeRow_23 Unreported)
 (MaxLifespanSignificance DrugAgeRow_23 Unreported)
 (WeightChangeSignificance DrugAgeRow_23 Unreported)
 
 ; row 24
-(Inheritance DrugAgeRow_24 Experiment)
+(InstanceOf DrugAgeRow_24 Experiment)
 (UsesIntervention DrugAgeRow_24 Ethanol)
 (UsesSpecies DrugAgeRow_24 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_24 A374)
 (HasSex DrugAgeRow_24 Male)
 (ReportedIn DrugAgeRow_24 PMID_13369)
-(Dosage DrugAgeRow_24 (Measure 4.0 %))
+(Dosage DrugAgeRow_24 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_24 29.7)
 (AvgLifespanSignificance DrugAgeRow_24 Unreported)
 (MaxLifespanSignificance DrugAgeRow_24 Unreported)
 (WeightChangeSignificance DrugAgeRow_24 Unreported)
 
 ; row 25
-(Inheritance DrugAgeRow_25 Experiment)
+(InstanceOf DrugAgeRow_25 Experiment)
 (UsesIntervention DrugAgeRow_25 Ethanol)
 (UsesSpecies DrugAgeRow_25 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_25 A374)
 (HasSex DrugAgeRow_25 Male)
 (ReportedIn DrugAgeRow_25 PMID_13369)
-(Dosage DrugAgeRow_25 (Measure 2.0 %))
+(Dosage DrugAgeRow_25 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_25 67.08)
 (AvgLifespanSignificance DrugAgeRow_25 Unreported)
 (MaxLifespanSignificance DrugAgeRow_25 Unreported)
 (WeightChangeSignificance DrugAgeRow_25 Unreported)
 
 ; row 26
-(Inheritance DrugAgeRow_26 Experiment)
+(InstanceOf DrugAgeRow_26 Experiment)
 (UsesIntervention DrugAgeRow_26 Ethanol)
 (UsesSpecies DrugAgeRow_26 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_26 A374)
 (HasSex DrugAgeRow_26 Female)
 (ReportedIn DrugAgeRow_26 PMID_13369)
-(Dosage DrugAgeRow_26 (Measure 4.0 %))
+(Dosage DrugAgeRow_26 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_26 19.75)
 (AvgLifespanSignificance DrugAgeRow_26 Unreported)
 (MaxLifespanSignificance DrugAgeRow_26 Unreported)
 (WeightChangeSignificance DrugAgeRow_26 Unreported)
 
 ; row 27
-(Inheritance DrugAgeRow_27 Experiment)
+(InstanceOf DrugAgeRow_27 Experiment)
 (UsesIntervention DrugAgeRow_27 Ethanol)
 (UsesSpecies DrugAgeRow_27 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_27 A374)
 (HasSex DrugAgeRow_27 Female)
 (ReportedIn DrugAgeRow_27 PMID_13369)
-(Dosage DrugAgeRow_27 (Measure 2.0 %))
+(Dosage DrugAgeRow_27 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_27 58.11)
 (AvgLifespanSignificance DrugAgeRow_27 Unreported)
 (MaxLifespanSignificance DrugAgeRow_27 Unreported)
 (WeightChangeSignificance DrugAgeRow_27 Unreported)
 
 ; row 28
-(Inheritance DrugAgeRow_28 Experiment)
+(InstanceOf DrugAgeRow_28 Experiment)
 (UsesIntervention DrugAgeRow_28 Ethanol)
 (UsesSpecies DrugAgeRow_28 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_28 A429)
 (HasSex DrugAgeRow_28 Male)
 (ReportedIn DrugAgeRow_28 PMID_13369)
-(Dosage DrugAgeRow_28 (Measure 4.0 %))
+(Dosage DrugAgeRow_28 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_28 66.34)
 (AvgLifespanSignificance DrugAgeRow_28 Unreported)
 (MaxLifespanSignificance DrugAgeRow_28 Unreported)
 (WeightChangeSignificance DrugAgeRow_28 Unreported)
 
 ; row 29
-(Inheritance DrugAgeRow_29 Experiment)
+(InstanceOf DrugAgeRow_29 Experiment)
 (UsesIntervention DrugAgeRow_29 Ethanol)
 (UsesSpecies DrugAgeRow_29 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_29 A429)
 (HasSex DrugAgeRow_29 Male)
 (ReportedIn DrugAgeRow_29 PMID_13369)
-(Dosage DrugAgeRow_29 (Measure 2.0 %))
+(Dosage DrugAgeRow_29 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_29 100.38)
 (AvgLifespanSignificance DrugAgeRow_29 Unreported)
 (MaxLifespanSignificance DrugAgeRow_29 Unreported)
 (WeightChangeSignificance DrugAgeRow_29 Unreported)
 
 ; row 30
-(Inheritance DrugAgeRow_30 Experiment)
+(InstanceOf DrugAgeRow_30 Experiment)
 (UsesIntervention DrugAgeRow_30 Ethanol)
 (UsesSpecies DrugAgeRow_30 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_30 A429)
 (HasSex DrugAgeRow_30 Female)
 (ReportedIn DrugAgeRow_30 PMID_13369)
-(Dosage DrugAgeRow_30 (Measure 4.0 %))
+(Dosage DrugAgeRow_30 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_30 -1.96)
 (AvgLifespanSignificance DrugAgeRow_30 Unreported)
 (MaxLifespanSignificance DrugAgeRow_30 Unreported)
 (WeightChangeSignificance DrugAgeRow_30 Unreported)
 
 ; row 31
-(Inheritance DrugAgeRow_31 Experiment)
+(InstanceOf DrugAgeRow_31 Experiment)
 (UsesIntervention DrugAgeRow_31 Ethanol)
 (UsesSpecies DrugAgeRow_31 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_31 A429)
 (HasSex DrugAgeRow_31 Female)
 (ReportedIn DrugAgeRow_31 PMID_13369)
-(Dosage DrugAgeRow_31 (Measure 2.0 %))
+(Dosage DrugAgeRow_31 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_31 2.51)
 (AvgLifespanSignificance DrugAgeRow_31 Unreported)
 (MaxLifespanSignificance DrugAgeRow_31 Unreported)
 (WeightChangeSignificance DrugAgeRow_31 Unreported)
 
 ; row 32
-(Inheritance DrugAgeRow_32 Experiment)
+(InstanceOf DrugAgeRow_32 Experiment)
 (UsesIntervention DrugAgeRow_32 Ethanol)
 (UsesSpecies DrugAgeRow_32 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_32 A376)
 (HasSex DrugAgeRow_32 Male)
 (ReportedIn DrugAgeRow_32 PMID_13369)
-(Dosage DrugAgeRow_32 (Measure 4.0 %))
+(Dosage DrugAgeRow_32 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_32 36.14)
 (AvgLifespanSignificance DrugAgeRow_32 Unreported)
 (MaxLifespanSignificance DrugAgeRow_32 Unreported)
 (WeightChangeSignificance DrugAgeRow_32 Unreported)
 
 ; row 33
-(Inheritance DrugAgeRow_33 Experiment)
+(InstanceOf DrugAgeRow_33 Experiment)
 (UsesIntervention DrugAgeRow_33 Ethanol)
 (UsesSpecies DrugAgeRow_33 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_33 A376)
 (HasSex DrugAgeRow_33 Male)
 (ReportedIn DrugAgeRow_33 PMID_13369)
-(Dosage DrugAgeRow_33 (Measure 2.0 %))
+(Dosage DrugAgeRow_33 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_33 75.73)
 (AvgLifespanSignificance DrugAgeRow_33 Unreported)
 (MaxLifespanSignificance DrugAgeRow_33 Unreported)
 (WeightChangeSignificance DrugAgeRow_33 Unreported)
 
 ; row 34
-(Inheritance DrugAgeRow_34 Experiment)
+(InstanceOf DrugAgeRow_34 Experiment)
 (UsesIntervention DrugAgeRow_34 Ethanol)
 (UsesSpecies DrugAgeRow_34 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_34 A376)
 (HasSex DrugAgeRow_34 Female)
 (ReportedIn DrugAgeRow_34 PMID_13369)
-(Dosage DrugAgeRow_34 (Measure 4.0 %))
+(Dosage DrugAgeRow_34 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_34 31.53)
 (AvgLifespanSignificance DrugAgeRow_34 Unreported)
 (MaxLifespanSignificance DrugAgeRow_34 Unreported)
 (WeightChangeSignificance DrugAgeRow_34 Unreported)
 
 ; row 35
-(Inheritance DrugAgeRow_35 Experiment)
+(InstanceOf DrugAgeRow_35 Experiment)
 (UsesIntervention DrugAgeRow_35 Ethanol)
 (UsesSpecies DrugAgeRow_35 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_35 A376)
 (HasSex DrugAgeRow_35 Female)
 (ReportedIn DrugAgeRow_35 PMID_13369)
-(Dosage DrugAgeRow_35 (Measure 2.0 %))
+(Dosage DrugAgeRow_35 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_35 101.79)
 (AvgLifespanSignificance DrugAgeRow_35 Unreported)
 (MaxLifespanSignificance DrugAgeRow_35 Unreported)
 (WeightChangeSignificance DrugAgeRow_35 Unreported)
 
 ; row 36
-(Inheritance DrugAgeRow_36 Experiment)
+(InstanceOf DrugAgeRow_36 Experiment)
 (UsesIntervention DrugAgeRow_36 Ethanol)
 (UsesSpecies DrugAgeRow_36 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_36 A422)
 (HasSex DrugAgeRow_36 Male)
 (ReportedIn DrugAgeRow_36 PMID_13369)
-(Dosage DrugAgeRow_36 (Measure 4.0 %))
+(Dosage DrugAgeRow_36 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_36 23.15)
 (AvgLifespanSignificance DrugAgeRow_36 Unreported)
 (MaxLifespanSignificance DrugAgeRow_36 Unreported)
 (WeightChangeSignificance DrugAgeRow_36 Unreported)
 
 ; row 37
-(Inheritance DrugAgeRow_37 Experiment)
+(InstanceOf DrugAgeRow_37 Experiment)
 (UsesIntervention DrugAgeRow_37 Ethanol)
 (UsesSpecies DrugAgeRow_37 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_37 A422)
 (HasSex DrugAgeRow_37 Male)
 (ReportedIn DrugAgeRow_37 PMID_13369)
-(Dosage DrugAgeRow_37 (Measure 2.0 %))
+(Dosage DrugAgeRow_37 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_37 69.04)
 (AvgLifespanSignificance DrugAgeRow_37 Unreported)
 (MaxLifespanSignificance DrugAgeRow_37 Unreported)
 (WeightChangeSignificance DrugAgeRow_37 Unreported)
 
 ; row 38
-(Inheritance DrugAgeRow_38 Experiment)
+(InstanceOf DrugAgeRow_38 Experiment)
 (UsesIntervention DrugAgeRow_38 Ethanol)
 (UsesSpecies DrugAgeRow_38 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_38 A422)
 (HasSex DrugAgeRow_38 Female)
 (ReportedIn DrugAgeRow_38 PMID_13369)
-(Dosage DrugAgeRow_38 (Measure 4.0 %))
+(Dosage DrugAgeRow_38 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_38 47.75)
 (AvgLifespanSignificance DrugAgeRow_38 Unreported)
 (MaxLifespanSignificance DrugAgeRow_38 Unreported)
 (WeightChangeSignificance DrugAgeRow_38 Unreported)
 
 ; row 39
-(Inheritance DrugAgeRow_39 Experiment)
+(InstanceOf DrugAgeRow_39 Experiment)
 (UsesIntervention DrugAgeRow_39 Ethanol)
 (UsesSpecies DrugAgeRow_39 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_39 A422)
 (HasSex DrugAgeRow_39 Female)
 (ReportedIn DrugAgeRow_39 PMID_13369)
-(Dosage DrugAgeRow_39 (Measure 2.0 %))
+(Dosage DrugAgeRow_39 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_39 37.7)
 (AvgLifespanSignificance DrugAgeRow_39 Unreported)
 (MaxLifespanSignificance DrugAgeRow_39 Unreported)
 (WeightChangeSignificance DrugAgeRow_39 Unreported)
 
 ; row 40
-(Inheritance DrugAgeRow_40 Experiment)
+(InstanceOf DrugAgeRow_40 Experiment)
 (UsesIntervention DrugAgeRow_40 Ethanol)
 (UsesSpecies DrugAgeRow_40 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_40 A428)
 (HasSex DrugAgeRow_40 Male)
 (ReportedIn DrugAgeRow_40 PMID_13369)
-(Dosage DrugAgeRow_40 (Measure 4.0 %))
+(Dosage DrugAgeRow_40 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_40 48.71)
 (AvgLifespanSignificance DrugAgeRow_40 Unreported)
 (MaxLifespanSignificance DrugAgeRow_40 Unreported)
 (WeightChangeSignificance DrugAgeRow_40 Unreported)
 
 ; row 41
-(Inheritance DrugAgeRow_41 Experiment)
+(InstanceOf DrugAgeRow_41 Experiment)
 (UsesIntervention DrugAgeRow_41 Ethanol)
 (UsesSpecies DrugAgeRow_41 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_41 A428)
 (HasSex DrugAgeRow_41 Male)
 (ReportedIn DrugAgeRow_41 PMID_13369)
-(Dosage DrugAgeRow_41 (Measure 2.0 %))
+(Dosage DrugAgeRow_41 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_41 66.66)
 (AvgLifespanSignificance DrugAgeRow_41 Unreported)
 (MaxLifespanSignificance DrugAgeRow_41 Unreported)
 (WeightChangeSignificance DrugAgeRow_41 Unreported)
 
 ; row 42
-(Inheritance DrugAgeRow_42 Experiment)
+(InstanceOf DrugAgeRow_42 Experiment)
 (UsesIntervention DrugAgeRow_42 Ethanol)
 (UsesSpecies DrugAgeRow_42 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_42 A428)
 (HasSex DrugAgeRow_42 Female)
 (ReportedIn DrugAgeRow_42 PMID_13369)
-(Dosage DrugAgeRow_42 (Measure 4.0 %))
+(Dosage DrugAgeRow_42 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_42 -3.89)
 (AvgLifespanSignificance DrugAgeRow_42 Unreported)
 (MaxLifespanSignificance DrugAgeRow_42 Unreported)
 (WeightChangeSignificance DrugAgeRow_42 Unreported)
 
 ; row 43
-(Inheritance DrugAgeRow_43 Experiment)
+(InstanceOf DrugAgeRow_43 Experiment)
 (UsesIntervention DrugAgeRow_43 Ethanol)
 (UsesSpecies DrugAgeRow_43 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_43 A428)
 (HasSex DrugAgeRow_43 Female)
 (ReportedIn DrugAgeRow_43 PMID_13369)
-(Dosage DrugAgeRow_43 (Measure 2.0 %))
+(Dosage DrugAgeRow_43 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_43 21.72)
 (AvgLifespanSignificance DrugAgeRow_43 Unreported)
 (MaxLifespanSignificance DrugAgeRow_43 Unreported)
 (WeightChangeSignificance DrugAgeRow_43 Unreported)
 
 ; row 44
-(Inheritance DrugAgeRow_44 Experiment)
+(InstanceOf DrugAgeRow_44 Experiment)
 (UsesIntervention DrugAgeRow_44 Ethanol)
 (UsesSpecies DrugAgeRow_44 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_44 A420)
 (HasSex DrugAgeRow_44 Male)
 (ReportedIn DrugAgeRow_44 PMID_13369)
-(Dosage DrugAgeRow_44 (Measure 4.0 %))
+(Dosage DrugAgeRow_44 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_44 95.7)
 (AvgLifespanSignificance DrugAgeRow_44 Unreported)
 (MaxLifespanSignificance DrugAgeRow_44 Unreported)
 (WeightChangeSignificance DrugAgeRow_44 Unreported)
 
 ; row 45
-(Inheritance DrugAgeRow_45 Experiment)
+(InstanceOf DrugAgeRow_45 Experiment)
 (UsesIntervention DrugAgeRow_45 Ethanol)
 (UsesSpecies DrugAgeRow_45 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_45 A420)
 (HasSex DrugAgeRow_45 Male)
 (ReportedIn DrugAgeRow_45 PMID_13369)
-(Dosage DrugAgeRow_45 (Measure 2.0 %))
+(Dosage DrugAgeRow_45 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_45 69.19)
 (AvgLifespanSignificance DrugAgeRow_45 Unreported)
 (MaxLifespanSignificance DrugAgeRow_45 Unreported)
 (WeightChangeSignificance DrugAgeRow_45 Unreported)
 
 ; row 46
-(Inheritance DrugAgeRow_46 Experiment)
+(InstanceOf DrugAgeRow_46 Experiment)
 (UsesIntervention DrugAgeRow_46 Ethanol)
 (UsesSpecies DrugAgeRow_46 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_46 A420)
 (HasSex DrugAgeRow_46 Female)
 (ReportedIn DrugAgeRow_46 PMID_13369)
-(Dosage DrugAgeRow_46 (Measure 4.0 %))
+(Dosage DrugAgeRow_46 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_46 88.55)
 (AvgLifespanSignificance DrugAgeRow_46 Unreported)
 (MaxLifespanSignificance DrugAgeRow_46 Unreported)
 (WeightChangeSignificance DrugAgeRow_46 Unreported)
 
 ; row 47
-(Inheritance DrugAgeRow_47 Experiment)
+(InstanceOf DrugAgeRow_47 Experiment)
 (UsesIntervention DrugAgeRow_47 Ethanol)
 (UsesSpecies DrugAgeRow_47 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_47 A420)
 (HasSex DrugAgeRow_47 Female)
 (ReportedIn DrugAgeRow_47 PMID_13369)
-(Dosage DrugAgeRow_47 (Measure 2.0 %))
+(Dosage DrugAgeRow_47 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_47 89.09)
 (AvgLifespanSignificance DrugAgeRow_47 Unreported)
 (MaxLifespanSignificance DrugAgeRow_47 Unreported)
 (WeightChangeSignificance DrugAgeRow_47 Unreported)
 
 ; row 48
-(Inheritance DrugAgeRow_48 Experiment)
+(InstanceOf DrugAgeRow_48 Experiment)
 (UsesIntervention DrugAgeRow_48 Ethanol)
 (UsesSpecies DrugAgeRow_48 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_48 A350)
 (HasSex DrugAgeRow_48 Male)
 (ReportedIn DrugAgeRow_48 PMID_13369)
-(Dosage DrugAgeRow_48 (Measure 4.0 %))
+(Dosage DrugAgeRow_48 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_48 21.75)
 (AvgLifespanSignificance DrugAgeRow_48 Unreported)
 (MaxLifespanSignificance DrugAgeRow_48 Unreported)
 (WeightChangeSignificance DrugAgeRow_48 Unreported)
 
 ; row 49
-(Inheritance DrugAgeRow_49 Experiment)
+(InstanceOf DrugAgeRow_49 Experiment)
 (UsesIntervention DrugAgeRow_49 Ethanol)
 (UsesSpecies DrugAgeRow_49 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_49 A350)
 (HasSex DrugAgeRow_49 Female)
 (ReportedIn DrugAgeRow_49 PMID_13369)
-(Dosage DrugAgeRow_49 (Measure 4.0 %))
+(Dosage DrugAgeRow_49 (Measure 4.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_49 28.42)
 (AvgLifespanSignificance DrugAgeRow_49 Unreported)
 (MaxLifespanSignificance DrugAgeRow_49 Unreported)
 (WeightChangeSignificance DrugAgeRow_49 Unreported)
 
 ; row 50
-(Inheritance DrugAgeRow_50 Experiment)
+(InstanceOf DrugAgeRow_50 Experiment)
 (UsesIntervention DrugAgeRow_50 Ethanol)
 (UsesSpecies DrugAgeRow_50 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_50 A350)
 (HasSex DrugAgeRow_50 Male)
 (ReportedIn DrugAgeRow_50 PMID_13369)
-(Dosage DrugAgeRow_50 (Measure 2.0 %))
+(Dosage DrugAgeRow_50 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_50 59.55)
 (AvgLifespanSignificance DrugAgeRow_50 Unreported)
 (MaxLifespanSignificance DrugAgeRow_50 Unreported)
 (WeightChangeSignificance DrugAgeRow_50 Unreported)
 
 ; row 51
-(Inheritance DrugAgeRow_51 Experiment)
+(InstanceOf DrugAgeRow_51 Experiment)
 (UsesIntervention DrugAgeRow_51 Ethanol)
 (UsesSpecies DrugAgeRow_51 Drosophila_mojavensis)
 (UsesStrain DrugAgeRow_51 A350)
 (HasSex DrugAgeRow_51 Female)
 (ReportedIn DrugAgeRow_51 PMID_13369)
-(Dosage DrugAgeRow_51 (Measure 2.0 %))
+(Dosage DrugAgeRow_51 (Measure 2.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_51 57.65)
 (AvgLifespanSignificance DrugAgeRow_51 Unreported)
 (MaxLifespanSignificance DrugAgeRow_51 Unreported)
 (WeightChangeSignificance DrugAgeRow_51 Unreported)
 
 ; row 52
-(Inheritance DrugAgeRow_52 Experiment)
+(InstanceOf DrugAgeRow_52 Experiment)
 (UsesIntervention DrugAgeRow_52 Diethylhydroxylamine)
 (UsesSpecies DrugAgeRow_52 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_52 Oregon_R)
@@ -690,7 +690,7 @@
 (WeightChangeSignificance DrugAgeRow_52 Unreported)
 
 ; row 53
-(Inheritance DrugAgeRow_53 Experiment)
+(InstanceOf DrugAgeRow_53 Experiment)
 (UsesIntervention DrugAgeRow_53 Diethylhydroxylamine)
 (UsesSpecies DrugAgeRow_53 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_53 Oregon_R)
@@ -703,7 +703,7 @@
 (WeightChangeSignificance DrugAgeRow_53 Unreported)
 
 ; row 54
-(Inheritance DrugAgeRow_54 Experiment)
+(InstanceOf DrugAgeRow_54 Experiment)
 (UsesIntervention DrugAgeRow_54 Diethylhydroxylamine)
 (UsesSpecies DrugAgeRow_54 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_54 Oregon_R)
@@ -716,7 +716,7 @@
 (WeightChangeSignificance DrugAgeRow_54 Unreported)
 
 ; row 55
-(Inheritance DrugAgeRow_55 Experiment)
+(InstanceOf DrugAgeRow_55 Experiment)
 (UsesIntervention DrugAgeRow_55 Diethylhydroxylamine)
 (UsesSpecies DrugAgeRow_55 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_55 Oregon_R)
@@ -729,7 +729,7 @@
 (WeightChangeSignificance DrugAgeRow_55 Unreported)
 
 ; row 56
-(Inheritance DrugAgeRow_56 Experiment)
+(InstanceOf DrugAgeRow_56 Experiment)
 (UsesIntervention DrugAgeRow_56 Diethylhydroxylamine)
 (UsesSpecies DrugAgeRow_56 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_56 Oregon_R)
@@ -742,7 +742,7 @@
 (WeightChangeSignificance DrugAgeRow_56 Unreported)
 
 ; row 57
-(Inheritance DrugAgeRow_57 Experiment)
+(InstanceOf DrugAgeRow_57 Experiment)
 (UsesIntervention DrugAgeRow_57 Diethylhydroxylamine)
 (UsesSpecies DrugAgeRow_57 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_57 Oregon_R)
@@ -755,7 +755,7 @@
 (WeightChangeSignificance DrugAgeRow_57 Unreported)
 
 ; row 58
-(Inheritance DrugAgeRow_58 Experiment)
+(InstanceOf DrugAgeRow_58 Experiment)
 (UsesIntervention DrugAgeRow_58 Diethylhydroxylamine)
 (UsesSpecies DrugAgeRow_58 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_58 Oregon_R)
@@ -768,7 +768,7 @@
 (WeightChangeSignificance DrugAgeRow_58 Unreported)
 
 ; row 59
-(Inheritance DrugAgeRow_59 Experiment)
+(InstanceOf DrugAgeRow_59 Experiment)
 (UsesIntervention DrugAgeRow_59 Diethylhydroxylamine)
 (UsesSpecies DrugAgeRow_59 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_59 Oregon_R)
@@ -781,7 +781,7 @@
 (WeightChangeSignificance DrugAgeRow_59 Unreported)
 
 ; row 60
-(Inheritance DrugAgeRow_60 Experiment)
+(InstanceOf DrugAgeRow_60 Experiment)
 (UsesIntervention DrugAgeRow_60 Diethylhydroxylamine)
 (UsesSpecies DrugAgeRow_60 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_60 Oregon_R)
@@ -794,7 +794,7 @@
 (WeightChangeSignificance DrugAgeRow_60 Unreported)
 
 ; row 61
-(Inheritance DrugAgeRow_61 Experiment)
+(InstanceOf DrugAgeRow_61 Experiment)
 (UsesIntervention DrugAgeRow_61 N_2_Selenium_bridged_beta_cyclodextrin)
 (UsesSpecies DrugAgeRow_61 Caenorhabditis_elegans)
 (UsesStrain DrugAgeRow_61 N2)
@@ -808,7 +808,7 @@
 (WeightChangeSignificance DrugAgeRow_61 Unreported)
 
 ; row 62
-(Inheritance DrugAgeRow_62 Experiment)
+(InstanceOf DrugAgeRow_62 Experiment)
 (UsesIntervention DrugAgeRow_62 N_2_Selenium_bridged_beta_cyclodextrin)
 (UsesSpecies DrugAgeRow_62 Caenorhabditis_elegans)
 (UsesStrain DrugAgeRow_62 N2)
@@ -822,7 +822,7 @@
 (WeightChangeSignificance DrugAgeRow_62 Unreported)
 
 ; row 63
-(Inheritance DrugAgeRow_63 Experiment)
+(InstanceOf DrugAgeRow_63 Experiment)
 (UsesIntervention DrugAgeRow_63 Lactic_acid)
 (UsesSpecies DrugAgeRow_63 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_63 Oregon_R)
@@ -835,7 +835,7 @@
 (WeightChangeSignificance DrugAgeRow_63 Unreported)
 
 ; row 64
-(Inheritance DrugAgeRow_64 Experiment)
+(InstanceOf DrugAgeRow_64 Experiment)
 (UsesIntervention DrugAgeRow_64 Tartaric_acid)
 (UsesSpecies DrugAgeRow_64 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_64 Oregon_R)
@@ -848,7 +848,7 @@
 (WeightChangeSignificance DrugAgeRow_64 Unreported)
 
 ; row 65
-(Inheritance DrugAgeRow_65 Experiment)
+(InstanceOf DrugAgeRow_65 Experiment)
 (UsesIntervention DrugAgeRow_65 Tartaric_acid)
 (UsesSpecies DrugAgeRow_65 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_65 Oregon_R)
@@ -861,7 +861,7 @@
 (WeightChangeSignificance DrugAgeRow_65 Unreported)
 
 ; row 66
-(Inheritance DrugAgeRow_66 Experiment)
+(InstanceOf DrugAgeRow_66 Experiment)
 (UsesIntervention DrugAgeRow_66 Tartaric_acid)
 (UsesSpecies DrugAgeRow_66 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_66 Oregon_R)
@@ -874,7 +874,7 @@
 (WeightChangeSignificance DrugAgeRow_66 Unreported)
 
 ; row 67
-(Inheritance DrugAgeRow_67 Experiment)
+(InstanceOf DrugAgeRow_67 Experiment)
 (UsesIntervention DrugAgeRow_67 Lactic_acid)
 (UsesSpecies DrugAgeRow_67 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_67 Oregon_R)
@@ -887,7 +887,7 @@
 (WeightChangeSignificance DrugAgeRow_67 Unreported)
 
 ; row 68
-(Inheritance DrugAgeRow_68 Experiment)
+(InstanceOf DrugAgeRow_68 Experiment)
 (UsesIntervention DrugAgeRow_68 Lactic_acid)
 (UsesSpecies DrugAgeRow_68 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_68 Oregon_R)
@@ -900,7 +900,7 @@
 (WeightChangeSignificance DrugAgeRow_68 Unreported)
 
 ; row 69
-(Inheritance DrugAgeRow_69 Experiment)
+(InstanceOf DrugAgeRow_69 Experiment)
 (UsesIntervention DrugAgeRow_69 Lactic_acid)
 (UsesSpecies DrugAgeRow_69 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_69 Oregon_R)
@@ -913,7 +913,7 @@
 (WeightChangeSignificance DrugAgeRow_69 Unreported)
 
 ; row 70
-(Inheritance DrugAgeRow_70 Experiment)
+(InstanceOf DrugAgeRow_70 Experiment)
 (UsesIntervention DrugAgeRow_70 Lactic_acid)
 (UsesSpecies DrugAgeRow_70 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_70 Oregon_R)
@@ -926,7 +926,7 @@
 (WeightChangeSignificance DrugAgeRow_70 Unreported)
 
 ; row 71
-(Inheritance DrugAgeRow_71 Experiment)
+(InstanceOf DrugAgeRow_71 Experiment)
 (UsesIntervention DrugAgeRow_71 Lactic_acid)
 (UsesSpecies DrugAgeRow_71 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_71 Oregon_R)
@@ -939,7 +939,7 @@
 (WeightChangeSignificance DrugAgeRow_71 Unreported)
 
 ; row 72
-(Inheritance DrugAgeRow_72 Experiment)
+(InstanceOf DrugAgeRow_72 Experiment)
 (UsesIntervention DrugAgeRow_72 Lactic_acid)
 (UsesSpecies DrugAgeRow_72 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_72 Oregon_R)
@@ -952,7 +952,7 @@
 (WeightChangeSignificance DrugAgeRow_72 Unreported)
 
 ; row 73
-(Inheritance DrugAgeRow_73 Experiment)
+(InstanceOf DrugAgeRow_73 Experiment)
 (UsesIntervention DrugAgeRow_73 Gluconic_acid)
 (UsesSpecies DrugAgeRow_73 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_73 Oregon_R)
@@ -965,7 +965,7 @@
 (WeightChangeSignificance DrugAgeRow_73 Unreported)
 
 ; row 74
-(Inheritance DrugAgeRow_74 Experiment)
+(InstanceOf DrugAgeRow_74 Experiment)
 (UsesIntervention DrugAgeRow_74 Gluconic_acid)
 (UsesSpecies DrugAgeRow_74 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_74 Oregon_R)
@@ -978,7 +978,7 @@
 (WeightChangeSignificance DrugAgeRow_74 Unreported)
 
 ; row 75
-(Inheritance DrugAgeRow_75 Experiment)
+(InstanceOf DrugAgeRow_75 Experiment)
 (UsesIntervention DrugAgeRow_75 Lactic_acid)
 (UsesSpecies DrugAgeRow_75 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_75 Oregon_R)
@@ -991,7 +991,7 @@
 (WeightChangeSignificance DrugAgeRow_75 Unreported)
 
 ; row 76
-(Inheritance DrugAgeRow_76 Experiment)
+(InstanceOf DrugAgeRow_76 Experiment)
 (UsesIntervention DrugAgeRow_76 Lactic_acid)
 (UsesSpecies DrugAgeRow_76 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_76 Oregon_R)
@@ -1004,7 +1004,7 @@
 (WeightChangeSignificance DrugAgeRow_76 Unreported)
 
 ; row 77
-(Inheritance DrugAgeRow_77 Experiment)
+(InstanceOf DrugAgeRow_77 Experiment)
 (UsesIntervention DrugAgeRow_77 Gluconic_acid)
 (UsesSpecies DrugAgeRow_77 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_77 Oregon_R)
@@ -1017,7 +1017,7 @@
 (WeightChangeSignificance DrugAgeRow_77 Unreported)
 
 ; row 78
-(Inheritance DrugAgeRow_78 Experiment)
+(InstanceOf DrugAgeRow_78 Experiment)
 (UsesIntervention DrugAgeRow_78 Gluconic_acid)
 (UsesSpecies DrugAgeRow_78 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_78 Oregon_R)
@@ -1030,7 +1030,7 @@
 (WeightChangeSignificance DrugAgeRow_78 Unreported)
 
 ; row 79
-(Inheritance DrugAgeRow_79 Experiment)
+(InstanceOf DrugAgeRow_79 Experiment)
 (UsesIntervention DrugAgeRow_79 Gluconic_acid)
 (UsesSpecies DrugAgeRow_79 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_79 Oregon_R)
@@ -1043,7 +1043,7 @@
 (WeightChangeSignificance DrugAgeRow_79 Unreported)
 
 ; row 80
-(Inheritance DrugAgeRow_80 Experiment)
+(InstanceOf DrugAgeRow_80 Experiment)
 (UsesIntervention DrugAgeRow_80 Gluconic_acid)
 (UsesSpecies DrugAgeRow_80 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_80 Oregon_R)
@@ -1056,7 +1056,7 @@
 (WeightChangeSignificance DrugAgeRow_80 Unreported)
 
 ; row 81
-(Inheritance DrugAgeRow_81 Experiment)
+(InstanceOf DrugAgeRow_81 Experiment)
 (UsesIntervention DrugAgeRow_81 Gluconic_acid)
 (UsesSpecies DrugAgeRow_81 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_81 Oregon_R)
@@ -1069,7 +1069,7 @@
 (WeightChangeSignificance DrugAgeRow_81 Unreported)
 
 ; row 82
-(Inheritance DrugAgeRow_82 Experiment)
+(InstanceOf DrugAgeRow_82 Experiment)
 (UsesIntervention DrugAgeRow_82 Gluconic_acid)
 (UsesSpecies DrugAgeRow_82 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_82 Oregon_R)
@@ -1083,7 +1083,7 @@
 (WeightChangeSignificance DrugAgeRow_82 Unreported)
 
 ; row 83
-(Inheritance DrugAgeRow_83 Experiment)
+(InstanceOf DrugAgeRow_83 Experiment)
 (UsesIntervention DrugAgeRow_83 Gluconic_acid)
 (UsesSpecies DrugAgeRow_83 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_83 Oregon_R)
@@ -1097,7 +1097,7 @@
 (WeightChangeSignificance DrugAgeRow_83 Unreported)
 
 ; row 84
-(Inheritance DrugAgeRow_84 Experiment)
+(InstanceOf DrugAgeRow_84 Experiment)
 (UsesIntervention DrugAgeRow_84 Gluconic_acid)
 (UsesSpecies DrugAgeRow_84 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_84 Oregon_R)
@@ -1111,7 +1111,7 @@
 (WeightChangeSignificance DrugAgeRow_84 Unreported)
 
 ; row 85
-(Inheritance DrugAgeRow_85 Experiment)
+(InstanceOf DrugAgeRow_85 Experiment)
 (UsesIntervention DrugAgeRow_85 Gluconic_acid)
 (UsesSpecies DrugAgeRow_85 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_85 Oregon_R)
@@ -1124,7 +1124,7 @@
 (WeightChangeSignificance DrugAgeRow_85 Unreported)
 
 ; row 86
-(Inheritance DrugAgeRow_86 Experiment)
+(InstanceOf DrugAgeRow_86 Experiment)
 (UsesIntervention DrugAgeRow_86 Calcium_lactate)
 (UsesSpecies DrugAgeRow_86 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_86 Oregon_R)
@@ -1137,7 +1137,7 @@
 (WeightChangeSignificance DrugAgeRow_86 Unreported)
 
 ; row 87
-(Inheritance DrugAgeRow_87 Experiment)
+(InstanceOf DrugAgeRow_87 Experiment)
 (UsesIntervention DrugAgeRow_87 Gluconic_acid)
 (UsesSpecies DrugAgeRow_87 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_87 Oregon_R)
@@ -1150,7 +1150,7 @@
 (WeightChangeSignificance DrugAgeRow_87 Unreported)
 
 ; row 88
-(Inheritance DrugAgeRow_88 Experiment)
+(InstanceOf DrugAgeRow_88 Experiment)
 (UsesIntervention DrugAgeRow_88 Gluconic_acid)
 (UsesSpecies DrugAgeRow_88 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_88 Oregon_R)
@@ -1163,7 +1163,7 @@
 (WeightChangeSignificance DrugAgeRow_88 Unreported)
 
 ; row 89
-(Inheritance DrugAgeRow_89 Experiment)
+(InstanceOf DrugAgeRow_89 Experiment)
 (UsesIntervention DrugAgeRow_89 Gluconic_acid)
 (UsesSpecies DrugAgeRow_89 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_89 Oregon_R)
@@ -1176,7 +1176,7 @@
 (WeightChangeSignificance DrugAgeRow_89 Unreported)
 
 ; row 90
-(Inheritance DrugAgeRow_90 Experiment)
+(InstanceOf DrugAgeRow_90 Experiment)
 (UsesIntervention DrugAgeRow_90 Gluconic_acid)
 (UsesSpecies DrugAgeRow_90 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_90 Oregon_R)
@@ -1189,7 +1189,7 @@
 (WeightChangeSignificance DrugAgeRow_90 Unreported)
 
 ; row 91
-(Inheritance DrugAgeRow_91 Experiment)
+(InstanceOf DrugAgeRow_91 Experiment)
 (UsesIntervention DrugAgeRow_91 Calcium_lactate)
 (UsesSpecies DrugAgeRow_91 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_91 Oregon_R)
@@ -1202,7 +1202,7 @@
 (WeightChangeSignificance DrugAgeRow_91 Unreported)
 
 ; row 92
-(Inheritance DrugAgeRow_92 Experiment)
+(InstanceOf DrugAgeRow_92 Experiment)
 (UsesIntervention DrugAgeRow_92 Calcium_gluconate)
 (UsesSpecies DrugAgeRow_92 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_92 Oregon_R)
@@ -1215,7 +1215,7 @@
 (WeightChangeSignificance DrugAgeRow_92 Unreported)
 
 ; row 93
-(Inheritance DrugAgeRow_93 Experiment)
+(InstanceOf DrugAgeRow_93 Experiment)
 (UsesIntervention DrugAgeRow_93 Calcium_lactate)
 (UsesSpecies DrugAgeRow_93 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_93 Oregon_R)
@@ -1228,7 +1228,7 @@
 (WeightChangeSignificance DrugAgeRow_93 Unreported)
 
 ; row 94
-(Inheritance DrugAgeRow_94 Experiment)
+(InstanceOf DrugAgeRow_94 Experiment)
 (UsesIntervention DrugAgeRow_94 Calcium_gluconate)
 (UsesSpecies DrugAgeRow_94 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_94 Oregon_R)
@@ -1241,7 +1241,7 @@
 (WeightChangeSignificance DrugAgeRow_94 Unreported)
 
 ; row 95
-(Inheritance DrugAgeRow_95 Experiment)
+(InstanceOf DrugAgeRow_95 Experiment)
 (UsesIntervention DrugAgeRow_95 Calcium_gluconate)
 (UsesSpecies DrugAgeRow_95 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_95 Oregon_R)
@@ -1254,13 +1254,13 @@
 (WeightChangeSignificance DrugAgeRow_95 Unreported)
 
 ; row 96
-(Inheritance DrugAgeRow_96 Experiment)
+(InstanceOf DrugAgeRow_96 Experiment)
 (UsesIntervention DrugAgeRow_96 magnesium_L_thiazolidine_4_carboxylate)
 (UsesSpecies DrugAgeRow_96 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_96 Oregon_R)
 (HasSex DrugAgeRow_96 Male)
 (ReportedIn DrugAgeRow_96 PMID_118043)
-(Dosage DrugAgeRow_96 (Measure 0.2 %))
+(Dosage DrugAgeRow_96 (Measure 0.2 percent))
 (AvgLifespanChangePercent DrugAgeRow_96 16.0)
 (AvgLifespanSignificance DrugAgeRow_96 Significant)
 (MaxLifespanChangePercent DrugAgeRow_96 17.0)
@@ -1268,13 +1268,13 @@
 (WeightChangeSignificance DrugAgeRow_96 Unreported)
 
 ; row 97
-(Inheritance DrugAgeRow_97 Experiment)
+(InstanceOf DrugAgeRow_97 Experiment)
 (UsesIntervention DrugAgeRow_97 sodium_L_thiazolidine_4_carboxylate)
 (UsesSpecies DrugAgeRow_97 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_97 Oregon_R)
 (HasSex DrugAgeRow_97 Male)
 (ReportedIn DrugAgeRow_97 PMID_118043)
-(Dosage DrugAgeRow_97 (Measure 0.2 %))
+(Dosage DrugAgeRow_97 (Measure 0.2 percent))
 (AvgLifespanChangePercent DrugAgeRow_97 8.0)
 (AvgLifespanSignificance DrugAgeRow_97 Significant)
 (MaxLifespanChangePercent DrugAgeRow_97 4.0)
@@ -1282,13 +1282,13 @@
 (WeightChangeSignificance DrugAgeRow_97 Unreported)
 
 ; row 98
-(Inheritance DrugAgeRow_98 Experiment)
+(InstanceOf DrugAgeRow_98 Experiment)
 (UsesIntervention DrugAgeRow_98 Nitrosodimethylurea)
 (UsesSpecies DrugAgeRow_98 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_98 D32)
 (HasSex DrugAgeRow_98 Male)
 (ReportedIn DrugAgeRow_98 PMID_119648)
-(Dosage DrugAgeRow_98 (Measure 0.0 %))
+(Dosage DrugAgeRow_98 (Measure 0.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_98 -37.0)
 (AvgLifespanSignificance DrugAgeRow_98 Significant)
 (MaxLifespanChangePercent DrugAgeRow_98 -33.0)
@@ -1296,13 +1296,13 @@
 (WeightChangeSignificance DrugAgeRow_98 Unreported)
 
 ; row 99
-(Inheritance DrugAgeRow_99 Experiment)
+(InstanceOf DrugAgeRow_99 Experiment)
 (UsesIntervention DrugAgeRow_99 Nitrosodimethylurea)
 (UsesSpecies DrugAgeRow_99 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_99 D32)
 (HasSex DrugAgeRow_99 Female)
 (ReportedIn DrugAgeRow_99 PMID_119648)
-(Dosage DrugAgeRow_99 (Measure 0.0 %))
+(Dosage DrugAgeRow_99 (Measure 0.0 percent))
 (AvgLifespanChangePercent DrugAgeRow_99 -2.94)
 (AvgLifespanSignificance DrugAgeRow_99 NotSignificant)
 (MaxLifespanChangePercent DrugAgeRow_99 0.0)
@@ -1310,13 +1310,13 @@
 (WeightChangeSignificance DrugAgeRow_99 Unreported)
 
 ; row 100
-(Inheritance DrugAgeRow_100 Experiment)
+(InstanceOf DrugAgeRow_100 Experiment)
 (UsesIntervention DrugAgeRow_100 N_2_Ethyl_6_methylpyridin_3_ol_hydrochloride)
 (UsesSpecies DrugAgeRow_100 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_100 R12_yy_yPlusY)
 (HasSex DrugAgeRow_100 Male)
 (ReportedIn DrugAgeRow_100 PMID_119648)
-(Dosage DrugAgeRow_100 (Measure 0.01 %))
+(Dosage DrugAgeRow_100 (Measure 0.01 percent))
 (AvgLifespanChangePercent DrugAgeRow_100 22.0)
 (AvgLifespanSignificance DrugAgeRow_100 Significant)
 (MaxLifespanChangePercent DrugAgeRow_100 17.0)
@@ -1324,13 +1324,13 @@
 (WeightChangeSignificance DrugAgeRow_100 Unreported)
 
 ; row 101
-(Inheritance DrugAgeRow_101 Experiment)
+(InstanceOf DrugAgeRow_101 Experiment)
 (UsesIntervention DrugAgeRow_101 N_2_Ethyl_6_methylpyridin_3_ol_hydrochloride)
 (UsesSpecies DrugAgeRow_101 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_101 R12_yy_yPlusY)
 (HasSex DrugAgeRow_101 Male)
 (ReportedIn DrugAgeRow_101 PMID_119648)
-(Dosage DrugAgeRow_101 (Measure 0.1 %))
+(Dosage DrugAgeRow_101 (Measure 0.1 percent))
 (AvgLifespanChangePercent DrugAgeRow_101 15.0)
 (AvgLifespanSignificance DrugAgeRow_101 Significant)
 (MaxLifespanChangePercent DrugAgeRow_101 10.0)
@@ -1338,13 +1338,13 @@
 (WeightChangeSignificance DrugAgeRow_101 Unreported)
 
 ; row 102
-(Inheritance DrugAgeRow_102 Experiment)
+(InstanceOf DrugAgeRow_102 Experiment)
 (UsesIntervention DrugAgeRow_102 N_2_Ethyl_6_methylpyridin_3_ol_hydrochloride)
 (UsesSpecies DrugAgeRow_102 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_102 R12_yy_yPlusY)
 (HasSex DrugAgeRow_102 Female)
 (ReportedIn DrugAgeRow_102 PMID_119648)
-(Dosage DrugAgeRow_102 (Measure 0.01 %))
+(Dosage DrugAgeRow_102 (Measure 0.01 percent))
 (AvgLifespanChangePercent DrugAgeRow_102 2.28)
 (AvgLifespanSignificance DrugAgeRow_102 NotSignificant)
 (MaxLifespanChangePercent DrugAgeRow_102 13.63)
@@ -1352,13 +1352,13 @@
 (WeightChangeSignificance DrugAgeRow_102 Unreported)
 
 ; row 103
-(Inheritance DrugAgeRow_103 Experiment)
+(InstanceOf DrugAgeRow_103 Experiment)
 (UsesIntervention DrugAgeRow_103 N_2_Ethyl_6_methylpyridin_3_ol_hydrochloride)
 (UsesSpecies DrugAgeRow_103 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_103 R12_yy_yPlusY)
 (HasSex DrugAgeRow_103 Female)
 (ReportedIn DrugAgeRow_103 PMID_119648)
-(Dosage DrugAgeRow_103 (Measure 0.1 %))
+(Dosage DrugAgeRow_103 (Measure 0.1 percent))
 (AvgLifespanChangePercent DrugAgeRow_103 -10.0)
 (AvgLifespanSignificance DrugAgeRow_103 NotSignificant)
 (MaxLifespanChangePercent DrugAgeRow_103 -9.09)
@@ -1366,13 +1366,13 @@
 (WeightChangeSignificance DrugAgeRow_103 Unreported)
 
 ; row 104
-(Inheritance DrugAgeRow_104 Experiment)
+(InstanceOf DrugAgeRow_104 Experiment)
 (UsesIntervention DrugAgeRow_104 N_2_Ethyl_6_methylpyridin_3_ol_hydrochloride)
 (UsesSpecies DrugAgeRow_104 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_104 D32)
 (HasSex DrugAgeRow_104 Male)
 (ReportedIn DrugAgeRow_104 PMID_119648)
-(Dosage DrugAgeRow_104 (Measure 0.01 %))
+(Dosage DrugAgeRow_104 (Measure 0.01 percent))
 (AvgLifespanChangePercent DrugAgeRow_104 20.4)
 (AvgLifespanSignificance DrugAgeRow_104 Significant)
 (MaxLifespanChangePercent DrugAgeRow_104 12.4)
@@ -1380,13 +1380,13 @@
 (WeightChangeSignificance DrugAgeRow_104 Unreported)
 
 ; row 105
-(Inheritance DrugAgeRow_105 Experiment)
+(InstanceOf DrugAgeRow_105 Experiment)
 (UsesIntervention DrugAgeRow_105 N_2_Ethyl_6_methylpyridin_3_ol_hydrochloride)
 (UsesSpecies DrugAgeRow_105 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_105 D32)
 (HasSex DrugAgeRow_105 Male)
 (ReportedIn DrugAgeRow_105 PMID_119648)
-(Dosage DrugAgeRow_105 (Measure 0.1 %))
+(Dosage DrugAgeRow_105 (Measure 0.1 percent))
 (AvgLifespanChangePercent DrugAgeRow_105 14.3)
 (AvgLifespanSignificance DrugAgeRow_105 Significant)
 (MaxLifespanChangePercent DrugAgeRow_105 -2.73)
@@ -1394,13 +1394,13 @@
 (WeightChangeSignificance DrugAgeRow_105 Unreported)
 
 ; row 106
-(Inheritance DrugAgeRow_106 Experiment)
+(InstanceOf DrugAgeRow_106 Experiment)
 (UsesIntervention DrugAgeRow_106 N_2_Ethyl_6_methylpyridin_3_ol_hydrochloride)
 (UsesSpecies DrugAgeRow_106 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_106 D32)
 (HasSex DrugAgeRow_106 Female)
 (ReportedIn DrugAgeRow_106 PMID_119648)
-(Dosage DrugAgeRow_106 (Measure 0.01 %))
+(Dosage DrugAgeRow_106 (Measure 0.01 percent))
 (AvgLifespanChangePercent DrugAgeRow_106 18.0)
 (AvgLifespanSignificance DrugAgeRow_106 Significant)
 (MaxLifespanChangePercent DrugAgeRow_106 2.32)
@@ -1408,13 +1408,13 @@
 (WeightChangeSignificance DrugAgeRow_106 Unreported)
 
 ; row 107
-(Inheritance DrugAgeRow_107 Experiment)
+(InstanceOf DrugAgeRow_107 Experiment)
 (UsesIntervention DrugAgeRow_107 N_2_Ethyl_6_methylpyridin_3_ol_hydrochloride)
 (UsesSpecies DrugAgeRow_107 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_107 D32)
 (HasSex DrugAgeRow_107 Female)
 (ReportedIn DrugAgeRow_107 PMID_119648)
-(Dosage DrugAgeRow_107 (Measure 0.1 %))
+(Dosage DrugAgeRow_107 (Measure 0.1 percent))
 (AvgLifespanChangePercent DrugAgeRow_107 23.0)
 (AvgLifespanSignificance DrugAgeRow_107 Significant)
 (MaxLifespanChangePercent DrugAgeRow_107 21.0)
@@ -1422,7 +1422,7 @@
 (WeightChangeSignificance DrugAgeRow_107 Unreported)
 
 ; row 108
-(Inheritance DrugAgeRow_108 Experiment)
+(InstanceOf DrugAgeRow_108 Experiment)
 (UsesIntervention DrugAgeRow_108 Phenobarbital)
 (UsesSpecies DrugAgeRow_108 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_108 Sprague_Dawley)
@@ -1435,7 +1435,7 @@
 (WeightChangeSignificance DrugAgeRow_108 Unreported)
 
 ; row 109
-(Inheritance DrugAgeRow_109 Experiment)
+(InstanceOf DrugAgeRow_109 Experiment)
 (UsesIntervention DrugAgeRow_109 Phenobarbital)
 (UsesSpecies DrugAgeRow_109 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_109 Sprague_Dawley)
@@ -1448,7 +1448,7 @@
 (WeightChangeSignificance DrugAgeRow_109 Unreported)
 
 ; row 110
-(Inheritance DrugAgeRow_110 Experiment)
+(InstanceOf DrugAgeRow_110 Experiment)
 (UsesIntervention DrugAgeRow_110 Nicotine)
 (UsesSpecies DrugAgeRow_110 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_110 Sprague_Dawley)
@@ -1461,7 +1461,7 @@
 (WeightChangeSignificance DrugAgeRow_110 Unreported)
 
 ; row 111
-(Inheritance DrugAgeRow_111 Experiment)
+(InstanceOf DrugAgeRow_111 Experiment)
 (UsesIntervention DrugAgeRow_111 Nicotine)
 (UsesSpecies DrugAgeRow_111 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_111 Sprague_Dawley)
@@ -1474,7 +1474,7 @@
 (WeightChangeSignificance DrugAgeRow_111 Unreported)
 
 ; row 112
-(Inheritance DrugAgeRow_112 Experiment)
+(InstanceOf DrugAgeRow_112 Experiment)
 (UsesIntervention DrugAgeRow_112 Pilocarpine)
 (UsesSpecies DrugAgeRow_112 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_112 Sprague_Dawley)
@@ -1487,7 +1487,7 @@
 (WeightChangeSignificance DrugAgeRow_112 Unreported)
 
 ; row 113
-(Inheritance DrugAgeRow_113 Experiment)
+(InstanceOf DrugAgeRow_113 Experiment)
 (UsesIntervention DrugAgeRow_113 Pilocarpine)
 (UsesSpecies DrugAgeRow_113 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_113 Sprague_Dawley)
@@ -1500,7 +1500,7 @@
 (WeightChangeSignificance DrugAgeRow_113 Unreported)
 
 ; row 114
-(Inheritance DrugAgeRow_114 Experiment)
+(InstanceOf DrugAgeRow_114 Experiment)
 (UsesIntervention DrugAgeRow_114 Atropine)
 (UsesSpecies DrugAgeRow_114 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_114 Sprague_Dawley)
@@ -1513,7 +1513,7 @@
 (WeightChangeSignificance DrugAgeRow_114 Unreported)
 
 ; row 115
-(Inheritance DrugAgeRow_115 Experiment)
+(InstanceOf DrugAgeRow_115 Experiment)
 (UsesIntervention DrugAgeRow_115 Atropine)
 (UsesSpecies DrugAgeRow_115 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_115 Sprague_Dawley)
@@ -1526,7 +1526,7 @@
 (WeightChangeSignificance DrugAgeRow_115 Unreported)
 
 ; row 116
-(Inheritance DrugAgeRow_116 Experiment)
+(InstanceOf DrugAgeRow_116 Experiment)
 (UsesIntervention DrugAgeRow_116 Cyclophosphamide)
 (UsesSpecies DrugAgeRow_116 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_116 Sprague_Dawley)
@@ -1539,7 +1539,7 @@
 (WeightChangeSignificance DrugAgeRow_116 Unreported)
 
 ; row 117
-(Inheritance DrugAgeRow_117 Experiment)
+(InstanceOf DrugAgeRow_117 Experiment)
 (UsesIntervention DrugAgeRow_117 Cyclophosphamide)
 (UsesSpecies DrugAgeRow_117 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_117 Sprague_Dawley)
@@ -1552,7 +1552,7 @@
 (WeightChangeSignificance DrugAgeRow_117 Unreported)
 
 ; row 118
-(Inheritance DrugAgeRow_118 Experiment)
+(InstanceOf DrugAgeRow_118 Experiment)
 (UsesIntervention DrugAgeRow_118 Amethopterin)
 (UsesSpecies DrugAgeRow_118 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_118 Sprague_Dawley)
@@ -1565,7 +1565,7 @@
 (WeightChangeSignificance DrugAgeRow_118 Unreported)
 
 ; row 119
-(Inheritance DrugAgeRow_119 Experiment)
+(InstanceOf DrugAgeRow_119 Experiment)
 (UsesIntervention DrugAgeRow_119 Amethopterin)
 (UsesSpecies DrugAgeRow_119 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_119 Sprague_Dawley)
@@ -1578,7 +1578,7 @@
 (WeightChangeSignificance DrugAgeRow_119 Unreported)
 
 ; row 120
-(Inheritance DrugAgeRow_120 Experiment)
+(InstanceOf DrugAgeRow_120 Experiment)
 (UsesIntervention DrugAgeRow_120 Hydrocortisone)
 (UsesSpecies DrugAgeRow_120 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_120 Sprague_Dawley)
@@ -1591,7 +1591,7 @@
 (WeightChangeSignificance DrugAgeRow_120 Unreported)
 
 ; row 121
-(Inheritance DrugAgeRow_121 Experiment)
+(InstanceOf DrugAgeRow_121 Experiment)
 (UsesIntervention DrugAgeRow_121 Hydrocortisone)
 (UsesSpecies DrugAgeRow_121 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_121 Sprague_Dawley)
@@ -1604,7 +1604,7 @@
 (WeightChangeSignificance DrugAgeRow_121 Unreported)
 
 ; row 122
-(Inheritance DrugAgeRow_122 Experiment)
+(InstanceOf DrugAgeRow_122 Experiment)
 (UsesIntervention DrugAgeRow_122 Floxuridine)
 (UsesSpecies DrugAgeRow_122 Caenorhabditis_elegans)
 (UsesStrain DrugAgeRow_122 N2)
@@ -1617,7 +1617,7 @@
 (WeightChangeSignificance DrugAgeRow_122 Unreported)
 
 ; row 123
-(Inheritance DrugAgeRow_123 Experiment)
+(InstanceOf DrugAgeRow_123 Experiment)
 (UsesIntervention DrugAgeRow_123 Floxuridine)
 (UsesSpecies DrugAgeRow_123 Caenorhabditis_elegans)
 (UsesStrain DrugAgeRow_123 N2)
@@ -1630,7 +1630,7 @@
 (WeightChangeSignificance DrugAgeRow_123 Unreported)
 
 ; row 124
-(Inheritance DrugAgeRow_124 Experiment)
+(InstanceOf DrugAgeRow_124 Experiment)
 (UsesIntervention DrugAgeRow_124 Floxuridine)
 (UsesSpecies DrugAgeRow_124 Caenorhabditis_elegans)
 (UsesStrain DrugAgeRow_124 N2)
@@ -1643,7 +1643,7 @@
 (WeightChangeSignificance DrugAgeRow_124 Unreported)
 
 ; row 125
-(Inheritance DrugAgeRow_125 Experiment)
+(InstanceOf DrugAgeRow_125 Experiment)
 (UsesIntervention DrugAgeRow_125 Floxuridine)
 (UsesSpecies DrugAgeRow_125 Caenorhabditis_elegans)
 (UsesStrain DrugAgeRow_125 N2)
@@ -1656,7 +1656,7 @@
 (WeightChangeSignificance DrugAgeRow_125 Unreported)
 
 ; row 126
-(Inheritance DrugAgeRow_126 Experiment)
+(InstanceOf DrugAgeRow_126 Experiment)
 (UsesIntervention DrugAgeRow_126 Hydrogen_iodide)
 (UsesSpecies DrugAgeRow_126 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_126 Oregon_R)
@@ -1669,7 +1669,7 @@
 (WeightChangeSignificance DrugAgeRow_126 Unreported)
 
 ; row 127
-(Inheritance DrugAgeRow_127 Experiment)
+(InstanceOf DrugAgeRow_127 Experiment)
 (UsesIntervention DrugAgeRow_127 Hydrogen_iodide)
 (UsesSpecies DrugAgeRow_127 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_127 Oregon_R)
@@ -1682,7 +1682,7 @@
 (WeightChangeSignificance DrugAgeRow_127 Unreported)
 
 ; row 128
-(Inheritance DrugAgeRow_128 Experiment)
+(InstanceOf DrugAgeRow_128 Experiment)
 (UsesIntervention DrugAgeRow_128 Iodine)
 (UsesSpecies DrugAgeRow_128 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_128 Oregon_R)
@@ -1695,7 +1695,7 @@
 (WeightChangeSignificance DrugAgeRow_128 Unreported)
 
 ; row 129
-(Inheritance DrugAgeRow_129 Experiment)
+(InstanceOf DrugAgeRow_129 Experiment)
 (UsesIntervention DrugAgeRow_129 Iodine)
 (UsesSpecies DrugAgeRow_129 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_129 Oregon_R)
@@ -1708,7 +1708,7 @@
 (WeightChangeSignificance DrugAgeRow_129 Unreported)
 
 ; row 130
-(Inheritance DrugAgeRow_130 Experiment)
+(InstanceOf DrugAgeRow_130 Experiment)
 (UsesIntervention DrugAgeRow_130 Iodine)
 (UsesSpecies DrugAgeRow_130 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_130 Oregon_R)
@@ -1721,7 +1721,7 @@
 (WeightChangeSignificance DrugAgeRow_130 Unreported)
 
 ; row 131
-(Inheritance DrugAgeRow_131 Experiment)
+(InstanceOf DrugAgeRow_131 Experiment)
 (UsesIntervention DrugAgeRow_131 Iodine)
 (UsesSpecies DrugAgeRow_131 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_131 Oregon_R)
@@ -1733,7 +1733,7 @@
 (WeightChangeSignificance DrugAgeRow_131 Unreported)
 
 ; row 132
-(Inheritance DrugAgeRow_132 Experiment)
+(InstanceOf DrugAgeRow_132 Experiment)
 (UsesIntervention DrugAgeRow_132 Iodine)
 (UsesSpecies DrugAgeRow_132 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_132 Oregon_R)
@@ -1746,7 +1746,7 @@
 (WeightChangeSignificance DrugAgeRow_132 Unreported)
 
 ; row 133
-(Inheritance DrugAgeRow_133 Experiment)
+(InstanceOf DrugAgeRow_133 Experiment)
 (UsesIntervention DrugAgeRow_133 Iodine)
 (UsesSpecies DrugAgeRow_133 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_133 Oregon_R)
@@ -1759,7 +1759,7 @@
 (WeightChangeSignificance DrugAgeRow_133 Unreported)
 
 ; row 134
-(Inheritance DrugAgeRow_134 Experiment)
+(InstanceOf DrugAgeRow_134 Experiment)
 (UsesIntervention DrugAgeRow_134 Iodoform)
 (UsesSpecies DrugAgeRow_134 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_134 Oregon_R)
@@ -1772,7 +1772,7 @@
 (WeightChangeSignificance DrugAgeRow_134 Unreported)
 
 ; row 135
-(Inheritance DrugAgeRow_135 Experiment)
+(InstanceOf DrugAgeRow_135 Experiment)
 (UsesIntervention DrugAgeRow_135 Iodoform)
 (UsesSpecies DrugAgeRow_135 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_135 Oregon_R)
@@ -1785,7 +1785,7 @@
 (WeightChangeSignificance DrugAgeRow_135 Unreported)
 
 ; row 136
-(Inheritance DrugAgeRow_136 Experiment)
+(InstanceOf DrugAgeRow_136 Experiment)
 (UsesIntervention DrugAgeRow_136 Iodoform)
 (UsesSpecies DrugAgeRow_136 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_136 Oregon_R)
@@ -1798,7 +1798,7 @@
 (WeightChangeSignificance DrugAgeRow_136 Unreported)
 
 ; row 137
-(Inheritance DrugAgeRow_137 Experiment)
+(InstanceOf DrugAgeRow_137 Experiment)
 (UsesIntervention DrugAgeRow_137 Diiodomethane)
 (UsesSpecies DrugAgeRow_137 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_137 Oregon_R)
@@ -1811,7 +1811,7 @@
 (WeightChangeSignificance DrugAgeRow_137 Unreported)
 
 ; row 138
-(Inheritance DrugAgeRow_138 Experiment)
+(InstanceOf DrugAgeRow_138 Experiment)
 (UsesIntervention DrugAgeRow_138 Diiodomethane)
 (UsesSpecies DrugAgeRow_138 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_138 Oregon_R)
@@ -1824,7 +1824,7 @@
 (WeightChangeSignificance DrugAgeRow_138 Unreported)
 
 ; row 139
-(Inheritance DrugAgeRow_139 Experiment)
+(InstanceOf DrugAgeRow_139 Experiment)
 (UsesIntervention DrugAgeRow_139 Diiodomethane)
 (UsesSpecies DrugAgeRow_139 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_139 Oregon_R)
@@ -1837,7 +1837,7 @@
 (WeightChangeSignificance DrugAgeRow_139 Unreported)
 
 ; row 140
-(Inheritance DrugAgeRow_140 Experiment)
+(InstanceOf DrugAgeRow_140 Experiment)
 (UsesIntervention DrugAgeRow_140 Butylated_hydroxytoluene)
 (UsesSpecies DrugAgeRow_140 Mus_musculus)
 (UsesStrain DrugAgeRow_140 BaLB_c)
@@ -1854,7 +1854,7 @@
 (WeightChangeSignificance DrugAgeRow_140 Unreported)
 
 ; row 141
-(Inheritance DrugAgeRow_141 Experiment)
+(InstanceOf DrugAgeRow_141 Experiment)
 (UsesIntervention DrugAgeRow_141 Butylated_hydroxytoluene)
 (UsesSpecies DrugAgeRow_141 Mus_musculus)
 (UsesStrain DrugAgeRow_141 BaLB_c)
@@ -1871,7 +1871,7 @@
 (WeightChangeSignificance DrugAgeRow_141 Unreported)
 
 ; row 142
-(Inheritance DrugAgeRow_142 Experiment)
+(InstanceOf DrugAgeRow_142 Experiment)
 (UsesIntervention DrugAgeRow_142 Butylated_hydroxytoluene)
 (UsesSpecies DrugAgeRow_142 Mus_musculus)
 (UsesStrain DrugAgeRow_142 BaLB_c)
@@ -1888,7 +1888,7 @@
 (WeightChangeSignificance DrugAgeRow_142 Unreported)
 
 ; row 143
-(Inheritance DrugAgeRow_143 Experiment)
+(InstanceOf DrugAgeRow_143 Experiment)
 (UsesIntervention DrugAgeRow_143 Butylated_hydroxytoluene)
 (UsesSpecies DrugAgeRow_143 Mus_musculus)
 (UsesStrain DrugAgeRow_143 BaLB_c)
@@ -1905,7 +1905,7 @@
 (WeightChangeSignificance DrugAgeRow_143 Unreported)
 
 ; row 144
-(Inheritance DrugAgeRow_144 Experiment)
+(InstanceOf DrugAgeRow_144 Experiment)
 (UsesIntervention DrugAgeRow_144 Butylated_hydroxytoluene)
 (UsesSpecies DrugAgeRow_144 Mus_musculus)
 (UsesStrain DrugAgeRow_144 BaLB_c)
@@ -1922,7 +1922,7 @@
 (WeightChangeSignificance DrugAgeRow_144 Unreported)
 
 ; row 145
-(Inheritance DrugAgeRow_145 Experiment)
+(InstanceOf DrugAgeRow_145 Experiment)
 (UsesIntervention DrugAgeRow_145 Butylated_hydroxytoluene)
 (UsesSpecies DrugAgeRow_145 Mus_musculus)
 (UsesStrain DrugAgeRow_145 BaLB_c)
@@ -1939,7 +1939,7 @@
 (WeightChangeSignificance DrugAgeRow_145 Unreported)
 
 ; row 146
-(Inheritance DrugAgeRow_146 Experiment)
+(InstanceOf DrugAgeRow_146 Experiment)
 (UsesIntervention DrugAgeRow_146 Ginseng_extract)
 (UsesSpecies DrugAgeRow_146 Mus_musculus)
 (UsesStrain DrugAgeRow_146 LACa)
@@ -1955,7 +1955,7 @@
 (WeightChangeSignificance DrugAgeRow_146 Unreported)
 
 ; row 147
-(Inheritance DrugAgeRow_147 Experiment)
+(InstanceOf DrugAgeRow_147 Experiment)
 (UsesIntervention DrugAgeRow_147 Ginseng_extract)
 (UsesSpecies DrugAgeRow_147 Mus_musculus)
 (UsesStrain DrugAgeRow_147 LACa)
@@ -1971,7 +1971,7 @@
 (WeightChangeSignificance DrugAgeRow_147 Unreported)
 
 ; row 148
-(Inheritance DrugAgeRow_148 Experiment)
+(InstanceOf DrugAgeRow_148 Experiment)
 (UsesIntervention DrugAgeRow_148 Ginseng_extract)
 (UsesSpecies DrugAgeRow_148 Mus_musculus)
 (UsesStrain DrugAgeRow_148 LACa)
@@ -1987,7 +1987,7 @@
 (WeightChangeSignificance DrugAgeRow_148 Unreported)
 
 ; row 149
-(Inheritance DrugAgeRow_149 Experiment)
+(InstanceOf DrugAgeRow_149 Experiment)
 (UsesIntervention DrugAgeRow_149 Ginseng_extract)
 (UsesSpecies DrugAgeRow_149 Mus_musculus)
 (UsesStrain DrugAgeRow_149 LACa)
@@ -2003,7 +2003,7 @@
 (WeightChangeSignificance DrugAgeRow_149 Unreported)
 
 ; row 150
-(Inheritance DrugAgeRow_150 Experiment)
+(InstanceOf DrugAgeRow_150 Experiment)
 (UsesIntervention DrugAgeRow_150 Pineal_gland_extract)
 (UsesSpecies DrugAgeRow_150 Rattus_norvegicus)
 (HasSex DrugAgeRow_150 Female)
@@ -2014,7 +2014,7 @@
 (WeightChangeSignificance DrugAgeRow_150 Unreported)
 
 ; row 151
-(Inheritance DrugAgeRow_151 Experiment)
+(InstanceOf DrugAgeRow_151 Experiment)
 (UsesIntervention DrugAgeRow_151 Sulfamerazine)
 (UsesSpecies DrugAgeRow_151 Rattus_norvegicus)
 (HasSex DrugAgeRow_151 Male)
@@ -2026,7 +2026,7 @@
 (WeightChangeSignificance DrugAgeRow_151 Unreported)
 
 ; row 152
-(Inheritance DrugAgeRow_152 Experiment)
+(InstanceOf DrugAgeRow_152 Experiment)
 (UsesIntervention DrugAgeRow_152 Sulfamerazine)
 (UsesSpecies DrugAgeRow_152 Rattus_norvegicus)
 (HasSex DrugAgeRow_152 Female)
@@ -2038,7 +2038,7 @@
 (WeightChangeSignificance DrugAgeRow_152 Unreported)
 
 ; row 153
-(Inheritance DrugAgeRow_153 Experiment)
+(InstanceOf DrugAgeRow_153 Experiment)
 (UsesIntervention DrugAgeRow_153 Beta_aminopropionitrile_fumarate)
 (UsesSpecies DrugAgeRow_153 Mus_musculus)
 (UsesStrain DrugAgeRow_153 LAF_J)
@@ -2056,7 +2056,7 @@
 (WeightChangeSignificance DrugAgeRow_153 NotSignificant)
 
 ; row 154
-(Inheritance DrugAgeRow_154 Experiment)
+(InstanceOf DrugAgeRow_154 Experiment)
 (UsesIntervention DrugAgeRow_154 Beta_aminopropionitrile_fumarate)
 (UsesSpecies DrugAgeRow_154 Mus_musculus)
 (UsesStrain DrugAgeRow_154 LAF_J)
@@ -2074,7 +2074,7 @@
 (WeightChangeSignificance DrugAgeRow_154 NotSignificant)
 
 ; row 155
-(Inheritance DrugAgeRow_155 Experiment)
+(InstanceOf DrugAgeRow_155 Experiment)
 (UsesIntervention DrugAgeRow_155 Beta_aminopropionitrile_fumarate)
 (UsesSpecies DrugAgeRow_155 Mus_musculus)
 (UsesStrain DrugAgeRow_155 LAF_J)
@@ -2092,7 +2092,7 @@
 (WeightChangeSignificance DrugAgeRow_155 NotSignificant)
 
 ; row 156
-(Inheritance DrugAgeRow_156 Experiment)
+(InstanceOf DrugAgeRow_156 Experiment)
 (UsesIntervention DrugAgeRow_156 Beta_aminopropionitrile_fumarate)
 (UsesSpecies DrugAgeRow_156 Mus_musculus)
 (UsesStrain DrugAgeRow_156 LAF_J)
@@ -2110,7 +2110,7 @@
 (WeightChangeSignificance DrugAgeRow_156 NotSignificant)
 
 ; row 157
-(Inheritance DrugAgeRow_157 Experiment)
+(InstanceOf DrugAgeRow_157 Experiment)
 (UsesIntervention DrugAgeRow_157 Beta_aminopropionitrile_fumarate)
 (UsesSpecies DrugAgeRow_157 Mus_musculus)
 (UsesStrain DrugAgeRow_157 LAF_J)
@@ -2128,7 +2128,7 @@
 (WeightChangeSignificance DrugAgeRow_157 NotSignificant)
 
 ; row 158
-(Inheritance DrugAgeRow_158 Experiment)
+(InstanceOf DrugAgeRow_158 Experiment)
 (UsesIntervention DrugAgeRow_158 Beta_aminopropionitrile_fumarate)
 (UsesSpecies DrugAgeRow_158 Mus_musculus)
 (UsesStrain DrugAgeRow_158 LAF_J)
@@ -2146,7 +2146,7 @@
 (WeightChangeSignificance DrugAgeRow_158 NotSignificant)
 
 ; row 159
-(Inheritance DrugAgeRow_159 Experiment)
+(InstanceOf DrugAgeRow_159 Experiment)
 (UsesIntervention DrugAgeRow_159 p_fluorophenylalanine)
 (UsesSpecies DrugAgeRow_159 Mus_musculus)
 (UsesStrain DrugAgeRow_159 CBA)
@@ -2163,7 +2163,7 @@
 (WeightChangeSignificance DrugAgeRow_159 Unreported)
 
 ; row 160
-(Inheritance DrugAgeRow_160 Experiment)
+(InstanceOf DrugAgeRow_160 Experiment)
 (UsesIntervention DrugAgeRow_160 p_fluorophenylalanine)
 (UsesSpecies DrugAgeRow_160 Mus_musculus)
 (UsesStrain DrugAgeRow_160 CBA)
@@ -2180,7 +2180,7 @@
 (WeightChangeSignificance DrugAgeRow_160 Unreported)
 
 ; row 161
-(Inheritance DrugAgeRow_161 Experiment)
+(InstanceOf DrugAgeRow_161 Experiment)
 (UsesIntervention DrugAgeRow_161 p_fluorophenylalanine)
 (UsesSpecies DrugAgeRow_161 Mus_musculus)
 (UsesStrain DrugAgeRow_161 CBA)
@@ -2197,7 +2197,7 @@
 (WeightChangeSignificance DrugAgeRow_161 Unreported)
 
 ; row 162
-(Inheritance DrugAgeRow_162 Experiment)
+(InstanceOf DrugAgeRow_162 Experiment)
 (UsesIntervention DrugAgeRow_162 p_fluorophenylalanine)
 (UsesSpecies DrugAgeRow_162 Mus_musculus)
 (UsesStrain DrugAgeRow_162 CBA)
@@ -2214,7 +2214,7 @@
 (WeightChangeSignificance DrugAgeRow_162 Unreported)
 
 ; row 163
-(Inheritance DrugAgeRow_163 Experiment)
+(InstanceOf DrugAgeRow_163 Experiment)
 (UsesIntervention DrugAgeRow_163 p_fluorophenylalanine)
 (UsesSpecies DrugAgeRow_163 Mus_musculus)
 (UsesStrain DrugAgeRow_163 CBA)
@@ -2231,7 +2231,7 @@
 (WeightChangeSignificance DrugAgeRow_163 Unreported)
 
 ; row 164
-(Inheritance DrugAgeRow_164 Experiment)
+(InstanceOf DrugAgeRow_164 Experiment)
 (UsesIntervention DrugAgeRow_164 p_fluorophenylalanine)
 (UsesSpecies DrugAgeRow_164 Mus_musculus)
 (UsesStrain DrugAgeRow_164 CBA)
@@ -2248,7 +2248,7 @@
 (WeightChangeSignificance DrugAgeRow_164 Unreported)
 
 ; row 165
-(Inheritance DrugAgeRow_165 Experiment)
+(InstanceOf DrugAgeRow_165 Experiment)
 (UsesIntervention DrugAgeRow_165 p_fluorophenylalanine)
 (UsesSpecies DrugAgeRow_165 Mus_musculus)
 (UsesStrain DrugAgeRow_165 CBA)
@@ -2265,7 +2265,7 @@
 (WeightChangeSignificance DrugAgeRow_165 Unreported)
 
 ; row 166
-(Inheritance DrugAgeRow_166 Experiment)
+(InstanceOf DrugAgeRow_166 Experiment)
 (UsesIntervention DrugAgeRow_166 p_fluorophenylalanine)
 (UsesSpecies DrugAgeRow_166 Mus_musculus)
 (UsesStrain DrugAgeRow_166 CBA)
@@ -2282,7 +2282,7 @@
 (WeightChangeSignificance DrugAgeRow_166 Unreported)
 
 ; row 167
-(Inheritance DrugAgeRow_167 Experiment)
+(InstanceOf DrugAgeRow_167 Experiment)
 (UsesIntervention DrugAgeRow_167 p_fluorophenylalanine)
 (UsesSpecies DrugAgeRow_167 Mus_musculus)
 (UsesStrain DrugAgeRow_167 CBA)
@@ -2299,7 +2299,7 @@
 (WeightChangeSignificance DrugAgeRow_167 Unreported)
 
 ; row 168
-(Inheritance DrugAgeRow_168 Experiment)
+(InstanceOf DrugAgeRow_168 Experiment)
 (UsesIntervention DrugAgeRow_168 p_fluorophenylalanine)
 (UsesSpecies DrugAgeRow_168 Mus_musculus)
 (UsesStrain DrugAgeRow_168 CBA)
@@ -2316,7 +2316,7 @@
 (WeightChangeSignificance DrugAgeRow_168 Unreported)
 
 ; row 169
-(Inheritance DrugAgeRow_169 Experiment)
+(InstanceOf DrugAgeRow_169 Experiment)
 (UsesIntervention DrugAgeRow_169 p_fluorophenylalanine)
 (UsesSpecies DrugAgeRow_169 Mus_musculus)
 (UsesStrain DrugAgeRow_169 CBA)
@@ -2333,7 +2333,7 @@
 (WeightChangeSignificance DrugAgeRow_169 Unreported)
 
 ; row 170
-(Inheritance DrugAgeRow_170 Experiment)
+(InstanceOf DrugAgeRow_170 Experiment)
 (UsesIntervention DrugAgeRow_170 p_fluorophenylalanine)
 (UsesSpecies DrugAgeRow_170 Mus_musculus)
 (UsesStrain DrugAgeRow_170 CBA)
@@ -2350,7 +2350,7 @@
 (WeightChangeSignificance DrugAgeRow_170 Unreported)
 
 ; row 171
-(Inheritance DrugAgeRow_171 Experiment)
+(InstanceOf DrugAgeRow_171 Experiment)
 (UsesIntervention DrugAgeRow_171 Hexachlorophene)
 (UsesSpecies DrugAgeRow_171 Mus_musculus)
 (UsesStrain DrugAgeRow_171 XVII_G)
@@ -2366,7 +2366,7 @@
 (WeightChangeSignificance DrugAgeRow_171 Unreported)
 
 ; row 172
-(Inheritance DrugAgeRow_172 Experiment)
+(InstanceOf DrugAgeRow_172 Experiment)
 (UsesIntervention DrugAgeRow_172 Hexachlorophene)
 (UsesSpecies DrugAgeRow_172 Mus_musculus)
 (UsesStrain DrugAgeRow_172 XVII_G)
@@ -2382,7 +2382,7 @@
 (WeightChangeSignificance DrugAgeRow_172 Unreported)
 
 ; row 173
-(Inheritance DrugAgeRow_173 Experiment)
+(InstanceOf DrugAgeRow_173 Experiment)
 (UsesIntervention DrugAgeRow_173 Hexachlorophene)
 (UsesSpecies DrugAgeRow_173 Mus_musculus)
 (UsesStrain DrugAgeRow_173 C57B1)
@@ -2398,7 +2398,7 @@
 (WeightChangeSignificance DrugAgeRow_173 Unreported)
 
 ; row 174
-(Inheritance DrugAgeRow_174 Experiment)
+(InstanceOf DrugAgeRow_174 Experiment)
 (UsesIntervention DrugAgeRow_174 Hexachlorophene)
 (UsesSpecies DrugAgeRow_174 Mus_musculus)
 (UsesStrain DrugAgeRow_174 C57B1)
@@ -2414,7 +2414,7 @@
 (WeightChangeSignificance DrugAgeRow_174 Unreported)
 
 ; row 175
-(Inheritance DrugAgeRow_175 Experiment)
+(InstanceOf DrugAgeRow_175 Experiment)
 (UsesIntervention DrugAgeRow_175 EGTA)
 (UsesSpecies DrugAgeRow_175 Mytilina_brevispina)
 (HasSex DrugAgeRow_175 Unknown)
@@ -2425,7 +2425,7 @@
 (WeightChangeSignificance DrugAgeRow_175 Unreported)
 
 ; row 176
-(Inheritance DrugAgeRow_176 Experiment)
+(InstanceOf DrugAgeRow_176 Experiment)
 (UsesIntervention DrugAgeRow_176 Tartrate)
 (UsesSpecies DrugAgeRow_176 Mytilina_brevispina)
 (HasSex DrugAgeRow_176 Unknown)
@@ -2436,7 +2436,7 @@
 (WeightChangeSignificance DrugAgeRow_176 Unreported)
 
 ; row 177
-(Inheritance DrugAgeRow_177 Experiment)
+(InstanceOf DrugAgeRow_177 Experiment)
 (UsesIntervention DrugAgeRow_177 Edetate_Calcium_Disodium)
 (UsesSpecies DrugAgeRow_177 Mytilina_brevispina)
 (HasSex DrugAgeRow_177 Unknown)
@@ -2447,7 +2447,7 @@
 (WeightChangeSignificance DrugAgeRow_177 Unreported)
 
 ; row 178
-(Inheritance DrugAgeRow_178 Experiment)
+(InstanceOf DrugAgeRow_178 Experiment)
 (UsesIntervention DrugAgeRow_178 Citrate)
 (UsesSpecies DrugAgeRow_178 Mytilina_brevispina)
 (HasSex DrugAgeRow_178 Unknown)
@@ -2458,7 +2458,7 @@
 (WeightChangeSignificance DrugAgeRow_178 Unreported)
 
 ; row 179
-(Inheritance DrugAgeRow_179 Experiment)
+(InstanceOf DrugAgeRow_179 Experiment)
 (UsesIntervention DrugAgeRow_179 Dehydroascorbic_acid)
 (UsesSpecies DrugAgeRow_179 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_179 Oregon_R)
@@ -2471,7 +2471,7 @@
 (WeightChangeSignificance DrugAgeRow_179 Unreported)
 
 ; row 180
-(Inheritance DrugAgeRow_180 Experiment)
+(InstanceOf DrugAgeRow_180 Experiment)
 (UsesIntervention DrugAgeRow_180 Dehydroascorbic_acid)
 (UsesSpecies DrugAgeRow_180 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_180 Oregon_R)
@@ -2484,7 +2484,7 @@
 (WeightChangeSignificance DrugAgeRow_180 Unreported)
 
 ; row 181
-(Inheritance DrugAgeRow_181 Experiment)
+(InstanceOf DrugAgeRow_181 Experiment)
 (UsesIntervention DrugAgeRow_181 Ascorbic_acid)
 (UsesSpecies DrugAgeRow_181 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_181 Oregon_R)
@@ -2497,7 +2497,7 @@
 (WeightChangeSignificance DrugAgeRow_181 Unreported)
 
 ; row 182
-(Inheritance DrugAgeRow_182 Experiment)
+(InstanceOf DrugAgeRow_182 Experiment)
 (UsesIntervention DrugAgeRow_182 Ascorbic_acid)
 (UsesSpecies DrugAgeRow_182 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_182 Oregon_R)
@@ -2510,7 +2510,7 @@
 (WeightChangeSignificance DrugAgeRow_182 Unreported)
 
 ; row 183
-(Inheritance DrugAgeRow_183 Experiment)
+(InstanceOf DrugAgeRow_183 Experiment)
 (UsesIntervention DrugAgeRow_183 Ascorbic_acid)
 (UsesSpecies DrugAgeRow_183 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_183 Oregon_R)
@@ -2523,7 +2523,7 @@
 (WeightChangeSignificance DrugAgeRow_183 Unreported)
 
 ; row 184
-(Inheritance DrugAgeRow_184 Experiment)
+(InstanceOf DrugAgeRow_184 Experiment)
 (UsesIntervention DrugAgeRow_184 Ascorbic_acid)
 (UsesSpecies DrugAgeRow_184 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_184 Oregon_R)
@@ -2536,7 +2536,7 @@
 (WeightChangeSignificance DrugAgeRow_184 Unreported)
 
 ; row 185
-(Inheritance DrugAgeRow_185 Experiment)
+(InstanceOf DrugAgeRow_185 Experiment)
 (UsesIntervention DrugAgeRow_185 Ascorbic_acid)
 (UsesSpecies DrugAgeRow_185 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_185 Oregon_R)
@@ -2549,7 +2549,7 @@
 (WeightChangeSignificance DrugAgeRow_185 Unreported)
 
 ; row 186
-(Inheritance DrugAgeRow_186 Experiment)
+(InstanceOf DrugAgeRow_186 Experiment)
 (UsesIntervention DrugAgeRow_186 Ascorbic_acid)
 (UsesSpecies DrugAgeRow_186 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_186 Oregon_R)
@@ -2562,7 +2562,7 @@
 (WeightChangeSignificance DrugAgeRow_186 Unreported)
 
 ; row 187
-(Inheritance DrugAgeRow_187 Experiment)
+(InstanceOf DrugAgeRow_187 Experiment)
 (UsesIntervention DrugAgeRow_187 Ascorbic_acid)
 (UsesSpecies DrugAgeRow_187 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_187 Oregon_R)
@@ -2575,7 +2575,7 @@
 (WeightChangeSignificance DrugAgeRow_187 Unreported)
 
 ; row 188
-(Inheritance DrugAgeRow_188 Experiment)
+(InstanceOf DrugAgeRow_188 Experiment)
 (UsesIntervention DrugAgeRow_188 Ascorbic_acid)
 (UsesSpecies DrugAgeRow_188 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_188 Oregon_R)
@@ -2588,7 +2588,7 @@
 (WeightChangeSignificance DrugAgeRow_188 Unreported)
 
 ; row 189
-(Inheritance DrugAgeRow_189 Experiment)
+(InstanceOf DrugAgeRow_189 Experiment)
 (UsesIntervention DrugAgeRow_189 Ascorbic_acid)
 (UsesSpecies DrugAgeRow_189 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_189 Oregon_R)
@@ -2601,7 +2601,7 @@
 (WeightChangeSignificance DrugAgeRow_189 Unreported)
 
 ; row 190
-(Inheritance DrugAgeRow_190 Experiment)
+(InstanceOf DrugAgeRow_190 Experiment)
 (UsesIntervention DrugAgeRow_190 Ascorbic_acid)
 (UsesSpecies DrugAgeRow_190 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_190 Oregon_R)
@@ -2614,7 +2614,7 @@
 (WeightChangeSignificance DrugAgeRow_190 Unreported)
 
 ; row 191
-(Inheritance DrugAgeRow_191 Experiment)
+(InstanceOf DrugAgeRow_191 Experiment)
 (UsesIntervention DrugAgeRow_191 Ascorbic_acid)
 (UsesSpecies DrugAgeRow_191 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_191 Oregon_R)
@@ -2627,7 +2627,7 @@
 (WeightChangeSignificance DrugAgeRow_191 Unreported)
 
 ; row 192
-(Inheritance DrugAgeRow_192 Experiment)
+(InstanceOf DrugAgeRow_192 Experiment)
 (UsesIntervention DrugAgeRow_192 Ascorbic_acid)
 (UsesSpecies DrugAgeRow_192 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_192 Oregon_R)
@@ -2640,7 +2640,7 @@
 (WeightChangeSignificance DrugAgeRow_192 Unreported)
 
 ; row 193
-(Inheritance DrugAgeRow_193 Experiment)
+(InstanceOf DrugAgeRow_193 Experiment)
 (UsesIntervention DrugAgeRow_193 Ascorbic_acid)
 (UsesSpecies DrugAgeRow_193 Drosophila_melanogaster)
 (UsesStrain DrugAgeRow_193 Oregon_R)
@@ -2653,7 +2653,7 @@
 (WeightChangeSignificance DrugAgeRow_193 Unreported)
 
 ; row 194
-(Inheritance DrugAgeRow_194 Experiment)
+(InstanceOf DrugAgeRow_194 Experiment)
 (UsesIntervention DrugAgeRow_194 Levodopa)
 (UsesSpecies DrugAgeRow_194 Mus_musculus)
 (UsesStrain DrugAgeRow_194 Swiss_Albino)
@@ -2671,7 +2671,7 @@
 (WeightChangeSignificance DrugAgeRow_194 NotSignificant)
 
 ; row 195
-(Inheritance DrugAgeRow_195 Experiment)
+(InstanceOf DrugAgeRow_195 Experiment)
 (UsesIntervention DrugAgeRow_195 Levodopa)
 (UsesSpecies DrugAgeRow_195 Mus_musculus)
 (UsesStrain DrugAgeRow_195 Swiss_Albino)
@@ -2689,7 +2689,7 @@
 (WeightChangeSignificance DrugAgeRow_195 NotSignificant)
 
 ; row 196
-(Inheritance DrugAgeRow_196 Experiment)
+(InstanceOf DrugAgeRow_196 Experiment)
 (UsesIntervention DrugAgeRow_196 Levodopa)
 (UsesSpecies DrugAgeRow_196 Mus_musculus)
 (UsesStrain DrugAgeRow_196 Swiss_Albino)
@@ -2707,7 +2707,7 @@
 (WeightChangeSignificance DrugAgeRow_196 NotSignificant)
 
 ; row 197
-(Inheritance DrugAgeRow_197 Experiment)
+(InstanceOf DrugAgeRow_197 Experiment)
 (UsesIntervention DrugAgeRow_197 Diethylnitrosamine)
 (UsesSpecies DrugAgeRow_197 Mesocricetus_auratus)
 (UsesStrain DrugAgeRow_197 ENGELA)
@@ -2720,7 +2720,7 @@
 (WeightChangeSignificance DrugAgeRow_197 Unreported)
 
 ; row 198
-(Inheritance DrugAgeRow_198 Experiment)
+(InstanceOf DrugAgeRow_198 Experiment)
 (UsesIntervention DrugAgeRow_198 Sodium_tungstate)
 (UsesSpecies DrugAgeRow_198 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_198 Long_Evans)
@@ -2734,7 +2734,7 @@
 (WeightChangeSignificance DrugAgeRow_198 Unreported)
 
 ; row 199
-(Inheritance DrugAgeRow_199 Experiment)
+(InstanceOf DrugAgeRow_199 Experiment)
 (UsesIntervention DrugAgeRow_199 Sodium_tungstate)
 (UsesSpecies DrugAgeRow_199 Rattus_norvegicus)
 (UsesStrain DrugAgeRow_199 Long_Evans)
@@ -2748,7 +2748,7 @@
 (WeightChangeSignificance DrugAgeRow_199 Unreported)
 
 ; row 200
-(Inheritance DrugAgeRow_200 Experiment)
+(InstanceOf DrugAgeRow_200 Experiment)
 (UsesIntervention DrugAgeRow_200 Vanadyl_sulfate)
 (UsesSpecies DrugAgeRow_200 Mus_musculus)
 (UsesStrain DrugAgeRow_200 Swiss)

@@ -18,22 +18,22 @@
     "warnings": []
   },
   {
-    "nl": "Find all drugs that extend lifespan.",
-    "metta_query": "(match &self (Inheritance $drug LifespanExtender) $drug)",
-    "explanation": "Retrieves all atoms $drug where an Inheritance link asserts they are a LifespanExtender.",
+    "nl": "Find all interventions that have an Extends link with known truth values.",
+    "metta_query": "(match &self ((Extends $drug $target) (stv $s $c)) (pair $drug (pair $target (stv $s $c))))",
+    "explanation": "Retrieves all atoms where an Extends predicate links an intervention to a target (e.g., Lifespan_Mouse), along with the attached truth value.",
     "intent": "retrieval",
-    "requires_pln_inference": true,
-    "confidence_filter": 0.7,
-    "warnings": ["LifespanExtender is a stub placeholder — will be fully defined once logical_predicates.metta is populated."]
+    "requires_pln_inference": false,
+    "confidence_filter": 0.0,
+    "warnings": ["Results depend on which Extends atoms have been loaded from curated sources or LLM extraction phases."]
   },
   {
-    "nl": "What is the truth value of Rapamycin extending lifespan?",
-    "metta_query": "(match &self (: (Inheritance Rapamycin LifespanExtender) (stv $s $c)) (stv $s $c))",
-    "explanation": "Looks up the STV (strength, confidence) attached to the Inheritance link between Rapamycin and LifespanExtender.",
+    "nl": "What is the truth value for Rapamycin causing mTORC1 inhibition?",
+    "metta_query": "(match &self ((Causes Rapamycin (Inhibits mTORC1)) (stv $s $c)) (stv $s $c))",
+    "explanation": "Looks up the STV (strength, confidence) attached to the causal link between Rapamycin and mTORC1 inhibition.",
     "intent": "retrieval",
-    "requires_pln_inference": true,
+    "requires_pln_inference": false,
     "confidence_filter": 0.0,
-    "warnings": ["LifespanExtender is a stub placeholder — will be fully defined once logical_predicates.metta is populated."]
+    "warnings": ["This atom is from the mechanistic/causal layer and may only be present once curated knowledge is loaded."]
   },
   {
     "nl": "List all evidence categories with confidence above 0.7.",
@@ -74,7 +74,7 @@
   {
     "nl": "What effect does Ethanol have on Drosophila mojavensis?",
     "metta_query": "(match &self\n  (, (UsesIntervention $exp Ethanol)\n     (UsesSpecies $exp Drosophila_mojavensis)\n     (AvgLifespanChangePercent $exp $change))\n  $change)",
-    "explanation": "Finds all experiment rows where Ethanol was used on Drosophila_mojavensis and returns the average lifespan change percentage for each. The `,` operator inside the single match call requires all three conditions to be satisfied simultaneously.",
+    "explanation": "Finds all experiment rows where Ethanol was used on Drosophila_mojavensis and returns the average lifespan change percentage for each.",
     "intent": "retrieval",
     "requires_pln_inference": false,
     "confidence_filter": 0.0,
@@ -83,7 +83,7 @@
   {
     "nl": "Show me all Rapamycin experiments on mice with their lifespan change and significance.",
     "metta_query": "(match &self\n  (, (UsesIntervention $exp Rapamycin)\n     (UsesSpecies $exp Mus_musculus)\n     (AvgLifespanChangePercent $exp $change)\n     (AvgLifespanSignificance $exp $sig))\n  (pair $exp (pair $change $sig)))",
-    "explanation": "Retrieves every experiment testing Rapamycin on Mus_musculus, returning experiment ID, average lifespan change, and statistical significance. All conditions are listed inside a single `,` conjunction within one match call.",
+    "explanation": "Retrieves every experiment testing Rapamycin on Mus_musculus, returning experiment ID, average lifespan change, and statistical significance.",
     "intent": "retrieval",
     "requires_pln_inference": false,
     "confidence_filter": 0.0,
@@ -92,7 +92,43 @@
   {
     "nl": "List all interventions tested on Caenorhabditis elegans.",
     "metta_query": "(match &self\n  (, (UsesSpecies $exp Caenorhabditis_elegans)\n     (UsesIntervention $exp $drug))\n  $drug)",
-    "explanation": "Returns intervention names for all experiments targeting Caenorhabditis_elegans. Both conditions are conjuncted with `,` inside a single match.",
+    "explanation": "Returns intervention names for all experiments targeting Caenorhabditis_elegans.",
+    "intent": "retrieval",
+    "requires_pln_inference": false,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "Which experiments used a dosage of 4 percent?",
+    "metta_query": "(match &self\n  (, (InstanceOf $exp Experiment)\n     (Dosage $exp (Measure 4.0 percent)))\n  $exp)",
+    "explanation": "Finds all experiment rows with a dosage of exactly 4.0 percent. Note: percentage units are represented as 'percent', not '%'.",
+    "intent": "retrieval",
+    "requires_pln_inference": false,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "Show all female Drosophila mojavensis experiments with their strain and lifespan change.",
+    "metta_query": "(match &self\n  (, (UsesSpecies $exp Drosophila_mojavensis)\n     (HasSex $exp Female)\n     (UsesStrain $exp $strain)\n     (AvgLifespanChangePercent $exp $change))\n  (pair $strain $change))",
+    "explanation": "Retrieves strain and average lifespan change for all female Drosophila_mojavensis experiments.",
+    "intent": "retrieval",
+    "requires_pln_inference": false,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "What species are classified as vertebrates?",
+    "metta_query": "(match &self (Inheritance $species Vertebrate) $species)",
+    "explanation": "Returns all species that have an Inheritance link to Vertebrate in the taxonomy.",
+    "intent": "retrieval",
+    "requires_pln_inference": false,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "Is Saccharomyces cerevisiae a fungus?",
+    "metta_query": "(match &self (Inheritance Saccharomyces_cerevisiae Fungi) True)",
+    "explanation": "Checks whether the Inheritance link from Saccharomyces_cerevisiae to Fungi exists. Returns 'True' if found, nothing otherwise.",
     "intent": "retrieval",
     "requires_pln_inference": false,
     "confidence_filter": 0.0,
