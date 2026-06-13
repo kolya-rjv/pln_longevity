@@ -29,7 +29,7 @@ def _detect_hyperon() -> bool:
     if _env == "true":
         return True
     try:
-        import importlib
+        import importlib.util  # NB: submodule must be imported explicitly
         return importlib.util.find_spec("hyperon") is not None
     except Exception:
         return False
