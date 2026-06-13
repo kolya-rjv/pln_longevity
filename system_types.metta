@@ -8,10 +8,11 @@
 ;; ==========================================
 ;; 0. Core record / ETL types
 ;; ==========================================
-
-(: Experiment Type)              ; one imported DrugAge row / study record
-(: Target Type)                  ; used by ExtendsMaxLifespan / DoesNotExtendMaxLifespan
-(: Expression Type)              ; used in signatures like Measure / SetLink / AndLink
+(: Experiment Type)
+(: Target Type)
+(: Expression Type)
+(: EmpiricalAssociation Type)     ; paper-derived quantitative evidence record
+(: HallmarkInterventionEvidence Type) ; review-level intervention evidence record
 
 ;; Significance labels (enumerated values)
 (: SignificanceLabel Type)
@@ -30,12 +31,28 @@
 (: EpigeneticClock Type)
 (Inheritance EpigeneticClock Biomarker)
 
-(: Pathway Type)                  ; e.g., mTOR pathway, Senescence
-(: Outcome Type)                  ; e.g., AllCauseMortality, CardiovascularEvent
-(: Demographic Type)              ; e.g., OlderAdult
+(: Pathway Type)
+(: Outcome Type)
+(: Demographic Type)
 (: Phenotype Type)
 (: Lifespan Phenotype)
 (: Healthspan Phenotype)
+
+;; ==========================================
+;; 1a. GrimAge / Epigenetic Clock Types
+;; ==========================================
+(: EpigeneticAgeAcceleration Type)
+(Inheritance EpigeneticAgeAcceleration Biomarker)
+
+(: MortalityRiskEstimator Type)
+(Inheritance MortalityRiskEstimator Biomarker)
+
+(: Protein Type)
+
+;; ==========================================
+;; 1b. Hallmarks of Aging Types
+;; ==========================================
+(: HallmarkOfAging Type)
 
 ;; ==========================================
 ;; 2. Interventions
@@ -43,7 +60,9 @@
 (: Intervention Type)
 (Inheritance Pharmaceutical Intervention)
 (Inheritance Supplement Intervention)
-(Inheritance Lifestyle Intervention)        ; e.g., Exercise, Fasting
+(Inheritance Lifestyle Intervention)
+(Inheritance GeneticIntervention Intervention)
+(Inheritance CombinationIntervention Intervention)
 
 ;; ==========================================
 ;; 3. Taxonomy Hierarchy
@@ -76,18 +95,14 @@
 ;; ==========================================
 ;; 6. Epistemic and Provenance Types
 ;; ==========================================
-(: EvidenceCategory Type)         ; Used for TV calibration mapping
+(: EvidenceCategory Type)
 (: SafetyCategory Type)
-(: Publication Type)              ; e.g., PMID_19587680
+(: Publication Type)
 
 ;; ==========================================
 ;; 7. GENE TYPES (GenAge)
 ;; ==========================================
-
 (: Gene Type)
-
-;; Record types — parallel to Experiment, not subtypes of Gene
-;; Connection to Gene goes through InvolvesGene predicate
 (: GeneticExperiment Type)
 (Inheritance GeneticExperiment Experiment)
 (: HumanAgingGene Type)
