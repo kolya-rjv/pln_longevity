@@ -143,3 +143,16 @@
 (: GeneName              (-> Gene String Atom))
 (: EntrezID              (-> Gene Number Atom))
 (: UniprotID             (-> Gene String Atom))
+
+;; ==========================================
+;; 11. CELLAGE PREDICATES
+;; ==========================================
+
+(: HasSenescenceType        (-> CellSenescenceRecord SenescenceType Atom))
+(: UsesCellContext          (-> CellSenescenceRecord CellContext Atom))
+(: HasSenescenceEffect      (-> CellSenescenceRecord Expression Atom))
+(: HasSenescenceEffectLabel (-> CellSenescenceRecord SenescenceEffectLabel Atom))
+
+(: ExpressionSampleCount          (-> SenescenceExpressionRecord Number Atom))
+(: DifferentialExpressionDirection (-> SenescenceExpressionRecord ExpressionDirection Atom))
+(: PValue                         (-> Atom Number Atom))

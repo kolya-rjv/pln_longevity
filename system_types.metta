@@ -102,3 +102,18 @@
 (: putative   SelectionBasis)
 (: upstream   SelectionBasis)
 (: human_link SelectionBasis)
+
+;; ==========================================
+;; 8. CELLAGE TYPES
+;; ==========================================
+
+(: CellSenescenceRecord Type)
+(Inheritance CellSenescenceRecord Experiment)
+
+(: SenescenceExpressionRecord Type)
+(Inheritance SenescenceExpressionRecord GeneticExperiment)
+
+(: SenescenceType Type)
+(: CellContext Type)
+(: SenescenceEffectLabel Type)
+(: ExpressionDirection Type)
