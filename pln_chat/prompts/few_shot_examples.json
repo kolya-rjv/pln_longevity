@@ -133,5 +133,32 @@
     "requires_pln_inference": false,
     "confidence_filter": 0.0,
     "warnings": []
+  },
+  {
+    "nl": "What truth value does the Lu 2019 evidence give for DNAm PAI-1 predicting coronary heart disease?",
+    "metta_query": "(calibrate-tv &self Lu2019_DNAmPAI1_CHD)",
+    "explanation": "Calibrates the raw Lu 2019 empirical association into a PLN truth value: strength from the reported hazard ratio, confidence from the evidence tier. Returns (stv 0.6 0.85). The raw evidence record is never mutated.",
+    "intent": "retrieval",
+    "requires_pln_inference": false,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "Does cellular senescence raise coronary heart disease risk, and how confident are we?",
+    "metta_query": "(infer &self CellularSenescence CoronaryHeartDisease)",
+    "explanation": "Runs signed transitive PLN deduction from CellularSenescence to CoronaryHeartDisease across curated mechanistic bridges and the calibrated Lu 2019 association. Returns (signed Pos (stv s c)): Pos means it raises risk, and confidence is attenuated per hop. Use (explain &self CellularSenescence CoronaryHeartDisease) instead to also get the node-by-node derivation path.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": ["Returns no result (no false chain) when the two concepts are unconnected in the loaded KB."]
+  },
+  {
+    "nl": "Rank dasatinib plus quercetin, fisetin and spermidine by their expected protective effect on coronary heart disease.",
+    "metta_query": "(rank-interventions &self (DasatinibPlusQuercetin Fisetin Spermidine) CoronaryHeartDisease)",
+    "explanation": "Ranks the candidate interventions by net protective effect on CoronaryHeartDisease. For each it runs signed PLN deduction, scores it (protective effects positive, harmful negative, weighted by both strength and confidence), and sorts most-protective first as (scored <intervention> <score> (signed <sign> (stv s c))). Interventions with no causal chain to the outcome are omitted rather than mis-ranked.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": ["Ordering reflects calibrated evidence and chain length; longer mechanistic chains carry lower confidence."]
   }
 ]

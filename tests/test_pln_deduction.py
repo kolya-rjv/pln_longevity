@@ -38,6 +38,7 @@ KB_FILES = [
     "hallmarks_lopezotin2023_intervention_evidence.metta",
     "mechanistic_bridges.metta",
     "pln_deduction.metta",
+    "pln_intervention_ranking.metta",
 ]
 
 _STV = r"\(stv\s+([-\d.eE]+)\s+([-\d.eE]+)\)"
@@ -151,3 +152,61 @@ def test_no_false_chain(kb):
     res = kb.run("!(infer &self DasatinibPlusQuercetin AllCauseMortality)")
     # MeTTa returns a single empty result group when nothing matches.
     assert res == [[]] or all(len(g) == 0 for g in res)
+
+
+# ── Demo 2: intervention ranking with uncertainty propagation ──────────────────
+# The added Fisetin / Spermidine bridges give a candidate pool that all reaches
+# CHD through the same senescence axis, with chains of differing length.
+
+def test_fisetin_protective_weaker_than_dq(kb):
+    # Fisetin is a senolytic like D+Q but with single-study evidence, so it is
+    # protective (Neg) with a smaller magnitude AND lower confidence than D+Q.
+    sign, s, c = _signed(kb, "!(infer &self Fisetin CoronaryHeartDisease)")
+    assert sign == "Neg"
+    assert s == pytest.approx(0.65 * 0.85 * 0.70 * 0.6)          # 0.23205
+    assert c == pytest.approx(0.50 * 0.65 * 0.65 * 0.85 * 0.9 ** 3)  # ~0.13091
+
+
+def test_spermidine_longer_chain_lower_confidence(kb):
+    # Spermidine reaches CHD one hop further upstream (via Autophagy), so the
+    # net effect stays protective but confidence is lower than the 4-hop
+    # senolytics — "uncertainty increases with chain length".
+    sign, s, c = _signed(kb, "!(infer &self Spermidine CoronaryHeartDisease)")
+    assert sign == "Neg"
+    assert s == pytest.approx(0.80 * 0.60 * 0.85 * 0.70 * 0.6)   # 0.17136
+    assert c == pytest.approx(0.50 * 0.65 ** 3 * 0.85 * 0.9 ** 4)  # ~0.076577
+
+
+@pytest.mark.parametrize("query, expect_sign", [
+    ("(signed Neg (stv 0.4 0.5))", 1),    # protective -> positive score
+    ("(signed Pos (stv 0.4 0.5))", -1),   # harmful   -> negative score
+])
+def test_rank_score_signs(kb, query, expect_sign):
+    res = kb.run(f"!(rank-score {query})")
+    score = float(str(res[0][0]))
+    assert score == pytest.approx(expect_sign * 0.2)
+
+
+def _ranked_order(kb: MeTTa, cands: str, outcome: str) -> list[str]:
+    """Return the intervention names in ranked order from rank-interventions."""
+    res = kb.run(f"!(rank-interventions &self ({cands}) {outcome})")
+    assert res and res[0], f"no ranking returned: {res}"
+    return re.findall(r"\(scored\s+(\S+)", str(res[0][0]))
+
+
+def test_rank_interventions_orders_by_protection(kb):
+    order = _ranked_order(
+        kb,
+        "DasatinibPlusQuercetin Fisetin Spermidine Elamipretide",
+        "CoronaryHeartDisease",
+    )
+    # Most protective first; Elamipretide has no chain to CHD -> omitted entirely.
+    assert order == ["DasatinibPlusQuercetin", "Fisetin", "Spermidine"]
+
+
+def test_rank_interventions_is_order_independent(kb):
+    # Identical inputs -> identical output regardless of candidate listing order
+    # (a headline PLN-over-LLM property).
+    a = _ranked_order(kb, "Spermidine Fisetin DasatinibPlusQuercetin", "CoronaryHeartDisease")
+    b = _ranked_order(kb, "Fisetin DasatinibPlusQuercetin Spermidine", "CoronaryHeartDisease")
+    assert a == b == ["DasatinibPlusQuercetin", "Fisetin", "Spermidine"]

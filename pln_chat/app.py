@@ -52,8 +52,31 @@ def _discover_metta_files() -> dict[str, Path]:
 
 _METTA_FILES = _discover_metta_files()
 _ONTOLOGY_CHOICES = list(_METTA_FILES.keys()) or ["(no .metta files found)"]
+
+# The coherent inference stack (calibration -> curated bridges -> deduction ->
+# intervention ranking) plus the ontology and evidence it reads. Selected by
+# default so the LLM translator SEES the inference functions
+# (calibrate-tv / infer / explain / rank-interventions) and the entity names
+# they operate on, and so the symbol validator recognises them. Execution always
+# runs against the full KB (_ALL_KB_PATHS) regardless of this selection — the
+# heavy DrugAge ETL files are intentionally left out of the default *context* to
+# keep the prompt focused, not out of execution.
+_INFERENCE_STACK: list[str] = [
+    "system_types.metta",
+    "logical_predicates.metta",
+    "epistemic_calibration.metta",
+    "grim_age_core.metta",
+    "grim_age_lu2019_evidence.metta",
+    "evidence_calibration.metta",
+    "hallmarks_core.metta",
+    "hallmarks_lopezotin2023_intervention_evidence.metta",
+    "mechanistic_bridges.metta",
+    "pln_deduction.metta",
+    "pln_intervention_ranking.metta",
+]
 _DEFAULT_SELECTION = (
-    [k for k in _ONTOLOGY_CHOICES if "epistemic" in k.lower()]
+    [f for f in _INFERENCE_STACK if f in _METTA_FILES]
+    or [k for k in _ONTOLOGY_CHOICES if "epistemic" in k.lower()]
     or _ONTOLOGY_CHOICES[:1]
 )
 

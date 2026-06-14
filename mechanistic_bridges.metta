@@ -29,7 +29,8 @@
 ;;
 ;; Load AFTER: system_types, logical_predicates, epistemic_calibration,
 ;;             grim_age_core (DNAmPAI1), hallmarks_core (CellularSenescence),
-;;             hallmarks_lopezotin2023_intervention_evidence (DasatinibPlusQuercetin).
+;;             hallmarks_lopezotin2023_intervention_evidence
+;;               (DasatinibPlusQuercetin, Fisetin, Spermidine).
 
 ;; ------------------------------------------------------------
 ;; Minimal typing for the SASP node introduced here.
@@ -69,3 +70,38 @@
 ;; signed, uncertainty-quantified intervention signal of pipeline.md Demo 2.
 (Effect DasatinibPlusQuercetin CellularSenescence Neg
    (stv 0.70 (evidence-confidence AnimalStudies_Replicated)))
+
+;; ------------------------------------------------------------
+;; More senolytic / autophagy interventions — the candidate pool the
+;; intervention-ranking demo (pln_intervention_ranking.metta, pipeline.md
+;; Demo 2) sorts over. Each reaches CHD through the SAME senescence axis above,
+;; so PLN ranks them by net protective magnitude x confidence — and confidence
+;; falls off with chain length, exactly the LLM-incomparable signal.
+;; ------------------------------------------------------------
+
+;; Fisetin is a senolytic in the same class as D+Q — it clears senescent cells
+;; (Neg), source-grounded by LopezOtin2023_Fisetin_Mouse ("increased health- and
+;; lifespan", hallmark CellularSenescence). Evidence is a SINGLE animal record
+;; here (vs. D+Q's mouse + human), so it maps to the lower AnimalStudies_Single
+;; tier and a slightly smaller magnitude prior — so PLN ranks D+Q above Fisetin
+;; on identical-mechanism grounds. This is the calibrated-evidence distinction an
+;; LLM blurs.
+(Effect Fisetin CellularSenescence Neg
+   (stv 0.65 (evidence-confidence AnimalStudies_Single)))
+
+;; Spermidine acts one step further upstream: it INDUCES autophagy (Pos on
+;; Autophagy), and autophagy in turn REDUCES the senescent-cell burden (Neg on
+;; CellularSenescence). Representing the mechanism honestly as two hops (rather
+;; than collapsing it to a direct senolytic claim) means Spermidine reaches CHD
+;; through a LONGER chain than the direct senolytics, so its conclusion carries
+;; appropriately lower confidence — it ranks below D+Q and Fisetin. Grounded by
+;; LopezOtin2023_Spermidine_Mouse ("extended longevity, reduced cardiac aging and
+;; oxidative stress", hallmark DisabledMacroautophagy) and the canonical
+;; autophagy-induction / senescence-clearance mechanism (pipeline.md A.6).
+(: Autophagy Pathway)
+
+(Effect Spermidine Autophagy Pos
+   (stv 0.80 (evidence-confidence AnimalStudies_Single)))
+
+(Effect Autophagy CellularSenescence Neg
+   (stv 0.60 (evidence-confidence AnimalStudies_Replicated)))

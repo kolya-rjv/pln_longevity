@@ -112,6 +112,15 @@ This signed, uncertainty-quantified, provenance-bearing intervention estimate is
 exactly what an LLM cannot produce, and is the unit an intervention-ranking demo
 sorts over (rank candidates by net protective magnitude × confidence).
 
+> **Now built (Demo 2).** That ranking demo exists:
+> `pln_intervention_ranking.metta` maps `infer` over a candidate pool, scores
+> each (protective = higher, harmful = negative), and sorts. On
+> `CoronaryHeartDisease` it ranks **D+Q ≻ Fisetin ≻ Spermidine** — D+Q over
+> Fisetin on *identical mechanism* but stronger evidence tier, Spermidine last
+> because its honest mechanism costs an extra hop (confidence decays per hop),
+> and Elamipretide omitted (no chain — no false placement). See
+> `docs/intervention_ranking.md`.
+
 ## 7. Open questions / next increments
 
 1. ~~**Signed / protective effects.**~~ ✅ **Done in v1** (this layer). Sign is a
@@ -123,6 +132,8 @@ sorts over (rank candidates by net protective magnitude × confidence).
    lifted link, not only curated bridges.
 4. **Revision for multiple paths** — when several derivations reach the same
    conclusion, combine them with a PLN revision rule instead of returning each.
+   (Now also surfaced by the ranking demo, which lists one entry per derivation
+   until this lands — `docs/intervention_ranking.md` §5.1.)
 5. **Cycle guarding** — the recursion assumes a DAG; add visited-set guarding
    before the bridge graph can contain cycles.
 6. **Mechanistic-consensus evidence tier** — curated bridges currently borrow
