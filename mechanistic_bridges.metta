@@ -105,3 +105,40 @@
 
 (Effect Autophagy CellularSenescence Neg
    (stv 0.60 (evidence-confidence AnimalStudies_Replicated)))
+
+;; ------------------------------------------------------------
+;; Cause -> observable-biomarker links (the abductive-diagnosis graph).
+;; ------------------------------------------------------------
+;; These connect upstream hallmark CAUSES to the GrimAge components and blood
+;; markers a patient actually presents with, so abductive diagnosis
+;; (pln_abductive_diagnosis.metta, pipeline.md Demo 1) can run the graph
+;; BACKWARD: given observed-elevated markers, rank the upstream causes that
+;; would raise them. All Pos (the cause, when elevated, RAISES the marker).
+;;
+;; Grounded in the GrimAge component interpretations (pipeline.md App. A.2: what
+;; each DNAm surrogate reflects) and the senescence / inflammation / mito
+;; cascades (App. A.6). strength = curated magnitude prior; confidence = the
+;; evidence-confidence lookup, as for every bridge above.
+
+;; CRP (C-reactive protein): the canonical circulating inflammation marker.
+(Inheritance CRP Biomarker)
+
+;; Senescence drives chronic inflammation via the SASP (App. A.6:
+;; SASP -> ChronicInflammation). This is what lets CellularSenescence explain
+;; inflammatory findings, not just DNAmPAI1.
+(Effect SASP ChronicInflammation Pos
+   (stv 0.85 (evidence-confidence AnimalStudies_Replicated)))
+
+;; Chronic inflammation elevates CRP, and feeds the GDF15 surrogate (App. A.2:
+;; "DNAmGDF15 reflects MitochondrialStress, Inflammation"). The GDF15 link is the
+;; weaker, secondary contributor (mitochondrial dysfunction below is primary).
+(Effect ChronicInflammation CRP Pos
+   (stv 0.80 (evidence-confidence AnimalStudies_Replicated)))
+(Effect ChronicInflammation DNAmGDF15 Pos
+   (stv 0.65 (evidence-confidence AnimalStudies_Replicated)))
+
+;; Mitochondrial dysfunction raises GDF15 (App. A.6: MitochondrialDysfunction ->
+;; Increases GDF15), read out by the DNAmGDF15 GrimAge surrogate. This is the
+;; primary, direct explanation for an isolated DNAmGDF15 elevation.
+(Effect MitochondrialDysfunction DNAmGDF15 Pos
+   (stv 0.75 (evidence-confidence AnimalStudies_Replicated)))

@@ -39,6 +39,7 @@ KB_FILES = [
     "mechanistic_bridges.metta",
     "pln_deduction.metta",
     "pln_intervention_ranking.metta",
+    "pln_abductive_diagnosis.metta",
 ]
 
 _STV = r"\(stv\s+([-\d.eE]+)\s+([-\d.eE]+)\)"
@@ -210,3 +211,76 @@ def test_rank_interventions_is_order_independent(kb):
     a = _ranked_order(kb, "Spermidine Fisetin DasatinibPlusQuercetin", "CoronaryHeartDisease")
     b = _ranked_order(kb, "Fisetin DasatinibPlusQuercetin Spermidine", "CoronaryHeartDisease")
     assert a == b == ["DasatinibPlusQuercetin", "Fisetin", "Spermidine"]
+
+
+# ── Demo 1: abductive diagnosis with ranked hypotheses ─────────────────────────
+# Run the SAME causal graph backwards: given observed-elevated markers, rank the
+# upstream causes that explain them, ranked by explanatory coverage.
+
+_HYP_RE = re.compile(
+    r"\(Hypothesis\s+(\S+)\s+" + _STV + r"\s+([-\d.eE]+)\s+([-\d.eE]+)\s+"
+    r"\(SupportedBy\s+\(([^)]*)\)\)"
+)
+
+
+def _diagnose(kb: MeTTa, hyps: str, obs: str) -> list[dict]:
+    """Run diagnose and parse the ranked hypothesis records, in returned order."""
+    res = kb.run(f"!(diagnose &self ({hyps}) ({obs}))")
+    assert res and res[0], f"no diagnosis returned: {res}"
+    out = str(res[0][0])
+    parsed = []
+    for m in _HYP_RE.finditer(out):
+        parsed.append({
+            "name": m.group(1),
+            "s": float(m.group(2)), "c": float(m.group(3)),
+            "coverage": int(float(m.group(4))), "mass": float(m.group(5)),
+            "markers": set(m.group(6).split()),
+        })
+    return parsed
+
+
+def test_explains_only_positive_chains(kb):
+    # CellularSenescence RAISES DNAmPAI1 (Pos) -> it explains an elevated reading.
+    r = kb.run("!(explains-obs &self CellularSenescence DNAmPAI1)")
+    assert "(explains DNAmPAI1" in str(r[0][0])
+    # MitochondrialDysfunction has no chain to DNAmPAI1 -> explains nothing.
+    r2 = kb.run("!(explains-obs &self MitochondrialDysfunction DNAmPAI1)")
+    assert r2 == [[]] or all(len(g) == 0 for g in r2)
+
+
+def test_diagnosis_ranks_by_coverage(kb):
+    dx = _diagnose(
+        kb,
+        "CellularSenescence MitochondrialDysfunction ChronicInflammation",
+        "DNAmPAI1 DNAmGDF15 CRP",
+    )
+    names = [h["name"] for h in dx]
+    covs = [h["coverage"] for h in dx]
+    # Parsimony: the cause explaining the most findings ranks first.
+    assert names == ["CellularSenescence", "ChronicInflammation", "MitochondrialDysfunction"]
+    assert covs == [3, 2, 1]
+
+
+def test_diagnosis_provenance_and_tv(kb):
+    dx = {h["name"]: h for h in _diagnose(
+        kb,
+        "CellularSenescence MitochondrialDysfunction ChronicInflammation",
+        "DNAmPAI1 DNAmGDF15 CRP",
+    )}
+    # CellularSenescence accounts for every observed marker.
+    assert dx["CellularSenescence"]["markers"] == {"DNAmPAI1", "DNAmGDF15", "CRP"}
+    assert dx["MitochondrialDysfunction"]["markers"] == {"DNAmGDF15"}
+    # reported strength = strongest single pathway; confidence = noisy-OR.
+    assert dx["CellularSenescence"]["s"] == pytest.approx(0.595)
+    assert dx["MitochondrialDysfunction"]["c"] == pytest.approx(0.65)
+
+
+def test_diagnosis_omits_unconnected_hypotheses(kb):
+    # GenomicInstability has no causal bridge to any observed marker -> dropped,
+    # not invented (no false hypothesis).
+    names = [h["name"] for h in _diagnose(
+        kb,
+        "CellularSenescence GenomicInstability",
+        "DNAmPAI1 DNAmGDF15 CRP",
+    )]
+    assert names == ["CellularSenescence"]

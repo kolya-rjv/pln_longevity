@@ -55,7 +55,8 @@ _METTA_FILES = _discover_metta_files()
 _ONTOLOGY_CHOICES = list(_METTA_FILES.keys()) or ["(no .metta files found)"]
 
 # The coherent inference stack (calibration -> curated bridges -> deduction ->
-# intervention ranking) plus the ontology and evidence it reads. Selected by
+# intervention ranking + abductive diagnosis) plus the ontology and evidence it
+# reads. Selected by
 # default so the LLM translator SEES the inference functions
 # (calibrate-tv / infer / explain / rank-interventions) and the entity names
 # they operate on, and so the symbol validator recognises them. Execution runs
@@ -73,6 +74,7 @@ _INFERENCE_STACK: list[str] = [
     "mechanistic_bridges.metta",
     "pln_deduction.metta",
     "pln_intervention_ranking.metta",
+    "pln_abductive_diagnosis.metta",
 ]
 _DEFAULT_SELECTION = (
     [f for f in _INFERENCE_STACK if f in _METTA_FILES]

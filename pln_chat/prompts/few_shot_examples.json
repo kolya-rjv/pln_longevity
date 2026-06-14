@@ -160,5 +160,14 @@
     "requires_pln_inference": true,
     "confidence_filter": 0.0,
     "warnings": ["Ordering reflects calibrated evidence and chain length; longer mechanistic chains carry lower confidence."]
+  },
+  {
+    "nl": "A patient shows elevated DNAmPAI1, DNAmGDF15 and CRP. What upstream causes best explain this, ranked?",
+    "metta_query": "(diagnose &self (CellularSenescence MitochondrialDysfunction ChronicInflammation) (DNAmPAI1 DNAmGDF15 CRP))",
+    "explanation": "Abductive diagnosis: runs the causal graph BACKWARD to rank upstream causes that would raise the observed markers. Each candidate is scored by how many findings it explains (coverage) then by total evidence, and returned as (Hypothesis <cause> (stv s c) <coverage> <mass> (SupportedBy <markers>)), most-explanatory first. Causes with no causal chain to any observed marker are omitted rather than invented.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": ["The candidate-cause list is explicit (here, the relevant hallmarks of aging); pass more to widen the search. Marker order within SupportedBy is not significant."]
   }
 ]
