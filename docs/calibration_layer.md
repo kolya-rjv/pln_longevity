@@ -141,13 +141,14 @@ emit this tag at write time.
 
 ## 7. Open architecture questions (please settle)
 
-1. **TV storage convention** — *how* is `(stv s c)` attached to a link? Options:
-   (a) type annotation `(: (Predicts A B) (stv s c))`; (b) a wrapper
-   `(TruthValue (Predicts A B) (stv s c))`; (c) `calibrate` stays a **function**
-   called at query time and nothing is stored. This **must match how the
-   not-yet-built deduction rule reads truth values** — so it should be decided
-   *together with* the first inference rule, not now. The stub commits to
-   nothing: `calibrate-tv` is a pure function returning the `(stv s c)`.
+1. **TV storage convention** — ✅ **RESOLVED** by the first deduction rule
+   (`pln_deduction.metta`, see `docs/deduction_layer.md`). None of (a)/(b)/(c)
+   exactly; the inference layer chains over a **dedicated truth-valued link**
+   `(Implication <from> <to> (stv s c))`. Raw evidence atoms stay untouched and
+   TV-free; domain predicates are *lifted* into this canonical link. For
+   calibrated empirical associations the lift derives the TV on the fly via
+   `calibrate-tv` (nothing is materialised), so `calibrate-tv` remains the pure
+   function the stub already is.
 2. **Species/model discount** — confidence only, or also strength?
 3. **Strength transform** — bucket vs `1 − 1/HR` vs logistic; and how to
    normalize across effect scales (per-year vs per-SD).

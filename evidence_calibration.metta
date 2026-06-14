@@ -15,9 +15,11 @@
 ;;   grim_age_core.metta                (typing for predictors/outcomes)
 ;;   grim_age_lu2019_evidence.metta     (the records calibrated below)
 ;;
-;; STATUS: design stub. Transforms are deliberately coarse and have NOT been
-;; run against a live Hyperon runtime (no `hyperon` in the env yet). Do not
-;; treat the numbers as validated. Smoke-test queries are at the bottom.
+;; STATUS: design stub, verified against hyperon 0.2.10 (smoke tests at the
+;; bottom; regression-guarded in tests/test_pln_deduction.py). Transforms are
+;; deliberately coarse — do not treat the numbers as numerically validated; the
+;; architecture is what is locked. The downstream deduction layer that consumes
+;; these TVs lives in pln_deduction.metta.
 
 ;; ================================================================
 ;; 0. Input contract
