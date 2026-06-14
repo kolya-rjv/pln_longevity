@@ -19,6 +19,7 @@ from config import (
     DEFAULT_MODEL,
     DEFAULT_TEMPERATURE,
     ONTOLOGY_DIR,
+    PLN_MAX_KB_FILE_BYTES,
     SHOW_DEBUG_DEFAULT,
     SHOW_EXPLANATION_DEFAULT,
     SHOW_METTA_DEFAULT,
@@ -57,10 +58,9 @@ _ONTOLOGY_CHOICES = list(_METTA_FILES.keys()) or ["(no .metta files found)"]
 # intervention ranking) plus the ontology and evidence it reads. Selected by
 # default so the LLM translator SEES the inference functions
 # (calibrate-tv / infer / explain / rank-interventions) and the entity names
-# they operate on, and so the symbol validator recognises them. Execution always
-# runs against the full KB (_ALL_KB_PATHS) regardless of this selection — the
-# heavy DrugAge ETL files are intentionally left out of the default *context* to
-# keep the prompt focused, not out of execution.
+# they operate on, and so the symbol validator recognises them. Execution runs
+# against the full KB (_ALL_KB_PATHS) regardless of this selection, minus any
+# file too large for the runtime (see _ALL_KB_PATHS below).
 _INFERENCE_STACK: list[str] = [
     "system_types.metta",
     "logical_predicates.metta",
@@ -83,8 +83,33 @@ _DEFAULT_SELECTION = (
 
 # ── Registry helper ────────────────────────────────────────────────────────────
 
-# All KB files available for execution — always the complete set.
-_ALL_KB_PATHS: list[Path] = list(_METTA_FILES.values())
+# KB files loaded into the hyperon space for EXECUTION. The full discovered set
+# MINUS any file over PLN_MAX_KB_FILE_BYTES: hyperon 0.2.10 panics (or silently
+# mis-matches) once a space exceeds a few thousand atoms, and the ~107 KB
+# drugage_etl_short.metta dump trips it — which otherwise crashes the whole app
+# on the first query. Excluded files stay available for queries in stub mode.
+def _runtime_kb_paths() -> list[Path]:
+    kept: list[Path] = []
+    skipped: list[str] = []
+    for path in _METTA_FILES.values():
+        try:
+            too_big = path.stat().st_size > PLN_MAX_KB_FILE_BYTES
+        except OSError:
+            too_big = False
+        if too_big:
+            skipped.append(path.name)
+        else:
+            kept.append(path)
+    if skipped:
+        print(
+            f"PLN runtime: skipping {len(skipped)} .metta file(s) over "
+            f"{PLN_MAX_KB_FILE_BYTES} bytes that destabilise hyperon 0.2.10 "
+            f"({', '.join(skipped)}) — query this data in stub mode."
+        )
+    return kept
+
+
+_ALL_KB_PATHS: list[Path] = _runtime_kb_paths()
 
 
 def _build_context(selected_files: list[str]) -> tuple[OntologyRegistry, dict[str, str]]:

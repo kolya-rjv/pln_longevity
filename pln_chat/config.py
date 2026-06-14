@@ -36,6 +36,16 @@ def _detect_hyperon() -> bool:
 
 PLN_RUNTIME_AVAILABLE: bool = _detect_hyperon()
 
+# Max size (bytes) of a .metta file loaded into the hyperon runtime space.
+# Files larger than this are SKIPPED at execution time: hyperon 0.2.10 panics
+# (hyperon-space trie: "Option::unwrap() on None") — or silently mis-matches —
+# once a space grows past a few thousand atoms, and the ~107 KB
+# drugage_etl_short.metta dump trips it. A size cap excludes that (and any future
+# oversized ETL output) generically while keeping every hand-written ontology /
+# inference file (all < 10 KB). Such bulk data stays queryable in stub mode.
+# Raise this (or set PLN_MAX_KB_FILE_BYTES) once the runtime handles larger spaces.
+PLN_MAX_KB_FILE_BYTES: int = int(os.getenv("PLN_MAX_KB_FILE_BYTES", "60000"))
+
 # ── UI defaults ────────────────────────────────────────────────────────────────
 DEFAULT_CONFIDENCE_THRESHOLD: float = 0.70
 SHOW_METTA_DEFAULT: bool = True
