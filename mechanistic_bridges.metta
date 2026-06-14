@@ -1,20 +1,23 @@
 ;; mechanistic_bridges.metta
-;; Curated mechanistic bridge priors for the inference layer.    [v0]
+;; Curated mechanistic bridge priors for the inference layer.    [v1]
 ;;
 ;; These are the connective tissue that lets PLN deduction chain ACROSS sources
-;; (pln_deduction.metta). Each is a single truth-valued directed link
+;; (pln_deduction.metta). Each is a single SIGNED truth-valued directed link
 ;;
-;;     (Implication <from> <to> (stv <strength> <confidence>))
+;;     (Effect <from> <to> <sign> (stv <strength> <confidence>))
+;;
+;;   sign ∈ { Pos, Neg }: Pos = <from> raises <to>, Neg = <from> reduces <to>.
 ;;
 ;; HONESTY CONTRACT — how these differ from calibrated empirical links:
 ;;   * confidence  is DERIVED, not invented: it is a lookup into the single
 ;;                 evidence-confidence authority (epistemic_calibration.metta),
 ;;                 by the strongest evidence tier behind the mechanism.
-;;   * strength    is an explicit CURATED PRIOR (expert estimate). Unlike a
-;;                 calibrated empirical link (whose strength is a reproducible
-;;                 function of a reported effect size), a mechanistic step has
-;;                 no single effect size, so strength is a documented judgment
-;;                 to be refined in the tuning loop (calibration_layer.md §8).
+;;   * strength    is an explicit CURATED PRIOR (expert estimate): the effect
+;;                 MAGNITUDE. Unlike a calibrated empirical link (whose strength
+;;                 is a reproducible function of a reported effect size), a
+;;                 mechanistic step has no single effect size, so strength is a
+;;                 documented judgment to refine in the tuning loop
+;;                 (calibration_layer.md §8).
 ;;     This is the one place strengths are hand-set; they are quarantined here,
 ;;     clearly labelled, and never mixed into the raw evidence files.
 ;;
@@ -25,7 +28,8 @@
 ;; natural follow-up (calibration_layer.md open-question #4).
 ;;
 ;; Load AFTER: system_types, logical_predicates, epistemic_calibration,
-;;             grim_age_core (defines DNAmPAI1).
+;;             grim_age_core (DNAmPAI1), hallmarks_core (CellularSenescence),
+;;             hallmarks_lopezotin2023_intervention_evidence (DasatinibPlusQuercetin).
 
 ;; ------------------------------------------------------------
 ;; Minimal typing for the SASP node introduced here.
@@ -34,7 +38,7 @@
 (: SASP Phenotype)
 
 ;; ------------------------------------------------------------
-;; Senescence -> SASP -> PAI-1 axis
+;; Senescence -> SASP -> PAI-1 axis (harmful direction)
 ;; ------------------------------------------------------------
 ;; Cellular senescence drives the SASP; the SASP includes elevated PAI-1
 ;; (SERPINE1), the plasma protein whose DNAm surrogate (DNAmPAI1) is a GrimAge
@@ -42,11 +46,26 @@
 ;; DNAmPAI1 -> CoronaryHeartDisease, these bridges let PLN derive the novel,
 ;; never-directly-stated conclusion CellularSenescence -> CoronaryHeartDisease.
 ;;
-;; strength: curated prior. confidence: = (evidence-confidence ...) lookup,
-;; left unevaluated so it stays a single source of truth; the arithmetic in
-;; combine-tv reduces it at chain time.
-(Implication CellularSenescence SASP
+;; strength: curated prior (magnitude). confidence: = (evidence-confidence ...)
+;; lookup, left unevaluated so it stays a single source of truth; the arithmetic
+;; in combine-tv reduces it at chain time.
+(Effect CellularSenescence SASP Pos
    (stv 0.85 (evidence-confidence AnimalStudies_Replicated)))
 
-(Implication SASP DNAmPAI1
+(Effect SASP DNAmPAI1 Pos
+   (stv 0.70 (evidence-confidence AnimalStudies_Replicated)))
+
+;; ------------------------------------------------------------
+;; Senolytic intervention (protective direction)
+;; ------------------------------------------------------------
+;; Dasatinib + Quercetin clears senescent cells, i.e. REDUCES the cellular-
+;; senescence burden (Neg). Source-grounded by the López-Otín 2023 review
+;; records LopezOtin2023_DQ_Mouse ("increased health- and lifespan") and
+;; LopezOtin2023_DQ_Human_DiabeticKidneyDisease ("reduction of senescent cells
+;; ... and of pro-inflammatory factors in serum").
+;;
+;; Chaining this Neg hop into the harmful senescence->...->CHD axis flips the net
+;; sign to Neg: PLN derives that D+Q is expected to *reduce* CHD risk — the
+;; signed, uncertainty-quantified intervention signal of pipeline.md Demo 2.
+(Effect DasatinibPlusQuercetin CellularSenescence Neg
    (stv 0.70 (evidence-confidence AnimalStudies_Replicated)))

@@ -5,6 +5,8 @@ These load the real .metta knowledge-base files into one shared MeTTa space
 
   * the evidence -> truth-value calibration reproduces its documented values;
   * transitive deduction propagates (stv s c) and attenuates confidence;
+  * SIGN propagates — a harmful axis is Pos, a senolytic intervention into that
+    axis flips the net effect to Neg (protective);
   * a novel cross-source inference is derived with an auditable path;
   * unconnected concepts yield NO chain (no false positives).
 
@@ -32,9 +34,14 @@ KB_FILES = [
     "grim_age_core.metta",
     "grim_age_lu2019_evidence.metta",
     "evidence_calibration.metta",
+    "hallmarks_core.metta",
+    "hallmarks_lopezotin2023_intervention_evidence.metta",
     "mechanistic_bridges.metta",
     "pln_deduction.metta",
 ]
+
+_STV = r"\(stv\s+([-\d.eE]+)\s+([-\d.eE]+)\)"
+_SIGNED = re.compile(r"\(signed\s+(Pos|Neg)\s+" + _STV + r"\)")
 
 
 @pytest.fixture(scope="module")
@@ -50,9 +57,18 @@ def _stv(kb: MeTTa, query: str) -> tuple[float, float]:
     """Run a query expected to return exactly one (stv s c); return (s, c)."""
     res = kb.run(query)
     assert res and res[0], f"no result for {query}: {res}"
-    m = re.search(r"\(stv\s+([-\d.eE]+)\s+([-\d.eE]+)\)", str(res[0][0]))
+    m = re.search(_STV, str(res[0][0]))
     assert m, f"no stv in result for {query}: {res}"
     return float(m.group(1)), float(m.group(2))
+
+
+def _signed(kb: MeTTa, query: str) -> tuple[str, float, float]:
+    """Run a query expected to return one (signed <Sign> (stv s c))."""
+    res = kb.run(query)
+    assert res and res[0], f"no result for {query}: {res}"
+    m = _SIGNED.search(str(res[0][0]))
+    assert m, f"no signed-stv in result for {query}: {res}"
+    return m.group(1), float(m.group(2)), float(m.group(3))
 
 
 # ── Calibration baseline (regression-guards the documented values) ──────────────
@@ -68,10 +84,24 @@ def test_calibration_values(kb, record, exp_s, exp_c):
     assert c == pytest.approx(exp_c)
 
 
-# ── Deduction: a direct empirical link lifts to its calibrated TV ───────────────
+# ── Sign algebra ───────────────────────────────────────────────────────────────
 
-def test_direct_link_is_calibrated(kb):
-    s, c = _stv(kb, "!(link-tv &self DNAmPAI1 CoronaryHeartDisease)")
+@pytest.mark.parametrize("a, b, exp", [
+    ("Pos", "Pos", "Pos"),
+    ("Pos", "Neg", "Neg"),
+    ("Neg", "Pos", "Neg"),
+    ("Neg", "Neg", "Pos"),   # reducing a reducer raises
+])
+def test_sign_product(kb, a, b, exp):
+    res = kb.run(f"!(sign-product {a} {b})")
+    assert str(res[0][0]) == exp
+
+
+# ── Deduction: a direct empirical link lifts to its calibrated, signed TV ────────
+
+def test_direct_link_is_calibrated_and_signed(kb):
+    sign, s, c = _signed(kb, "!(link-effect &self DNAmPAI1 CoronaryHeartDisease)")
+    assert sign == "Pos"                       # HR 1.31 > 1 → harmful
     assert (s, c) == pytest.approx((0.6, 0.85))
 
 
@@ -79,33 +109,45 @@ def test_direct_link_is_calibrated(kb):
 
 def test_one_hop_propagation(kb):
     # SASP -> DNAmPAI1 (0.70, 0.65) chained into DNAmPAI1 -> CHD (0.6, 0.85)
-    s, c = _stv(kb, "!(infer &self SASP CoronaryHeartDisease)")
+    sign, s, c = _signed(kb, "!(infer &self SASP CoronaryHeartDisease)")
+    assert sign == "Pos"
     assert s == pytest.approx(0.70 * 0.6)                    # 0.42
     assert c == pytest.approx(0.65 * 0.85 * 0.9)             # 0.49725
 
 
-def test_novel_cross_source_inference(kb):
-    # CellularSenescence -> CHD is stated by NO source; it is derived across
-    # the Hallmarks concept, the curated SASP/PAI-1 bridges, and Lu 2019.
-    s, c = _stv(kb, "!(infer &self CellularSenescence CoronaryHeartDisease)")
+def test_novel_cross_source_inference_harmful(kb):
+    # CellularSenescence -> CHD is stated by NO source; derived across the
+    # Hallmarks concept, the curated SASP/PAI-1 bridges, and Lu 2019. Harmful.
+    sign, s, c = _signed(kb, "!(infer &self CellularSenescence CoronaryHeartDisease)")
+    assert sign == "Pos"
     assert s == pytest.approx(0.85 * 0.70 * 0.6)             # 0.357
     assert c == pytest.approx(0.65 * 0.65 * 0.85 * 0.9 * 0.9)  # ~0.29089
-    # Confidence must be strictly lower than any single hop's confidence.
-    assert c < 0.65
+    assert c < 0.65                                          # below any single hop
+
+
+# ── The headline: a protective intervention flips the net sign ─────────────────
+
+def test_protective_intervention_flips_sign(kb):
+    # D+Q clears senescence (Neg) -> ... -> CHD (Pos axis): net Neg = REDUCES risk.
+    sign, s, c = _signed(kb, "!(infer &self DasatinibPlusQuercetin CoronaryHeartDisease)")
+    assert sign == "Neg"                                     # protective
+    assert s == pytest.approx(0.70 * 0.85 * 0.70 * 0.6)      # 0.2499
+    assert c == pytest.approx(0.65 ** 3 * 0.85 * 0.9 ** 3)   # ~0.17017
 
 
 # ── Provenance: the derivation path is auditable ───────────────────────────────
 
-def test_explain_returns_path(kb):
-    res = kb.run("!(explain &self CellularSenescence CoronaryHeartDisease)")
+def test_explain_returns_signed_path(kb):
+    res = kb.run("!(explain &self DasatinibPlusQuercetin CoronaryHeartDisease)")
     out = str(res[0][0])
-    assert "(Chain (CellularSenescence SASP DNAmPAI1 CoronaryHeartDisease)" in out
-    assert "stv" in out
+    assert ("(Chain (DasatinibPlusQuercetin CellularSenescence SASP DNAmPAI1 "
+            "CoronaryHeartDisease)") in out
+    assert "(signed Neg" in out
 
 
 # ── No false chains between unconnected concepts ───────────────────────────────
 
 def test_no_false_chain(kb):
-    res = kb.run("!(infer &self CellularSenescence AllCauseMortality)")
+    res = kb.run("!(infer &self DasatinibPlusQuercetin AllCauseMortality)")
     # MeTTa returns a single empty result group when nothing matches.
     assert res == [[]] or all(len(g) == 0 for g in res)

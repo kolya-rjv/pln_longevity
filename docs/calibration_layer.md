@@ -156,6 +156,10 @@ emit this tag at write time.
    `MetaAnalysis_Human` category (~0.90) above `MultipleHumanTrials`?
 5. **Negative evidence** — represent ITP failures as strength ≈ 0, or via a
    distinct predicate? (Affects e.g. `Extends Resveratrol Lifespan`.)
+   *Partially addressed downstream:* the deduction layer now carries an explicit
+   `Pos`/`Neg` sign on every link, so protective/harmful direction is
+   first-class (`docs/deduction_layer.md` §3). Strength-≈0 vs. sign for ITP
+   nulls is still open here.
 6. **Multiple records, one link** — aggregation / PLN revision rule when several
    evidence records bear on the same relation.
 
