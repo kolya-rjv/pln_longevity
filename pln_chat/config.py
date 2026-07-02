@@ -47,7 +47,7 @@ PLN_RUNTIME_AVAILABLE: bool = _detect_hyperon()
 PLN_MAX_KB_FILE_BYTES: int = int(os.getenv("PLN_MAX_KB_FILE_BYTES", "60000"))
 
 # ── UI defaults ────────────────────────────────────────────────────────────────
-DEFAULT_CONFIDENCE_THRESHOLD: float = 0.70
+DEFAULT_CONFIDENCE_THRESHOLD: float = 0.0
 SHOW_METTA_DEFAULT: bool = True
 SHOW_EXPLANATION_DEFAULT: bool = True
 SHOW_DEBUG_DEFAULT: bool = False
