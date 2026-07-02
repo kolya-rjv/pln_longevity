@@ -24,7 +24,9 @@
     "intent": "retrieval",
     "requires_pln_inference": false,
     "confidence_filter": 0.0,
-    "warnings": ["Results depend on which Extends atoms have been loaded from curated sources or LLM extraction phases."]
+    "warnings": [
+      "Results depend on which Extends atoms have been loaded from curated sources or LLM extraction phases."
+    ]
   },
   {
     "nl": "What is the truth value for Rapamycin causing mTORC1 inhibition?",
@@ -33,7 +35,9 @@
     "intent": "retrieval",
     "requires_pln_inference": false,
     "confidence_filter": 0.0,
-    "warnings": ["This atom is from the mechanistic/causal layer and may only be present once curated knowledge is loaded."]
+    "warnings": [
+      "This atom is from the mechanistic/causal layer and may only be present once curated knowledge is loaded."
+    ]
   },
   {
     "nl": "List all evidence categories with confidence above 0.7.",
@@ -150,7 +154,9 @@
     "intent": "inference",
     "requires_pln_inference": true,
     "confidence_filter": 0.0,
-    "warnings": ["Returns no result (no false chain) when the two concepts are unconnected in the loaded KB."]
+    "warnings": [
+      "Returns no result (no false chain) when the two concepts are unconnected in the loaded KB."
+    ]
   },
   {
     "nl": "Rank dasatinib plus quercetin, fisetin and spermidine by their expected protective effect on coronary heart disease.",
@@ -159,7 +165,9 @@
     "intent": "inference",
     "requires_pln_inference": true,
     "confidence_filter": 0.0,
-    "warnings": ["Ordering reflects calibrated evidence and chain length; longer mechanistic chains carry lower confidence."]
+    "warnings": [
+      "Ordering reflects calibrated evidence and chain length; longer mechanistic chains carry lower confidence."
+    ]
   },
   {
     "nl": "A patient shows elevated DNAmPAI1, DNAmGDF15 and CRP. What upstream causes best explain this, ranked?",
@@ -168,6 +176,30 @@
     "intent": "inference",
     "requires_pln_inference": true,
     "confidence_filter": 0.0,
-    "warnings": ["The candidate-cause list is explicit (here, the relevant hallmarks of aging); pass more to widen the search. Marker order within SupportedBy is not significant."]
+    "warnings": [
+      "The candidate-cause list is explicit (here, the relevant hallmarks of aging); pass more to widen the search. Marker order within SupportedBy is not significant."
+    ]
+  },
+  {
+    "nl": "Patient001 has a discordant methylation profile. Diagnose the most likely upstream causes.",
+    "metta_query": "(diagnose-patient &self Patient001 (CellularSenescence MitochondrialDysfunction ChronicInflammation))",
+    "explanation": "Patient-grounded abductive diagnosis. Instead of a hand-typed marker list, it reads Patient001's measured standardized biomarkers, grounds them into the ELEVATED findings (via the documented threshold in patient_profile.metta), and runs the same backward causal search as `diagnose`. Returns (Hypothesis <cause> (stv s c) <coverage> <mass> (SupportedBy <markers>)) most-explanatory first. A measured finding no bridge can explain is carried but credited to no cause.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Uses the patient's grounded observations; only markers above the elevated-z-threshold become findings. The candidate-cause list is explicit (here the relevant hallmarks of aging)."
+    ]
+  },
+  {
+    "nl": "For Patient001, rank dasatinib plus quercetin, fisetin and spermidine by expected benefit on coronary heart disease.",
+    "metta_query": "(rank-interventions-for-patient &self Patient001 (DasatinibPlusQuercetin Fisetin Spermidine) CoronaryHeartDisease)",
+    "explanation": "Patient-personalized intervention ranking (Demo 2 with f(patient factors)). Each candidate's population protective score on the outcome is added to its patient-relevance — how much it reduces the markers THIS patient actually presents elevated — and sorted most-beneficial first as (scored <intervention> <score> (signed <sign> (stv s c))). Candidates with no causal chain to the outcome are omitted rather than mis-ranked.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Personalization is additive on top of the population score; ordering still reflects calibrated evidence and chain length."
+    ]
   }
 ]

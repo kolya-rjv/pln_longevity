@@ -101,8 +101,10 @@ plausible-sounding rank.
 2. **Base rates** — without node priors (deduction_layer.md §7.2) the score is a
    coverage/evidence proxy, not a calibrated posterior `P(cause | findings)`.
    Adding base rates upgrades this to a proper Bayesian abduction.
-3. **Patient grounding** — observations are passed explicitly; wiring them to a
-   real NHANES methylation + blood profile (still-absent layer) turns the demo
-   from synthetic to personalized.
+3. ~~**Patient grounding**~~ ✅ **Done** — `patient_profile.metta` grounds a
+   patient's measured biomarkers into the observation set; `diagnose-patient`
+   reproduces this ranking straight from `Patient001`'s values (see
+   `docs/patient_grounding.md`). Remaining: import real NHANES rows as `MeasuredZ`
+   atoms instead of one curated example patient.
 4. **Auto-candidate causes** — default the hypothesis set to all twelve hallmarks
    (unconnected ones already drop out) instead of an explicit list.

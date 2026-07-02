@@ -96,10 +96,12 @@ Three reads that an LLM cannot reproduce from first principles:
 1. **Multiple derivations per candidate** — when `infer` yields several paths to
    the outcome, rank currently lists each; combine them with a PLN **revision**
    rule first (shared with `deduction_layer.md` §7.4).
-2. **Patient grounding** — the ranking is currently population-level. Demo 2 in
-   full multiplies in patient-specific factors (`f(patient factors)`,
-   `pipeline.md` §4.2); that needs the still-absent NHANES / patient-profile
-   layer.
+2. ~~**Patient grounding**~~ ✅ **Done (v1)** — `patient_profile.metta` adds
+   `rank-interventions-for-patient`, folding a patient-relevance factor
+   (`f(patient factors)`) onto the population score from this layer (see
+   `docs/patient_grounding.md`). v1 combines additively; the multiplicative form
+   of `pipeline.md` §4.2 and reordering across differently-presenting patients
+   are the documented follow-ups.
 3. **Multi-outcome ranking** — rank against a basket of outcomes (mortality, CHF,
    CHD) and aggregate, rather than a single target.
 4. **Surface in the chat app** — add a `rank-interventions` few-shot so the LLM

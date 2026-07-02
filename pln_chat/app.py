@@ -75,6 +75,7 @@ _INFERENCE_STACK: list[str] = [
     "pln_deduction.metta",
     "pln_intervention_ranking.metta",
     "pln_abductive_diagnosis.metta",
+    "patient_profile.metta",
 ]
 _DEFAULT_SELECTION = (
     [f for f in _INFERENCE_STACK if f in _METTA_FILES]
