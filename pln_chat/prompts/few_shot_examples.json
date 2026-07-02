@@ -201,5 +201,16 @@
     "warnings": [
       "Personalization is additive on top of the population score; ordering still reflects calibrated evidence and chain length."
     ]
+  },
+  {
+    "nl": "Classify each of Patient001's measured biomarkers as elevated, normal or low.",
+    "metta_query": "(match &self (MeasuredZ Patient001 $marker $z) (Status $marker (patient-status &self Patient001 $marker)))",
+    "explanation": "Grounds each of Patient001's raw standardized measurements into a qualitative status via patient-status (which applies the elevated-z-threshold in patient_profile.metta), returning (Status <marker> <Elevated|Normal|Low>) per measured marker.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Only markers actually measured for the patient are classified; unmeasured markers return no status."
+    ]
   }
 ]

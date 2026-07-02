@@ -32,6 +32,9 @@ _RULE_DEF = re.compile(r'^\(=\s+\((\S+)\s+\$', re.DOTALL)
 # (Inheritance <symbol> <parent>) -- concrete instance declaration
 _INHERITANCE = re.compile(r'^\(Inheritance\s+(\S+)\s+(\S+)\s*\)$')
 
+# (InstanceOf <symbol> <type>) -- ETL row / patient profile -> type membership
+_INSTANCEOF = re.compile(r'^\(InstanceOf\s+(\S+)\s+(\S+)\s*\)$')
+
 
 def _strip_inline_comment(line: str) -> str:
     """Remove a trailing ; comment outside parentheses (simple heuristic)."""
@@ -140,6 +143,22 @@ def parse_metta_file(path: Path) -> OntologyRegistry:
                     type_signature=parent,
                     source_file=filename,
                 ))
+            continue
+
+        # Concrete instance declarations: (InstanceOf Symbol Type)
+        # e.g. (InstanceOf Patient001 PatientProfile)
+        #      (InstanceOf DrugAgeRow_0 Experiment)
+        m5 = _INSTANCEOF.match(expr)
+        if m5:
+            symbol, parent = m5.group(1), m5.group(2)
+            if not registry.get(symbol):
+                registry.register(OntologyEntry(
+                    name=symbol,
+                    category="constant",
+                    type_signature=parent,
+                    source_file=filename,
+                ))
+            continue
 
     return registry
 
