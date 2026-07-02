@@ -131,11 +131,16 @@ combination is **additive and auditable**: `personalized = population + relevanc
    promote an intervention that also helps this patient, never demote a
    population-protective one below a harmful one). A multiplicative form is the
    documented refinement.
-3. **Reordering across patients.** With only the senescence axis bridged, every
-   candidate helps the same markers, so personalization *amplifies* but does not
-   *reorder*. A second bridged axis (e.g. metabolic) would let one patient rank a
-   metabolic drug first and another rank a senolytic first — the compelling
-   "personalization changes the decision" demo. Needs new bridges, not new engine.
+3. ~~**Reordering across patients.**~~ ✅ **Done** — a second, independent
+   **metabolic axis** (`mechanistic_bridges.metta`: `DeregulatedNutrientSensing →
+   InsulinResistance → FastingGlucose/HbA1c → CHD`; `Metformin`/`Berberine ⊣
+   InsulinResistance`) plus a metabolic-dominant **`Patient002`** now make
+   personalization *reorder*, not just amplify: from the **same pool against the
+   same outcome**, `Patient001` ranks `DasatinibPlusQuercetin` first and
+   `Patient002` ranks `Metformin` first — the "personalization changes the
+   decision" demo (regression-guarded in `tests/test_patient_grounding.py`).
+   Remaining: bridge more axes (mito, inflammation-primary) and let a patient
+   present *multiple* co-elevated axes.
 4. **Discordance interpretation.** The profile already encodes the normal-Horvath
    / elevated-GrimAge discordance; the `pipeline.md` App. A.4 discordance rules
    (e.g. `(Normal Horvath) ∧ (Elevated GrimAge) ⇒ mortality risk independent of

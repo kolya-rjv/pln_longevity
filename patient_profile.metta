@@ -93,6 +93,30 @@
 (MeasuredZ Patient001 DNAmLeptin      -1.5)   ; low — exercises the Low branch
 
 ;; ================================================================
+;; 1b. Second example patient — metabolic-dominant (contrast to Patient001)
+;; ================================================================
+;; Same surface discordance (elevated GrimAge) but a DIFFERENT driver: elevated
+;; fasting glucose + HbA1c with NORMAL senescence markers. This contrast is what
+;; makes personalization REORDER rather than merely amplify — from the same
+;; candidate pool against the same outcome, Patient002 ranks the AMPK activators
+;; (metformin, berberine) first where Patient001 ranks the senolytics first (see
+;; the metabolic axis in mechanistic_bridges.metta and docs/patient_grounding.md
+;; §6). GrimAge is elevated for BOTH, but for different upstream reasons — the
+;; personalized diagnosis and ranking separate them; an LLM cannot.
+(InstanceOf Patient002 PatientProfile)
+(PatientAge     Patient002 61)
+(PatientSex     Patient002 Male)
+(PatientSmoking Patient002 FormerSmoker)
+
+(MeasuredZ Patient002 HorvathAgeAccel  0.3)   ; first-gen clock ~ normal
+(MeasuredZ Patient002 AgeAccelGrim     1.3)   ; GrimAge elevated (metabolic aging)
+(MeasuredZ Patient002 FastingGlucose   1.9)   ; elevated — the metabolic signal
+(MeasuredZ Patient002 HbA1c            1.6)   ; elevated
+(MeasuredZ Patient002 DNAmPAI1         0.2)   ; senescence markers NORMAL
+(MeasuredZ Patient002 CRP              0.4)
+(MeasuredZ Patient002 DNAmGDF15        0.1)
+
+;; ================================================================
 ;; 2. Grounding: standardized value -> qualitative status
 ;; ================================================================
 ;; The single tunable threshold (in SDs) at which a marker is called Elevated /

@@ -206,3 +206,69 @@ def test_personalized_score_is_population_base_plus_relevance(kb):
         "(DasatinibPlusQuercetin Fisetin Spermidine) CoronaryHeartDisease)",
     ))
     assert order["DasatinibPlusQuercetin"] == pytest.approx(base + rel)
+
+
+# ── The metabolic axis + Patient002: personalization REORDERS across patients ────
+# Patient001 is senescence-dominant, Patient002 metabolic-dominant. From the SAME
+# candidate pool against the SAME outcome, the top recommendation flips — the
+# f(patient factors) property that an LLM cannot reproduce deterministically.
+
+_POOL = "DasatinibPlusQuercetin Fisetin Spermidine Metformin Berberine"
+
+
+def test_patient002_status_and_observations(kb):
+    assert _one(kb, "!(patient-status &self Patient002 FastingGlucose)") == "Elevated"
+    assert _one(kb, "!(patient-status &self Patient002 HbA1c)") == "Elevated"
+    assert _one(kb, "!(patient-status &self Patient002 DNAmPAI1)") == "Normal"
+    obs = set(re.findall(r"\w+", _one(kb, "!(patient-observations &self Patient002)")))
+    assert obs == {"AgeAccelGrim", "FastingGlucose", "HbA1c"}   # senescence markers excluded
+
+
+def test_metabolic_axis_reaches_chd(kb):
+    out = _one(kb, "!(infer &self Metformin CoronaryHeartDisease)")
+    m = re.search(r"\(signed\s+(\w+)\s+" + _STV + r"\)", out)
+    assert m and m.group(1) == "Neg"                       # net protective
+    assert float(m.group(2)) == pytest.approx(0.33)        # 0.75*0.80*0.55
+    assert float(m.group(3)) == pytest.approx(0.268515)    # 0.85*0.65*0.60*0.9^2
+
+
+def test_diagnose_patient002_finds_metabolic_cause(kb):
+    out = _one(
+        kb,
+        "!(diagnose-patient &self Patient002 "
+        "(CellularSenescence DeregulatedNutrientSensing MitochondrialDysfunction))",
+    )
+    hyps = {m.group(1): set(m.group(6).split()) for m in _HYP_RE.finditer(out)}
+    # The metabolic hallmark explains the glucose/HbA1c picture; the senescence and
+    # mito causes explain none of Patient002's elevated markers and are omitted.
+    assert set(hyps) == {"DeregulatedNutrientSensing"}
+    assert hyps["DeregulatedNutrientSensing"] == {"FastingGlucose", "HbA1c"}
+
+
+def test_metformin_relevance_is_patient_specific(kb):
+    # Metformin reduces Patient002's elevated metabolic markers (relevance > 0) but
+    # none of Patient001's elevated senescence markers (relevance == 0).
+    assert _num(kb, "!(patient-relevance &self Patient002 Metformin)") > 0.4
+    assert _num(kb, "!(patient-relevance &self Patient001 Metformin)") == pytest.approx(0.0)
+
+
+def test_personalization_reorders_across_patients(kb):
+    p1 = [n for n, _ in _ranked(
+        kb, f"!(rank-interventions-for-patient &self Patient001 ({_POOL}) CoronaryHeartDisease)")]
+    p2 = [n for n, _ in _ranked(
+        kb, f"!(rank-interventions-for-patient &self Patient002 ({_POOL}) CoronaryHeartDisease)")]
+    # Same pool, same outcome — OPPOSITE top pick.
+    assert p1[0] == "DasatinibPlusQuercetin"     # senescence patient -> senolytic
+    assert p2[0] == "Metformin"                  # metabolic patient -> AMPK activator
+    # Full verified orders.
+    assert p1 == ["DasatinibPlusQuercetin", "Fisetin", "Metformin", "Berberine", "Spermidine"]
+    assert p2 == ["Metformin", "Berberine", "DasatinibPlusQuercetin", "Fisetin", "Spermidine"]
+
+
+def test_metformin_ranks_above_berberine_same_mechanism(kb):
+    # Same AMPK mechanism; metformin's stronger evidence/magnitude ranks it first
+    # for the metabolic patient — the calibrated-evidence distinction (cf. D+Q vs
+    # Fisetin on the senescence axis).
+    order = dict(_ranked(
+        kb, f"!(rank-interventions-for-patient &self Patient002 ({_POOL}) CoronaryHeartDisease)"))
+    assert order["Metformin"] > order["Berberine"]
