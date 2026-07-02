@@ -16,7 +16,27 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from config import PLN_RUNTIME_AVAILABLE
+from config import ONTOLOGY_DIR, PLN_RUNTIME_AVAILABLE
+
+# ── Scoped DrugAge inference stack ───────────────────────────────────────────────
+# The MINIMAL set of hand-written layers needed to lift + rank DrugAge rows,
+# loaded into a QUERY-SCOPED space alongside a filtered row slice (see
+# run_drugage_ranking). It deliberately EXCLUDES grim_age / hallmarks /
+# mechanistic_bridges: those are the CHD axis, add atoms, and would let compound
+# names collide with curated Effect bridges. Keeping the stack minimal is what
+# keeps the space under the hyperon panic threshold.
+DRUGAGE_STACK: list[Path] = [
+    ONTOLOGY_DIR / f for f in (
+        "system_types.metta",
+        "logical_predicates.metta",
+        "epistemic_calibration.metta",
+        "species_taxonomy.metta",
+        "evidence_calibration.metta",
+        "pln_deduction.metta",
+        "pln_intervention_ranking.metta",
+        "drugage_calibration.metta",
+    )
+]
 
 
 @dataclass
@@ -156,6 +176,7 @@ def _hyperon_run(
     metta_query: str,
     confidence_threshold: float,
     kb_files: Optional[list[Path]],
+    extra_atoms: Optional[str] = None,
 ) -> PLNRunResult:
     """Execute query using the real Hyperon MeTTa interpreter.
 
@@ -198,6 +219,11 @@ def _hyperon_run(
                 kb_blocks.append(path.read_text(encoding="utf-8"))
             except OSError:
                 pass
+        # A caller-supplied slice (e.g. a filtered set of DrugAge rows selected
+        # per-query) is injected into the SAME space after the files. This is how
+        # a query-scoped space is assembled without loading a whole ETL dump.
+        if extra_atoms:
+            kb_blocks.append(extra_atoms)
         kb_text = "\n".join(kb_blocks)
 
         # Log the query (and which KB files were loaded) for debugging. The KB
@@ -244,6 +270,7 @@ def run_query(
     metta_query: str,
     confidence_threshold: float = 0.0,
     kb_files: Optional[list[Path]] = None,
+    extra_atoms: Optional[str] = None,
 ) -> PLNRunResult:
     """Execute a MeTTa query, using stub or runtime mode as configured.
 
@@ -255,9 +282,63 @@ def run_query(
         Minimum STV confidence for results to be included.
     kb_files:
         .metta KB files to load into the Hyperon space (runtime mode only).
+    extra_atoms:
+        Optional raw MeTTa text injected into the SAME space after the files —
+        used to scope a query to a selected data slice (e.g. DrugAge rows).
     """
     if not metta_query.strip():
         return PLNRunResult(status="empty", mode="stub" if not PLN_RUNTIME_AVAILABLE else "runtime")
     if PLN_RUNTIME_AVAILABLE:
-        return _hyperon_run(metta_query, confidence_threshold, kb_files)
+        return _hyperon_run(metta_query, confidence_threshold, kb_files, extra_atoms)
     return _stub_run(metta_query, confidence_threshold)
+
+
+def run_drugage_ranking(
+    compounds: list[str],
+    *,
+    outcome: str = "Mortality",
+    best_per_compound: bool = True,
+    limit: Optional[int] = None,
+    source: Optional[Path] = None,
+    confidence_threshold: float = 0.0,
+) -> tuple[PLNRunResult, list]:
+    """Rank real DrugAge compounds by calibrated, signed effect on lifespan.
+
+    Assembles a QUERY-SCOPED hyperon space = the DrugAge inference stack
+    (DRUGAGE_STACK) + only the DrugAge rows matching `compounds` (selected by
+    ontology.drugage_selector, capped under the panic threshold), then runs
+    `rank-interventions` against `outcome` (default Mortality — the compound ->
+    Lifespan -> Mortality chain keeps the Neg=beneficial convention; see
+    docs/etl_inference_wiring.md).
+
+    Returns (PLNRunResult, selected_rows). The result's atoms are the ranked,
+    signed, uncertainty-quantified `(scored ...)` tuples; selected_rows carries
+    the provenance of exactly which rows were injected.
+
+    Keep the compound pool to a handful (Demo-2 scale): the underlying MeTTa
+    insertion sort in pln_intervention_ranking is ~O(n^2) with a high constant
+    (docs/etl_inference_wiring.md §7). best_per_compound (default) keeps the pool
+    at one entry per compound.
+    """
+    from ontology.drugage_selector import MAX_ROWS, build_drugage_slice
+
+    slice_text, rows = build_drugage_slice(
+        compounds,
+        best_per_compound=best_per_compound,
+        limit=limit if limit is not None else MAX_ROWS,
+        source=source,
+    )
+    # Candidate atoms = the compounds actually present in the slice (a requested
+    # compound with no matching row simply drops out — no false ranking).
+    cands = " ".join(sorted({r.compound for r in rows}))
+    if not cands:
+        return PLNRunResult(status="empty", mode="runtime" if PLN_RUNTIME_AVAILABLE else "stub"), rows
+
+    query = f"!(rank-interventions &self ({cands}) {outcome})"
+    result = run_query(
+        query,
+        confidence_threshold=confidence_threshold,
+        kb_files=DRUGAGE_STACK,
+        extra_atoms=slice_text,
+    )
+    return result, rows
