@@ -104,9 +104,15 @@ Three reads that an LLM cannot reproduce from first principles:
    are the documented follow-ups.
 3. **Multi-outcome ranking** — rank against a basket of outcomes (mortality, CHF,
    CHD) and aggregate, rather than a single target.
-4. **Surface in the chat app** — add a `rank-interventions` few-shot so the LLM
-   translator emits it. **Blocked** by a *pre-existing* full-KB runtime issue
-   (see §6), not by this layer.
+4. **Surface in the chat app** — add a few-shot so the LLM translator emits a
+   ranking form. ✅ **Done for the DrugAge lifespan/mortality axis (v1):** the
+   translator emits a dedicated `(rank-drugage-lifespan (C1 C2 …))` and
+   `pln_chat/app.py` routes it to the **scoped** `run_drugage_ranking` — which
+   sidesteps the §6 full-KB panic by never touching `_ALL_KB_PATHS` (see
+   `docs/etl_inference_wiring.md` §8.5 and `docs/drugage_chat_test_queries.md`).
+   The **generic** `(rank-interventions … CoronaryHeartDisease)` over the whole KB
+   is still **blocked** by the same pre-existing full-KB runtime issue (§6): the
+   scoping trick that unblocks DrugAge is per-vertical, not a general fix.
 
 ## 6. Known issue: full-KB runtime panic (pre-existing, not introduced here)
 

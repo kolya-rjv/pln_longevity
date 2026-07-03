@@ -66,6 +66,17 @@ class DrugAgeRow:
             return _EVIDENCE_RANK[("itp",)]
         return _EVIDENCE_RANK.get((self.significance or "Unreported",), 1)
 
+    @property
+    def pmid(self) -> Optional[str]:
+        """Provenance token (e.g. 'PMID_24341993') parsed from the row block, if any.
+
+        The raw row is never rewritten, so provenance is read back from the
+        verbatim `(ReportedIn <row> PMID_…)` atom — the audit trail the chat app
+        surfaces alongside a ranked compound (docs/etl_inference_wiring.md §5).
+        """
+        m = _RE_PMID.search(self.block)
+        return m.group(1) if m else None
+
 
 _RE_ROWID = re.compile(r"\(InstanceOf\s+(\S+)\s+Experiment\)")
 _RE_COMPOUND = re.compile(r"\(UsesIntervention\s+\S+\s+(\S+?)\)")
@@ -73,6 +84,7 @@ _RE_SPECIES = re.compile(r"\(UsesSpecies\s+\S+\s+(\S+?)\)")
 _RE_ITP = re.compile(r"\(IsITPStudy\s+\S+\)")
 _RE_SIG = re.compile(r"\(AvgLifespanSignificance\s+\S+\s+(\S+?)\)")
 _RE_CHANGE = re.compile(r"\(AvgLifespanChangePercent\s+\S+\s+([-\d.eE]+)\)")
+_RE_PMID = re.compile(r"\(ReportedIn\s+\S+\s+(\S+?)\)")
 
 
 def _parse_block(block: str) -> Optional[DrugAgeRow]:

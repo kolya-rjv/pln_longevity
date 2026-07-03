@@ -212,5 +212,36 @@
     "warnings": [
       "Only markers actually measured for the patient are classified; unmeasured markers return no status."
     ]
+  },
+  {
+    "nl": "Rank rapamycin, acarbose and resveratrol by their expected effect on lifespan and mortality.",
+    "metta_query": "(rank-drugage-lifespan (Rapamycin Acarbose Resveratrol))",
+    "explanation": "Ranks REAL compounds by their measured DrugAge lifespan effect, routed to the scoped DrugAge engine (never the generic space, which lacks the DrugAge rows). For each compound it lifts its DrugAge experiment rows into a signed, calibrated Effect — magnitude from the reported % lifespan change, confidence from the ITP / species / significance tier — chains lifespan→mortality, and sorts most-protective first as (scored <compound> <score> (signed Neg (stv s c))). A well-run ITP null like resveratrol keeps HIGH confidence but ~0 strength, so it sinks toward 0 (an honest 'confidently no effect', not 'uncertain') rather than ranking high.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Use the exact DrugAge intervention names (e.g. Rapamycin, Resveratrol, Metformin, Acarbose). Ranking is per compound over a handful at a time — the scoped-space demo scale. A compound with no DrugAge lifespan row is omitted, not mis-ranked."
+    ]
+  },
+  {
+    "nl": "How much does metformin lower mortality by extending lifespan, according to the DrugAge data?",
+    "metta_query": "(rank-drugage-lifespan (Metformin))",
+    "explanation": "Single-compound DrugAge lift/effect lookup: lifts metformin's DrugAge rows into a signed, calibrated Effect and reports it as (scored Metformin <score> (signed <sign> (stv s c))) with the backing study. Metformin's gold-standard ITP mouse result is a null, so its confidence stays high while its strength is ~0 — 'confidently did not extend mouse lifespan', not 'unknown'.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "Which extends life more strongly once you weigh the evidence — the big worm result for ethanol or the replicated mouse result for rapamycin?",
+    "metta_query": "(rank-drugage-lifespan (Ethanol Rapamycin))",
+    "explanation": "Ranks the two real compounds by DrugAge lifespan effect on mortality, weighing magnitude AND confidence together (never sign alone): a large invertebrate effect carries lower confidence (worm/fly tier) than a replicated ITP mouse result, so a smaller high-confidence mouse effect can legitimately outrank a bigger low-confidence worm one. Returns (scored <compound> <score> (signed Neg (stv s c))) most-protective first.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Ordering reflects both the calibrated magnitude and the species/ITP confidence tier; a worm-only effect is down-weighted relative to a mouse one."
+    ]
   }
 ]

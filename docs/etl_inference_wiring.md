@@ -262,10 +262,34 @@ runs the whole path end-to-end; completing at all is the no-panic proof.
 4. **Strength normalisation across organisms.** A +40 % worm extension and a
    +40 % mouse extension are not equivalent biology; the transform currently
    treats percent uniformly. A per-clade scale is a natural knob.
-5. **Surface in the chat app.** The runtime hook exists (`run_drugage_ranking`);
-   an LLM few-shot that emits it — unblocking `docs/intervention_ranking.md` §5.4
-   for the DrugAge axis now that scoping defeats the panic — is the remaining
-   glue.
+5. ~~**Surface in the chat app.**~~ ✅ **Done (v1).** The translator now emits a
+   **dedicated** NL-facing form `(rank-drugage-lifespan (C1 C2 …))` (three
+   few-shots in `pln_chat/prompts/few_shot_examples.json` + a system-prompt
+   section), and `pln_chat/app.py::chat()` routes it — BEFORE the generic
+   `run_query` — to `run_drugage_ranking` (the scoped stack), feeding the result
+   through the unchanged `format_bot_response`. Routing/parse/degrade live in the
+   Gradio-free `pln_chat/core/drugage_router.py`; asserted by
+   `tests/test_drugage_chat_routing.py` and demonstrated by ten executed queries
+   in `docs/drugage_chat_test_queries.md`. This unblocks
+   `docs/intervention_ranking.md` §5.4 for the DrugAge axis. Routing caveats hit:
+   - **A distinct symbol is load-bearing.** Overloading `(rank-interventions …
+     Mortality)` could not be routed unambiguously *and* would be mis-executed by
+     the generic path (no DrugAge rows in `_ALL_KB_PATHS`, colliding CHD bridges,
+     panic risk). A separate `rank-drugage-lifespan` symbol is what makes the
+     branch a clean string check.
+   - **The generic symbol validator is bypassed for the routed form.** Its
+     compound names / `rank-drugage-lifespan` are not in the UI-selected registry,
+     so `validate()` would flag them as "unknown"; the routed form is validated
+     instead by the selector (does a real row match?). Everything else keeps
+     `validate()`.
+   - **Compound-name mismatch is the likeliest silent failure** (LLM string vs
+     ETL token). Handled two ways: the selector matches case-/separator-insensitively
+     (`rapamycin`→`Rapamycin`) and the few-shots model canonical names. A requested
+     compound with no row is **omitted and named** (not mis-ranked); tested
+     explicitly.
+   - **`build/` is a soft dependency.** Missing `build/drugage_etl.metta` degrades
+     to a "run `scripts/run_etl.sh`" message, never a crash. (The committed 5-row
+     fixture has no non-null ITP variety, so the app path targets `build/`.)
 6. **Other ETL verticals.** GenAge/CellAge rows can be lifted the same way (a
    gene→hallmark or senescence-effect link); this slice locks the pattern.
 
@@ -276,4 +300,7 @@ runs the whole path end-to-end; completing at all is the no-panic proof.
 - Not a modification of any raw ETL row — the lift is on the fly.
 - Not a fix of hyperon's underlying panic — we scope *around* it.
 - Not a general multi-row PLN revision or a faster sort — both are §8 follow-ups.
-- Not the chat-app UI/LLM integration — only the runtime entry point it needs.
+- The calibration/runtime *layer* itself is just the entry point
+  (`run_drugage_ranking`); the chat-app routing that reaches it is a thin
+  consumer added on top (§8.5, `pln_chat/core/drugage_router.py`), not part of
+  this layer's inference logic.

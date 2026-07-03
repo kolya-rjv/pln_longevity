@@ -83,6 +83,23 @@ Units for dosage include: mM, uM, nM, pM, mg_mL, ug_mL, ppm, percent,
 mg_kg, ug_g, mg, Months, Weeks, Days. Percentage concentrations use the
 symbol `percent` — NOT the `%` character.
 
+--- RANKING REAL COMPOUNDS BY LIFESPAN / MORTALITY EFFECT ---
+When the user asks to RANK or compare REAL compounds by their effect on
+lifespan, longevity, or mortality (e.g. "rank rapamycin, metformin and
+resveratrol by lifespan benefit", "how much does acarbose lower mortality"),
+emit the dedicated form
+
+  (rank-drugage-lifespan (<Compound1> <Compound2> ...))
+
+NOT the generic (rank-interventions ...). This routes to the scoped DrugAge
+engine, which ranks the compounds' real DrugAge lifespan evidence (calibrated,
+signed, uncertainty-quantified) by protective effect on Mortality. Use the exact
+DrugAge intervention names (e.g. Rapamycin, Resveratrol, Metformin, Acarbose);
+keep the pool to a handful of compounds. A single compound is valid (a
+one-compound effect lookup). Set intent="inference" and
+requires_pln_inference=true. Reserve (rank-interventions ... CoronaryHeartDisease)
+for the curated mechanistic / CHD axis — not DrugAge lifespan questions.
+
 --- CURRENT ONTOLOGY SNAPSHOT ---
 {ontology_snapshot}
 

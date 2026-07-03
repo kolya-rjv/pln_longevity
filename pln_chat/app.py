@@ -28,8 +28,9 @@ from ontology.loader import load_specific_files
 from ontology.registry import OntologyRegistry, BUILTIN_REGISTRY
 from ontology.expander import run_expansion_pipeline
 from core.context_builder import build_system_prompt
+from core.drugage_router import parse_drugage_query, route_drugage_ranking
 from core.llm_translator import translate
-from core.metta_validator import validate
+from core.metta_validator import ValidationResult, validate
 from core.pln_runner import run_query
 from utils.formatting import format_bot_response
 from utils.logging import log_turn
@@ -165,13 +166,28 @@ def chat(
     print("=" * 60)
     # ─── END DEBUG ─────────
 
-    validation = validate(translation.metta_query, registry)  # uses parsed registry for symbol checks
-
-    pln_result = run_query(
-        metta_query=translation.metta_query,
-        confidence_threshold=confidence_threshold,
-        kb_files=_ALL_KB_PATHS,
-    )
+    # ── DrugAge lifespan/mortality ranking — dedicated scoped route ────────────
+    # A `(rank-drugage-lifespan (C1 C2 …))` query must NOT go through the generic
+    # run_query: that space excludes the DrugAge build/ rows and includes the
+    # colliding CHD bridges (and would risk the hyperon panic). Detect the form
+    # and dispatch to the scoped run_drugage_ranking instead; everything else
+    # keeps the existing path. See core/drugage_router.py + docs §8.5.
+    drugage_compounds = parse_drugage_query(translation.metta_query)
+    if drugage_compounds is not None:
+        # The routed form is validated by the selector (does a row match?), not by
+        # the generic symbol index, which lacks the scoped DrugAge symbols/names.
+        validation = ValidationResult(valid=True)
+        pln_result = route_drugage_ranking(
+            drugage_compounds,
+            confidence_threshold=confidence_threshold,
+        )
+    else:
+        validation = validate(translation.metta_query, registry)  # parsed registry for symbol checks
+        pln_result = run_query(
+            metta_query=translation.metta_query,
+            confidence_threshold=confidence_threshold,
+            kb_files=_ALL_KB_PATHS,
+        )
 
     bot_response = format_bot_response(
         translation=translation,
