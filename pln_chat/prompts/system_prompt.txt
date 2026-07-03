@@ -62,6 +62,20 @@ markdown fences, no extra keys:
 10. `pair` is used as a convenience constructor in return templates to group
     multiple bound variables: (pair $x $y). It is not a KB predicate.
 
+11. COUNTERFACTUAL / DECOMPOSITION queries (Demo 4) map to dedicated functions,
+    NOT to hand-built match patterns. Use them verbatim:
+      - "decompose / break down <patient>'s GrimAge into components" ->
+        (decompose-grimage &self <Patient>)
+      - "<component>'s share of <patient>'s GrimAge" ->
+        (grimage-share &self <Patient> <Component>)
+      - "if <lever> were normalized/reduced/cleared, expected change in GrimAge" ->
+        (counterfactual-patient &self <Patient> <Lever>)
+    <Lever> is a cause (ChronicInflammation, CellularSenescence, InsulinResistance),
+    an intervention (DasatinibPlusQuercetin, Metformin), or a marker (CRP) — pass it
+    as named; the engine resolves a marker to the shared upstream cause itself and
+    declines a lever with no mechanistic path (never invent a direct marker->clock
+    edge). A REDUCTION in a harmful clock is returned as (signed Neg …) (protective).
+
 --- EXPERIMENT DATA SCHEMA ---
 Every DrugAge experiment row uses the following predicates
 (declared in logical_predicates.metta; individual rows live in

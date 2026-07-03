@@ -243,5 +243,60 @@
     "warnings": [
       "Ordering reflects both the calibrated magnitude and the species/ITP confidence tier; a worm-only effect is down-weighted relative to a mouse one."
     ]
+  },
+  {
+    "nl": "Break down Patient001's elevated GrimAge into the biomarker components driving it.",
+    "metta_query": "(decompose-grimage &self Patient001)",
+    "explanation": "Causal decomposition (Demo 4, §5.1): splits Patient001's elevated GrimAge into its per-component attributable shares. For each measured-elevated DNAm surrogate it returns (Component <M> (z z) (weight w) (contribution w*z) (DrivenBy (<upstream causes>))), where the causes are the hallmarks that infer says raise that component, plus the total attributed share and the honest unattributed residual. Components with no measured elevation or no causal driver are left in the residual, never invented.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "The composition weight is a coarse v1 constant (equal over the 8 GrimAge surrogates); the residual is the part those weights and the unmeasured components do not yet explain."
+    ]
+  },
+  {
+    "nl": "For Patient001, if chronic inflammation were normalized, what is the expected change in GrimAge?",
+    "metta_query": "(counterfactual-patient &self Patient001 ChronicInflammation)",
+    "explanation": "Counterfactual do-inference (Demo 4): do(ChronicInflammation normalized) and propagate the reduction through each GrimAge component the driver reaches. Returns (Counterfactual <lever> AgeAccelGrim (expected-delta d) (signed Neg (stv s c)) (Via (<components>))). A REDUCTION in a harmful clock is protective, so the sign is Neg and expected-delta is negative; confidence is propagated from the causal route (longer route -> lower c). Inflammation reaches only DNAmGDF15, so the Via lists that single component.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "expected-delta and strength are in GrimAge SD units under the coarse v1 composition weights; the estimate is signed by the Neg=beneficial convention (a reduction is protective)."
+    ]
+  },
+  {
+    "nl": "How much would clearing Patient001's senescent cells be expected to lower their GrimAge?",
+    "metta_query": "(counterfactual-patient &self Patient001 CellularSenescence)",
+    "explanation": "Counterfactual do(CellularSenescence normalized). Because senescence is UPSTREAM of inflammation it reaches BOTH DNAmPAI1 (via the SASP) and DNAmGDF15 (via chronic inflammation), so it yields a larger GrimAge reduction than normalizing inflammation alone — but at lower confidence, since those components sit two to three hops downstream. Returns (Counterfactual CellularSenescence AgeAccelGrim (expected-delta d) (signed Neg (stv s c)) (Via (DNAmPAI1 DNAmGDF15))).",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Larger reductions reached through longer causal routes carry lower confidence — compare the c of this estimate with the inflammation-only one."
+    ]
+  },
+  {
+    "nl": "If Patient001's CRP were brought down to normal, what would happen to their GrimAge?",
+    "metta_query": "(counterfactual-patient &self Patient001 CRP)",
+    "explanation": "CRP is a downstream readout (a leaf), not a GrimAge component, so there is NO direct CRP -> GrimAge mechanism. The counterfactual routes the CRP lever through the shared upstream cause that drives it (ChronicInflammation), which also drives the inflammation-attributable GrimAge component DNAmGDF15. The result is therefore identical to normalizing inflammation — the expected reduction is credited to DNAmGDF15 (Via (DNAmGDF15)), never to a fabricated CRP -> GrimAge edge.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "A marker with no outgoing causal edge is resolved to the cause that raises it; it is never treated as if it directly moved the outcome."
+    ]
+  },
+  {
+    "nl": "What share of Patient001's GrimAge elevation is attributable to DNAmPAI1?",
+    "metta_query": "(grimage-share &self Patient001 DNAmPAI1)",
+    "explanation": "Returns the single-component decomposition record for DNAmPAI1: (Component DNAmPAI1 (z z) (weight w) (contribution w*z) (DrivenBy (<causes>))). The contribution is that component's attributable share of the GrimAge elevation under the v1 composition weight, and DrivenBy names the upstream cause(s) infer credits (here CellularSenescence, via the SASP). Returns nothing if the component is not elevated for the patient.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Only a measured, elevated component has a share; a normal/low or unmeasured surrogate returns no record."
+    ]
   }
 ]

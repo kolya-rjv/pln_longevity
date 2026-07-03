@@ -63,7 +63,8 @@ that marker. This one convention is deliberate:
 - it is the number **NHANES / a blood panel actually yields**, so the eventual
   NHANES import is a data-loading step, not a redesign;
 - it makes the *magnitude* of dysregulation available (how many SDs), which the
-  personalization factor (§5) and future counterfactuals can weigh.
+  personalization factor (§5) weighs — and which the **counterfactual layer** now
+  scales its expected GrimAge deltas by (`docs/counterfactual_analysis.md`).
 
 Demographics (`PatientAge` / `PatientSex` / `PatientSmoking`) are stored raw but
 **not yet reasoned over** — they are the hooks for the sex/age-specific modifiers
@@ -102,6 +103,10 @@ reproduces the population ranking straight from measured values:
 
 `AgeAccelGrim` is elevated too, but no bridge explains it, so it is **carried in
 the observation set yet credited to no hypothesis** — grounded, never invented.
+(Abductive diagnosis still leaves it un-credited; the composition edge added by the
+**counterfactual layer** now *does* credit it — `decompose-grimage` splits the
+elevated GrimAge into its DNAm-surrogate components and traces each to its upstream
+cause, see `docs/counterfactual_analysis.md` §3.2.)
 
 **Demo 2 — `rank-interventions-for-patient <space> <patient> <pool> <outcome>`.**
 The `f(patient factors)` the ranking doc asked for. Each candidate's population
