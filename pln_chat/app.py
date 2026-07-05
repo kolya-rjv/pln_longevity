@@ -57,16 +57,17 @@ _ONTOLOGY_CHOICES = list(_METTA_FILES.keys()) or ["(no .metta files found)"]
 
 # The coherent inference stack (calibration -> curated bridges -> deduction ->
 # intervention ranking + abductive diagnosis + patient grounding + counterfactual +
-# risk prediction) plus the ontology and evidence it reads. Selected by
-# default so the LLM translator SEES the inference functions
+# risk prediction + supplement recommendations) plus the ontology and evidence it
+# reads. Selected by default so the LLM translator SEES the inference functions
 # (calibrate-tv / infer / explain / rank-interventions / diagnose-patient /
-# decompose-grimage / counterfactual / predict-risk) and the entity names they
-# operate on, and so the symbol validator recognises them. Execution runs
-# against the full KB (_ALL_KB_PATHS) regardless of this selection, minus any
-# file too large for the runtime (see _ALL_KB_PATHS below). pln_counterfactual and
-# pln_risk_prediction are small and on this focused stack, so Demos 4 & 5 ride the
-# ordinary run_query path — no scoped space needed (unlike the DrugAge slice); see
-# docs/counterfactual_analysis.md and docs/risk_prediction.md.
+# decompose-grimage / counterfactual / predict-risk / recommend-supplements) and the
+# entity names they operate on, and so the symbol validator recognises them. Execution
+# runs against the full KB (_ALL_KB_PATHS) regardless of this selection, minus any
+# file too large for the runtime (see _ALL_KB_PATHS below). pln_counterfactual,
+# pln_risk_prediction and pln_supplement_recommendation are small and on this focused
+# stack, so Demos 4, 5 & 6 ride the ordinary run_query path — no scoped space needed
+# (unlike the DrugAge slice); see docs/counterfactual_analysis.md,
+# docs/risk_prediction.md and docs/supplement_recommendations.md.
 _INFERENCE_STACK: list[str] = [
     "system_types.metta",
     "logical_predicates.metta",
@@ -83,6 +84,8 @@ _INFERENCE_STACK: list[str] = [
     "patient_profile.metta",
     "pln_counterfactual.metta",
     "pln_risk_prediction.metta",
+    "supplement_evidence.metta",
+    "pln_supplement_recommendation.metta",
 ]
 _DEFAULT_SELECTION = (
     [f for f in _INFERENCE_STACK if f in _METTA_FILES]

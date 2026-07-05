@@ -90,6 +90,23 @@ markdown fences, no extra keys:
     lever with no path to the clock honestly projects ~0 change and an edge-less lever is
     omitted. <Lever> uses the same tokens as the counterfactual queries above.
 
+13. SUPPLEMENT RECOMMENDATION queries (Demo 6) map to dedicated functions, NOT to
+    hand-built match patterns. Use them verbatim:
+      - "what supplements should <patient> take", "recommend supplements for <patient>" ->
+        (recommend-supplements-patient &self <Patient>)
+      - "should <patient> take <Supplement>", "what tier is <Supplement> for <patient>" ->
+        (supplement-for-patient &self <Patient> <Supplement>)
+      - an explicit candidate pool ("rank omega3, fisetin and nmn for <patient>") ->
+        (recommend-supplements &self <Patient> (<Supplement> …))
+    <Supplement> is a curated supplement token (Omega3, Berberine, Fisetin, NMN,
+    Resveratrol). The result is TIERED — (Tier1HighConfidence …) (Tier2Promising …)
+    (NotRecommended …) (Interactions …) — personalized to the patient's elevated markers:
+    a supplement irrelevant to the patient's profile is OMITTED, a compound with a
+    negative gold-standard trial (Resveratrol / ITP_Negative) is placed in NotRecommended
+    DESPITE a plausible mechanism (never a recommendation an LLM would invent), and a
+    drug-supplement interaction with the patient's current medication is flagged. Set
+    intent="inference" and requires_pln_inference=true.
+
 --- EXPERIMENT DATA SCHEMA ---
 Every DrugAge experiment row uses the following predicates
 (declared in logical_predicates.metta; individual rows live in

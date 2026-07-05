@@ -113,6 +113,13 @@ Three reads that an LLM cannot reproduce from first principles:
    The **generic** `(rank-interventions … CoronaryHeartDisease)` over the whole KB
    is still **blocked** by the same pre-existing full-KB runtime issue (§6): the
    scoping trick that unblocks DrugAge is per-vertical, not a general fix.
+5. **Reused by the supplement recommender (Demo 6).** ✅ The same
+   `superpose/collapse/sort` + `rank-score` machinery, and the patient-relevance
+   score it feeds, are consumed wholesale by `pln_supplement_recommendation.metta`
+   to rank supplements within evidence tiers — a personalized, tiered recommendation
+   with a negative-evidence veto and interaction flags. Because that file is small
+   and on the focused stack, it rides the ordinary chat `run_query` path (no scoped
+   space). See `docs/supplement_recommendations.md`.
 
 ## 6. Known issue: full-KB runtime panic (pre-existing, not introduced here)
 

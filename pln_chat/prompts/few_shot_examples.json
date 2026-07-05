@@ -342,5 +342,58 @@
     "warnings": [
       "A lever with no path to the clock projects ~0 change here; an edge-less lever (e.g. Elamipretide) is omitted entirely rather than mis-placed."
     ]
+  },
+  {
+    "nl": "What supplements should Patient001 consider, and how strong is the evidence for each?",
+    "metta_query": "(recommend-supplements-patient &self Patient001)",
+    "explanation": "Produces a tiered, personalized supplement recommendation: each candidate is scored by how much it protectively reduces the markers Patient001 actually presents elevated, then bucketed into Tier1 (strong human evidence, e.g. Omega3), Tier2 (promising/preliminary, e.g. Fisetin, NMN) or NotRecommended by its calibrated evidence tier. Supplements carry lower confidence than pharmaceuticals, and a candidate irrelevant to this patient's profile is omitted entirely.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Supplement recommendations carry appropriately lower confidence than pharmaceutical evidence; this is guidance to discuss with a clinician, not an RCT-grade prescription."
+    ]
+  },
+  {
+    "nl": "Should Patient001 take resveratrol for their elevated GrimAge?",
+    "metta_query": "(supplement-for-patient &self Patient001 Resveratrol)",
+    "explanation": "Resveratrol has a senescence-clearing mechanism that IS relevant to Patient001's markers, so it looks appealing — but it carries an ITP-negative gold-standard trial (no lifespan effect). The recommender therefore places it in NotRecommended DESPITE the plausible mechanism. This is the PLN restraint an LLM lacks: it declines a compound on the negative trial rather than recommending it on the mechanism.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "A plausible mechanism does not override a negative gold-standard trial; NotRecommended here reflects the ITP-negative evidence, not an absent mechanism."
+    ]
+  },
+  {
+    "nl": "Recommend supplements for Patient002 and flag any interactions with their medications.",
+    "metta_query": "(recommend-supplements-patient &self Patient002)",
+    "explanation": "Patient002 is metabolic-dominant (elevated glucose/HbA1c), so the SAME candidate pool now recommends Berberine (Tier1, relevant to their metabolic markers) and omits the senescence/inflammation supplements — personalization reorders across patients, it does not merely amplify. Because Patient002 is on metformin, the Berberine<->Metformin interaction (shared AMPK mechanism) is flagged in the Interactions block.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "The Berberine-Metformin interaction is a shared-mechanism (additive glucose lowering) flag to review with a clinician, not a contraindication."
+    ]
+  },
+  {
+    "nl": "Would berberine help Patient001?",
+    "metta_query": "(supplement-for-patient &self Patient001 Berberine)",
+    "explanation": "Berberine acts on the metabolic axis (reduces insulin resistance -> glucose/HbA1c). Patient001 presents NONE of those markers elevated, so berberine is irrelevant to this patient's profile and the recommender returns nothing — it is omitted rather than given a fabricated placement. (Berberine IS recommended for the metabolic Patient002.)",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "An empty result means the supplement is not relevant to THIS patient's elevated markers, not that it is unsafe or ineffective in general."
+    ]
+  },
+  {
+    "nl": "Rank omega-3, fisetin and NMN for Patient001 by how well they fit their biomarker profile.",
+    "metta_query": "(recommend-supplements &self Patient001 (Omega3 Fisetin NMN))",
+    "explanation": "Runs the recommender over an explicit candidate pool. Each is scored by its personalized relevance (protective effect across Patient001's elevated markers) times a safety factor, and tiered by evidence quality; the (Targets ...) field records exactly which of the patient's elevated markers each supplement addresses, so the ranking is fully auditable.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": []
   }
 ]

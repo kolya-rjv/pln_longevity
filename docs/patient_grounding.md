@@ -127,6 +127,15 @@ scores rise sharply over the population baseline (D+Q `0.043 → 0.231`). The
 combination is **additive and auditable**: `personalized = population + relevance`
 (the full signed TV is kept in each `scored` tuple).
 
+**Demo 6 — the supplement recommender consumes `patient-relevance` directly.** The
+same "how much does this intervention reduce the markers *this* patient presents
+elevated" signal is exactly what personalizes a supplement recommendation:
+`pln_supplement_recommendation.metta` uses `patient-relevance` verbatim to score a
+candidate, omitting one with relevance 0 and tiering the rest by evidence quality.
+This is what makes the *same* pool recommend `Berberine` for the metabolic
+`Patient002` and omit it for the senescence-dominant `Patient001` — see
+`docs/supplement_recommendations.md`.
+
 ## 6. Open questions / next increments
 
 1. **NHANES import.** `MeasuredZ` is the exact shape a NHANES age-acceleration /
