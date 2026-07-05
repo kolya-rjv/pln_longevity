@@ -76,6 +76,20 @@ markdown fences, no extra keys:
     declines a lever with no mechanistic path (never invent a direct marker->clock
     edge). A REDUCTION in a harmful clock is returned as (signed Neg …) (protective).
 
+12. RISK PREDICTION queries (Demo 5) map to dedicated functions, NOT to hand-built
+    match patterns. Use them verbatim:
+      - "<patient>'s 10-year cardiovascular / CHD risk", "how likely is a heart event" ->
+        (predict-risk-patient &self <Patient>)
+      - "break down / what drives <patient>'s CHD risk into factors" ->
+        (risk-decomposition-patient &self <Patient>)
+      - "how much would <lever> lower <patient>'s CHD risk", "projected risk if <lever>" ->
+        (project-risk-patient &self <Patient> <Lever>)
+    The estimate is an ABSOLUTE probability with a propagated confidence interval; the
+    decomposition apportions the excess-over-baseline risk to the elevated GrimAge
+    components (with an explicit residual); a projection reuses the counterfactual, so a
+    lever with no path to the clock honestly projects ~0 change and an edge-less lever is
+    omitted. <Lever> uses the same tokens as the counterfactual queries above.
+
 --- EXPERIMENT DATA SCHEMA ---
 Every DrugAge experiment row uses the following predicates
 (declared in logical_predicates.metta; individual rows live in

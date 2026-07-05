@@ -56,16 +56,17 @@ _METTA_FILES = _discover_metta_files()
 _ONTOLOGY_CHOICES = list(_METTA_FILES.keys()) or ["(no .metta files found)"]
 
 # The coherent inference stack (calibration -> curated bridges -> deduction ->
-# intervention ranking + abductive diagnosis + patient grounding + counterfactual)
-# plus the ontology and evidence it reads. Selected by
+# intervention ranking + abductive diagnosis + patient grounding + counterfactual +
+# risk prediction) plus the ontology and evidence it reads. Selected by
 # default so the LLM translator SEES the inference functions
 # (calibrate-tv / infer / explain / rank-interventions / diagnose-patient /
-# decompose-grimage / counterfactual) and the entity names they operate on, and so
-# the symbol validator recognises them. Execution runs
+# decompose-grimage / counterfactual / predict-risk) and the entity names they
+# operate on, and so the symbol validator recognises them. Execution runs
 # against the full KB (_ALL_KB_PATHS) regardless of this selection, minus any
-# file too large for the runtime (see _ALL_KB_PATHS below). pln_counterfactual is
-# small and on this focused stack, so Demo 4 rides the ordinary run_query path —
-# no scoped space needed (unlike the DrugAge slice); see docs/counterfactual_analysis.md.
+# file too large for the runtime (see _ALL_KB_PATHS below). pln_counterfactual and
+# pln_risk_prediction are small and on this focused stack, so Demos 4 & 5 ride the
+# ordinary run_query path — no scoped space needed (unlike the DrugAge slice); see
+# docs/counterfactual_analysis.md and docs/risk_prediction.md.
 _INFERENCE_STACK: list[str] = [
     "system_types.metta",
     "logical_predicates.metta",
@@ -81,6 +82,7 @@ _INFERENCE_STACK: list[str] = [
     "pln_abductive_diagnosis.metta",
     "patient_profile.metta",
     "pln_counterfactual.metta",
+    "pln_risk_prediction.metta",
 ]
 _DEFAULT_SELECTION = (
     [f for f in _INFERENCE_STACK if f in _METTA_FILES]

@@ -106,7 +106,9 @@ the observation set yet credited to no hypothesis** — grounded, never invented
 (Abductive diagnosis still leaves it un-credited; the composition edge added by the
 **counterfactual layer** now *does* credit it — `decompose-grimage` splits the
 elevated GrimAge into its DNAm-surrogate components and traces each to its upstream
-cause, see `docs/counterfactual_analysis.md` §3.2.)
+cause, see `docs/counterfactual_analysis.md` §3.2. The **risk-prediction layer**
+(Demo 5) goes one step further and *uses* this same elevated `AgeAccelGrim` as the
+hazard predictor for an absolute 10-year CHD risk — `docs/risk_prediction.md`.)
 
 **Demo 2 — `rank-interventions-for-patient <space> <patient> <pool> <outcome>`.**
 The `f(patient factors)` the ranking doc asked for. Each candidate's population

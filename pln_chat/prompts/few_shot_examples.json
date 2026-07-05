@@ -298,5 +298,49 @@
     "warnings": [
       "Only a measured, elevated component has a share; a normal/low or unmeasured surrogate returns no record."
     ]
+  },
+  {
+    "nl": "What is Patient001's 10-year risk of coronary heart disease?",
+    "metta_query": "(predict-risk-patient &self Patient001)",
+    "explanation": "Computes an absolute 10-year CHD risk as baseline(age,sex) × HR^(z_clock × sd→years), reading the hazard ratio off the Lu 2019 AgeAccelGrim→CHD evidence record already in the KB. Returns a point estimate with a propagated confidence interval (which widens as the source-evidence confidence falls), the baseline, and the clock multiplier — the uncertainty-quantified number an LLM can only hedge about.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "The point estimate and interval are v1 coarse (single composite-clock predictor, curated baseline table); the architecture is locked, the constants are documented tunables."
+    ]
+  },
+  {
+    "nl": "Which biomarkers are driving Patient001's elevated cardiovascular risk, and by how much?",
+    "metta_query": "(risk-decomposition-patient &self Patient001)",
+    "explanation": "Splits the EXCESS risk over baseline into attributable contributing factors: each elevated GrimAge component (DNAmPAI1, DNAmGDF15) is credited a share proportional to its elevation, and the unattributed remainder is reported as an explicit residual. The baseline + attributed factors + residual sum back to the total risk — an auditable decomposition, not a vibe.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Only measured, elevated components are credited; the coarse v1 weights leave an honest positive residual, never forced to zero."
+    ]
+  },
+  {
+    "nl": "How much would clearing Patient001's senescent cells be expected to lower their 10-year heart-disease risk?",
+    "metta_query": "(project-risk-patient &self Patient001 CellularSenescence)",
+    "explanation": "Projects the absolute-risk reduction under an intervention by reusing the counterfactual do-operator: the lever's expected GrimAge reduction lowers the clock z, and the risk is recomputed. Clearing senescence is upstream and reaches BOTH clock surrogates, so it buys a larger CHD-risk reduction than reducing inflammation alone — but at lower confidence, because those surrogates sit further downstream.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "The projection carries the counterfactual's route-length-sensitive confidence; a longer causal route means a less certain estimate."
+    ]
+  },
+  {
+    "nl": "If Patient001 took metformin for metabolic health, how much would their cardiovascular risk drop?",
+    "metta_query": "(project-risk-patient &self Patient001 Metformin)",
+    "explanation": "Metformin resolves to the metabolic driver (InsulinResistance), whose axis terminates at FastingGlucose→CHD and reaches NO GrimAge clock surrogate. Because the risk model is clock-driven, the honest projected change is ~0 — an explicit 'this lever does not move THIS estimate', not a fabricated number. (Metformin still helps CHD directly via the metabolic axis; that is the intervention-ranking demo, not this clock-based risk model.)",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "A lever with no path to the clock projects ~0 change here; an edge-less lever (e.g. Elamipretide) is omitted entirely rather than mis-placed."
+    ]
   }
 ]

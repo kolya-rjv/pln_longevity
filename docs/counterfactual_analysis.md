@@ -233,6 +233,13 @@ co-effect of — never a direct `CRP → GrimAge` edge (§3.3).
 
 ## 7. Open questions / next increments
 
+> **Now consumed by Demo 5.** `counterfactual-patient` is reused unchanged by the
+> risk-prediction layer (`pln_risk_prediction.metta`, `docs/risk_prediction.md`): a
+> lever's expected GrimAge reduction lowers the clock z and the absolute CHD risk is
+> recomputed, so the B > A > C ordering below reappears in absolute-risk terms and an
+> unresolvable lever is omitted from the risk projection too. The multi-lever
+> follow-up (#5) is now shared with that layer's own multi-lever projection.
+
 1. **Base rates.** Like the deduction layer (`deduction_layer.md` §7.2), the
    magnitude uses the conservative independence product without node priors
    `P(B), P(C)`. Adding them upgrades the transmission — and hence the delta —
