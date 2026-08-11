@@ -34,7 +34,7 @@ _BUILTINS: set[str] = {
     "True", "False",
 }
 
-_SYMBOL_RE  = re.compile(r"[A-Za-z][A-Za-z0-9_\-]*")
+_SYMBOL_RE  = re.compile(r"[A-Za-z][A-Za-z0-9_\->]*")
 _VARIABLE_RE = re.compile(r"\$[A-Za-z][A-Za-z0-9_\-]*")
 
 

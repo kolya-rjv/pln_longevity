@@ -142,3 +142,61 @@
 ;; primary, direct explanation for an isolated DNAmGDF15 elevation.
 (Effect MitochondrialDysfunction DNAmGDF15 Pos
    (stv 0.75 (evidence-confidence AnimalStudies_Replicated)))
+
+;; ============================================================
+;; METABOLIC / NUTRIENT-SENSING AXIS  (the second bridged axis)
+;; ============================================================
+;; A senescence axis ALONE lets patient grounding only AMPLIFY scores — every
+;; candidate reduces the same markers, so no patient reorders the ranking. This
+;; second, INDEPENDENT axis is what makes personalization REORDER: a metabolic-
+;; dominant patient (elevated fasting glucose / HbA1c, normal senescence markers)
+;; ranks the AMPK-activating drugs first, while the senescence-dominant Patient001
+;; ranks the senolytics first — from the SAME candidate pool against the SAME
+;; outcome. That is pipeline.md §4.2's f(patient factors) made visible, and the
+;; LLM-incomparable claim "different patients get different recommendations".
+;;
+;; Structure deliberately mirrors the senescence axis above:
+;;   hallmark  DeregulatedNutrientSensing
+;;      ->(Pos) pathway  InsulinResistance                  (harmful)
+;;         ->(Pos) markers FastingGlucose / HbA1c           (what the patient shows)
+;;            ->(Pos) outcome CoronaryHeartDisease           (the shared target)
+;;   interventions Metformin / Berberine ->(Neg) InsulinResistance   (protective)
+;;
+;; Grounded in pipeline.md App. A.3 (glucose–clock correlations), A.5/A.6
+;; (InsulinResistance -> mTOR; Berberine/Metformin -> AMPK activation) and the
+;; standard epidemiology linking hyperglycaemia to coronary risk. As everywhere:
+;; strength = curated magnitude prior; confidence = evidence-confidence lookup.
+
+;; Minimal typing for the nodes / interventions introduced here.
+(: InsulinResistance Phenotype)
+(Inheritance FastingGlucose Biomarker)
+(Inheritance HbA1c Biomarker)
+(Inheritance Metformin Pharmaceutical)
+(Inheritance Berberine Supplement)
+
+;; Hallmark -> pathway -> observable markers (harmful direction, Pos). These give
+;; the abductive-diagnosis graph a metabolic cause: DeregulatedNutrientSensing
+;; explains a patient's elevated glucose / HbA1c.
+(Effect DeregulatedNutrientSensing InsulinResistance Pos
+   (stv 0.80 (evidence-confidence AnimalStudies_Replicated)))
+(Effect InsulinResistance FastingGlucose Pos
+   (stv 0.80 (evidence-confidence AnimalStudies_Replicated)))
+(Effect InsulinResistance HbA1c Pos
+   (stv 0.70 (evidence-confidence AnimalStudies_Replicated)))
+
+;; Terminal harmful link to the shared outcome — the metabolic-axis counterpart of
+;; the calibrated Lu 2019 DNAmPAI1 -> CHD link the senescence axis terminates in.
+;; Curated epidemiological prior (hyperglycaemia raises coronary risk); a dedicated
+;; calibrated glucose–CHD evidence record is the honest upgrade (see doc).
+(Effect FastingGlucose CoronaryHeartDisease Pos
+   (stv 0.55 (evidence-confidence Epidemiological)))
+
+;; Interventions: AMPK activators that REDUCE insulin resistance (protective, Neg).
+;; Metformin carries stronger (multi-trial, larger) glucose-lowering evidence than
+;; the nutraceutical berberine on the identical AMPK mechanism, so it ranks above
+;; berberine for a metabolic patient — exactly as D+Q ranks above Fisetin on the
+;; senescence axis (the calibrated-evidence distinction an LLM blurs).
+(Effect Metformin InsulinResistance Neg
+   (stv 0.75 (evidence-confidence MultipleHumanTrials)))
+(Effect Berberine InsulinResistance Neg
+   (stv 0.65 (evidence-confidence MultipleHumanTrials)))

@@ -24,7 +24,9 @@
     "intent": "retrieval",
     "requires_pln_inference": false,
     "confidence_filter": 0.0,
-    "warnings": ["Results depend on which Extends atoms have been loaded from curated sources or LLM extraction phases."]
+    "warnings": [
+      "Results depend on which Extends atoms have been loaded from curated sources or LLM extraction phases."
+    ]
   },
   {
     "nl": "What is the truth value for Rapamycin causing mTORC1 inhibition?",
@@ -33,7 +35,9 @@
     "intent": "retrieval",
     "requires_pln_inference": false,
     "confidence_filter": 0.0,
-    "warnings": ["This atom is from the mechanistic/causal layer and may only be present once curated knowledge is loaded."]
+    "warnings": [
+      "This atom is from the mechanistic/causal layer and may only be present once curated knowledge is loaded."
+    ]
   },
   {
     "nl": "List all evidence categories with confidence above 0.7.",
@@ -150,7 +154,9 @@
     "intent": "inference",
     "requires_pln_inference": true,
     "confidence_filter": 0.0,
-    "warnings": ["Returns no result (no false chain) when the two concepts are unconnected in the loaded KB."]
+    "warnings": [
+      "Returns no result (no false chain) when the two concepts are unconnected in the loaded KB."
+    ]
   },
   {
     "nl": "Rank dasatinib plus quercetin, fisetin and spermidine by their expected protective effect on coronary heart disease.",
@@ -159,7 +165,9 @@
     "intent": "inference",
     "requires_pln_inference": true,
     "confidence_filter": 0.0,
-    "warnings": ["Ordering reflects calibrated evidence and chain length; longer mechanistic chains carry lower confidence."]
+    "warnings": [
+      "Ordering reflects calibrated evidence and chain length; longer mechanistic chains carry lower confidence."
+    ]
   },
   {
     "nl": "A patient shows elevated DNAmPAI1, DNAmGDF15 and CRP. What upstream causes best explain this, ranked?",
@@ -168,6 +176,224 @@
     "intent": "inference",
     "requires_pln_inference": true,
     "confidence_filter": 0.0,
-    "warnings": ["The candidate-cause list is explicit (here, the relevant hallmarks of aging); pass more to widen the search. Marker order within SupportedBy is not significant."]
+    "warnings": [
+      "The candidate-cause list is explicit (here, the relevant hallmarks of aging); pass more to widen the search. Marker order within SupportedBy is not significant."
+    ]
+  },
+  {
+    "nl": "Patient001 has a discordant methylation profile. Diagnose the most likely upstream causes.",
+    "metta_query": "(diagnose-patient &self Patient001 (CellularSenescence MitochondrialDysfunction ChronicInflammation))",
+    "explanation": "Patient-grounded abductive diagnosis. Instead of a hand-typed marker list, it reads Patient001's measured standardized biomarkers, grounds them into the ELEVATED findings (via the documented threshold in patient_profile.metta), and runs the same backward causal search as `diagnose`. Returns (Hypothesis <cause> (stv s c) <coverage> <mass> (SupportedBy <markers>)) most-explanatory first. A measured finding no bridge can explain is carried but credited to no cause.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Uses the patient's grounded observations; only markers above the elevated-z-threshold become findings. The candidate-cause list is explicit (here the relevant hallmarks of aging)."
+    ]
+  },
+  {
+    "nl": "For Patient001, rank dasatinib plus quercetin, fisetin and spermidine by expected benefit on coronary heart disease.",
+    "metta_query": "(rank-interventions-for-patient &self Patient001 (DasatinibPlusQuercetin Fisetin Spermidine) CoronaryHeartDisease)",
+    "explanation": "Patient-personalized intervention ranking (Demo 2 with f(patient factors)). Each candidate's population protective score on the outcome is added to its patient-relevance — how much it reduces the markers THIS patient actually presents elevated — and sorted most-beneficial first as (scored <intervention> <score> (signed <sign> (stv s c))). Candidates with no causal chain to the outcome are omitted rather than mis-ranked.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Personalization is additive on top of the population score; ordering still reflects calibrated evidence and chain length."
+    ]
+  },
+  {
+    "nl": "Classify each of Patient001's measured biomarkers as elevated, normal or low.",
+    "metta_query": "(match &self (MeasuredZ Patient001 $marker $z) (Status $marker (patient-status &self Patient001 $marker)))",
+    "explanation": "Grounds each of Patient001's raw standardized measurements into a qualitative status via patient-status (which applies the elevated-z-threshold in patient_profile.metta), returning (Status <marker> <Elevated|Normal|Low>) per measured marker.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Only markers actually measured for the patient are classified; unmeasured markers return no status."
+    ]
+  },
+  {
+    "nl": "Rank rapamycin, acarbose and resveratrol by their expected effect on lifespan and mortality.",
+    "metta_query": "(rank-drugage-lifespan (Rapamycin Acarbose Resveratrol))",
+    "explanation": "Ranks REAL compounds by their measured DrugAge lifespan effect, routed to the scoped DrugAge engine (never the generic space, which lacks the DrugAge rows). For each compound it lifts its DrugAge experiment rows into a signed, calibrated Effect — magnitude from the reported % lifespan change, confidence from the ITP / species / significance tier — chains lifespan→mortality, and sorts most-protective first as (scored <compound> <score> (signed Neg (stv s c))). A well-run ITP null like resveratrol keeps HIGH confidence but ~0 strength, so it sinks toward 0 (an honest 'confidently no effect', not 'uncertain') rather than ranking high.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Use the exact DrugAge intervention names (e.g. Rapamycin, Resveratrol, Metformin, Acarbose). Ranking is per compound over a handful at a time — the scoped-space demo scale. A compound with no DrugAge lifespan row is omitted, not mis-ranked."
+    ]
+  },
+  {
+    "nl": "How much does metformin lower mortality by extending lifespan, according to the DrugAge data?",
+    "metta_query": "(rank-drugage-lifespan (Metformin))",
+    "explanation": "Single-compound DrugAge lift/effect lookup: lifts metformin's DrugAge rows into a signed, calibrated Effect and reports it as (scored Metformin <score> (signed <sign> (stv s c))) with the backing study. Metformin's gold-standard ITP mouse result is a null, so its confidence stays high while its strength is ~0 — 'confidently did not extend mouse lifespan', not 'unknown'.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "Which extends life more strongly once you weigh the evidence — the big worm result for ethanol or the replicated mouse result for rapamycin?",
+    "metta_query": "(rank-drugage-lifespan (Ethanol Rapamycin))",
+    "explanation": "Ranks the two real compounds by DrugAge lifespan effect on mortality, weighing magnitude AND confidence together (never sign alone): a large invertebrate effect carries lower confidence (worm/fly tier) than a replicated ITP mouse result, so a smaller high-confidence mouse effect can legitimately outrank a bigger low-confidence worm one. Returns (scored <compound> <score> (signed Neg (stv s c))) most-protective first.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Ordering reflects both the calibrated magnitude and the species/ITP confidence tier; a worm-only effect is down-weighted relative to a mouse one."
+    ]
+  },
+  {
+    "nl": "Break down Patient001's elevated GrimAge into the biomarker components driving it.",
+    "metta_query": "(decompose-grimage &self Patient001)",
+    "explanation": "Causal decomposition (Demo 4, §5.1): splits Patient001's elevated GrimAge into its per-component attributable shares. For each measured-elevated DNAm surrogate it returns (Component <M> (z z) (weight w) (contribution w*z) (DrivenBy (<upstream causes>))), where the causes are the hallmarks that infer says raise that component, plus the total attributed share and the honest unattributed residual. Components with no measured elevation or no causal driver are left in the residual, never invented.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "The composition weight is a coarse v1 constant (equal over the 8 GrimAge surrogates); the residual is the part those weights and the unmeasured components do not yet explain."
+    ]
+  },
+  {
+    "nl": "For Patient001, if chronic inflammation were normalized, what is the expected change in GrimAge?",
+    "metta_query": "(counterfactual-patient &self Patient001 ChronicInflammation)",
+    "explanation": "Counterfactual do-inference (Demo 4): do(ChronicInflammation normalized) and propagate the reduction through each GrimAge component the driver reaches. Returns (Counterfactual <lever> AgeAccelGrim (expected-delta d) (signed Neg (stv s c)) (Via (<components>))). A REDUCTION in a harmful clock is protective, so the sign is Neg and expected-delta is negative; confidence is propagated from the causal route (longer route -> lower c). Inflammation reaches only DNAmGDF15, so the Via lists that single component.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "expected-delta and strength are in GrimAge SD units under the coarse v1 composition weights; the estimate is signed by the Neg=beneficial convention (a reduction is protective)."
+    ]
+  },
+  {
+    "nl": "How much would clearing Patient001's senescent cells be expected to lower their GrimAge?",
+    "metta_query": "(counterfactual-patient &self Patient001 CellularSenescence)",
+    "explanation": "Counterfactual do(CellularSenescence normalized). Because senescence is UPSTREAM of inflammation it reaches BOTH DNAmPAI1 (via the SASP) and DNAmGDF15 (via chronic inflammation), so it yields a larger GrimAge reduction than normalizing inflammation alone — but at lower confidence, since those components sit two to three hops downstream. Returns (Counterfactual CellularSenescence AgeAccelGrim (expected-delta d) (signed Neg (stv s c)) (Via (DNAmPAI1 DNAmGDF15))).",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Larger reductions reached through longer causal routes carry lower confidence — compare the c of this estimate with the inflammation-only one."
+    ]
+  },
+  {
+    "nl": "If Patient001's CRP were brought down to normal, what would happen to their GrimAge?",
+    "metta_query": "(counterfactual-patient &self Patient001 CRP)",
+    "explanation": "CRP is a downstream readout (a leaf), not a GrimAge component, so there is NO direct CRP -> GrimAge mechanism. The counterfactual routes the CRP lever through the shared upstream cause that drives it (ChronicInflammation), which also drives the inflammation-attributable GrimAge component DNAmGDF15. The result is therefore identical to normalizing inflammation — the expected reduction is credited to DNAmGDF15 (Via (DNAmGDF15)), never to a fabricated CRP -> GrimAge edge.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "A marker with no outgoing causal edge is resolved to the cause that raises it; it is never treated as if it directly moved the outcome."
+    ]
+  },
+  {
+    "nl": "What share of Patient001's GrimAge elevation is attributable to DNAmPAI1?",
+    "metta_query": "(grimage-share &self Patient001 DNAmPAI1)",
+    "explanation": "Returns the single-component decomposition record for DNAmPAI1: (Component DNAmPAI1 (z z) (weight w) (contribution w*z) (DrivenBy (<causes>))). The contribution is that component's attributable share of the GrimAge elevation under the v1 composition weight, and DrivenBy names the upstream cause(s) infer credits (here CellularSenescence, via the SASP). Returns nothing if the component is not elevated for the patient.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Only a measured, elevated component has a share; a normal/low or unmeasured surrogate returns no record."
+    ]
+  },
+  {
+    "nl": "What is Patient001's 10-year risk of coronary heart disease?",
+    "metta_query": "(predict-risk-patient &self Patient001)",
+    "explanation": "Computes an absolute 10-year CHD risk as baseline(age,sex) × HR^(z_clock × sd→years), reading the hazard ratio off the Lu 2019 AgeAccelGrim→CHD evidence record already in the KB. Returns a point estimate with a propagated confidence interval (which widens as the source-evidence confidence falls), the baseline, and the clock multiplier — the uncertainty-quantified number an LLM can only hedge about.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "The point estimate and interval are v1 coarse (single composite-clock predictor, curated baseline table); the architecture is locked, the constants are documented tunables."
+    ]
+  },
+  {
+    "nl": "Which biomarkers are driving Patient001's elevated cardiovascular risk, and by how much?",
+    "metta_query": "(risk-decomposition-patient &self Patient001)",
+    "explanation": "Splits the EXCESS risk over baseline into attributable contributing factors: each elevated GrimAge component (DNAmPAI1, DNAmGDF15) is credited a share proportional to its elevation, and the unattributed remainder is reported as an explicit residual. The baseline + attributed factors + residual sum back to the total risk — an auditable decomposition, not a vibe.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Only measured, elevated components are credited; the coarse v1 weights leave an honest positive residual, never forced to zero."
+    ]
+  },
+  {
+    "nl": "How much would clearing Patient001's senescent cells be expected to lower their 10-year heart-disease risk?",
+    "metta_query": "(project-risk-patient &self Patient001 CellularSenescence)",
+    "explanation": "Projects the absolute-risk reduction under an intervention by reusing the counterfactual do-operator: the lever's expected GrimAge reduction lowers the clock z, and the risk is recomputed. Clearing senescence is upstream and reaches BOTH clock surrogates, so it buys a larger CHD-risk reduction than reducing inflammation alone — but at lower confidence, because those surrogates sit further downstream.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "The projection carries the counterfactual's route-length-sensitive confidence; a longer causal route means a less certain estimate."
+    ]
+  },
+  {
+    "nl": "If Patient001 took metformin for metabolic health, how much would their cardiovascular risk drop?",
+    "metta_query": "(project-risk-patient &self Patient001 Metformin)",
+    "explanation": "Metformin resolves to the metabolic driver (InsulinResistance), whose axis terminates at FastingGlucose→CHD and reaches NO GrimAge clock surrogate. Because the risk model is clock-driven, the honest projected change is ~0 — an explicit 'this lever does not move THIS estimate', not a fabricated number. (Metformin still helps CHD directly via the metabolic axis; that is the intervention-ranking demo, not this clock-based risk model.)",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "A lever with no path to the clock projects ~0 change here; an edge-less lever (e.g. Elamipretide) is omitted entirely rather than mis-placed."
+    ]
+  },
+  {
+    "nl": "What supplements should Patient001 consider, and how strong is the evidence for each?",
+    "metta_query": "(recommend-supplements-patient &self Patient001)",
+    "explanation": "Produces a tiered, personalized supplement recommendation: each candidate is scored by how much it protectively reduces the markers Patient001 actually presents elevated, then bucketed into Tier1 (strong human evidence, e.g. Omega3), Tier2 (promising/preliminary, e.g. Fisetin, NMN) or NotRecommended by its calibrated evidence tier. Supplements carry lower confidence than pharmaceuticals, and a candidate irrelevant to this patient's profile is omitted entirely.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "Supplement recommendations carry appropriately lower confidence than pharmaceutical evidence; this is guidance to discuss with a clinician, not an RCT-grade prescription."
+    ]
+  },
+  {
+    "nl": "Should Patient001 take resveratrol for their elevated GrimAge?",
+    "metta_query": "(supplement-for-patient &self Patient001 Resveratrol)",
+    "explanation": "Resveratrol has a senescence-clearing mechanism that IS relevant to Patient001's markers, so it looks appealing — but it carries an ITP-negative gold-standard trial (no lifespan effect). The recommender therefore places it in NotRecommended DESPITE the plausible mechanism. This is the PLN restraint an LLM lacks: it declines a compound on the negative trial rather than recommending it on the mechanism.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "A plausible mechanism does not override a negative gold-standard trial; NotRecommended here reflects the ITP-negative evidence, not an absent mechanism."
+    ]
+  },
+  {
+    "nl": "Recommend supplements for Patient002 and flag any interactions with their medications.",
+    "metta_query": "(recommend-supplements-patient &self Patient002)",
+    "explanation": "Patient002 is metabolic-dominant (elevated glucose/HbA1c), so the SAME candidate pool now recommends Berberine (Tier1, relevant to their metabolic markers) and omits the senescence/inflammation supplements — personalization reorders across patients, it does not merely amplify. Because Patient002 is on metformin, the Berberine<->Metformin interaction (shared AMPK mechanism) is flagged in the Interactions block.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "The Berberine-Metformin interaction is a shared-mechanism (additive glucose lowering) flag to review with a clinician, not a contraindication."
+    ]
+  },
+  {
+    "nl": "Would berberine help Patient001?",
+    "metta_query": "(supplement-for-patient &self Patient001 Berberine)",
+    "explanation": "Berberine acts on the metabolic axis (reduces insulin resistance -> glucose/HbA1c). Patient001 presents NONE of those markers elevated, so berberine is irrelevant to this patient's profile and the recommender returns nothing — it is omitted rather than given a fabricated placement. (Berberine IS recommended for the metabolic Patient002.)",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "An empty result means the supplement is not relevant to THIS patient's elevated markers, not that it is unsafe or ineffective in general."
+    ]
+  },
+  {
+    "nl": "Rank omega-3, fisetin and NMN for Patient001 by how well they fit their biomarker profile.",
+    "metta_query": "(recommend-supplements &self Patient001 (Omega3 Fisetin NMN))",
+    "explanation": "Runs the recommender over an explicit candidate pool. Each is scored by its personalized relevance (protective effect across Patient001's elevated markers) times a safety factor, and tiered by evidence quality; the (Targets ...) field records exactly which of the patient's elevated markers each supplement addresses, so the ranking is fully auditable.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": []
   }
 ]

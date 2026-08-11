@@ -96,15 +96,30 @@ Three reads that an LLM cannot reproduce from first principles:
 1. **Multiple derivations per candidate** — when `infer` yields several paths to
    the outcome, rank currently lists each; combine them with a PLN **revision**
    rule first (shared with `deduction_layer.md` §7.4).
-2. **Patient grounding** — the ranking is currently population-level. Demo 2 in
-   full multiplies in patient-specific factors (`f(patient factors)`,
-   `pipeline.md` §4.2); that needs the still-absent NHANES / patient-profile
-   layer.
+2. ~~**Patient grounding**~~ ✅ **Done (v1)** — `patient_profile.metta` adds
+   `rank-interventions-for-patient`, folding a patient-relevance factor
+   (`f(patient factors)`) onto the population score from this layer (see
+   `docs/patient_grounding.md`). v1 combines additively; the multiplicative form
+   of `pipeline.md` §4.2 and reordering across differently-presenting patients
+   are the documented follow-ups.
 3. **Multi-outcome ranking** — rank against a basket of outcomes (mortality, CHF,
    CHD) and aggregate, rather than a single target.
-4. **Surface in the chat app** — add a `rank-interventions` few-shot so the LLM
-   translator emits it. **Blocked** by a *pre-existing* full-KB runtime issue
-   (see §6), not by this layer.
+4. **Surface in the chat app** — add a few-shot so the LLM translator emits a
+   ranking form. ✅ **Done for the DrugAge lifespan/mortality axis (v1):** the
+   translator emits a dedicated `(rank-drugage-lifespan (C1 C2 …))` and
+   `pln_chat/app.py` routes it to the **scoped** `run_drugage_ranking` — which
+   sidesteps the §6 full-KB panic by never touching `_ALL_KB_PATHS` (see
+   `docs/etl_inference_wiring.md` §8.5 and `docs/drugage_chat_test_queries.md`).
+   The **generic** `(rank-interventions … CoronaryHeartDisease)` over the whole KB
+   is still **blocked** by the same pre-existing full-KB runtime issue (§6): the
+   scoping trick that unblocks DrugAge is per-vertical, not a general fix.
+5. **Reused by the supplement recommender (Demo 6).** ✅ The same
+   `superpose/collapse/sort` + `rank-score` machinery, and the patient-relevance
+   score it feeds, are consumed wholesale by `pln_supplement_recommendation.metta`
+   to rank supplements within evidence tiers — a personalized, tiered recommendation
+   with a negative-evidence veto and interaction flags. Because that file is small
+   and on the focused stack, it rides the ordinary chat `run_query` path (no scoped
+   space). See `docs/supplement_recommendations.md`.
 
 ## 6. Known issue: full-KB runtime panic (pre-existing, not introduced here)
 
