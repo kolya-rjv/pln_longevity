@@ -91,18 +91,13 @@ _INFERENCE_STACK: list[str] = [
     "pln_deduction.metta",
     "pln_intervention_ranking.metta",
     "pln_abductive_diagnosis.metta",
-<<<<<<< HEAD
+
     "drugage_calibration.metta",
 
     "patient_profile.metta",
     "pln_counterfactual.metta",
     "pln_risk_prediction.metta",
 
-=======
-    "patient_profile.metta",
-    "pln_counterfactual.metta",
-    "pln_risk_prediction.metta",
->>>>>>> 05a2a76d217be80a09de18b543082b516d9f13f2
     "supplement_evidence.metta",
     "pln_supplement_recommendation.metta",
 ]
