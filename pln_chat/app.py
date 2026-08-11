@@ -65,16 +65,34 @@ _ONTOLOGY_CHOICES = list(_METTA_FILES.keys()) or ["(no .metta files found)"]
 _INFERENCE_STACK: list[str] = [
     "system_types.metta",
     "logical_predicates.metta",
+    "measurement_types.metta",
     "epistemic_calibration.metta",
+    "species_taxonomy.metta",
+
+    "drugage_entries.metta",
+    "cellage_metadata.metta",
+    
+
     "grim_age_core.metta",
     "grim_age_lu2019_evidence.metta",
     "evidence_calibration.metta",
+
     "hallmarks_core.metta",
+    "hallmarks_lopezotin2023_anchors.metta",
     "hallmarks_lopezotin2023_intervention_evidence.metta",
+
     "mechanistic_bridges.metta",
     "pln_deduction.metta",
     "pln_intervention_ranking.metta",
     "pln_abductive_diagnosis.metta",
+    "drugage_calibration.metta",
+
+    "patient_profile.metta",
+    "pln_counterfactual.metta",
+    "pln_risk_prediction.metta",
+
+    "supplement_evidence.metta",
+    "pln_supplement_recommendation.metta",
 ]
 _DEFAULT_SELECTION = (
     [f for f in _INFERENCE_STACK if f in _METTA_FILES]
@@ -553,4 +571,7 @@ with gr.Blocks(
 
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860, debug=True)
+    demo.launch(
+        server_name="127.0.0.1",
+        server_port=7860,
+    )
