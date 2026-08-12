@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # Ensure the pln_chat package root is on sys.path so submodule imports work
@@ -23,7 +24,7 @@ from config import (
     SHOW_EXPLANATION_DEFAULT,
     SHOW_METTA_DEFAULT,
 )
-from ontology.loader import load_specific_files
+from ontology.loader import load_specific_files, read_raw
 from ontology.registry import OntologyRegistry, BUILTIN_REGISTRY
 from ontology.expander import run_expansion_pipeline
 from core.context_builder import build_system_prompt
@@ -32,6 +33,7 @@ from core.metta_validator import validate
 from core.pln_runner import run_query
 from utils.formatting import format_bot_response
 from utils.logging import log_turn
+from utils.metta_highlight import highlight_metta
 
 
 # ── Discover available .metta files ───────────────────────────────────────────
@@ -280,10 +282,101 @@ def apply_to_ontology(state: dict) -> tuple[str, gr.Button]:
     )
 
 
+# ── File Browser helpers ────────────────────────────────────────────────────
+
+def _scan_metta_files() -> dict[str, str]:
+    """Re-scan disk for .metta files.
+
+    Kept independent of the startup-time `_METTA_FILES` global so files
+    created after launch (e.g. via the Ontology Expander tab) can be picked
+    up with the "Refresh" button instead of requiring a server restart.
+    """
+    return {name: str(p) for name, p in _discover_metta_files().items()}
+
+
+def _render_metta_file(path_str: str | None) -> tuple[str, str]:
+    """Return (metadata markdown, syntax-highlighted HTML) for one .metta file."""
+    if not path_str:
+        return "_No .metta files found._", '<pre class="metta-viewer">(nothing to show)</pre>'
+
+    path = Path(path_str)
+    if not path.exists():
+        return (
+            f"_`{path.name}` no longer exists on disk — try Refresh._",
+            '<pre class="metta-viewer">(file missing)</pre>',
+        )
+
+    text = read_raw(path)
+    stat = path.stat()
+    n_lines = len(text.splitlines())
+    size_kb = stat.st_size / 1024
+    modified = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+    meta = (
+        f"**{path.name}**  ·  {n_lines:,} lines  ·  {size_kb:.1f} KB  ·  "
+        f"modified {modified}  ·  `{path}`"
+    )
+    body = highlight_metta(text) if text.strip() else "<em>(empty file)</em>"
+    return meta, f'<pre class="metta-viewer">{body}</pre>'
+
+
+def browse_selected_file(filename: str, files_state: dict[str, str]) -> tuple[str, str]:
+    """Handler for selecting a file in the Browse Ontology Files tab."""
+    return _render_metta_file(files_state.get(filename))
+
+
+def refresh_file_browser(current_selection: str):
+    """Handler for the 'Refresh file list' button.
+
+    Re-scans disk and keeps the current selection if it still exists,
+    otherwise falls back to the first available file.
+    """
+    files_state = _scan_metta_files()
+    choices = list(files_state.keys())
+    selection = current_selection if current_selection in files_state else (choices[0] if choices else None)
+    meta, view = _render_metta_file(files_state.get(selection) if selection else None)
+    return (
+        gr.update(
+            choices=choices or ["(no .metta files found)"],
+            value=selection,
+            label=f".metta files ({len(choices)} found)",
+        ),
+        files_state,
+        meta,
+        view,
+    )
+
+
+# ── Styling ──────────────────────────────────────────────────────────────────
+
+_APP_CSS = """
+.metta-viewer {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    padding: 14px 16px;
+    border-radius: 8px;
+    overflow: auto;
+    white-space: pre;
+    max-height: 65vh;
+    margin: 0;
+}
+.mh-comment  { color: #6c7086; font-style: italic; }
+.mh-string   { color: #a6e3a1; }
+.mh-number   { color: #fab387; }
+.mh-variable { color: #f38ba8; }
+.mh-head     { color: #89b4fa; font-weight: 600; }
+.mh-symbol   { color: #cdd6f4; }
+.mh-paren    { color: #7f849c; }
+"""
+
+
 # ── Gradio UI ──────────────────────────────────────────────────────────────────
 
 with gr.Blocks(
     title="PLN Natural Language Query Interface",
+    css=_APP_CSS,
 ) as demo:
     gr.Markdown(
         "# PLN Natural Language Query Interface\n"
@@ -366,7 +459,49 @@ with gr.Blocks(
             clear_btn.click(fn=lambda: ([], ""), outputs=_chat_outputs)
 
         # ════════════════════════════════════════════════════════════════════
-        # Tab 2 — Ontology Expander
+        # Tab 2 — Browse Ontology Files
+        # ════════════════════════════════════════════════════════════════════
+        with gr.Tab("Browse Ontology Files"):
+            gr.Markdown(
+                "## Browse Ontology Files\n"
+                "Inspect the raw `.metta` files that make up the knowledge base — "
+                "every file discovered under the repo root and the custom ontology "
+                "drop-in folder (`pln_chat/ontology/metta_files/`)."
+            )
+
+            _initial_files_state = _scan_metta_files()
+            _initial_selection = _ONTOLOGY_CHOICES[0] if _METTA_FILES else None
+            _initial_meta, _initial_view = _render_metta_file(
+                _initial_files_state.get(_initial_selection) if _initial_selection else None
+            )
+
+            with gr.Row():
+                with gr.Column(scale=1, min_width=260):
+                    file_radio = gr.Radio(
+                        choices=_ONTOLOGY_CHOICES,
+                        value=_initial_selection,
+                        label=f".metta files ({len(_METTA_FILES)} found)",
+                    )
+                    browser_refresh_btn = gr.Button("↻ Refresh file list", size="sm")
+                with gr.Column(scale=3):
+                    file_meta_md = gr.Markdown(value=_initial_meta)
+                    file_view_html = gr.HTML(value=_initial_view)
+
+            file_browser_state = gr.State(value=_initial_files_state)
+
+            file_radio.change(
+                fn=browse_selected_file,
+                inputs=[file_radio, file_browser_state],
+                outputs=[file_meta_md, file_view_html],
+            )
+            browser_refresh_btn.click(
+                fn=refresh_file_browser,
+                inputs=file_radio,
+                outputs=[file_radio, file_browser_state, file_meta_md, file_view_html],
+            )
+
+        # ════════════════════════════════════════════════════════════════════
+        # Tab 3 — Ontology Expander
         # ════════════════════════════════════════════════════════════════════
         with gr.Tab("Ontology Expander"):
             gr.Markdown(
