@@ -3,7 +3,7 @@ openai>=1.0
 pydantic>=2.0
 python-dotenv>=1.0
 pypdf>=4.0          # PDF text extraction for the Ontology Expander pipeline
-fastapi>=0.100      # HTTP/JSON API (api.py) — sibling of the Gradio UI
-uvicorn>=0.23       # ASGI server for api.py
-# Optional: uncomment when Hyperon runtime is available
-hyperon>=0.1
+pandas>=2.0         # HAGR ETL (drugage_etl.py / genage / cellage — scripts/run_etl.sh)
+# PLN runtime: the calibration + deduction layers are verified against this
+# exact version (see pln_deduction.metta §5 / docs/deduction_layer.md).
+hyperon==0.2.10

@@ -130,6 +130,12 @@ def generate(csv_path: str, out_path: str) -> None:
 
 
 if __name__ == "__main__":
-    csv_in = "data/GenAge/models_genes/genage_models.csv"
-    metta_out = "genage_models_etl.metta"
-    generate(csv_in, metta_out)
+    import argparse
+
+    ap = argparse.ArgumentParser(description="GenAge model organisms CSV → MeTTa ETL")
+    ap.add_argument("--input", default="data/genage/genage_models.csv",
+                    help="GenAge model organisms CSV")
+    ap.add_argument("--output", default="genage_models_etl.metta",
+                    help="MeTTa output path")
+    args = ap.parse_args()
+    generate(args.input, args.output)

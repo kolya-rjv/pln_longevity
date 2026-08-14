@@ -216,3 +216,11 @@ __marimo__/
 .streamlit/secrets.toml
 
 /pln_chat/logs/
+
+# ETL — keep the raw .zip archives under data/, ignore everything unpacked or
+# generated from them (regenerate with scripts/run_etl.sh).
+/build/
+data/**/*.csv
+data/**/*.tsv
+data/**/*.txt
+data/**/release.html
