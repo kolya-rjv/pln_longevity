@@ -4,7 +4,16 @@ This is a REST sibling of the Gradio UI in app.py, for scripts and agents
 that want to call the query pipeline directly instead of driving a browser.
 It runs the exact same core pipeline as the chat handler in app.py
 (translate -> validate -> run_query -> format_bot_response) and exposes it
-as JSON endpoints with auto-generated OpenAPI docs.
+as JSON endpoints with auto-generated OpenAPI docs. Callers that already
+know the MeTTa they want can skip translation via POST /metta/run instead
+of POST /query.
+
+The KB now includes a curated inference stack (calibration, deduction,
+abductive diagnosis, intervention ranking, patient grounding, counterfactual
+analysis, risk prediction, supplement recommendations — see app.py's
+_INFERENCE_STACK) plus a scoped DrugAge lifespan-ranking engine reachable
+via POST /drugage/rank (or a `(rank-drugage-lifespan (...))` form through
+/query or /metta/run). See API.md for the full picture.
 
 Run standalone:
     python api.py
@@ -18,6 +27,7 @@ This process is independent of app.py — run it alongside the Gradio UI
 """
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -42,14 +52,17 @@ from config import (
     ONTOLOGY_DIR,
     OPENAI_API_KEY,
     PLN_API_KEY,
+    PLN_MAX_KB_FILE_BYTES,
     PLN_RUNTIME_AVAILABLE,
 )
 from ontology.loader import load_specific_files
 from ontology.registry import BUILTIN_REGISTRY, OntologyRegistry
 from ontology.expander import run_expansion_pipeline
+from ontology.drugage_selector import BUILD_DRUGAGE
 from core.context_builder import build_system_prompt
+from core.drugage_router import parse_drugage_query, route_drugage_ranking
 from core.llm_translator import translate
-from core.metta_validator import validate
+from core.metta_validator import ValidationResult, validate
 from core.pln_runner import run_query
 from utils.formatting import format_bot_response
 from utils.logging import log_turn
@@ -67,21 +80,99 @@ def _discover_metta_files() -> dict[str, Path]:
     return files
 
 
+# The coherent inference stack the LLM translator needs to SEE (as system-prompt
+# context) to emit calls into the demo functions — calibrate-tv / infer / explain
+# / rank-interventions / diagnose-patient / decompose-grimage / counterfactual /
+# predict-risk / recommend-supplements — and for the symbol validator to
+# recognise them. Mirrors app.py's _INFERENCE_STACK verbatim; keep in sync.
+_INFERENCE_STACK: list[str] = [
+    "system_types.metta",
+    "logical_predicates.metta",
+    "measurement_types.metta",
+    "epistemic_calibration.metta",
+    "species_taxonomy.metta",
+
+    "drugage_entries.metta",
+    "cellage_metadata.metta",
+
+    "grim_age_core.metta",
+    "grim_age_lu2019_evidence.metta",
+    "evidence_calibration.metta",
+
+    "hallmarks_core.metta",
+    "hallmarks_lopezotin2023_anchors.metta",
+    "hallmarks_lopezotin2023_intervention_evidence.metta",
+
+    "mechanistic_bridges.metta",
+    "pln_deduction.metta",
+    "pln_intervention_ranking.metta",
+    "pln_abductive_diagnosis.metta",
+
+    "drugage_calibration.metta",
+
+    "patient_profile.metta",
+    "pln_counterfactual.metta",
+    "pln_risk_prediction.metta",
+
+    "supplement_evidence.metta",
+    "pln_supplement_recommendation.metta",
+]
+
+
 def _default_selection(choices: list[str]) -> list[str]:
-    return [k for k in choices if "epistemic" in k.lower()] or choices[:1]
+    """Mirrors app.py's _DEFAULT_SELECTION: the curated inference stack (so the
+    LLM translator sees the demo functions), falling back to an 'epistemic' file
+    or the first available file if the stack isn't present."""
+    return (
+        [f for f in _INFERENCE_STACK if f in choices]
+        or [k for k in choices if "epistemic" in k.lower()]
+        or choices[:1]
+    )
+
+
+# KB files actually usable at EXECUTION time: every discovered file MINUS any
+# over PLN_MAX_KB_FILE_BYTES. hyperon 0.2.10 panics (or silently mis-matches)
+# once a space exceeds a few thousand atoms, and e.g. the ~107 KB
+# drugage_etl_short.metta dump trips it. Mirrors app.py's _runtime_kb_paths();
+# excluded files stay queryable in stub mode and are listed by GET /ontology/files.
+def _runtime_kb_paths() -> list[Path]:
+    kept: list[Path] = []
+    for path in _discover_metta_files().values():
+        try:
+            too_big = path.stat().st_size > PLN_MAX_KB_FILE_BYTES
+        except OSError:
+            too_big = False
+        if not too_big:
+            kept.append(path)
+    return kept
 
 
 def _build_context(selected_files: list[str]) -> tuple[OntologyRegistry, dict[str, str]]:
     """Load selected .metta files for the LLM system-prompt context.
 
     Mirrors app.py: the selection only controls what the LLM sees. Execution
-    against the KB always uses every discovered .metta file (see /query).
+    against the KB always uses the runtime-safe file set (_runtime_kb_paths),
+    regardless of this selection — see /query and /metta/run.
     """
     metta_files = _discover_metta_files()
     paths = [metta_files[f] for f in selected_files if f in metta_files]
     if paths:
         return load_specific_files(paths)
     return BUILTIN_REGISTRY, {}
+
+
+def _runtime_registry() -> OntologyRegistry:
+    """Registry built from every file actually used at execution time
+    (_runtime_kb_paths) — the default for validating a raw MeTTa query in
+    /metta/run when the caller hasn't scoped `ontology_files`. Deliberately NOT
+    "every discovered file": a file excluded from execution (oversized) would
+    otherwise validate symbols that then silently fail to resolve at runtime.
+    """
+    paths = _runtime_kb_paths()
+    if not paths:
+        return BUILTIN_REGISTRY
+    registry, _ = load_specific_files(paths)
+    return registry
 
 
 def _resolve_target_path(target_file: Optional[str], new_filename: Optional[str]) -> Path:
@@ -102,6 +193,38 @@ def _resolve_target_path(target_file: Optional[str], new_filename: Optional[str]
     stem = stem or "expanded_ontology"
     CUSTOM_ONTOLOGY_DIR.mkdir(parents=True, exist_ok=True)
     return CUSTOM_ONTOLOGY_DIR / f"{stem}.metta"
+
+
+# ── Patient profile discovery ───────────────────────────────────────────────
+# Patients are hardcoded facts in patient_profile.metta (part of the runtime KB
+# set), not something a caller submits — a query just names one (e.g.
+# "Patient001") for the dedicated <Patient> query forms documented in API.md /
+# the system prompt. This just makes the known names (+ a few headline facts)
+# discoverable over HTTP instead of requiring a caller to read the .metta file.
+_PATIENT_AGE_RE = re.compile(r"\(PatientAge\s+(\S+)\s+([\d.]+)\)")
+_PATIENT_SEX_RE = re.compile(r"\(PatientSex\s+(\S+)\s+(\S+)\)")
+_PATIENT_SMOKING_RE = re.compile(r"\(PatientSmoking\s+(\S+)\s+(\S+)\)")
+
+
+def _patient_summaries() -> list[dict]:
+    registry, raw_contents = load_specific_files(_runtime_kb_paths())
+    patient_ids = sorted(
+        name for name, entry in registry.entries.items()
+        if entry.type_signature == "PatientProfile"
+    )
+    text = "\n".join(raw_contents.values())
+    ages = dict(_PATIENT_AGE_RE.findall(text))
+    sexes = dict(_PATIENT_SEX_RE.findall(text))
+    smoking = dict(_PATIENT_SMOKING_RE.findall(text))
+    return [
+        {
+            "id": pid,
+            "age": float(ages[pid]) if pid in ages else None,
+            "sex": sexes.get(pid),
+            "smoking": smoking.get(pid),
+        }
+        for pid in patient_ids
+    ]
 
 
 # ── Optional auth ────────────────────────────────────────────────────────────
@@ -125,7 +248,7 @@ app = FastAPI(
         "the same logic behind the Gradio chat UI (app.py), for scripts and agents. "
         "See /docs for interactive testing."
     ),
-    version="1.0.0",
+    version="1.1.0",
 )
 
 # Permissive by default so a local agent/script can call this without CORS
@@ -156,9 +279,11 @@ class QueryRequest(BaseModel):
     ontology_files: Optional[list[str]] = Field(
         default=None,
         description="Which .metta files to inject into the LLM's system-prompt context "
-                    "(see GET /ontology/files for choices). Defaults to the same "
-                    "selection the UI starts with. PLN execution always runs against "
-                    "every .metta file regardless of this selection.",
+                    "(see GET /ontology/files for choices). Defaults to the curated inference "
+                    "stack (calibration, deduction, diagnosis, ranking, patient grounding, "
+                    "counterfactual, risk, supplement layers) so the LLM knows about the demo "
+                    "functions. PLN execution always runs against every runtime-safe .metta "
+                    "file (GET /ontology/files -> excluded_from_runtime) regardless of this.",
     )
     model: str = Field(default=DEFAULT_MODEL, description=f"One of {AVAILABLE_MODELS}.")
     temperature: float = Field(default=DEFAULT_TEMPERATURE, ge=0.0, le=1.0)
@@ -191,14 +316,119 @@ class QueryResponse(BaseModel):
     pln_mode: str
     pln_query_time_ms: int
     pln_results: list[PLNAtomOut]
+    pln_error: Optional[str] = Field(
+        default=None,
+        description="Set when pln_status is 'error' (the `answer` text also embeds this).",
+    )
+    routed: Optional[str] = Field(
+        default=None,
+        description="Set to 'drugage_ranking' when the generated MeTTa was a "
+                    "`(rank-drugage-lifespan ...)` form and got dispatched to the scoped "
+                    "DrugAge engine instead of the generic KB (see POST /drugage/rank).",
+    )
     usage: Optional[dict] = None
     error: Optional[str] = Field(default=None, description="Set when the LLM translation step failed.")
     history: list[HistoryTurn] = Field(description="Updated history — pass back verbatim for the next turn.")
 
 
+class MettaRunRequest(BaseModel):
+    metta_query: str = Field(
+        ...,
+        description="Raw MeTTa expression(s) to validate and execute directly — "
+                    "skips the LLM translator entirely (no OpenAI call). A "
+                    "`(rank-drugage-lifespan (Compound1 Compound2 ...))` form is "
+                    "detected and dispatched to the scoped DrugAge engine, same as /query.",
+    )
+    ontology_files: Optional[list[str]] = Field(
+        default=None,
+        description="Which .metta files to check symbols against for validation "
+                    "(see GET /ontology/files). Defaults to every runtime-safe file — "
+                    "unlike /query, there's no LLM context window to economize here, "
+                    "but an oversized file excluded from execution is still excluded "
+                    "from validation too, so a 'valid' query is one that will actually "
+                    "find data. Execution always runs against the same runtime-safe set.",
+    )
+    confidence_threshold: float = Field(
+        default=DEFAULT_CONFIDENCE_THRESHOLD, ge=0.0, le=1.0,
+        description="PLN results below this confidence are filtered out.",
+    )
+    extra_atoms: Optional[str] = Field(
+        default=None,
+        description="Optional raw MeTTa text injected into the same space after the KB "
+                    "files and before the query runs — e.g. a scratch fact to test a "
+                    "hypothetical without writing it to a .metta file.",
+    )
+
+
+class MettaRunResponse(BaseModel):
+    metta_query: str
+    validation_valid: bool
+    validation_issues: list[str]
+    pln_status: str
+    pln_mode: str
+    pln_query_time_ms: int
+    pln_results: list[PLNAtomOut]
+    pln_error: Optional[str] = Field(
+        default=None,
+        description="Set when pln_status is 'error' — e.g. the DrugAge ETL "
+                    "output hasn't been generated yet, or the hyperon runtime raised.",
+    )
+    routed: Optional[str] = Field(
+        default=None,
+        description="Set to 'drugage_ranking' when metta_query was a "
+                    "`(rank-drugage-lifespan ...)` form (see POST /drugage/rank).",
+    )
+
+
 class OntologyFilesResponse(BaseModel):
     files: list[str]
     default_selection: list[str]
+    excluded_from_runtime: list[str] = Field(
+        default_factory=list,
+        description="Discovered files over PLN_MAX_KB_FILE_BYTES, skipped at PLN execution "
+                    "time to avoid a hyperon panic. Still queryable in stub mode.",
+    )
+
+
+class PatientOut(BaseModel):
+    id: str
+    age: Optional[float] = None
+    sex: Optional[str] = None
+    smoking: Optional[str] = None
+
+
+class PatientsResponse(BaseModel):
+    patients: list[PatientOut]
+
+
+class DrugAgeRankRequest(BaseModel):
+    compounds: list[str] = Field(
+        ...,
+        min_length=1,
+        description="DrugAge intervention names, e.g. ['Rapamycin', 'Metformin', 'Resveratrol']. "
+                    "Matched case-/separator-insensitively against DrugAge rows. Keep the pool "
+                    "to a handful — the underlying ranking is ~O(n^2).",
+    )
+    confidence_threshold: float = Field(
+        default=DEFAULT_CONFIDENCE_THRESHOLD, ge=0.0, le=1.0,
+        description="Ranked results below this STV confidence are filtered out.",
+    )
+
+
+class DrugAgeRankResponse(BaseModel):
+    status: str
+    mode: str
+    query_time_ms: int
+    results: list[PLNAtomOut] = Field(
+        description="Ranked (scored ...) tuples first, then one provenance line per ranked "
+                    "compound (PMID + evidence), then an 'Omitted' note for any requested "
+                    "compound with no matching DrugAge row.",
+    )
+    error: Optional[str] = Field(
+        default=None,
+        description="Set if the DrugAge ETL output hasn't been generated yet "
+                    "(run scripts/run_etl.sh) or the engine raised.",
+    )
 
 
 class ExpandRequest(BaseModel):
@@ -266,14 +496,34 @@ def health() -> dict:
         "openai_key_configured": bool(OPENAI_API_KEY),
         "api_key_required": bool(PLN_API_KEY),
         "available_models": AVAILABLE_MODELS,
+        "drugage_build_available": BUILD_DRUGAGE.exists(),
     }
 
 
 @app.get("/ontology/files", response_model=OntologyFilesResponse)
 def ontology_files() -> OntologyFilesResponse:
     """List discovered .metta files, for populating `ontology_files` / `target_file`."""
-    choices = list(_discover_metta_files().keys())
-    return OntologyFilesResponse(files=choices, default_selection=_default_selection(choices))
+    all_files = _discover_metta_files()
+    choices = list(all_files.keys())
+    runtime_names = {p.name for p in _runtime_kb_paths()}
+    excluded = sorted(name for name in choices if name not in runtime_names)
+    return OntologyFilesResponse(
+        files=choices,
+        default_selection=_default_selection(choices),
+        excluded_from_runtime=excluded,
+    )
+
+
+@app.get("/patients", response_model=PatientsResponse)
+def patients() -> PatientsResponse:
+    """Known patient profiles (from patient_profile.metta).
+
+    Patients are static KB facts, not something you submit — use one of these
+    IDs as the <Patient> argument in a /query question ("what's Patient001's
+    10-year CHD risk?") or a dedicated /metta/run form
+    (`(predict-risk-patient &self Patient001)`).
+    """
+    return PatientsResponse(patients=[PatientOut(**p) for p in _patient_summaries()])
 
 
 @app.post("/query", response_model=QueryResponse, dependencies=[Depends(_require_api_key)])
@@ -283,11 +533,12 @@ def query(req: QueryRequest) -> QueryResponse:
     Equivalent to typing into the "PLN Query" tab and clicking Send — runs
     translate -> validate -> run_query -> format_bot_response and returns
     every intermediate result as structured JSON (not just the rendered text).
+    A translated `(rank-drugage-lifespan ...)` query is dispatched to the
+    scoped DrugAge engine instead (see `routed` in the response).
     """
     if not req.message.strip():
         raise HTTPException(status_code=422, detail="message must not be empty.")
 
-    all_kb_paths = list(_discover_metta_files().values())
     selected = req.ontology_files
     if selected is None:
         selected = _default_selection(list(_discover_metta_files().keys()))
@@ -304,13 +555,22 @@ def query(req: QueryRequest) -> QueryResponse:
         temperature=req.temperature,
     )
 
-    validation = validate(translation.metta_query, registry)
-
-    pln_result = run_query(
-        metta_query=translation.metta_query,
-        confidence_threshold=req.confidence_threshold,
-        kb_files=all_kb_paths,
-    )
+    routed: Optional[str] = None
+    drugage_compounds = parse_drugage_query(translation.metta_query)
+    if drugage_compounds is not None:
+        routed = "drugage_ranking"
+        validation = ValidationResult(valid=True)
+        pln_result = route_drugage_ranking(
+            drugage_compounds,
+            confidence_threshold=req.confidence_threshold,
+        )
+    else:
+        validation = validate(translation.metta_query, registry)
+        pln_result = run_query(
+            metta_query=translation.metta_query,
+            confidence_threshold=req.confidence_threshold,
+            kb_files=_runtime_kb_paths(),
+        )
 
     answer = format_bot_response(
         translation=translation,
@@ -349,9 +609,100 @@ def query(req: QueryRequest) -> QueryResponse:
             )
             for r in pln_result.results
         ],
+        pln_error=pln_result.error,
+        routed=routed,
         usage=translation.usage,
         error=translation.error,
         history=[HistoryTurn(**m) for m in updated_history],
+    )
+
+
+@app.post("/metta/run", response_model=MettaRunResponse, dependencies=[Depends(_require_api_key)])
+def metta_run(req: MettaRunRequest) -> MettaRunResponse:
+    """Validate and execute a raw MeTTa query directly, bypassing the LLM translator.
+
+    For callers that already know the MeTTa they want to run (e.g. an agent
+    iterating on queries) — no OpenAI call, and no risk of the translator
+    reinterpreting a query you already wrote correctly. Equivalent to the
+    validate -> run_query half of /query, skipping the translate step. A
+    `(rank-drugage-lifespan ...)` form is dispatched to the scoped DrugAge
+    engine, same as /query (see `routed` in the response) — writing that form
+    by hand and expecting the generic path to see DrugAge data will not work,
+    since that data is deliberately excluded from the generic runtime KB.
+    """
+    if not req.metta_query.strip():
+        raise HTTPException(status_code=422, detail="metta_query must not be empty.")
+
+    routed: Optional[str] = None
+    drugage_compounds = parse_drugage_query(req.metta_query)
+    if drugage_compounds is not None:
+        routed = "drugage_ranking"
+        validation = ValidationResult(valid=True)
+        pln_result = route_drugage_ranking(
+            drugage_compounds,
+            confidence_threshold=req.confidence_threshold,
+        )
+    else:
+        registry = (
+            _runtime_registry()
+            if req.ontology_files is None
+            else _build_context(req.ontology_files)[0]
+        )
+        validation = validate(req.metta_query, registry)
+        pln_result = run_query(
+            metta_query=req.metta_query,
+            confidence_threshold=req.confidence_threshold,
+            kb_files=_runtime_kb_paths(),
+            extra_atoms=req.extra_atoms,
+        )
+
+    return MettaRunResponse(
+        metta_query=req.metta_query,
+        validation_valid=validation.valid,
+        validation_issues=validation.issues,
+        pln_status=pln_result.status,
+        pln_mode=pln_result.mode,
+        pln_query_time_ms=pln_result.query_time_ms,
+        pln_results=[
+            PLNAtomOut(
+                atom=r.atom,
+                strength=(r.stv or {}).get("strength"),
+                confidence=(r.stv or {}).get("confidence"),
+            )
+            for r in pln_result.results
+        ],
+        pln_error=pln_result.error,
+        routed=routed,
+    )
+
+
+@app.post("/drugage/rank", response_model=DrugAgeRankResponse, dependencies=[Depends(_require_api_key)])
+def drugage_rank(req: DrugAgeRankRequest) -> DrugAgeRankResponse:
+    """Rank real DrugAge compounds by calibrated, signed effect on lifespan/mortality.
+
+    Direct structured entry point to the same scoped engine /query and
+    /metta/run dispatch to for a `(rank-drugage-lifespan ...)` form — skip the
+    LLM translator (and MeTTa syntax) entirely when you already know the
+    compound names. Requires build/drugage_etl.metta (run scripts/run_etl.sh
+    first) — as of this writing the engine does NOT fall back to the
+    committed 201-row sample despite drugage_etl_short.metta existing in the
+    repo; see GET /health's drugage_build_available before calling this.
+    """
+    result = route_drugage_ranking(req.compounds, confidence_threshold=req.confidence_threshold)
+
+    return DrugAgeRankResponse(
+        status=result.status,
+        mode=result.mode,
+        query_time_ms=result.query_time_ms,
+        results=[
+            PLNAtomOut(
+                atom=r.atom,
+                strength=(r.stv or {}).get("strength"),
+                confidence=(r.stv or {}).get("confidence"),
+            )
+            for r in result.results
+        ],
+        error=result.error,
     )
 
 
