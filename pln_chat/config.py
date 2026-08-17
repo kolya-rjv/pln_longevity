@@ -51,3 +51,11 @@ DEFAULT_CONFIDENCE_THRESHOLD: float = 0.0
 SHOW_METTA_DEFAULT: bool = True
 SHOW_EXPLANATION_DEFAULT: bool = True
 SHOW_DEBUG_DEFAULT: bool = False
+
+# ── HTTP API (api.py) ────────────────────────────────────────────────────────
+# Plain JSON sibling of the Gradio UI, meant for scripts/agents to call directly.
+PLN_API_HOST: str = os.getenv("PLN_API_HOST", "0.0.0.0")
+PLN_API_PORT: int = int(os.getenv("PLN_API_PORT", "8000"))
+# Optional shared secret. When set, /query and /ontology/* require a matching
+# `X-API-Key` header. Leave unset for local experimentation.
+PLN_API_KEY: str = os.getenv("PLN_API_KEY", "")
