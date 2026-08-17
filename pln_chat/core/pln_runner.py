@@ -16,7 +16,27 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from config import PLN_RUNTIME_AVAILABLE
+from config import ONTOLOGY_DIR, PLN_RUNTIME_AVAILABLE
+
+# ── Scoped DrugAge inference stack ───────────────────────────────────────────────
+# The MINIMAL set of hand-written layers needed to lift + rank DrugAge rows,
+# loaded into a QUERY-SCOPED space alongside a filtered row slice (see
+# run_drugage_ranking). It deliberately EXCLUDES grim_age / hallmarks /
+# mechanistic_bridges: those are the CHD axis, add atoms, and would let compound
+# names collide with curated Effect bridges. Keeping the stack minimal is what
+# keeps the space under the hyperon panic threshold.
+DRUGAGE_STACK: list[Path] = [
+    ONTOLOGY_DIR / f for f in (
+        "system_types.metta",
+        "logical_predicates.metta",
+        "epistemic_calibration.metta",
+        "species_taxonomy.metta",
+        "evidence_calibration.metta",
+        "pln_deduction.metta",
+        "pln_intervention_ranking.metta",
+        "drugage_calibration.metta",
+    )
+]
 
 
 @dataclass
@@ -156,13 +176,22 @@ def _hyperon_run(
     metta_query: str,
     confidence_threshold: float,
     kb_files: Optional[list[Path]],
+    extra_atoms: Optional[str] = None,
 ) -> PLNRunResult:
     """Execute query using the real Hyperon MeTTa interpreter.
 
-    Mirrors the standalone script pattern exactly:
+    The knowledge base is loaded by concatenating every KB file's content into
+    one shared space, then the query is run separately against it:
 
-        !(import! &self <stem>)   ; one per KB file
+        <contents of kb_file_1>
+        <contents of kb_file_2>
+        ...
         !(match &self (, ...) $template)
+
+    This is deliberately NOT `!(import! &self <stem>)` per file. Per-file imports
+    put each module in its own space, so a `(match &self ...)` inside one file
+    cannot see atoms defined in another (it returns empty silently), and module
+    name resolution is order-dependent. One shared space avoids both problems.
 
     Parameters
     ----------
@@ -172,12 +201,9 @@ def _hyperon_run(
     confidence_threshold:
         Filter out results whose STV confidence is below this value.
     kb_files:
-        Ordered list of .metta knowledge-base files to load before the query.
-        The parent directory of the first file is used as the working directory
-        so that `import!` can resolve module names by stem.
+        Ordered list of .metta knowledge-base files whose contents are loaded
+        into the space before the query runs.
     """
-    import os
-
     try:
         from hyperon import MeTTa  # type: ignore
 
@@ -185,50 +211,44 @@ def _hyperon_run(
         if not normalized:
             return PLNRunResult(status="empty", mode="runtime")
 
-        # Build a single script: one !(import! &self <stem>) per KB file,
-        # followed by the query — exactly like a standalone .metta script.
-        import_lines: list[str] = []
-        kb_dir: Optional[Path] = None
+        # Concatenate every KB file's content into one block. A missing or
+        # unreadable file is skipped rather than aborting the whole query.
+        kb_blocks: list[str] = []
         for path in (kb_files or []):
-            import_lines.append(f"!(import! &self {path.stem})")
-            if kb_dir is None:
-                kb_dir = path.parent
+            try:
+                kb_blocks.append(path.read_text(encoding="utf-8"))
+            except OSError:
+                pass
+        # A caller-supplied slice (e.g. a filtered set of DrugAge rows selected
+        # per-query) is injected into the SAME space after the files. This is how
+        # a query-scoped space is assembled without loading a whole ETL dump.
+        if extra_atoms:
+            kb_blocks.append(extra_atoms)
+        kb_text = "\n".join(kb_blocks)
 
-        full_script = "\n".join(import_lines + [normalized])
-
-        # Log the full script for debugging (overwrite on each query)
+        # Log the query (and which KB files were loaded) for debugging. The KB
+        # bodies are large and unchanging, so only their names are recorded.
         try:
             from config import LOGS_DIR
             LOGS_DIR.mkdir(parents=True, exist_ok=True)
-            (LOGS_DIR / "last_query.metta").write_text(full_script, encoding="utf-8")
+            loaded = "\n".join(f";; loaded: {p.name}" for p in (kb_files or []))
+            (LOGS_DIR / "last_query.metta").write_text(
+                f"{loaded}\n\n{normalized}", encoding="utf-8")
         except Exception:  # noqa: BLE001
             pass  # logging must never break query execution
 
-        # Run from the KB directory so import! resolves module names correctly.
-        original_dir = os.getcwd()
-        if kb_dir is not None:
-            os.chdir(kb_dir)
         try:
             metta = MeTTa()
             start = time.monotonic()
-            # ─── DEBUG ───
-            print("=" * 60)
-            print("FULL SCRIPT SENT TO METTA:")
-            print(full_script)
-            print("=" * 60)
-            # ─── END DEBUG ───
-            raw: list[list] = metta.run(full_script)
+            if kb_text.strip():
+                metta.run(kb_text)                   # populate &self; result ignored
+            raw: list[list] = metta.run(normalized)  # every group is a query result
             elapsed = int((time.monotonic() - start) * 1000)
         except Exception as run_exc:
             return PLNRunResult(status="error", mode="runtime", error=str(run_exc))
-        finally:
-            os.chdir(original_dir)
 
-        # raw is a list of result-lists, one per ! expression — skip import
-        # results (first len(import_lines) groups) and only process query results.
-        query_raw = raw[len(import_lines):] if len(raw) > len(import_lines) else raw
         results: list[PLNAtomResult] = []
-        for result_group in query_raw:
+        for result_group in raw:
             for atom in result_group:
                 atom_str = str(atom)
                 results.append(PLNAtomResult(atom=atom_str, stv=_stv_from_atom(atom_str)))
@@ -250,6 +270,7 @@ def run_query(
     metta_query: str,
     confidence_threshold: float = 0.0,
     kb_files: Optional[list[Path]] = None,
+    extra_atoms: Optional[str] = None,
 ) -> PLNRunResult:
     """Execute a MeTTa query, using stub or runtime mode as configured.
 
@@ -261,9 +282,63 @@ def run_query(
         Minimum STV confidence for results to be included.
     kb_files:
         .metta KB files to load into the Hyperon space (runtime mode only).
+    extra_atoms:
+        Optional raw MeTTa text injected into the SAME space after the files —
+        used to scope a query to a selected data slice (e.g. DrugAge rows).
     """
     if not metta_query.strip():
         return PLNRunResult(status="empty", mode="stub" if not PLN_RUNTIME_AVAILABLE else "runtime")
     if PLN_RUNTIME_AVAILABLE:
-        return _hyperon_run(metta_query, confidence_threshold, kb_files)
+        return _hyperon_run(metta_query, confidence_threshold, kb_files, extra_atoms)
     return _stub_run(metta_query, confidence_threshold)
+
+
+def run_drugage_ranking(
+    compounds: list[str],
+    *,
+    outcome: str = "Mortality",
+    best_per_compound: bool = True,
+    limit: Optional[int] = None,
+    source: Optional[Path] = None,
+    confidence_threshold: float = 0.0,
+) -> tuple[PLNRunResult, list]:
+    """Rank real DrugAge compounds by calibrated, signed effect on lifespan.
+
+    Assembles a QUERY-SCOPED hyperon space = the DrugAge inference stack
+    (DRUGAGE_STACK) + only the DrugAge rows matching `compounds` (selected by
+    ontology.drugage_selector, capped under the panic threshold), then runs
+    `rank-interventions` against `outcome` (default Mortality — the compound ->
+    Lifespan -> Mortality chain keeps the Neg=beneficial convention; see
+    docs/etl_inference_wiring.md).
+
+    Returns (PLNRunResult, selected_rows). The result's atoms are the ranked,
+    signed, uncertainty-quantified `(scored ...)` tuples; selected_rows carries
+    the provenance of exactly which rows were injected.
+
+    Keep the compound pool to a handful (Demo-2 scale): the underlying MeTTa
+    insertion sort in pln_intervention_ranking is ~O(n^2) with a high constant
+    (docs/etl_inference_wiring.md §7). best_per_compound (default) keeps the pool
+    at one entry per compound.
+    """
+    from ontology.drugage_selector import MAX_ROWS, build_drugage_slice
+
+    slice_text, rows = build_drugage_slice(
+        compounds,
+        best_per_compound=best_per_compound,
+        limit=limit if limit is not None else MAX_ROWS,
+        source=source,
+    )
+    # Candidate atoms = the compounds actually present in the slice (a requested
+    # compound with no matching row simply drops out — no false ranking).
+    cands = " ".join(sorted({r.compound for r in rows}))
+    if not cands:
+        return PLNRunResult(status="empty", mode="runtime" if PLN_RUNTIME_AVAILABLE else "stub"), rows
+
+    query = f"!(rank-interventions &self ({cands}) {outcome})"
+    result = run_query(
+        query,
+        confidence_threshold=confidence_threshold,
+        kb_files=DRUGAGE_STACK,
+        extra_atoms=slice_text,
+    )
+    return result, rows

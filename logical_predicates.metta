@@ -3,7 +3,7 @@
 ;; ==========================================
 
 ;; ==========================================
-;; 0. Instance-of (for ETL row → type membership)
+;; 0. Instance-of (for ETL row -> type membership)
 ;; ==========================================
 ;; Use this instead of Inheritance for "X is an instance of Type".
 ;; This prevents PLN transitive deduction from chaining rows through
@@ -14,11 +14,8 @@
 ;; 1. Mechanistic Effect Wrappers
 ;; ==========================================
 ;; These are UNARY constructors that wrap a target to create a
-;; mechanistic-effect expression.  Used inside Causes:
-;;   (Causes Rapamycin (Inhibits mTORC1) (stv 0.95 0.98))
-;;
-;; (Inhibits mTORC1) : Expression
-
+;; mechanistic-effect expression. Used inside Causes:
+;;   (Causes Rapamycin (Inhibits mTORC1))
 (: Increases (-> Atom Expression))
 (: Decreases (-> Atom Expression))
 (: Inhibits  (-> Atom Expression))
@@ -39,7 +36,7 @@
 ;; ==========================================
 (: Predicts       (-> Biomarker Outcome Atom))
 (: CorrelatedWith (-> Atom Atom Atom))
-(: Reflects       (-> Biomarker Atom Atom))      ;; Maps surrogate markers to biology
+(: Reflects       (-> Biomarker Atom Atom))      ;; biological interpretation
 (: HazardRatio    (-> Biomarker Outcome Atom))
 
 ;; ==========================================
@@ -48,10 +45,28 @@
 ;; Inheritance: taxonomic / subsumption links that PLN reasons over.
 ;; Do NOT use for row-to-type membership (use InstanceOf instead).
 (: Inheritance (-> Atom Atom Atom))
+(: PartOf      (-> Atom Atom Atom))
+(: SetLink     (-> Expression Atom))
+(: AndLink     (-> Expression Atom))
 
-(: PartOf      (-> Atom Atom Atom))        ;; Composition (e.g., DNAmPAI1 PartOf GrimAge)
-(: SetLink     (-> Expression Atom))       ;; Grouping multiple targets
-(: AndLink     (-> Expression Atom))       ;; Logical AND
+;; ==========================================
+;; 4a. Hallmarks of Aging ontology
+;; ==========================================
+;; HallmarkComponent is a source-backed conceptual anchor. It is not
+;; a statistical correlation and should not receive an invented STV.
+(: HallmarkComponent   (-> Atom HallmarkOfAging Atom))
+(: TargetsHallmark     (-> Intervention HallmarkOfAging Atom))
+(: CandidateBridge     (-> Atom Atom String Atom))
+
+;; Review-level intervention evidence records. These preserve the
+;; wording and source reference from a review table without pretending
+;; that the review itself reports a calibrated PLN truth value.
+(: EvidenceHallmark        (-> HallmarkInterventionEvidence HallmarkOfAging Atom))
+(: EvidenceIntervention    (-> HallmarkInterventionEvidence Intervention Atom))
+(: EvidenceSpeciesModel    (-> HallmarkInterventionEvidence Atom Atom))
+(: EvidenceOutcomeText     (-> HallmarkInterventionEvidence String Atom))
+(: EvidenceReferenceNumber (-> HallmarkInterventionEvidence Number Atom))
+(: EvidenceNote            (-> Atom String Atom))
 
 ;; ==========================================
 ;; 5. Modifiers & Caveats
@@ -69,15 +84,12 @@
 ;; ==========================================
 ;; 7. EXPERIMENT / DATASET RECORD PREDICATES
 ;; ==========================================
-
 (: UsesIntervention            (-> Experiment Intervention Atom))
 (: UsesSpecies                 (-> Experiment Taxon Atom))
 (: UsesStrain                  (-> Experiment Strain Atom))
 (: HasSex                      (-> Experiment Sex Atom))
 (: ReportedIn                  (-> Experiment Publication Atom))
-
 (: Dosage                      (-> Experiment Expression Atom))
-
 (: AvgLifespanChangePercent    (-> Experiment Number Atom))
 (: AvgLifespanSignificance     (-> Experiment SignificanceLabel Atom))
 (: MaxLifespanSignificance     (-> Experiment SignificanceLabel Atom))
@@ -86,59 +98,36 @@
 ;; ==========================================
 ;; 8. PROTOCOL PREDICATES (Strictly Typed)
 ;; ==========================================
-
-;; Concentration in medium (e.g., 14 ppm in food)
 (: Concentration (-> TreatmentProtocol Expression Atom))
-
-;; Normalized bodyweight dose (e.g., 2.24 ppm/day)
 (: DosePerMass (-> TreatmentProtocol Expression Atom))
-
-;; Delivery Mechanics
 (: DeliveryRoute (-> TreatmentProtocol Route Atom))
 (: AdministrationFrequency (-> TreatmentProtocol Frequency Atom))
-
-;; Temporal Dynamics — polymorphic via two declarations
 (: AgeAtInitiation (-> TreatmentProtocol Expression Atom))
 (: AgeAtInitiation (-> TreatmentProtocol LifeStage Atom))
-
 (: TreatmentDuration (-> TreatmentProtocol Expression Atom))
 (: TreatmentDuration (-> TreatmentProtocol DurationEvent Atom))
-
-;; Lifespan phenotype flags
 (: ExtendsMaxLifespan (-> TreatmentProtocol Target Atom))
 (: DoesNotExtendMaxLifespan (-> TreatmentProtocol Target Atom))
-
 (: AltersBodyWeight (-> TreatmentProtocol Phenotype Atom))
 
 ;; ==========================================
 ;; 9. FUTURE PREDICATES (stubs for later phases)
 ;; ==========================================
-;; Uncomment as you implement the corresponding pipeline phases.
-;;
-;; (: EvidenceLevel    (-> Intervention Atom Atom))
-;; (: SafetyProfile    (-> Intervention Atom Atom))
-;; (: Implies          (-> Atom Atom Atom))
-;; (: SimilarMechanism (-> Intervention Intervention Atom Atom))
-;; (: OutperformsFor   (-> Atom Atom Atom Atom))
+;; (: EvidenceLevel     (-> Intervention Atom Atom))
+;; (: SafetyProfile     (-> Intervention Atom Atom))
+;; (: Implies           (-> Atom Atom Atom))
+;; (: SimilarMechanism  (-> Intervention Intervention Atom Atom))
+;; (: OutperformsFor    (-> Atom Atom Atom Atom))
 ;; (: SexSpecificEffect (-> Atom Atom Atom Atom))
-;; (: Note             (-> Atom String Atom))
+;; (: Note              (-> Atom String Atom))
 
 ;; ==========================================
 ;; 10. GENE PREDICATES (GenAge)
 ;; ==========================================
-
-;; Atom as first arg — applies to both GeneticExperiment and HumanAgingGene
 (: InvolvesGene          (-> Atom Gene Atom))
-
-;; GeneticExperiment predicates
-;; HasLifespanEffect takes (Increases Lifespan) or (Decreases Lifespan)
 (: HasLifespanEffect     (-> GeneticExperiment Expression Atom))
 (: LifespanChangePercent (-> GeneticExperiment Number Atom))
-
-;; HumanAgingGene predicates
 (: HasSelectionBasis     (-> HumanAgingGene SelectionBasis Atom))
-
-;; Gene entity predicates
 (: GeneSymbol            (-> Gene String Atom))
 (: GeneName              (-> Gene String Atom))
 (: EntrezID              (-> Gene Number Atom))
@@ -155,4 +144,38 @@
 
 (: ExpressionSampleCount          (-> SenescenceExpressionRecord Number Atom))
 (: DifferentialExpressionDirection (-> SenescenceExpressionRecord ExpressionDirection Atom))
+
+;; PValue is shared by CellAge expression records and GrimAge empirical
+;; associations; the generic (-> Atom Number Atom) covers both uses.
 (: PValue                         (-> Atom Number Atom))
+
+;; ==========================================
+;; 12. BIOMARKER MODEL + PUBLICATION PREDICATES (GrimAge)
+;; ==========================================
+;; Generic enough to reuse for PhenoAge, DunedinPACE, other methylation
+;; clocks and extracted papers.
+(: ModelInput             (-> Atom Atom Atom))
+(: SurrogateFor           (-> Biomarker Biomarker Atom))
+(: ResidualOf             (-> Biomarker Biomarker Atom))
+(: AdjustmentCovariate    (-> Biomarker Atom Atom))
+(: ValueEncoding          (-> Atom String Atom))
+(: EncodedBy              (-> Protein Gene Atom))
+(: HasCpGCount            (-> Biomarker Number Atom))
+(: HasTotalUniqueCpGCount (-> Biomarker Number Atom))
+(: SupportedByPublication (-> Atom Publication Atom))
+(: PublicationTitle       (-> Publication String Atom))
+(: PublicationYear        (-> Publication Number Atom))
+(: JournalName            (-> Publication String Atom))
+(: DOI                    (-> Publication String Atom))
+
+;; ==========================================
+;; 13. STRUCTURED EMPIRICAL EVIDENCE RECORDS (GrimAge)
+;; ==========================================
+;; Keep exact paper measurements separate from calibrated PLN truth values;
+;; evidence_calibration.metta transforms these records into TVs.
+(: HasPredictor   (-> EmpiricalAssociation Biomarker Atom))
+(: HasOutcome     (-> EmpiricalAssociation Outcome Atom))
+(: EffectMetric   (-> EmpiricalAssociation String Atom))
+(: EffectValue    (-> EmpiricalAssociation Number Atom))
+(: EffectScale    (-> EmpiricalAssociation String Atom))
+;; PValue: declared once in section 11 (generic over Atom).

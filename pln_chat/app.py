@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # Ensure the pln_chat package root is on sys.path so submodule imports work
@@ -19,19 +20,22 @@ from config import (
     DEFAULT_MODEL,
     DEFAULT_TEMPERATURE,
     ONTOLOGY_DIR,
+    PLN_MAX_KB_FILE_BYTES,
     SHOW_DEBUG_DEFAULT,
     SHOW_EXPLANATION_DEFAULT,
     SHOW_METTA_DEFAULT,
 )
-from ontology.loader import load_specific_files
+from ontology.loader import load_specific_files, read_raw
 from ontology.registry import OntologyRegistry, BUILTIN_REGISTRY
 from ontology.expander import run_expansion_pipeline
 from core.context_builder import build_system_prompt
+from core.drugage_router import parse_drugage_query, route_drugage_ranking
 from core.llm_translator import translate
-from core.metta_validator import validate
+from core.metta_validator import ValidationResult, validate
 from core.pln_runner import run_query
 from utils.formatting import format_bot_response
 from utils.logging import log_turn
+from utils.metta_highlight import highlight_metta
 
 
 # ── Discover available .metta files ───────────────────────────────────────────
@@ -52,16 +56,89 @@ def _discover_metta_files() -> dict[str, Path]:
 
 _METTA_FILES = _discover_metta_files()
 _ONTOLOGY_CHOICES = list(_METTA_FILES.keys()) or ["(no .metta files found)"]
+
+# The coherent inference stack (calibration -> curated bridges -> deduction ->
+# intervention ranking + abductive diagnosis + patient grounding + counterfactual +
+# risk prediction + supplement recommendations) plus the ontology and evidence it
+# reads. Selected by default so the LLM translator SEES the inference functions
+# (calibrate-tv / infer / explain / rank-interventions / diagnose-patient /
+# decompose-grimage / counterfactual / predict-risk / recommend-supplements) and the
+# entity names they operate on, and so the symbol validator recognises them. Execution
+# runs against the full KB (_ALL_KB_PATHS) regardless of this selection, minus any
+# file too large for the runtime (see _ALL_KB_PATHS below). pln_counterfactual,
+# pln_risk_prediction and pln_supplement_recommendation are small and on this focused
+# stack, so Demos 4, 5 & 6 ride the ordinary run_query path — no scoped space needed
+# (unlike the DrugAge slice); see docs/counterfactual_analysis.md,
+# docs/risk_prediction.md and docs/supplement_recommendations.md.
+_INFERENCE_STACK: list[str] = [
+    "system_types.metta",
+    "logical_predicates.metta",
+    "measurement_types.metta",
+    "epistemic_calibration.metta",
+    "species_taxonomy.metta",
+
+    "drugage_entries.metta",
+    "cellage_metadata.metta",
+    
+
+    "grim_age_core.metta",
+    "grim_age_lu2019_evidence.metta",
+    "evidence_calibration.metta",
+
+    "hallmarks_core.metta",
+    "hallmarks_lopezotin2023_anchors.metta",
+    "hallmarks_lopezotin2023_intervention_evidence.metta",
+
+    "mechanistic_bridges.metta",
+    "pln_deduction.metta",
+    "pln_intervention_ranking.metta",
+    "pln_abductive_diagnosis.metta",
+
+    "drugage_calibration.metta",
+
+    "patient_profile.metta",
+    "pln_counterfactual.metta",
+    "pln_risk_prediction.metta",
+
+    "supplement_evidence.metta",
+    "pln_supplement_recommendation.metta",
+]
 _DEFAULT_SELECTION = (
-    [k for k in _ONTOLOGY_CHOICES if "epistemic" in k.lower()]
+    [f for f in _INFERENCE_STACK if f in _METTA_FILES]
+    or [k for k in _ONTOLOGY_CHOICES if "epistemic" in k.lower()]
     or _ONTOLOGY_CHOICES[:1]
 )
 
 
 # ── Registry helper ────────────────────────────────────────────────────────────
 
-# All KB files available for execution — always the complete set.
-_ALL_KB_PATHS: list[Path] = list(_METTA_FILES.values())
+# KB files loaded into the hyperon space for EXECUTION. The full discovered set
+# MINUS any file over PLN_MAX_KB_FILE_BYTES: hyperon 0.2.10 panics (or silently
+# mis-matches) once a space exceeds a few thousand atoms, and the ~107 KB
+# drugage_etl_short.metta dump trips it — which otherwise crashes the whole app
+# on the first query. Excluded files stay available for queries in stub mode.
+def _runtime_kb_paths() -> list[Path]:
+    kept: list[Path] = []
+    skipped: list[str] = []
+    for path in _METTA_FILES.values():
+        try:
+            too_big = path.stat().st_size > PLN_MAX_KB_FILE_BYTES
+        except OSError:
+            too_big = False
+        if too_big:
+            skipped.append(path.name)
+        else:
+            kept.append(path)
+    if skipped:
+        print(
+            f"PLN runtime: skipping {len(skipped)} .metta file(s) over "
+            f"{PLN_MAX_KB_FILE_BYTES} bytes that destabilise hyperon 0.2.10 "
+            f"({', '.join(skipped)}) — query this data in stub mode."
+        )
+    return kept
+
+
+_ALL_KB_PATHS: list[Path] = _runtime_kb_paths()
 
 
 def _build_context(selected_files: list[str]) -> tuple[OntologyRegistry, dict[str, str]]:
@@ -114,13 +191,28 @@ def chat(
     print("=" * 60)
     # ─── END DEBUG ─────────
 
-    validation = validate(translation.metta_query, registry)  # uses parsed registry for symbol checks
-
-    pln_result = run_query(
-        metta_query=translation.metta_query,
-        confidence_threshold=confidence_threshold,
-        kb_files=_ALL_KB_PATHS,
-    )
+    # ── DrugAge lifespan/mortality ranking — dedicated scoped route ────────────
+    # A `(rank-drugage-lifespan (C1 C2 …))` query must NOT go through the generic
+    # run_query: that space excludes the DrugAge build/ rows and includes the
+    # colliding CHD bridges (and would risk the hyperon panic). Detect the form
+    # and dispatch to the scoped run_drugage_ranking instead; everything else
+    # keeps the existing path. See core/drugage_router.py + docs §8.5.
+    drugage_compounds = parse_drugage_query(translation.metta_query)
+    if drugage_compounds is not None:
+        # The routed form is validated by the selector (does a row match?), not by
+        # the generic symbol index, which lacks the scoped DrugAge symbols/names.
+        validation = ValidationResult(valid=True)
+        pln_result = route_drugage_ranking(
+            drugage_compounds,
+            confidence_threshold=confidence_threshold,
+        )
+    else:
+        validation = validate(translation.metta_query, registry)  # parsed registry for symbol checks
+        pln_result = run_query(
+            metta_query=translation.metta_query,
+            confidence_threshold=confidence_threshold,
+            kb_files=_ALL_KB_PATHS,
+        )
 
     bot_response = format_bot_response(
         translation=translation,
@@ -280,10 +372,101 @@ def apply_to_ontology(state: dict) -> tuple[str, gr.Button]:
     )
 
 
+# ── File Browser helpers ────────────────────────────────────────────────────
+
+def _scan_metta_files() -> dict[str, str]:
+    """Re-scan disk for .metta files.
+
+    Kept independent of the startup-time `_METTA_FILES` global so files
+    created after launch (e.g. via the Ontology Expander tab) can be picked
+    up with the "Refresh" button instead of requiring a server restart.
+    """
+    return {name: str(p) for name, p in _discover_metta_files().items()}
+
+
+def _render_metta_file(path_str: str | None) -> tuple[str, str]:
+    """Return (metadata markdown, syntax-highlighted HTML) for one .metta file."""
+    if not path_str:
+        return "_No .metta files found._", '<pre class="metta-viewer">(nothing to show)</pre>'
+
+    path = Path(path_str)
+    if not path.exists():
+        return (
+            f"_`{path.name}` no longer exists on disk — try Refresh._",
+            '<pre class="metta-viewer">(file missing)</pre>',
+        )
+
+    text = read_raw(path)
+    stat = path.stat()
+    n_lines = len(text.splitlines())
+    size_kb = stat.st_size / 1024
+    modified = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+    meta = (
+        f"**{path.name}**  ·  {n_lines:,} lines  ·  {size_kb:.1f} KB  ·  "
+        f"modified {modified}  ·  `{path}`"
+    )
+    body = highlight_metta(text) if text.strip() else "<em>(empty file)</em>"
+    return meta, f'<pre class="metta-viewer">{body}</pre>'
+
+
+def browse_selected_file(filename: str, files_state: dict[str, str]) -> tuple[str, str]:
+    """Handler for selecting a file in the Browse Ontology Files tab."""
+    return _render_metta_file(files_state.get(filename))
+
+
+def refresh_file_browser(current_selection: str):
+    """Handler for the 'Refresh file list' button.
+
+    Re-scans disk and keeps the current selection if it still exists,
+    otherwise falls back to the first available file.
+    """
+    files_state = _scan_metta_files()
+    choices = list(files_state.keys())
+    selection = current_selection if current_selection in files_state else (choices[0] if choices else None)
+    meta, view = _render_metta_file(files_state.get(selection) if selection else None)
+    return (
+        gr.update(
+            choices=choices or ["(no .metta files found)"],
+            value=selection,
+            label=f".metta files ({len(choices)} found)",
+        ),
+        files_state,
+        meta,
+        view,
+    )
+
+
+# ── Styling ──────────────────────────────────────────────────────────────────
+
+_APP_CSS = """
+.metta-viewer {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    padding: 14px 16px;
+    border-radius: 8px;
+    overflow: auto;
+    white-space: pre;
+    max-height: 65vh;
+    margin: 0;
+}
+.mh-comment  { color: #6c7086; font-style: italic; }
+.mh-string   { color: #a6e3a1; }
+.mh-number   { color: #fab387; }
+.mh-variable { color: #f38ba8; }
+.mh-head     { color: #89b4fa; font-weight: 600; }
+.mh-symbol   { color: #cdd6f4; }
+.mh-paren    { color: #7f849c; }
+"""
+
+
 # ── Gradio UI ──────────────────────────────────────────────────────────────────
 
 with gr.Blocks(
     title="PLN Natural Language Query Interface",
+    css=_APP_CSS,
 ) as demo:
     gr.Markdown(
         "# PLN Natural Language Query Interface\n"
@@ -366,7 +549,49 @@ with gr.Blocks(
             clear_btn.click(fn=lambda: ([], ""), outputs=_chat_outputs)
 
         # ════════════════════════════════════════════════════════════════════
-        # Tab 2 — Ontology Expander
+        # Tab 2 — Browse Ontology Files
+        # ════════════════════════════════════════════════════════════════════
+        with gr.Tab("Browse Ontology Files"):
+            gr.Markdown(
+                "## Browse Ontology Files\n"
+                "Inspect the raw `.metta` files that make up the knowledge base — "
+                "every file discovered under the repo root and the custom ontology "
+                "drop-in folder (`pln_chat/ontology/metta_files/`)."
+            )
+
+            _initial_files_state = _scan_metta_files()
+            _initial_selection = _ONTOLOGY_CHOICES[0] if _METTA_FILES else None
+            _initial_meta, _initial_view = _render_metta_file(
+                _initial_files_state.get(_initial_selection) if _initial_selection else None
+            )
+
+            with gr.Row():
+                with gr.Column(scale=1, min_width=260):
+                    file_radio = gr.Radio(
+                        choices=_ONTOLOGY_CHOICES,
+                        value=_initial_selection,
+                        label=f".metta files ({len(_METTA_FILES)} found)",
+                    )
+                    browser_refresh_btn = gr.Button("↻ Refresh file list", size="sm")
+                with gr.Column(scale=3):
+                    file_meta_md = gr.Markdown(value=_initial_meta)
+                    file_view_html = gr.HTML(value=_initial_view)
+
+            file_browser_state = gr.State(value=_initial_files_state)
+
+            file_radio.change(
+                fn=browse_selected_file,
+                inputs=[file_radio, file_browser_state],
+                outputs=[file_meta_md, file_view_html],
+            )
+            browser_refresh_btn.click(
+                fn=refresh_file_browser,
+                inputs=file_radio,
+                outputs=[file_radio, file_browser_state, file_meta_md, file_view_html],
+            )
+
+        # ════════════════════════════════════════════════════════════════════
+        # Tab 3 — Ontology Expander
         # ════════════════════════════════════════════════════════════════════
         with gr.Tab("Ontology Expander"):
             gr.Markdown(
@@ -503,4 +728,7 @@ with gr.Blocks(
 
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860, debug=True)
+    demo.launch(
+        server_name="127.0.0.1",
+        server_port=7860,
+    )
