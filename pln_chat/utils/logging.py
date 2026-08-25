@@ -20,6 +20,24 @@ logging.basicConfig(
 logger = logging.getLogger("pln_chat")
 
 
+def log_query(user_message: str) -> None:
+    """Append the raw user input query as soon as it's received.
+
+    Logged independently of `log_turn` so the input is captured even if
+    translation or PLN execution later fails or raises.
+    """
+    record = {
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "event":     "input_query",
+        "user":      user_message,
+    }
+    try:
+        with _log_file.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record) + "\n")
+    except OSError:
+        logger.warning("Could not write to session log file: %s", _log_file)
+
+
 def log_turn(user_message: str, translation, pln_result) -> None:
     """Append a single conversation turn as a JSON line to the session log."""
     record = {

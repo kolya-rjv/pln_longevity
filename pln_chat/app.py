@@ -34,7 +34,7 @@ from core.llm_translator import translate
 from core.metta_validator import ValidationResult, validate
 from core.pln_runner import run_query
 from utils.formatting import format_bot_response
-from utils.logging import log_turn
+from utils.logging import log_query, log_turn
 from utils.metta_highlight import highlight_metta
 
 
@@ -169,6 +169,8 @@ def chat(
 ) -> tuple[list[dict], str]:
     if not user_message.strip():
         return history, ""
+
+    log_query(user_message)
 
     registry, raw_contents = _build_context(selected_files)
     system_prompt = build_system_prompt(registry, raw_contents)
