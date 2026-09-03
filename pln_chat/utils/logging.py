@@ -20,6 +20,15 @@ logging.basicConfig(
 logger = logging.getLogger("pln_chat")
 
 
+def _append_record(record: dict) -> None:
+    """Append one JSON record without allowing logging failures to break a call."""
+    try:
+        with _log_file.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record) + "\n")
+    except OSError:
+        logger.warning("Could not write to session log file: %s", _log_file)
+
+
 def log_query(user_message: str) -> None:
     """Append the raw user input query as soon as it's received.
 
@@ -31,11 +40,7 @@ def log_query(user_message: str) -> None:
         "event":     "input_query",
         "user":      user_message,
     }
-    try:
-        with _log_file.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record) + "\n")
-    except OSError:
-        logger.warning("Could not write to session log file: %s", _log_file)
+    _append_record(record)
 
 
 def log_turn(user_message: str, translation, pln_result) -> None:
@@ -49,8 +54,34 @@ def log_turn(user_message: str, translation, pln_result) -> None:
         "pln_mode":    getattr(pln_result, "mode", ""),
         "error":       getattr(translation, "error", None),
     }
-    try:
-        with _log_file.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record) + "\n")
-    except OSError:
-        logger.warning("Could not write to session log file: %s", _log_file)
+    _append_record(record)
+
+
+def log_http_request(
+    *,
+    method: str,
+    path: str,
+    query: str,
+    body: str,
+    status_code: int,
+    duration_ms: int,
+    client: str | None,
+    content_type: str | None,
+    user_agent: str | None,
+    error: str | None = None,
+) -> None:
+    """Log every HTTP API request, including its raw request body."""
+    _append_record({
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "event": "http_request",
+        "method": method,
+        "path": path,
+        "query": query,
+        "body": body,
+        "status_code": status_code,
+        "duration_ms": duration_ms,
+        "client": client,
+        "content_type": content_type,
+        "user_agent": user_agent,
+        "error": error,
+    })

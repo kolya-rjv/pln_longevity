@@ -1,4 +1,4 @@
-"""PLN Natural Language Query Interface — Gradio entry point."""
+"""PLN Natural Language Query Interface — combined Gradio + HTTP entry point."""
 from __future__ import annotations
 
 import sys
@@ -729,8 +729,26 @@ with gr.Blocks(
             )
 
 
+def create_combined_app():
+    """Mount Gradio at `/` after the REST routes on the shared FastAPI app.
+
+    Route order matters: FastAPI's `/query`, `/metta/run`, `/docs`, and other
+    concrete routes are registered before Gradio's catch-all root mount.
+    Consequently one ngrok origin serves both interfaces without changing the
+    existing REST paths.
+    """
+    from api import app as api_app
+
+    return gr.mount_gradio_app(api_app, demo, path="/")
+
+
 if __name__ == "__main__":
-    demo.launch(
-        server_name="127.0.0.1",
-        server_port=7860,
+    import uvicorn
+
+    from config import PLN_SERVER_HOST, PLN_SERVER_PORT
+
+    uvicorn.run(
+        create_combined_app(),
+        host=PLN_SERVER_HOST,
+        port=PLN_SERVER_PORT,
     )

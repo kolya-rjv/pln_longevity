@@ -1,6 +1,6 @@
 """PLN Natural Language Query Interface — plain HTTP/JSON API.
 
-This is a REST sibling of the Gradio UI in app.py, for scripts and agents
+This is the REST portion of the Gradio UI in app.py, for scripts and agents
 that want to call the query pipeline directly instead of driving a browser.
 It runs the exact same core pipeline as the chat handler in app.py
 (translate -> validate -> run_query -> format_bot_response) and exposes it
@@ -22,13 +22,16 @@ Run standalone:
 Or with uvicorn directly (e.g. for --reload during development):
     uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 
-This process is independent of app.py — run it alongside the Gradio UI
-(different port) or on its own.
+When `app.py` starts, it mounts Gradio at `/` on this FastAPI application, so
+the UI and these routes share one port and ngrok origin. This module can still
+be run on its own when an API-only process is useful.
 """
 from __future__ import annotations
 
+import importlib.util
 import re
 import sys
+import time
 from pathlib import Path
 
 # Ensure the pln_chat package root is on sys.path so submodule imports work
@@ -37,11 +40,11 @@ _ROOT = Path(__file__).parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from typing import Optional
+from typing import Literal, Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from config import (
     AVAILABLE_MODELS,
@@ -51,11 +54,11 @@ from config import (
     DEFAULT_TEMPERATURE,
     ONTOLOGY_DIR,
     OPENAI_API_KEY,
-    PLN_API_KEY,
+    PLN_CORS_ORIGINS,
     PLN_MAX_KB_FILE_BYTES,
     PLN_RUNTIME_AVAILABLE,
 )
-from ontology.loader import load_specific_files
+from ontology.loader import load_specific_files, parse_metta_text
 from ontology.registry import BUILTIN_REGISTRY, OntologyRegistry
 from ontology.expander import run_expansion_pipeline
 from ontology.drugage_selector import BUILD_DRUGAGE
@@ -65,7 +68,7 @@ from core.llm_translator import translate
 from core.metta_validator import ValidationResult, validate
 from core.pln_runner import run_query
 from utils.formatting import format_bot_response
-from utils.logging import log_turn
+from utils.logging import log_http_request, log_turn
 
 
 # ── Ontology file discovery / resolution (mirrors app.py) ──────────────────
@@ -161,6 +164,21 @@ def _build_context(selected_files: list[str]) -> tuple[OntologyRegistry, dict[st
     return BUILTIN_REGISTRY, {}
 
 
+def _validate_ontology_files(selected_files: list[str]) -> None:
+    """Reject misspelled file selections instead of silently using less context."""
+    known = _discover_metta_files()
+    unknown = sorted(set(selected_files) - set(known))
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "unknown_ontology_files",
+                "message": "Unknown ontology file selection.",
+                "files": unknown,
+            },
+        )
+
+
 def _runtime_registry() -> OntologyRegistry:
     """Registry built from every file actually used at execution time
     (_runtime_kb_paths) — the default for validating a raw MeTTa query in
@@ -175,6 +193,43 @@ def _runtime_registry() -> OntologyRegistry:
     return registry
 
 
+_SAFE_METTA_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.metta$")
+
+
+def _normalise_metta_name(value: str, *, field: str) -> str:
+    """Return a safe basename ending in .metta, or reject the request."""
+    name = value.strip()
+    if not name.endswith(".metta"):
+        name = f"{name}.metta"
+    if not _SAFE_METTA_NAME.fullmatch(name) or Path(name).name != name:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "invalid_ontology_filename",
+                "message": f"{field} must be a plain .metta filename without path separators.",
+            },
+        )
+    return name
+
+
+def _ensure_allowed_target(path: Path) -> Path:
+    """Confine ontology writes to direct children of the two ontology roots."""
+    resolved = path.resolve(strict=False)
+    allowed_parents = {
+        ONTOLOGY_DIR.resolve(strict=False),
+        CUSTOM_ONTOLOGY_DIR.resolve(strict=False),
+    }
+    if resolved.parent not in allowed_parents:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "invalid_ontology_filename",
+                "message": "Ontology target resolves outside an allowed ontology directory.",
+            },
+        )
+    return path
+
+
 def _resolve_target_path(target_file: Optional[str], new_filename: Optional[str]) -> Path:
     """Return an absolute Path for a .metta file to append extracted entries to.
 
@@ -185,14 +240,12 @@ def _resolve_target_path(target_file: Optional[str], new_filename: Optional[str]
     """
     metta_files = _discover_metta_files()
     if target_file and target_file in metta_files:
-        return metta_files[target_file]
+        return _ensure_allowed_target(metta_files[target_file])
 
-    stem = (target_file or new_filename or "expanded_ontology").strip()
-    if stem.endswith(".metta"):
-        stem = stem[: -len(".metta")]
-    stem = stem or "expanded_ontology"
+    raw_name = target_file or new_filename or "expanded_ontology"
+    name = _normalise_metta_name(raw_name, field="target_file/new_filename")
     CUSTOM_ONTOLOGY_DIR.mkdir(parents=True, exist_ok=True)
-    return CUSTOM_ONTOLOGY_DIR / f"{stem}.metta"
+    return _ensure_allowed_target(CUSTOM_ONTOLOGY_DIR / name)
 
 
 # ── Patient profile discovery ───────────────────────────────────────────────
@@ -227,18 +280,6 @@ def _patient_summaries() -> list[dict]:
     ]
 
 
-# ── Optional auth ────────────────────────────────────────────────────────────
-
-def _require_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
-    """No-op unless PLN_API_KEY is set; then require a matching X-API-Key header.
-
-    Every call here costs an OpenAI request (and /ontology/* can write to
-    disk), so set PLN_API_KEY before exposing this beyond localhost.
-    """
-    if PLN_API_KEY and x_api_key != PLN_API_KEY:
-        raise HTTPException(status_code=401, detail="Missing or invalid X-API-Key header.")
-
-
 # ── App ──────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
@@ -252,27 +293,61 @@ app = FastAPI(
 )
 
 # Permissive by default so a local agent/script can call this without CORS
-# friction during experimentation. Tighten allow_origins if this is ever
-# exposed beyond localhost.
+# friction during experimentation. Set PLN_CORS_ORIGINS to a comma-separated
+# allowlist when a browser client reaches this beyond localhost.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=PLN_CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
+@app.middleware("http")
+async def log_api_request(request: Request, call_next):
+    """Record every API request, including raw JSON/text bodies and failures."""
+    started = time.monotonic()
+    raw_body = await request.body()
+    body = raw_body.decode("utf-8", errors="replace")
+    status_code = 500
+    error: Optional[str] = None
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+    except Exception as exc:
+        error = str(exc)
+        raise
+    finally:
+        client = request.client.host if request.client else None
+        log_http_request(
+            method=request.method,
+            path=request.url.path,
+            query=request.url.query,
+            body=body,
+            status_code=status_code,
+            duration_ms=int((time.monotonic() - started) * 1000),
+            client=client,
+            content_type=request.headers.get("content-type"),
+            user_agent=request.headers.get("user-agent"),
+            error=error,
+        )
+
+
 # ── Schemas ──────────────────────────────────────────────────────────────────
 
 class HistoryTurn(BaseModel):
-    role: str
-    content: str
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=50_000)
 
 
 class QueryRequest(BaseModel):
-    message: str = Field(..., description="Natural-language question for the KB.")
+    message: str = Field(
+        ..., max_length=50_000, description="Natural-language question for the KB."
+    )
     history: list[HistoryTurn] = Field(
         default_factory=list,
+        max_length=100,
         description="Prior turns (oldest first) for multi-turn context. "
                     "Pass back the `history` from the previous response to continue a conversation.",
     )
@@ -294,6 +369,13 @@ class QueryRequest(BaseModel):
     show_metta: bool = Field(default=True, description="Include the generated MeTTa query in `answer`.")
     show_explanation: bool = Field(default=True, description="Include the NL explanation in `answer`.")
     show_debug: bool = Field(default=False, description="Include token usage / raw LLM response in `answer`.")
+
+    @field_validator("model")
+    @classmethod
+    def model_must_be_supported(cls, value: str) -> str:
+        if value not in AVAILABLE_MODELS:
+            raise ValueError(f"model must be one of: {', '.join(AVAILABLE_MODELS)}")
+        return value
 
 
 class PLNAtomOut(BaseModel):
@@ -334,6 +416,7 @@ class QueryResponse(BaseModel):
 class MettaRunRequest(BaseModel):
     metta_query: str = Field(
         ...,
+        max_length=200_000,
         description="Raw MeTTa expression(s) to validate and execute directly — "
                     "skips the LLM translator entirely (no OpenAI call). A "
                     "`(rank-drugage-lifespan (Compound1 Compound2 ...))` form is "
@@ -354,6 +437,7 @@ class MettaRunRequest(BaseModel):
     )
     extra_atoms: Optional[str] = Field(
         default=None,
+        max_length=500_000,
         description="Optional raw MeTTa text injected into the same space after the KB "
                     "files and before the query runs — e.g. a scratch fact to test a "
                     "hypothetical without writing it to a .metta file.",
@@ -432,7 +516,10 @@ class DrugAgeRankResponse(BaseModel):
 
 
 class ExpandRequest(BaseModel):
-    paper_text: str = Field(..., description="Paper text or abstract to extract new ontology entries from.")
+    paper_text: str = Field(
+        ..., max_length=2_000_000,
+        description="Paper text or abstract to extract new ontology entries from.",
+    )
     filename: str = Field(
         default="pasted_text.txt",
         description="Source label recorded in the generated MeTTa block's header comment.",
@@ -454,6 +541,13 @@ class ExpandRequest(BaseModel):
         description="If true, write the extracted entries to disk immediately. "
                     "If false (default), only preview them — call POST /ontology/apply to write.",
     )
+
+    @field_validator("model")
+    @classmethod
+    def model_must_be_supported(cls, value: str) -> str:
+        if value not in AVAILABLE_MODELS:
+            raise ValueError(f"model must be one of: {', '.join(AVAILABLE_MODELS)}")
+        return value
 
 
 class ExtractedEntryOut(BaseModel):
@@ -490,11 +584,15 @@ class ApplyResponse(BaseModel):
 @app.get("/health")
 def health() -> dict:
     """Liveness + config check — confirm the server is reachable before querying."""
+    runtime_importable = importlib.util.find_spec("hyperon") is not None
+    runtime_ready = PLN_RUNTIME_AVAILABLE and runtime_importable and bool(_runtime_kb_paths())
     return {
         "status": "ok",
         "pln_mode": "runtime" if PLN_RUNTIME_AVAILABLE else "stub",
+        "runtime_importable": runtime_importable,
+        "runtime_ready": runtime_ready,
+        "runtime_kb_file_count": len(_runtime_kb_paths()),
         "openai_key_configured": bool(OPENAI_API_KEY),
-        "api_key_required": bool(PLN_API_KEY),
         "available_models": AVAILABLE_MODELS,
         "drugage_build_available": BUILD_DRUGAGE.exists(),
     }
@@ -526,7 +624,7 @@ def patients() -> PatientsResponse:
     return PatientsResponse(patients=[PatientOut(**p) for p in _patient_summaries()])
 
 
-@app.post("/query", response_model=QueryResponse, dependencies=[Depends(_require_api_key)])
+@app.post("/query", response_model=QueryResponse)
 def query(req: QueryRequest) -> QueryResponse:
     """Ask a natural-language question of the PLN knowledge base.
 
@@ -542,6 +640,8 @@ def query(req: QueryRequest) -> QueryResponse:
     selected = req.ontology_files
     if selected is None:
         selected = _default_selection(list(_discover_metta_files().keys()))
+    else:
+        _validate_ontology_files(selected)
     registry, raw_contents = _build_context(selected)
     system_prompt = build_system_prompt(registry, raw_contents)
 
@@ -558,6 +658,14 @@ def query(req: QueryRequest) -> QueryResponse:
     routed: Optional[str] = None
     drugage_compounds = parse_drugage_query(translation.metta_query)
     if drugage_compounds is not None:
+        if not drugage_compounds:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "invalid_drugage_query",
+                    "message": "rank-drugage-lifespan requires at least one compound.",
+                },
+            )
         routed = "drugage_ranking"
         validation = ValidationResult(valid=True)
         pln_result = route_drugage_ranking(
@@ -617,7 +725,7 @@ def query(req: QueryRequest) -> QueryResponse:
     )
 
 
-@app.post("/metta/run", response_model=MettaRunResponse, dependencies=[Depends(_require_api_key)])
+@app.post("/metta/run", response_model=MettaRunResponse)
 def metta_run(req: MettaRunRequest) -> MettaRunResponse:
     """Validate and execute a raw MeTTa query directly, bypassing the LLM translator.
 
@@ -636,6 +744,14 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
     routed: Optional[str] = None
     drugage_compounds = parse_drugage_query(req.metta_query)
     if drugage_compounds is not None:
+        if not drugage_compounds:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "invalid_drugage_query",
+                    "message": "rank-drugage-lifespan requires at least one compound.",
+                },
+            )
         routed = "drugage_ranking"
         validation = ValidationResult(valid=True)
         pln_result = route_drugage_ranking(
@@ -643,12 +759,28 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
             confidence_threshold=req.confidence_threshold,
         )
     else:
+        if req.ontology_files is not None:
+            _validate_ontology_files(req.ontology_files)
         registry = (
             _runtime_registry()
             if req.ontology_files is None
             else _build_context(req.ontology_files)[0]
         )
-        validation = validate(req.metta_query, registry)
+        if req.extra_atoms:
+            registry.merge(parse_metta_text(req.extra_atoms, source_name="<api-extra-atoms>"))
+        validation = validate(
+            "\n".join(part for part in (req.extra_atoms, req.metta_query) if part),
+            registry,
+        )
+        if not validation.valid:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "invalid_metta_query",
+                    "message": "MeTTa validation failed; the query was not executed.",
+                    "issues": validation.issues,
+                },
+            )
         pln_result = run_query(
             metta_query=req.metta_query,
             confidence_threshold=req.confidence_threshold,
@@ -676,7 +808,7 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
     )
 
 
-@app.post("/drugage/rank", response_model=DrugAgeRankResponse, dependencies=[Depends(_require_api_key)])
+@app.post("/drugage/rank", response_model=DrugAgeRankResponse)
 def drugage_rank(req: DrugAgeRankRequest) -> DrugAgeRankResponse:
     """Rank real DrugAge compounds by calibrated, signed effect on lifespan/mortality.
 
@@ -706,7 +838,7 @@ def drugage_rank(req: DrugAgeRankRequest) -> DrugAgeRankResponse:
     )
 
 
-@app.post("/ontology/expand", response_model=ExpandResponse, dependencies=[Depends(_require_api_key)])
+@app.post("/ontology/expand", response_model=ExpandResponse)
 def ontology_expand(req: ExpandRequest) -> ExpandResponse:
     """Extract new PLN ontology entries from pasted paper text.
 
@@ -748,7 +880,7 @@ def ontology_expand(req: ExpandRequest) -> ExpandResponse:
     )
 
 
-@app.post("/ontology/apply", response_model=ApplyResponse, dependencies=[Depends(_require_api_key)])
+@app.post("/ontology/apply", response_model=ApplyResponse)
 def ontology_apply(req: ApplyRequest) -> ApplyResponse:
     """Write a previously-previewed MeTTa block to disk.
 
@@ -759,8 +891,9 @@ def ontology_apply(req: ApplyRequest) -> ApplyResponse:
         raise HTTPException(status_code=422, detail="metta_block must not be empty.")
 
     metta_files = _discover_metta_files()
-    name = req.target_file if req.target_file.endswith(".metta") else f"{req.target_file}.metta"
-    target_path = metta_files.get(req.target_file) or (CUSTOM_ONTOLOGY_DIR / name)
+    name = _normalise_metta_name(req.target_file, field="target_file")
+    target_path = metta_files.get(name) or (CUSTOM_ONTOLOGY_DIR / name)
+    target_path = _ensure_allowed_target(target_path)
 
     try:
         target_path.parent.mkdir(parents=True, exist_ok=True)

@@ -82,14 +82,13 @@ def _iter_top_level_expressions(text: str):
             yield expr
 
 
-def parse_metta_file(path: Path) -> OntologyRegistry:
-    """Parse a single .metta file and return a populated OntologyRegistry."""
+def parse_metta_text(text: str, source_name: str = "<memory>") -> OntologyRegistry:
+    """Build a best-effort symbol registry from an in-memory MeTTa block.
+
+    This uses the same parser as :func:`parse_metta_file` and is useful for
+    validating API-supplied ``extra_atoms`` without first writing them to disk.
+    """
     registry = OntologyRegistry()
-    filename = path.name
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return registry
 
     for expr in _iter_top_level_expressions(text):
         # Type / function declarations
@@ -101,7 +100,7 @@ def parse_metta_file(path: Path) -> OntologyRegistry:
                 name=symbol,
                 category=_categorise(type_sig),
                 type_signature=type_sig,
-                source_file=filename,
+                source_file=source_name,
             ))
             continue
 
@@ -113,7 +112,7 @@ def parse_metta_file(path: Path) -> OntologyRegistry:
                 registry.register(OntologyEntry(
                     name=constant,
                     category="constant",
-                    source_file=filename,
+                    source_file=source_name,
                 ))
             continue
 
@@ -125,7 +124,7 @@ def parse_metta_file(path: Path) -> OntologyRegistry:
                 registry.register(OntologyEntry(
                     name=fn_name,
                     category="function",
-                    source_file=filename,
+                    source_file=source_name,
                 ))
             continue
 
@@ -141,7 +140,7 @@ def parse_metta_file(path: Path) -> OntologyRegistry:
                     name=symbol,
                     category="constant",
                     type_signature=parent,
-                    source_file=filename,
+                    source_file=source_name,
                 ))
             continue
 
@@ -156,11 +155,20 @@ def parse_metta_file(path: Path) -> OntologyRegistry:
                     name=symbol,
                     category="constant",
                     type_signature=parent,
-                    source_file=filename,
+                    source_file=source_name,
                 ))
             continue
 
     return registry
+
+
+def parse_metta_file(path: Path) -> OntologyRegistry:
+    """Parse a single .metta file and return a populated OntologyRegistry."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return OntologyRegistry()
+    return parse_metta_text(text, source_name=path.name)
 
 
 def read_raw(path: Path) -> str:

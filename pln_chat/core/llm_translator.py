@@ -9,7 +9,7 @@ from typing import Optional
 
 import openai
 
-from config import OPENAI_API_KEY
+from config import OPENAI_API_KEY, OPENAI_MAX_RETRIES, OPENAI_TIMEOUT_SECONDS
 
 
 @dataclass
@@ -65,7 +65,11 @@ def translate(
     if not OPENAI_API_KEY:
         return _error_result("OPENAI_API_KEY is not set — add it to your .env file.")
 
-    client = openai.OpenAI(api_key=OPENAI_API_KEY)
+    client = openai.OpenAI(
+        api_key=OPENAI_API_KEY,
+        timeout=OPENAI_TIMEOUT_SECONDS,
+        max_retries=OPENAI_MAX_RETRIES,
+    )
 
     messages: list[dict] = [{"role": "system", "content": system_prompt}]
     for msg in history:

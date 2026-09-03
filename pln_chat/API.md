@@ -1,7 +1,8 @@
 # PLN Query API
 
 A plain HTTP/JSON API for `pln_chat`, meant for scripts and agents to call
-directly instead of driving the Gradio UI through a browser. It wraps the
+directly instead of driving the Gradio UI through a browser. The normal launch
+mounts it and Gradio on the same server and public origin. It wraps the
 exact same pipeline as the "PLN Query" and "Ontology Expander" tabs in
 `app.py` — same `translate -> validate -> run_query -> format` logic, same
 `.metta` files — just returned as structured JSON instead of chat HTML.
@@ -12,9 +13,6 @@ risk prediction, supplement recommendations — plus a scoped DrugAge
 lifespan-ranking engine. See "Demo query forms" below for what's reachable
 and how.
 
-It's a separate process from the Gradio UI (`app.py`); run one or both,
-on different ports.
-
 ## Run it
 
 ```bash
@@ -22,24 +20,41 @@ cd pln_chat
 pip install -r requirements.txt
 cp .env.example .env   # then fill in OPENAI_API_KEY
 
-python api.py
-# -> http://0.0.0.0:8000
-# interactive docs (try requests from the browser): http://localhost:8000/docs
+python app.py
+# UI:               http://localhost:7860/
+# interactive docs: http://localhost:7860/docs
 # raw OpenAPI schema (useful for pointing an agent at the API's shape):
-#   http://localhost:8000/openapi.json
+#   http://localhost:7860/openapi.json
 ```
 
-Equivalent: `uvicorn api:app --host 0.0.0.0 --port 8000 --reload`
+Equivalent importable combined app:
+`uvicorn server:app --host 127.0.0.1 --port 7860`
 
-By default there's no auth, for fast local experimentation. To require a
-shared secret (e.g. before exposing this past localhost), set `PLN_API_KEY`
-in `.env` and send it back as an `X-API-Key` header on every request.
+Point ngrok at that one listener:
+
+```bash
+ngrok http 7860
+```
+
+The resulting origin serves Gradio at `/` and the JSON API at `/query`,
+`/metta/run`, `/patients`, etc. For an API-only process, `python api.py` still
+listens on port 8000 by default.
+
+There is no authentication layer. The service is intended to run only in the
+private environment where the Gradio UI and invited agents can already reach
+it.
+
+OpenAI calls have a 60-second timeout and one SDK retry by default; configure
+`OPENAI_TIMEOUT_SECONDS` / `OPENAI_MAX_RETRIES` as needed. Every HTTP request,
+its raw body, each raw chat prompt, and each translated MeTTa query are written
+to `pln_chat/logs/session_*.jsonl`. For browser clients, set
+`PLN_CORS_ORIGINS` to a comma-separated origin allowlist.
 
 ## Endpoints
 
 | Method | Path               | Purpose                                                    |
 |--------|--------------------|--------------------------------------------------------------|
-| GET    | `/health`          | Liveness + config check (PLN mode, whether a key is required, whether the DrugAge ETL build exists) |
+| GET    | `/health`          | Liveness + readiness check (PLN, OpenAI, KB, and DrugAge build) |
 | GET    | `/ontology/files`  | List discovered `.metta` files (+ default selection, + which are excluded from execution) |
 | GET    | `/patients`        | List known patient profiles (for the `<Patient>` query forms below) |
 | POST   | `/query`           | Ask a natural-language question of the KB (goes through the LLM translator) |
@@ -51,6 +66,9 @@ in `.env` and send it back as an `X-API-Key` header on every request.
 Full request/response schemas are in `/docs` and `/openapi.json` once the
 server is running.
 
+Invalid model names, ontology selections, MeTTa, and unsafe ontology target
+filenames return HTTP 422 before paid inference, PLN execution, or disk writes.
+
 **A note on KB size:** hyperon 0.2.10 panics once a space gets too large, so
 any `.metta` file over `PLN_MAX_KB_FILE_BYTES` (default 60 KB — currently
 just `drugage_etl_short.metta`) is excluded from execution (`run_query`,
@@ -61,13 +79,13 @@ under `excluded_from_runtime`. It's still queryable in stub mode (no
 ## Examples
 
 ```bash
-curl localhost:8000/health
+curl localhost:7860/health
 
-curl localhost:8000/ontology/files
+curl localhost:7860/ontology/files
 
-curl localhost:8000/patients
+curl localhost:7860/patients
 
-curl -X POST localhost:8000/query \
+curl -X POST localhost:7860/query \
   -H 'Content-Type: application/json' \
   -d '{"message": "What interventions might help reduce GrimAge acceleration?"}'
 ```
@@ -79,7 +97,7 @@ Ask about a specific patient (see `GET /patients` for valid IDs) — this
 routes through the same dedicated MeTTa forms listed below:
 
 ```bash
-curl -X POST localhost:8000/query \
+curl -X POST localhost:7860/query \
   -H 'Content-Type: application/json' \
   -d '{"message": "What is Patient001'"'"'s 10-year CHD risk, and what drives it?"}'
 ```
@@ -88,7 +106,7 @@ If you already know the MeTTa you want to run — e.g. an agent iterating on
 queries directly — skip the LLM translator with `/metta/run`:
 
 ```bash
-curl -X POST localhost:8000/metta/run \
+curl -X POST localhost:7860/metta/run \
   -H 'Content-Type: application/json' \
   -d '{"metta_query": "!(predict-risk-patient &self Patient001)"}'
 ```
@@ -103,7 +121,7 @@ automatically — see `routed` in the response) or call the dedicated endpoint
 directly:
 
 ```bash
-curl -X POST localhost:8000/drugage/rank \
+curl -X POST localhost:7860/drugage/rank \
   -H 'Content-Type: application/json' \
   -d '{"compounds": ["Rapamycin", "Metformin", "Resveratrol"]}'
 ```
@@ -115,7 +133,7 @@ sample (`drugage_etl_short.metta`) when the build is missing; it returns a
 clear `error` instead.
 
 ```bash
-curl -X POST localhost:8000/ontology/expand \
+curl -X POST localhost:7860/ontology/expand \
   -H 'Content-Type: application/json' \
   -d '{
         "paper_text": "<abstract or full text here>",
@@ -124,7 +142,7 @@ curl -X POST localhost:8000/ontology/expand \
       }'
 # review the returned metta_block, then either re-call with "apply": true,
 # or POST it separately:
-curl -X POST localhost:8000/ontology/apply \
+curl -X POST localhost:7860/ontology/apply \
   -H 'Content-Type: application/json' \
   -d '{"metta_block": "...", "target_file": "my_paper_extract.metta"}'
 ```
@@ -162,5 +180,18 @@ dropped.
 Give the agent the base URL plus `/openapi.json` (or the `/docs` page) —
 that's enough for most HTTP-capable agents to discover the endpoints and
 call `/query` on their own. Good first calls: `/health` (confirms the server
-is up and whether `X-API-Key` is required before it starts spending OpenAI
-calls) and `/patients` (valid `<Patient>` IDs for the forms above).
+is ready before it starts spending OpenAI calls) and `/patients` (valid
+`<Patient>` IDs for the forms above).
+
+This satisfies a local or otherwise network-reachable agent integration. It
+does not itself provision a public URL, TLS, process supervision, rate limits,
+or a reverse proxy; add those deployment controls before giving a remote agent
+access. Keep the listener within the intended private network because endpoints
+are intentionally unauthenticated.
+
+## Testing
+
+The complete test matrix and commands are in
+[`docs/api_testing.md`](../docs/api_testing.md). The fast HTTP + combined-mount
+suite is `pytest tests/test_api.py tests/test_combined_app.py -q`;
+`scripts/test_pln_api.py` is the black-box runner for a live deployment.
