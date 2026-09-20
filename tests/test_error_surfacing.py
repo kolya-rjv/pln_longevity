@@ -42,7 +42,7 @@ def isolated_api(monkeypatch):
     monkeypatch.setattr(
         api_module, "_build_context", lambda selected: (OntologyRegistry(), {})
     )
-    monkeypatch.setattr(api_module, "build_system_prompt", lambda registry, raw: "prompt")
+    monkeypatch.setattr(api_module, "build_system_prompt", lambda registry, raw, inventory=None: "prompt")
 
 
 def _post(path: str, payload: dict):
@@ -176,7 +176,7 @@ def test_an_oversized_prompt_is_refused_before_the_api_call(monkeypatch):
     translate = Mock()
     monkeypatch.setattr(api_module, "translate", translate)
     monkeypatch.setattr(
-        api_module, "build_system_prompt", lambda registry, raw: "x" * 2_000_000
+        api_module, "build_system_prompt", lambda registry, raw, inventory=None: "x" * 2_000_000
     )
 
     response = _post("/query", {"message": "which genes drive senescence?"})
@@ -191,7 +191,7 @@ def test_an_oversized_prompt_is_refused_before_the_api_call(monkeypatch):
 def test_the_size_guard_names_the_files_responsible(monkeypatch):
     monkeypatch.setattr(api_module, "translate", Mock())
     monkeypatch.setattr(
-        api_module, "build_system_prompt", lambda registry, raw: "x" * 2_000_000
+        api_module, "build_system_prompt", lambda registry, raw, inventory=None: "x" * 2_000_000
     )
     response = _post(
         "/query",

@@ -60,10 +60,12 @@ from config import (
     PLN_MAX_KB_FILE_BYTES,
     PLN_MAX_ONTOLOGY_FILES,
     PLN_MAX_PROMPT_TOKENS,
+    PLN_PROMPT_FILE_MAX_BYTES,
     PLN_MAX_RANK_COMPOUNDS,
     PLN_MAX_RANK_ROWS,
     PLN_RUNTIME_AVAILABLE,
 )
+from ontology.inventory import inventory_for, schema_card, summarise_oversized
 from ontology.loader import load_specific_files, parse_metta_text
 from ontology.registry import BUILTIN_REGISTRY, OntologyRegistry
 from ontology.expander import run_expansion_pipeline
@@ -176,12 +178,25 @@ def _build_context(selected_files: list[str]) -> tuple[OntologyRegistry, dict[st
     Mirrors app.py: the selection only controls what the LLM sees. Execution
     against the KB always uses the runtime-safe file set (_runtime_kb_paths),
     regardless of this selection — see /query and /metta/run.
+
+    A selected file over PLN_PROMPT_FILE_MAX_BYTES is replaced by its schema
+    card rather than pasted verbatim: a 525 KB gene dump is what took one
+    prompt to 417,000 tokens and an upstream 400.
     """
     metta_files = _discover_metta_files()
     paths = [metta_files[f] for f in selected_files if f in metta_files]
-    if paths:
-        return load_specific_files(paths)
-    return BUILTIN_REGISTRY, {}
+    if not paths:
+        return BUILTIN_REGISTRY, {}
+    registry, raw_contents = load_specific_files(paths)
+    raw_contents, _ = summarise_oversized(
+        raw_contents, paths, max_bytes=PLN_PROMPT_FILE_MAX_BYTES
+    )
+    return registry, raw_contents
+
+
+def _runtime_inventory():
+    """What the EXECUTION KB actually holds (ground facts, not declarations)."""
+    return inventory_for(_runtime_kb_paths())
 
 
 def _dedupe_ontology_files(value: Optional[list[str]]) -> Optional[list[str]]:
@@ -585,6 +600,19 @@ class QueryResponse(BaseModel):
     warnings: list[str]
     validation_valid: bool
     validation_issues: list[str]
+    validation_warnings: list[str] = Field(
+        default_factory=list,
+        description="Non-fatal observations about the generated query — chiefly, "
+                    "that it calls a predicate the runtime KB has no facts for.",
+    )
+    ungrounded_predicates: list[str] = Field(
+        default_factory=list,
+        description="Predicates the query uses that are DECLARED in the ontology but "
+                    "hold zero ground atoms, so the query is well-formed and returns "
+                    "nothing. An empty `pln_results` alongside a non-empty list here "
+                    "means 'the KB cannot answer this', not 'the answer is no'. "
+                    "See GET /kb/schema.",
+    )
     pln_status: str
     pln_mode: str
     pln_query_time_ms: int
@@ -667,6 +695,13 @@ class MettaRunResponse(BaseModel):
     )
     validation_valid: bool
     validation_issues: list[str]
+    validation_warnings: list[str] = Field(default_factory=list)
+    ungrounded_predicates: list[str] = Field(
+        default_factory=list,
+        description="Predicates this query uses that hold zero ground atoms. The "
+                    "query still RUNS — it is valid MeTTa — but it cannot match "
+                    "anything. See GET /kb/schema.",
+    )
     pln_status: str
     pln_mode: str
     pln_query_time_ms: int
@@ -690,6 +725,33 @@ class OntologyFilesResponse(BaseModel):
         default_factory=list,
         description="Discovered files over PLN_MAX_KB_FILE_BYTES, skipped at PLN execution "
                     "time to avoid a hyperon panic. Still queryable in stub mode.",
+    )
+
+
+class PredicateOut(BaseModel):
+    name: str
+    arity: Optional[int] = None
+    fact_count: int
+    sources: list[str] = Field(default_factory=list)
+    sample_arguments: list[str] = Field(default_factory=list)
+
+
+class KbSchemaResponse(BaseModel):
+    """What the execution KB actually holds — counted, not declared."""
+    files: list[str]
+    ground_facts: int
+    grounded_predicates: list[PredicateOut]
+    declared_but_empty_predicates: list[str] = Field(
+        description="Declared in the ontology's vocabulary, zero ground atoms. A "
+                    "query using one of these is valid MeTTa and returns nothing.",
+    )
+    entity_count: int
+    function_count: int
+    type_count: int
+    facts_by_file: dict[str, int]
+    schema_card: str = Field(
+        description="The same information as compact text — the block injected "
+                    "into the LLM translator's system prompt.",
     )
 
 
@@ -943,6 +1005,49 @@ def ontology_files() -> OntologyFilesResponse:
     )
 
 
+@app.get("/kb/schema", response_model=KbSchemaResponse)
+def kb_schema() -> KbSchemaResponse:
+    """What the knowledge base actually holds: predicates, arities, fact counts.
+
+    The answer to "list your data sources and counts", and the reference a
+    caller needs before trusting an empty result. The ontology DECLARES a larger
+    vocabulary than it populates — `TargetsHallmark`, `Causes`, `Predicts`,
+    `Extends`, the gene predicates and the DrugAge row predicates are all
+    declared with zero facts in the generic runtime — so a query over one of
+    them is well-formed and returns nothing. Those are listed separately here
+    (and flagged per-query as `ungrounded_predicates`), because "the KB has no
+    such relation" and "the answer is no" are very different statements.
+
+    Counted from the ground atoms of the runtime-safe file set, not from type
+    declarations.
+    """
+    paths = _runtime_kb_paths()
+    inv = inventory_for(paths)
+    by_file: dict[str, int] = {}
+    for path in paths:
+        by_file[path.name] = inventory_for([path]).fact_total()
+    return KbSchemaResponse(
+        files=inv.files,
+        ground_facts=inv.fact_total(),
+        grounded_predicates=[
+            PredicateOut(
+                name=p.name,
+                arity=p.arity,
+                fact_count=p.fact_count,
+                sources=sorted(p.sources),
+                sample_arguments=list(p.sample_args),
+            )
+            for p in inv.grounded_predicates()
+        ],
+        declared_but_empty_predicates=sorted(inv.declared_only),
+        entity_count=len(inv.entities),
+        function_count=len(inv.functions),
+        type_count=len(inv.types),
+        facts_by_file=by_file,
+        schema_card=schema_card(inv, max_predicates=200),
+    )
+
+
 @app.get("/patients", response_model=PatientsResponse)
 def patients() -> PatientsResponse:
     """Known patient profiles (from patient_profile.metta).
@@ -974,7 +1079,7 @@ def query(req: QueryRequest) -> QueryResponse:
     else:
         _validate_ontology_files(selected)
     registry, raw_contents = _build_context(selected)
-    system_prompt = build_system_prompt(registry, raw_contents)
+    system_prompt = build_system_prompt(registry, raw_contents, _runtime_inventory())
 
     history_msgs = [turn.model_dump() for turn in req.history]
     prompt_tokens_estimate = _guard_prompt_size(
@@ -1015,7 +1120,9 @@ def query(req: QueryRequest) -> QueryResponse:
             ),
         )
     else:
-        validation = validate(translation.metta_query, registry)
+        validation = validate(
+            translation.metta_query, registry, _runtime_inventory()
+        )
         kb_files = _runtime_kb_paths()
         pln_result = run_offloaded(
             "run_query",
@@ -1066,6 +1173,8 @@ def query(req: QueryRequest) -> QueryResponse:
         warnings=translation.warnings,
         validation_valid=validation.valid,
         validation_issues=validation.issues,
+        validation_warnings=validation.warnings,
+        ungrounded_predicates=validation.ungrounded_predicates,
         pln_status=pln_result.status,
         pln_mode=pln_result.mode,
         pln_query_time_ms=pln_result.query_time_ms,
@@ -1138,6 +1247,7 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
         validation = validate(
             "\n".join(part for part in (req.extra_atoms, req.metta_query) if part),
             registry,
+            _runtime_inventory(),
         )
         if not validation.valid:
             raise HTTPException(
@@ -1173,6 +1283,8 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
         confidence_threshold_applied=req.confidence_threshold,
         validation_valid=validation.valid,
         validation_issues=validation.issues,
+        validation_warnings=validation.warnings,
+        ungrounded_predicates=validation.ungrounded_predicates,
         pln_status=pln_result.status,
         pln_mode=pln_result.mode,
         pln_query_time_ms=pln_result.query_time_ms,

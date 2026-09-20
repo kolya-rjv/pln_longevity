@@ -222,7 +222,7 @@ def test_query_runs_shared_pipeline_and_returns_reusable_history(client, monkeyp
         api_module, "_build_context", lambda selected: (OntologyRegistry(), {})
     )
     monkeypatch.setattr(
-        api_module, "build_system_prompt", lambda registry, raw: "prompt"
+        api_module, "build_system_prompt", lambda registry, raw, inventory=None: "prompt"
     )
     monkeypatch.setattr(api_module, "translate", translate)
     monkeypatch.setattr(api_module, "run_query", run_query)

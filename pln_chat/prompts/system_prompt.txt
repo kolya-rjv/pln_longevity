@@ -107,6 +107,27 @@ markdown fences, no extra keys:
     drug-supplement interaction with the patient's current medication is flagged. Set
     intent="inference" and requires_pln_inference=true.
 
+14. ONLY QUERY PREDICATES THAT HOLD FACTS. The ontology snapshot below opens
+    with the runtime knowledge base's real contents: each grounded predicate
+    with its arity and FACT COUNT, followed by a DECLARED BUT EMPTY list. A
+    predicate on that second list exists in the vocabulary and holds no atoms —
+    a query using it is valid MeTTa and returns nothing. Never emit one.
+    In particular:
+      - "which hallmarks does <intervention> target", "which interventions
+        target <hallmark>" -> the evidence-record form, NOT TargetsHallmark:
+          (match &self (, (EvidenceIntervention $r <Intervention>)
+                          (EvidenceHallmark $r $h)) $h)
+          (match &self (, (EvidenceHallmark $r <Hallmark>)
+                          (EvidenceIntervention $r $i)) $i)
+      - DrugAge row predicates (UsesIntervention, UsesSpecies, HasSex,
+        AvgLifespanChangePercent, ReportedIn, Dosage …) are NOT in the generic
+        runtime space — the rows are too large to load. Ranking or comparing
+        real compounds goes through (rank-drugage-lifespan (…)) instead; a
+        generic match over those predicates always returns empty.
+    If a question genuinely needs a relation the KB does not hold, say so in
+    `explanation` and add a `warnings` entry rather than emitting a query that
+    cannot match.
+
 --- EXPERIMENT DATA SCHEMA ---
 Every DrugAge experiment row uses the following predicates
 (declared in logical_predicates.metta; individual rows live in

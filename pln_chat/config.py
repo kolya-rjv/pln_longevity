@@ -31,6 +31,12 @@ PLN_MAX_PROMPT_TOKENS: int = int(os.getenv("PLN_MAX_PROMPT_TOKENS", "200000"))
 # thumb; MeTTa's punctuation density makes it conservative (i.e. it slightly
 # OVER-counts), which is the safe direction for a pre-flight guard.
 PLN_CHARS_PER_TOKEN: float = float(os.getenv("PLN_CHARS_PER_TOKEN", "4.0"))
+# A selected .metta file larger than this is SUMMARISED into a schema card
+# (predicates, arities, fact counts) instead of being pasted into the prompt
+# verbatim. Every hand-written layer in this repo is under 20 KB; the files that
+# exceed it are ETL dumps, whose row-by-row text is the least useful thing per
+# token the translator could be shown. 0 disables summarisation.
+PLN_PROMPT_FILE_MAX_BYTES: int = int(os.getenv("PLN_PROMPT_FILE_MAX_BYTES", "25000"))
 
 # ── PLN runtime ────────────────────────────────────────────────────────────────
 # Auto-detected: true when the `hyperon` package is importable.

@@ -97,6 +97,7 @@ to `pln_chat/logs/session_*.jsonl`. For browser clients, set
 |--------|--------------------|--------------------------------------------------------------|
 | GET    | `/health`          | Liveness + readiness check (PLN, OpenAI, KB, and DrugAge build) |
 | GET    | `/ontology/files`  | List discovered `.metta` files (+ default selection, + which are excluded from execution) |
+| GET    | `/kb/schema`       | What the KB actually holds: predicates, arities, fact counts, and which predicates are declared but empty |
 | GET    | `/patients`        | List known patient profiles (for the `<Patient>` query forms below) |
 | POST   | `/query`           | Ask a natural-language question of the KB (goes through the LLM translator) |
 | POST   | `/metta/run`       | Validate + execute a raw MeTTa query directly (no LLM call)  |
@@ -151,12 +152,54 @@ A failed translation also sets `intent: "error"` rather than borrowing
 `clarification`, which is a real answer the engine gives when a question needs
 narrowing.
 
+### Valid, and guaranteed to return nothing
+
+The ontology DECLARES a much larger vocabulary than it populates.
+`logical_predicates.metta` declares `TargetsHallmark`, `Causes`, `Predicts`,
+`Extends`, the gene predicates and the DrugAge row predicates; the generic
+runtime space holds **zero** facts for any of them. A query over one of those
+is perfectly well-formed MeTTa and returns nothing — which reads exactly like
+"the answer is no". The translator emitted `TargetsHallmark` three times in the
+2026-09-18 evaluation, and `UsesIntervention` / `AvgLifespanChangePercent`
+three more.
+
+Two changes remove that failure mode:
+
+* `GET /kb/schema` reports the truth — every grounded predicate with its arity,
+  fact count and source files, plus `declared_but_empty_predicates`. It is also
+  the answer to "what data do you have and how much of it".
+* every `/query` and `/metta/run` response carries `ungrounded_predicates` and
+  `validation_warnings`. An empty `pln_results` next to a non-empty
+  `ungrounded_predicates` means *the KB cannot express this relation*, not *no*.
+
+The same inventory now backs the validator and the LLM's system prompt. That
+also fixes the **opposite** bug, which was quietly worse: the symbol registry
+only ever harvested type declarations, `Inheritance` and `InstanceOf`, so 71
+symbols that genuinely exist in the KB — `MTORC1`, `AMPK`, `SIRT1`, `Mouse`,
+`Human`, `CDKN2A_P16` — were reported as unknown, and `/metta/run` answered 422
+to queries the engine would have served. Validation is now measured against the
+actual ground atoms. (A p-value written as `2.0e-75` also no longer contributes
+two imaginary "unknown symbols".)
+
 **A note on KB size:** hyperon 0.2.10 panics once a space gets too large, so
 any `.metta` file over `PLN_MAX_KB_FILE_BYTES` (default 60 KB — currently
 just `drugage_etl_short.metta`) is excluded from execution (`run_query`,
 `/metta/run`'s default validation) but still listed by `/ontology/files`
 under `excluded_from_runtime`. It's still queryable in stub mode (no
 `hyperon` installed / `PLN_RUNTIME_AVAILABLE=false`).
+
+The same size question applies to the **prompt**, and used to be fatal there.
+The LLM context pasted every selected file verbatim; selecting a CellAge or
+GenAge ETL file took the prompt to 417,000 tokens and the call came back as a
+billed upstream 400. A selected file over `PLN_PROMPT_FILE_MAX_BYTES`
+(default 25 KB) is now replaced by its **schema card** — `cellage_genes.metta`
+goes from ~131,000 tokens to ~215, and says which predicates it holds and how
+many facts each has, which is more useful to a translator than the rows are.
+Every hand-written layer in this repo is under that limit and is still pasted
+verbatim, because its prose is what the translator reasons from. The default
+prompt also drops from ~62,400 to ~57,400 tokens, because the grounded schema
+card replaces a flat ~7,000-token symbol index in which a declaration and 400
+facts looked identical.
 
 ## Examples
 

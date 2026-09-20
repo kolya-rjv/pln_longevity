@@ -6,7 +6,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from typing import Optional
+
 from ontology.compound_names import alias_hint_lines
+from ontology.inventory import RuntimeInventory
 from ontology.registry import OntologyRegistry
 from ontology.snapshots import build_ontology_context
 
@@ -48,7 +51,11 @@ def _load_compound_aliases() -> str:
     return "\n".join(f"  {line}" for line in alias_hint_lines())
 
 
-def build_system_prompt(registry: OntologyRegistry, raw_contents: dict[str, str] | None = None) -> str:
+def build_system_prompt(
+    registry: OntologyRegistry,
+    raw_contents: dict[str, str] | None = None,
+    inventory: Optional[RuntimeInventory] = None,
+) -> str:
     """Return the fully-composed system prompt with ontology and examples injected.
 
     Parameters
@@ -58,9 +65,13 @@ def build_system_prompt(registry: OntologyRegistry, raw_contents: dict[str, str]
     raw_contents:
         Filename -> raw .metta text mapping. When provided, the verbatim .metta
         content is injected as the primary ontology context.
+    inventory:
+        What the runtime KB actually holds (see ontology/inventory.py). When
+        supplied, the prompt leads with a grounded schema card instead of a flat
+        symbol index.
     """
     template = _load_template()
-    ontology_snapshot = build_ontology_context(raw_contents or {}, registry)
+    ontology_snapshot = build_ontology_context(raw_contents or {}, registry, inventory)
     few_shot_text = _load_few_shot_text()
     return template.format(
         ontology_snapshot=ontology_snapshot,
