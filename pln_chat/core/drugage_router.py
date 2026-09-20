@@ -20,6 +20,12 @@ form, `parse_drugage_query` recognises it, and `route_drugage_ranking` dispatche
 to `run_drugage_ranking` and packages the result (ranking + provenance) as a
 `PLNRunResult` the existing `format_bot_response` renders unchanged.
 
+Caller spellings are resolved to DrugAge symbols FIRST, by the shared
+`ontology.compound_names.CompoundResolver`, so `sirolimus`, `NMN`, `EGCG`,
+`NAC` and `17-alpha-estradiol` reach the rows they name instead of silently
+dropping out of the ranking (the single most misleading behaviour the
+2026-09-18 API evaluation found).
+
 Kept free of any Gradio import so it is unit-testable without the UI stack.
 
 See docs/etl_inference_wiring.md §8.5.
@@ -32,7 +38,8 @@ from typing import Optional
 
 from config import PLN_RUNTIME_AVAILABLE
 from core.pln_runner import PLNAtomResult, PLNRunResult, run_drugage_ranking
-from ontology.drugage_selector import BUILD_DRUGAGE, _norm
+from ontology.compound_names import Resolution
+from ontology.drugage_selector import BUILD_DRUGAGE, _norm, build_resolver
 
 # The dedicated NL-facing symbol the translator emits for this intent. A DISTINCT
 # symbol (not the generic `rank-interventions`) is what lets the app route
@@ -65,6 +72,21 @@ def parse_drugage_query(metta_query: str) -> Optional[list[str]]:
     if not m:
         return []
     return m.group(1).split()
+
+
+def resolve_compounds(
+    compounds: list[str],
+    *,
+    source: Optional[Path] = None,
+) -> list[Resolution]:
+    """Resolve caller-typed compound names against the DrugAge vocabulary.
+
+    The SAME call the ranking makes, exposed so the HTTP layer can report what
+    each requested name resolved to without repeating the logic (the resolver
+    is cached per source file, so calling it twice costs a dict lookup).
+    """
+    resolver = build_resolver(source or BUILD_DRUGAGE)
+    return resolver.resolve_all(compounds)
 
 
 def _missing_build_result() -> PLNRunResult:
@@ -112,7 +134,10 @@ def route_drugage_ranking(
       1. the ranked, signed, uncertainty-quantified `(scored …)` tuple, followed by
       2. one provenance bullet per ranked compound (the backing PMID + evidence),
       3. an "omitted" note for any requested compound with no matching DrugAge row
-         (omitted rather than mis-ranked — docs/etl_inference_wiring.md §5).
+         (omitted rather than mis-ranked — docs/etl_inference_wiring.md §5),
+      4. one note per requested name that did NOT match literally — a synonym
+         (`sirolimus` -> `Rapamycin`), an ETL symbol artefact, an accepted typo
+         correction, an ambiguity or a miss with suggestions.
 
     Degrades gracefully (a clear message, never a crash) when `build/` is missing
     or the engine raises.
@@ -128,9 +153,26 @@ def route_drugage_ranking(
             error=None,
         )
 
+    # Resolve caller spellings to DrugAge symbols BEFORE any row selection, so
+    # the ranking, the provenance bullets and the omitted note all speak about
+    # the same compounds (see ontology/compound_names.py for the ladder).
+    resolutions = resolve_compounds(compounds, source=src)
+    canonical = [r.matched for r in resolutions if r.matched is not None]
+
+    if not canonical:
+        result = PLNRunResult(
+            status="empty",
+            mode="runtime" if PLN_RUNTIME_AVAILABLE else "stub",
+            results=[
+                PLNAtomResult(note)
+                for note in (r.warning for r in resolutions) if note
+            ],
+        )
+        return result
+
     try:
         result, rows = run_drugage_ranking(
-            compounds,
+            canonical,
             source=src,
             confidence_threshold=confidence_threshold,
         )
@@ -151,11 +193,25 @@ def route_drugage_ranking(
         enriched.append(PLNAtomResult(_provenance_line(row)))
 
     matched = {_norm(r.compound) for r in rows}
-    omitted = [c for c in compounds if _norm(c) not in matched]
+    # A name that RESOLVED but whose canonical compound still produced no row
+    # (only possible when the slice cap bites) plus every name the resolver
+    # could not place. Both are reported against the ORIGINAL spelling, because
+    # that is what the caller typed and will recognise.
+    omitted: list[str] = []
+    for res in resolutions:
+        if res.matched is None or _norm(res.matched) not in matched:
+            omitted.append(res.query)
     if omitted:
         enriched.append(PLNAtomResult(
             f"Omitted (no DrugAge lifespan rows matched): {', '.join(omitted)}"
         ))
+    # Every non-literal match and every failure, spelled out. The evaluation
+    # found the silent version of this the most misleading behaviour of the
+    # endpoint: `sirolimus`, `NMN`, `EGCG` and `NAC` simply vanished.
+    for res in resolutions:
+        note = res.warning
+        if note:
+            enriched.append(PLNAtomResult(note))
 
     return PLNRunResult(
         status="ok" if enriched else "empty",

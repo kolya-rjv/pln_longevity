@@ -132,6 +132,33 @@ this writing the engine does **not** fall back to the smaller committed
 sample (`drugage_etl_short.metta`) when the build is missing; it returns a
 clear `error` instead.
 
+**Compound names are resolved, not just normalised.** DrugAge stores one
+spelling per compound, so `sirolimus`, `NMN`, `NAD+`, `EGCG`, `NAC` and every
+spelling of `17-alpha-estradiol` used to match nothing and vanish from the
+ranking. Each requested name now goes through a shared resolver
+(`pln_chat/ontology/compound_names.py`) and the response carries a
+`resolutions` array saying what happened to it:
+
+| `method`       | meaning                                                          |
+|----------------|------------------------------------------------------------------|
+| `exact`        | the string is a DrugAge symbol verbatim                           |
+| `normalized`   | case / separator / unicode / Greek-letter difference only         |
+| `synonym`      | a curated chemical identity (`sirolimus` is rapamycin)            |
+| `etl_artifact` | the ETL prefixes a symbol starting with a digit with `N_`         |
+| `fuzzy`        | an unambiguous near-miss accepted as a typo, with a warning       |
+| `ambiguous`    | several candidates — **nothing is ranked**, candidates returned   |
+| `unmatched`    | no match — **nothing is ranked**, nearest names returned          |
+
+```json
+{"query": "sirolimus", "matched": "Rapamycin", "method": "synonym",
+ "score": 1.0, "note": "INN for rapamycin (Rapamune)", "suggestions": []}
+```
+
+`ambiguous` and `unmatched` never resolve to a compound: ranking the wrong
+substance is worse than omitting one. The same table is injected into the LLM
+translator's system prompt, so `/query` and `/drugage/rank` agree on what a
+name means instead of each guessing separately.
+
 ```bash
 curl -X POST localhost:7860/ontology/expand \
   -H 'Content-Type: application/json' \

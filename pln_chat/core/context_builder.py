@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from ontology.compound_names import alias_hint_lines
 from ontology.registry import OntologyRegistry
 from ontology.snapshots import build_ontology_context
 
@@ -37,6 +38,16 @@ def _load_few_shot_text() -> str:
     return "\n".join(lines)
 
 
+def _load_compound_aliases() -> str:
+    """The shared DrugAge alias table, as `alias -> DrugAge symbol` lines.
+
+    The translator and POST /drugage/rank previously resolved names
+    independently — which is why "urolithin A" worked and "NMN" did not. Both
+    now read `ontology.compound_names`.
+    """
+    return "\n".join(f"  {line}" for line in alias_hint_lines())
+
+
 def build_system_prompt(registry: OntologyRegistry, raw_contents: dict[str, str] | None = None) -> str:
     """Return the fully-composed system prompt with ontology and examples injected.
 
@@ -54,4 +65,5 @@ def build_system_prompt(registry: OntologyRegistry, raw_contents: dict[str, str]
     return template.format(
         ontology_snapshot=ontology_snapshot,
         few_shot_examples=few_shot_text,
+        compound_aliases=_load_compound_aliases(),
     )

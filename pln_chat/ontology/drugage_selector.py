@@ -21,7 +21,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import TYPE_CHECKING, Iterable, Optional
+
+if TYPE_CHECKING:  # pragma: no cover - import for type checkers only
+    from ontology.compound_names import CompoundResolver
 
 # Repo root is two levels up from this file (pln_chat/ontology/ -> repo).
 _REPO = Path(__file__).resolve().parent.parent.parent
@@ -122,8 +125,68 @@ def load_rows(source: Optional[Path] = None) -> list[DrugAgeRow]:
 
 
 def _norm(name: str) -> str:
-    """Loose compound/species matching: case-insensitive, drop separators."""
+    """Loose compound/species matching: case-insensitive, drop separators.
+
+    Kept as the ROW-side key. A caller-typed name goes through
+    `ontology.compound_names.CompoundResolver` first (synonyms, abbreviations,
+    Greek letters, ETL symbol artefacts); this function only has to match the
+    canonical DrugAge string that comes back. `canonical_key` is a strict
+    superset of this normalisation, so the two agree on every name `_norm`
+    already matched.
+    """
     return re.sub(r"[^a-z0-9]", "", name.lower())
+
+
+# ── Compound-name vocabulary (for the shared resolver) ───────────────────────
+# Parsing the 1,043-symbol vocabulary out of the 1.8 MB build takes ~30 ms, so
+# it is cached per (path, mtime): regenerating the ETL invalidates the cache
+# without a restart, and a stable file costs one parse per process.
+_VOCAB_CACHE: dict[tuple[str, float, int], list[str]] = {}
+_RESOLVER_CACHE: dict[tuple[str, float, int], "CompoundResolver"] = {}
+
+
+def _source_stamp(path: Path) -> tuple[str, float, int]:
+    try:
+        st = path.stat()
+        return (str(path), st.st_mtime, st.st_size)
+    except OSError:
+        return (str(path), 0.0, 0)
+
+
+def _resolve_source(source: Optional[Path]) -> Path:
+    """The file to read rows from: the caller's, else build/, else the sample.
+
+    A caller-supplied path that does not exist falls back the same way rather
+    than raising, so name RESOLUTION still works on a checkout where the ETL has
+    not been run — the ranking itself still reports the missing build.
+    """
+    if source is not None and source.exists():
+        return source
+    return BUILD_DRUGAGE if BUILD_DRUGAGE.exists() else SAMPLE_DRUGAGE
+
+
+def load_vocabulary(source: Optional[Path] = None) -> list[str]:
+    """Every distinct DrugAge intervention symbol in `source`, sorted."""
+    path = _resolve_source(source)
+    stamp = _source_stamp(path)
+    cached = _VOCAB_CACHE.get(stamp)
+    if cached is None:
+        cached = sorted({r.compound for r in load_rows(path)})
+        _VOCAB_CACHE[stamp] = cached
+    return cached
+
+
+def build_resolver(source: Optional[Path] = None) -> "CompoundResolver":
+    """A `CompoundResolver` over `source`'s vocabulary (cached per file stamp)."""
+    from ontology.compound_names import CompoundResolver
+
+    path = _resolve_source(source)
+    stamp = _source_stamp(path)
+    cached = _RESOLVER_CACHE.get(stamp)
+    if cached is None:
+        cached = CompoundResolver(load_vocabulary(path))
+        _RESOLVER_CACHE[stamp] = cached
+    return cached
 
 
 def select_rows(

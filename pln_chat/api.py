@@ -63,7 +63,11 @@ from ontology.registry import BUILTIN_REGISTRY, OntologyRegistry
 from ontology.expander import run_expansion_pipeline
 from ontology.drugage_selector import BUILD_DRUGAGE
 from core.context_builder import build_system_prompt
-from core.drugage_router import parse_drugage_query, route_drugage_ranking
+from core.drugage_router import (
+    parse_drugage_query,
+    resolve_compounds,
+    route_drugage_ranking,
+)
 from core.llm_translator import translate
 from core.metta_validator import ValidationResult, validate
 from core.pln_runner import run_query
@@ -499,6 +503,27 @@ class DrugAgeRankRequest(BaseModel):
     )
 
 
+class CompoundResolutionOut(BaseModel):
+    """How ONE requested compound name was matched against the DrugAge vocabulary."""
+    query: str = Field(description="The name exactly as the caller sent it.")
+    matched: Optional[str] = Field(
+        default=None,
+        description="The DrugAge intervention symbol used, or null when the name "
+                    "could not be resolved (nothing is ranked for it).",
+    )
+    method: str = Field(
+        description="Which rung matched: exact | normalized | synonym | etl_artifact | "
+                    "fuzzy | ambiguous | unmatched. Anything other than exact/normalized "
+                    "means the endpoint made a judgement worth reading.",
+    )
+    score: float = Field(description="Similarity for a `fuzzy` match, else 1.0 / 0.0.")
+    note: Optional[str] = Field(default=None, description="Why a synonym/artefact rung fired.")
+    suggestions: list[str] = Field(
+        default_factory=list,
+        description="Nearest DrugAge names for an unresolved or ambiguous request.",
+    )
+
+
 class DrugAgeRankResponse(BaseModel):
     status: str
     mode: str
@@ -506,7 +531,14 @@ class DrugAgeRankResponse(BaseModel):
     results: list[PLNAtomOut] = Field(
         description="Ranked (scored ...) tuples first, then one provenance line per ranked "
                     "compound (PMID + evidence), then an 'Omitted' note for any requested "
-                    "compound with no matching DrugAge row.",
+                    "compound with no matching DrugAge row, then one note per name that "
+                    "did not match literally.",
+    )
+    resolutions: list[CompoundResolutionOut] = Field(
+        default_factory=list,
+        description="One entry per requested compound saying which DrugAge symbol it "
+                    "was matched to and how. Read this before trusting an omission: "
+                    "'sirolimus' is Rapamycin, 'NMN' is Nicotinamide_mononucleotide.",
     )
     error: Optional[str] = Field(
         default=None,
@@ -821,11 +853,13 @@ def drugage_rank(req: DrugAgeRankRequest) -> DrugAgeRankResponse:
     repo; see GET /health's drugage_build_available before calling this.
     """
     result = route_drugage_ranking(req.compounds, confidence_threshold=req.confidence_threshold)
+    resolutions = resolve_compounds(req.compounds)
 
     return DrugAgeRankResponse(
         status=result.status,
         mode=result.mode,
         query_time_ms=result.query_time_ms,
+        resolutions=[CompoundResolutionOut(**r.as_dict()) for r in resolutions],
         results=[
             PLNAtomOut(
                 atom=r.atom,

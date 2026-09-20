@@ -145,6 +145,15 @@ one-compound effect lookup). Set intent="inference" and
 requires_pln_inference=true. Reserve (rank-interventions ... CoronaryHeartDisease)
 for the curated mechanistic / CHD axis — not DrugAge lifespan questions.
 
+--- COMPOUND NAME ALIASES (DrugAge) ---
+DrugAge stores ONE spelling per compound. When a question uses a synonym, an
+abbreviation or a Greek letter, emit the DrugAge spelling below — the same table
+POST /drugage/rank resolves with, so the two halves agree. A name not listed
+here should be passed through as written; the endpoint resolves it (and reports
+what it resolved to) rather than silently dropping it.
+
+{compound_aliases}
+
 --- CURRENT ONTOLOGY SNAPSHOT ---
 {ontology_snapshot}
 
