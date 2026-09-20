@@ -65,10 +65,12 @@ from config import (
     PLN_MAX_RANK_ROWS,
     PLN_RUNTIME_AVAILABLE,
 )
+from ontology.hallmarks import hallmark_index
 from ontology.inventory import inventory_for, schema_card, summarise_oversized
 from ontology.loader import load_specific_files, parse_metta_text
 from ontology.registry import BUILTIN_REGISTRY, OntologyRegistry
 from ontology.expander import run_expansion_pipeline
+from ontology.drugage_scoring import load_knobs
 from ontology.drugage_selector import BUILD_DRUGAGE
 from core.context_builder import build_system_prompt
 from core.executor import (
@@ -81,6 +83,7 @@ from core.executor import (
 from core.drugage_router import (
     SCORE_SEMANTICS,
     _row_out,
+    drugage_top,
     parse_drugage_query,
     rank_drugage,
     resolve_compounds,
@@ -1003,6 +1006,224 @@ def ontology_files() -> OntologyFilesResponse:
         default_selection=_default_selection(choices),
         excluded_from_runtime=excluded,
     )
+
+
+class DrugAgeTopEntry(BaseModel):
+    rank: int
+    compound: str
+    score: float
+    sign: str
+    direction: str
+    strength: float
+    confidence: float
+    evidence_tier: str = Field(description="The EvidenceCategory the confidence came from.")
+    species: Optional[str] = None
+    sex: Optional[str] = None
+    is_itp: bool = False
+    significance: Optional[str] = None
+    avg_lifespan_change_percent: Optional[float] = None
+    pmid: Optional[str] = None
+    row_id: str
+
+
+class DrugAgeTopResponse(BaseModel):
+    entries: list[DrugAgeTopEntry]
+    total_compounds: int = Field(description="Distinct compounds matching the filters.")
+    total_rows: int
+    scored_rows: int
+    unscorable_rows: int = Field(
+        description="Rows with no reported average lifespan change, which cannot "
+                    "be lifted into an Effect link and therefore have no score.",
+    )
+    source: str
+    filters: dict
+    semantics: dict
+
+
+class HallmarkEvidenceOut(BaseModel):
+    record_id: str
+    intervention: Optional[str] = None
+    hallmark: Optional[str] = None
+    species_model: Optional[str] = None
+    outcome_text: Optional[str] = None
+    reference_number: Optional[int] = None
+    publication: Optional[str] = None
+    source_file: Optional[str] = None
+
+
+class InterventionsResponse(BaseModel):
+    hallmark: Optional[str] = None
+    intervention: Optional[str] = None
+    evidence: list[HallmarkEvidenceOut]
+    covered_interventions: list[str] = Field(
+        description="Every intervention with at least one hallmark evidence record. "
+                    "The curated layer is a REVIEW TABLE, not a census: an absence "
+                    "here means no record was curated, not that no link exists.",
+    )
+    covered_hallmarks: list[str]
+    note: Optional[str] = None
+
+
+class HallmarkOut(BaseModel):
+    name: str
+    components: list[str] = Field(default_factory=list)
+    intervention_count: int = 0
+    interventions: list[str] = Field(default_factory=list)
+
+
+class HallmarksResponse(BaseModel):
+    hallmarks: list[HallmarkOut]
+    evidence_records: int
+
+
+@app.get("/drugage/top", response_model=DrugAgeTopResponse)
+def drugage_top_endpoint(
+    n: int = 20,
+    species: Optional[str] = None,
+    clade: Optional[str] = None,
+    min_confidence: float = 0.0,
+    itp_only: bool = False,
+    significant_only: bool = False,
+    direction: Literal["protective", "harmful", "any"] = "protective",
+) -> DrugAgeTopResponse:
+    """Rank the WHOLE DrugAge build by calibrated effect on mortality. No LLM.
+
+    "Which drugs extend lifespan in mice with the strongest evidence?" — the
+    question there was no way to ask. POST /drugage/rank scores a pool the
+    caller already knows; this scores all 1,043 compounds and returns the top n.
+
+    Filters compose: `species=Mus_musculus&itp_only=true&min_confidence=0.5`
+    is "gold-standard replicated mouse evidence only". `clade` takes
+    Vertebrate / Invertebrate / Fungi / Protozoa. `direction=harmful` ranks the
+    other end — compounds that SHORTENED lifespan — most harmful first.
+
+    Scoring is done in Python because it cannot be done in the engine: 1,043
+    compounds would be 1,043 MeTTa calls, and loading the rows to rank them in
+    one space aborts hyperon. It uses the calibration layer's own constants,
+    parsed from the .metta files, and a test asserts it agrees with the engine
+    bit for bit.
+    """
+    if n < 1 or n > 500:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "invalid_n", "message": "n must be between 1 and 500."},
+        )
+    top = run_offloaded(
+        "drugage_top",
+        {"n": n, "species": species, "clade": clade,
+         "min_confidence": min_confidence, "itp_only": itp_only,
+         "significant_only": significant_only, "direction": direction},
+        lambda: drugage_top(
+            n=n, species=species, clade=clade, min_confidence=min_confidence,
+            itp_only=itp_only, significant_only=significant_only,
+            direction=direction,
+        ),
+    )
+    return DrugAgeTopResponse(
+        entries=[
+            DrugAgeTopEntry(
+                rank=i,
+                compound=e.row.compound,
+                score=e.score,
+                sign=e.sign,
+                direction="protective" if e.protective else "harmful",
+                strength=e.strength,
+                confidence=e.confidence,
+                evidence_tier=e.tier_category,
+                species=e.row.species,
+                sex=e.row.sex,
+                is_itp=e.row.is_itp,
+                significance=e.row.significance,
+                avg_lifespan_change_percent=e.row.avg_change,
+                pmid=e.row.pmid,
+                row_id=e.row.row_id,
+            )
+            for i, e in enumerate(top.entries, 1)
+        ],
+        total_compounds=top.total_compounds,
+        total_rows=top.total_rows,
+        scored_rows=top.scored_rows,
+        unscorable_rows=top.unscorable_rows,
+        source=top.source,
+        filters=top.filters,
+        semantics=SCORE_SEMANTICS,
+    )
+
+
+@app.get("/interventions", response_model=InterventionsResponse)
+def interventions(
+    hallmark: Optional[str] = None,
+    intervention: Optional[str] = None,
+) -> InterventionsResponse:
+    """Which interventions target a hallmark of aging, and vice versa. No LLM.
+
+    Both directions of the question that kept returning empty. The translator
+    reached for `TargetsHallmark`, a predicate the ontology declares and nothing
+    populates; the relation actually lives in the López-Otín 2023 review-level
+    evidence records, which carry the species model, the reported outcome text
+    and the reference number.
+
+    Pass `hallmark=MitochondrialDysfunction` or `intervention=Fisetin`, or
+    neither to list the whole curated table. An intervention with no record
+    comes back as an explicit `note`, not as silence.
+    """
+    index = hallmark_index(_runtime_kb_paths())
+    if hallmark and intervention:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "invalid_filter",
+                "message": "Pass hallmark OR intervention, not both.",
+            },
+        )
+    if hallmark:
+        records = index.for_hallmark(hallmark)
+    elif intervention:
+        records = index.for_intervention(intervention)
+    else:
+        records = index.records()
+
+    note = None
+    if hallmark and not records:
+        note = (
+            f"No curated intervention-evidence record names the hallmark "
+            f"'{hallmark}'. Known hallmarks with records: "
+            f"{', '.join(index.covered_hallmarks())}."
+        )
+    elif intervention and not records:
+        note = (
+            f"'{intervention}' has no curated hallmark-evidence record. The "
+            f"hallmark layer is a review TABLE (López-Otín 2023, Table 1), not a "
+            f"census, so this means no record was curated — not that the "
+            f"intervention has no mechanism. Covered interventions: "
+            f"{', '.join(index.interventions())}."
+        )
+
+    return InterventionsResponse(
+        hallmark=hallmark,
+        intervention=intervention,
+        evidence=[HallmarkEvidenceOut(**r.as_dict()) for r in records],
+        covered_interventions=index.interventions(),
+        covered_hallmarks=index.covered_hallmarks(),
+        note=note,
+    )
+
+
+@app.get("/hallmarks", response_model=HallmarksResponse)
+def hallmarks() -> HallmarksResponse:
+    """Every hallmark of aging in the KB, with its anchors and interventions."""
+    index = hallmark_index(_runtime_kb_paths())
+    names = sorted(index.hallmarks | set(index.components))
+    out: list[HallmarkOut] = []
+    for name in names:
+        records = index.for_hallmark(name)
+        out.append(HallmarkOut(
+            name=name,
+            components=sorted(index.components.get(name, [])),
+            intervention_count=len({r.intervention for r in records if r.intervention}),
+            interventions=sorted({r.intervention for r in records if r.intervention}),
+        ))
+    return HallmarksResponse(hallmarks=out, evidence_records=len(index.records()))
 
 
 @app.get("/kb/schema", response_model=KbSchemaResponse)

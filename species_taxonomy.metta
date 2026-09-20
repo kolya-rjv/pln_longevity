@@ -62,3 +62,17 @@
 (Inheritance Podospora_anserina Fungi)
 (Inheritance Paramecium_tetraurelia Protozoa)
 (Inheritance Schizosaccharomyces_pombe Fungi)
+;; ==== CAPITALISATION VARIANTS FROM THE DRUGAGE SOURCE ====
+;; DrugAge's CSV is inconsistent about species capitalisation, and the ETL's
+;; symbol sanitiser preserves whatever it is given, so the same organism can
+;; reach the KB under two symbols. Without these three atoms, four real mouse /
+;; rat / housefly rows fall through `species-tier-conf`'s default branch and are
+;; scored at the INVERTEBRATE tier (0.35) instead of the vertebrate one (0.50) —
+;; a mouse study down-weighted as if it were a fly. Mapping the variant to the
+;; same clade is a data-quality correction, not a new claim: it asserts nothing
+;; that the canonical spelling above does not already assert.
+;; (Fixing the capitalisation in the ETL instead would change generated symbols
+;; and break any stored reference to them.)
+(Inheritance Mus_Musculus Vertebrate)
+(Inheritance Rattus_Norvegicus Vertebrate)
+(Inheritance Musca_Domestica Invertebrate)

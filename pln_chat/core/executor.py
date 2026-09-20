@@ -114,10 +114,16 @@ def _task_route_drugage_ranking(**kwargs) -> Any:
     return route_drugage_ranking(**kwargs)
 
 
+def _task_drugage_top(**kwargs) -> Any:
+    from core.drugage_router import drugage_top
+    return drugage_top(**kwargs)
+
+
 _TASKS: dict[str, Callable[..., Any]] = {
     "run_query": _task_run_query,
     "rank_drugage": _task_rank_drugage,
     "route_drugage_ranking": _task_route_drugage_ranking,
+    "drugage_top": _task_drugage_top,
 }
 
 

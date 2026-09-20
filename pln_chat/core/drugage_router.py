@@ -46,6 +46,7 @@ from core.pln_runner import (
     run_drugage_ranking,
 )
 from ontology.compound_names import Resolution
+from ontology.drugage_scoring import RowScore, load_knobs, score_rows
 from ontology.drugage_selector import (
     BUILD_DRUGAGE,
     REPRESENTATIVE_POLICY,
@@ -407,3 +408,124 @@ def route_drugage_ranking(
         strategy=strategy,
         include_all_rows=False,
     ).result
+
+
+# ── Whole-KB discovery (no LLM, no MeTTa) ────────────────────────────────────
+
+@dataclass
+class DrugAgeTop:
+    """A ranking over the WHOLE DrugAge build, not a caller-supplied pool."""
+    entries: list[RowScore] = field(default_factory=list)
+    total_compounds: int = 0
+    total_rows: int = 0
+    scored_rows: int = 0
+    unscorable_rows: int = 0
+    source: str = ""
+    filters: dict = field(default_factory=dict)
+
+
+def _representative(scores: list[RowScore]) -> RowScore:
+    """The same representative-row policy the pooled ranking uses (§ selector)."""
+    best = max(s.row.evidence_rank for s in scores)
+    tier = [s for s in scores if s.row.evidence_rank == best]
+    top_sig = max(
+        _SIG_RANK.get(s.row.significance or "Unreported", 1) for s in tier
+    )
+    tier = [
+        s for s in tier
+        if _SIG_RANK.get(s.row.significance or "Unreported", 1) == top_sig
+    ]
+    tier.sort(key=lambda s: (s.row.avg_change if s.row.avg_change is not None else 0.0,
+                             s.row.row_id))
+    return tier[(len(tier) - 1) // 2]
+
+
+_SIG_RANK = {"Significant": 2, "Unreported": 1, "NotSignificant": 0}
+
+
+def drugage_top(
+    *,
+    n: int = 20,
+    species: Optional[str] = None,
+    clade: Optional[str] = None,
+    min_confidence: float = 0.0,
+    itp_only: bool = False,
+    significant_only: bool = False,
+    direction: str = "protective",
+    source: Optional[Path] = None,
+) -> DrugAgeTop:
+    """Rank the whole DrugAge build by calibrated, signed effect on mortality.
+
+    This is the "strongest evidence overall" question the evaluation called the
+    one people ask first and found unanswerable: the translator invented a
+    four-compound pool and ranked only those, and a generic MeTTa match returned
+    nothing because DrugAge rows are excluded from the runtime space.
+
+    It cannot go through the engine. Ranking 1,043 compounds would be 1,043
+    MeTTa calls, and loading the rows to do it in one space aborts the
+    interpreter (hyperon 0.2.10 panics on a variable-slot match past a few
+    hundred rows). The arithmetic is therefore applied in Python, using the
+    calibration layer's OWN constants — see ontology/drugage_scoring.py, and the
+    equality test against the engine in tests/test_drugage_discovery.py.
+    """
+    src = _resolve_top_source(source)
+    rows = load_rows(src)
+    knobs = load_knobs()
+
+    if species:
+        rows = [r for r in rows if r.species and _norm(r.species) == _norm(species)]
+    if clade:
+        rows = [
+            r for r in rows
+            if knobs.species_clade.get(r.species or "", "").lower() == clade.lower()
+        ]
+    if itp_only:
+        rows = [r for r in rows if r.is_itp]
+    if significant_only:
+        rows = [r for r in rows if r.significance == "Significant"]
+
+    scored = score_rows(rows, knobs=knobs)
+    unscorable = len(rows) - len(scored)
+
+    by_compound: dict[str, list[RowScore]] = {}
+    for s in scored:
+        by_compound.setdefault(s.row.compound, []).append(s)
+    representatives = [_representative(group) for group in by_compound.values()]
+
+    if min_confidence > 0:
+        representatives = [s for s in representatives if s.confidence >= min_confidence]
+    if direction == "protective":
+        representatives = [s for s in representatives if s.protective]
+    elif direction == "harmful":
+        representatives = [s for s in representatives if not s.protective]
+
+    # Most protective first; for `direction=harmful` the interesting end is the
+    # other one, so sort ascending there rather than showing the least harmful.
+    if direction == "harmful":
+        representatives.sort(key=lambda s: (s.score, s.row.compound))
+    else:
+        representatives.sort(key=lambda s: (-s.score, s.row.compound))
+    return DrugAgeTop(
+        entries=representatives[: max(0, n)],
+        total_compounds=len(by_compound),
+        total_rows=len(rows),
+        scored_rows=len(scored),
+        unscorable_rows=unscorable,
+        source=str(src),
+        filters={
+            "species": species,
+            "clade": clade,
+            "min_confidence": min_confidence,
+            "itp_only": itp_only,
+            "significant_only": significant_only,
+            "direction": direction,
+            "n": n,
+        },
+    )
+
+
+def _resolve_top_source(source: Optional[Path]) -> Path:
+    """The build if it exists, else the committed sample — and say which."""
+    if source is not None and source.exists():
+        return source
+    return BUILD_DRUGAGE if BUILD_DRUGAGE.exists() else SAMPLE_DRUGAGE

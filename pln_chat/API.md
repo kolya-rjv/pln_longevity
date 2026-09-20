@@ -98,6 +98,9 @@ to `pln_chat/logs/session_*.jsonl`. For browser clients, set
 | GET    | `/health`          | Liveness + readiness check (PLN, OpenAI, KB, and DrugAge build) |
 | GET    | `/ontology/files`  | List discovered `.metta` files (+ default selection, + which are excluded from execution) |
 | GET    | `/kb/schema`       | What the KB actually holds: predicates, arities, fact counts, and which predicates are declared but empty |
+| GET    | `/drugage/top`     | Rank the **whole** DrugAge build by calibrated lifespan effect — no LLM, no compound list |
+| GET    | `/interventions`   | Which interventions target a hallmark of aging (and the reverse), with provenance |
+| GET    | `/hallmarks`       | Every hallmark in the KB, its anchor components and its interventions |
 | GET    | `/patients`        | List known patient profiles (for the `<Patient>` query forms below) |
 | POST   | `/query`           | Ask a natural-language question of the KB (goes through the LLM translator) |
 | POST   | `/metta/run`       | Validate + execute a raw MeTTa query directly (no LLM call)  |
@@ -151,6 +154,55 @@ response reports its own `prompt_tokens_estimate`.
 A failed translation also sets `intent: "error"` rather than borrowing
 `clarification`, which is a real answer the engine gives when a question needs
 narrowing.
+
+## Discovery without an LLM
+
+Four questions that used to be unanswerable are now plain GETs. None of them
+spends an OpenAI call, and none of them needs the caller to already know the
+answer.
+
+**"Which drugs extend lifespan in mice with the strongest evidence?"** —
+`POST /drugage/rank` only ever scored a pool the caller supplied, so the
+translator invented a four-compound pool and ranked that. `GET /drugage/top`
+ranks all 1,043 compounds in the build:
+
+```bash
+curl 'localhost:7860/drugage/top?n=10&species=Mus_musculus&itp_only=true'
+# -> Rapamycin +0.319, Astaxanthin +0.304, 17alpha-estradiol +0.304,
+#    Canagliflozin +0.251, NDGA +0.251, Aspirin +0.231, Acarbose +0.187 ...
+#    each with its species, sex, significance, change %, PMID and evidence tier
+```
+
+Filters compose: `species=`, `clade=` (Vertebrate / Invertebrate / Fungi /
+Protozoa), `itp_only=`, `significant_only=`, `min_confidence=`, `n=`, and
+`direction=harmful` to rank the compounds that SHORTENED lifespan, most harmful
+first.
+
+This one is scored in Python rather than in MeTTa, and the reason is not
+performance: ranking 1,043 compounds would be 1,043 engine calls, and loading
+the rows to rank them in one space **aborts** hyperon (a non-unwinding panic
+past a few hundred rows in a variable-slot match). The scorer reads its
+constants out of `drugage_calibration.metta` / `epistemic_calibration.metta` /
+`species_taxonomy.metta` at load time — tuning a knob retunes both paths — and
+`tests/test_drugage_discovery.py` asserts it reproduces the engine bit for bit.
+
+**"Which interventions target mitochondrial dysfunction?"** and **"which
+hallmarks does rapamycin target?"** — both directions of a relation that kept
+returning empty because the translator reached for `TargetsHallmark`, which the
+ontology declares and nothing populates:
+
+```bash
+curl 'localhost:7860/interventions?hallmark=MitochondrialDysfunction'
+curl 'localhost:7860/interventions?intervention=Fisetin'
+curl localhost:7860/hallmarks
+```
+
+Each record carries the species model, the reported outcome text, the review
+reference number and the publication. An intervention with no record gets an
+explicit `note` saying the curated layer is a review table rather than a census
+— not silence.
+
+**"List your data sources and counts"** — `GET /kb/schema`, below.
 
 ### Valid, and guaranteed to return nothing
 
