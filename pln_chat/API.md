@@ -101,6 +101,7 @@ to `pln_chat/logs/session_*.jsonl`. For browser clients, set
 | GET    | `/drugage/top`     | Rank the **whole** DrugAge build by calibrated lifespan effect — no LLM, no compound list |
 | GET    | `/interventions`   | Which interventions target a hallmark of aging (and the reverse), with provenance — review records and bare `TargetsHallmark` facts kept apart |
 | GET    | `/hallmarks`       | Every hallmark in the KB, its anchor components and its interventions |
+| GET    | `/evidence/human`  | What HUMAN evidence the KB holds for an intervention — design, n, what was measured, what was found, PMID, tier; a null result and a missing record kept apart |
 | GET    | `/patients`        | List the built-in patient profiles                            |
 | GET    | `/patients/markers`| Which biomarkers a caller-supplied patient may carry, and in what units |
 | POST   | `/patients/preview`| Validate your own patient and see the atoms it becomes — no inference |
@@ -220,7 +221,7 @@ against the raw `extra_atoms` path:
 
 ## Discovery without an LLM
 
-Four questions that used to be unanswerable are now plain GETs. None of them
+Five questions that used to be unanswerable are now plain GETs. None of them
 spends an OpenAI call, and none of them needs the caller to already know the
 answer.
 
@@ -300,6 +301,121 @@ mice while extending lifespan (Weiss 2018, PMID 29579736), and the KB records
 that as a `Limitation` fact rather than a comment. An LLM will make that chain
 on request; the point of the deduction layer is that it will not.
 
+**"What does the evidence say about metformin in HUMANS?"** — this used to be
+answered in prose. The answer was true (the bulk data loaded here — DrugAge,
+GenAge, CellAge — is model-organism and cell evidence, which cannot speak to
+people) but it was un-grounded: there was nothing in the KB to point at, so the
+honest answer had to be *written* by a language model. `human_evidence.metta`
+is the record set, and `GET /evidence/human` reads it:
+
+```bash
+curl 'localhost:7860/evidence/human?intervention=Metformin'
+curl 'localhost:7860/evidence/human?intervention=DasatinibPlusQuercetin'
+curl localhost:7860/evidence/human           # the whole table
+```
+
+```
+Metformin
+  Bannister2014_Metformin_Survival  ObservationalCohort  n=78241
+      result ReportedBenefit   tier Epidemiological   PMID 25041462
+  Barzilai2016_TAME_Metformin       PlannedTrial       n=null
+      result NotYetReported    tier null              PMID 27304507
+```
+
+Each record carries its design (`RandomizedControlledTrial` /
+`ObservationalCohort` / `OpenLabelPilot` / `PlannedTrial`), its n, what was
+measured, what was found, the PMID and an `evidence_tier` drawn from
+`epistemic_calibration.metta`. The point of the shape is the three states prose
+destroys:
+
+* `result: "ReportedNull"` — somebody measured it in people and nothing
+  changed. Dasatinib + quercetin returns three records from two trials, and one
+  of them is the null: pulmonary function in 14 people with IPF was
+  **unchanged** (Justice 2019, PMID 30616998), from the same n=14 pilot whose
+  physical-function measures improved. A summary sentence keeps the first and
+  loses the second.
+* `evidence_tier: null` with `result: "NotYetReported"` — **TAME has not
+  reported.** Barzilai 2016 (PMID 27304507) is the trial's design rationale, not
+  a result, so the record deliberately carries no tier and no truth value. This
+  is the most consequential fabrication available in this field, and the record
+  shape is built so it cannot be committed by accident.
+* no record at all — an explicit `note` ("an absence of a RECORD, not evidence
+  of absence"), never an unexplained empty list. Omega-3 is a fourth case: its
+  human tier already lives in `supplement_evidence.metta`, so it comes back
+  under `cross_references` rather than duplicated here.
+
+Nothing in this layer carries a truth value or adds an edge to the graph
+`infer` traverses — same stance as `TargetsHallmark`. A study record says what
+was measured in how many people and what was found; turning that into a signed,
+weighted causal edge is a separate act of calibration a curator performs
+deliberately.
+
+In MeTTa, the same thing:
+
+```
+!(human-evidence &self Metformin)
+!(human-evidence &self DasatinibPlusQuercetin)
+!(human-evidence-interventions &self)
+```
+
+**"What would his risk look like if he had never smoked?"** — recorded as an
+honest Gap, and it was one. `PatientSmoking` reached **zero** inference paths:
+before `lifestyle_evidence.metta` it appeared in its type declaration, two
+patient facts, one doc line and a regex in `api.py`, and nothing consumed it.
+
+The fix is not a `smoking -> CHD` edge. The risk model reads exactly one
+predictor — the composite clock `AgeAccelGrim` — and a parallel smoking term
+would double-count an exposure the clock already carries. GrimAge carries it
+explicitly: `DNAmPACKYRS` is a GrimAge component built from 172 CpGs and is the
+DNAm surrogate *for* pack-years. So the wiring is the one the clock's own
+construction implies:
+
+```
+SmokingCessation --Neg--> SmokingPackYears --Pos--> DNAmPACKYRS  (PartOf GrimAge)
+```
+
+and the existing machinery does the rest — `resolve-lever` routes the lever to
+the driver it reduces, `cf-parts` finds `DNAmPACKYRS` among the clock's
+components, and `project-risk` turns the clock reduction into absolute risk.
+Not one line of the counterfactual or risk layer changed.
+
+```
+!(counterfactual-patient &self Patient003 SmokingCessation)
+;; => (Counterfactual SmokingCessation AgeAccelGrim (expected-delta -0.21)
+;;       (signed Neg (stv 0.21 0.85)) (Via (DNAmPACKYRS)))
+
+!(project-risk-patient &self Patient003 SmokingCessation)
+;; => (ProjectedRisk SmokingCessation CoronaryHeartDisease
+;;       (point 0.2226…) (reduction 0.01369…) (delta-clock -0.21)
+;;       (confidence 0.85) (Via (DNAmPACKYRS)))
+;;    23.63% -> 22.27% absolute over ten years.
+```
+
+`Patient003` is a new, **synthetic** smoking-dominant profile in
+`lifestyle_evidence.metta` — a 64-year-old male former smoker with a strongly
+elevated `DNAmPACKYRS` and normal senescence, inflammation and metabolic
+markers, the third axis alongside senescence-dominant `Patient001` and
+metabolic-dominant `Patient002`. `Patient002` was NOT edited to demo this,
+although he is already a `FormerSmoker`: his numbers are quoted in the
+evaluation and pinned by a test, and rewriting a published patient to make a
+new feature look good is how a knowledge base stops being trustworthy.
+`Patient001`'s and `Patient002`'s answers are byte-identical before and after.
+
+Two consequences worth reading literally:
+
+* The lever acts on `DNAmPACKYRS`, not on the status string. A caller-supplied
+  smoker who sends no `DNAmPACKYRS` gets an expected delta of 0 and an empty
+  `(Via ())`, and `POST /patients/preview` now warns about exactly that — the
+  zero means "no measured pack-years signal to act on", not "quitting would not
+  help".
+* Quitting does not restore a never-smoker. The cessation edge's strength is
+  0.39, anchored on Duncan 2019's HR of 0.61 (95% CI 0.49–0.76) for quitting
+  within 5 years versus continuing (PMID 31429895) — and the KB records as a
+  `Limitation` fact that risk stays significantly elevated versus never smokers
+  beyond 5 years, and that Joehanes 2016 (PMID 27651444) still finds 185
+  smoking-associated CpGs differentially methylated in former versus never
+  smokers. A strength of 1.0 would assert the opposite of what both papers say.
+
 **"List your data sources and counts"** — `GET /kb/schema`, below.
 
 ### Valid, and guaranteed to return nothing
@@ -339,6 +455,22 @@ just `drugage_etl_short.metta`) is excluded from execution (`run_query`,
 `/metta/run`'s default validation) but still listed by `/ontology/files`
 under `excluded_from_runtime`. It's still queryable in stub mode (no
 `hyperon` installed / `PLN_RUNTIME_AVAILABLE=false`).
+
+There is a second, sharper limit on the same space, and it is not about file
+size: **the number of top-level expressions the runtime KB loads in total.**
+Adding `lifestyle_evidence.metta` and a first draft of `human_evidence.metta`
+took it from ~940 to ~1050 expressions, and `POST /query` for a caller-supplied
+patient started aborting the interpreter outright — the non-unwinding panic in
+`hyperon-space/src/index/trie.rs`, which no `except` can catch. In the API that
+surfaces as a 500 and a replaced worker (`core/executor.py` exists for exactly
+this); in the test suite it killed the run with "Fatal Python error: Aborted"
+and no failing test to point at.
+
+The human-evidence records were reshaped to one atom per study rather than one
+atom per field, which cost ~49 expressions instead of ~113, and
+`tests/test_human_evidence.py` now carries two guards: a cheap budget assertion
+on the expression count, and the query that died, re-run in a **subprocess**, so
+the next regression is a red test rather than a dead process.
 
 The same size question applies to the **prompt**, and used to be fatal there.
 The LLM context pasted every selected file verbatim; selecting a CellAge or
@@ -510,10 +642,11 @@ curl -X POST localhost:7860/ontology/apply \
 These map to dedicated MeTTa functions rather than hand-built patterns — the
 LLM translator already knows to emit them for matching natural-language
 questions (`/query`), or write them directly for `/metta/run`. `<Patient>` is
-a known ID from `GET /patients` (currently `Patient001` / `Patient002`);
-`<Lever>` is a cause (`ChronicInflammation`, `CellularSenescence`,
-`InsulinResistance`), an intervention (`DasatinibPlusQuercetin`,
-`Metformin`), or a marker (`CRP`).
+a known ID from `GET /patients` (currently `Patient001` / `Patient002` /
+`Patient003`); `<Lever>` is a cause (`ChronicInflammation`,
+`CellularSenescence`, `InsulinResistance`, `SmokingPackYears`), an intervention
+(`DasatinibPlusQuercetin`, `Metformin`, `SmokingCessation`), or a marker
+(`CRP`).
 
 | Ask (natural language)                                    | Dedicated form                                          |
 |-------------------------------------------------------------|----------------------------------------------------------|
@@ -528,6 +661,8 @@ a known ID from `GET /patients` (currently `Patient001` / `Patient002`);
 | "rank omega3, fisetin and nmn for `<Patient>`"                | `(recommend-supplements &self <Patient> (<Supplement> …))`  |
 | "which hallmarks does `<Intervention>` target"                | `(hallmarks-of &self <Intervention>)`                        |
 | "which interventions target `<Hallmark>`"                     | `(interventions-for &self <Hallmark>)`                        |
+| "what if `<Patient>` had never smoked / had quit"              | `(counterfactual-patient &self <Patient> SmokingCessation)`   |
+| "what does the evidence say about `<Intervention>` in humans" | `(human-evidence &self <Intervention>)` — or just call `GET /evidence/human` |
 | "rank rapamycin, metformin by lifespan benefit"               | `(rank-drugage-lifespan (<Compound1> <Compound2> …))` — or just call `POST /drugage/rank` |
 
 A finding with no mechanistic path is omitted rather than invented; a

@@ -101,8 +101,12 @@ _INFERENCE_STACK: list[str] = [
     "pln_counterfactual.metta",
     "pln_risk_prediction.metta",
 
+    "lifestyle_evidence.metta",
+
     "supplement_evidence.metta",
     "pln_supplement_recommendation.metta",
+
+    "human_evidence.metta",
 ]
 _DEFAULT_SELECTION = (
     [f for f in _INFERENCE_STACK if f in _METTA_FILES]

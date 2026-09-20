@@ -114,7 +114,12 @@ MARKERS: dict[str, MarkerSpec] = {
     ),
     "DNAmPACKYRS": MarkerSpec(
         "DNAmPACKYRS", "grimage_component",
-        "DNAm surrogate of smoking pack-years; a GrimAge component",
+        "DNAm surrogate of smoking pack-years; a GrimAge component, and since "
+        "lifestyle_evidence.metta the one marker the smoking lever acts on. Send "
+        "it for a current or former smoker and "
+        "(counterfactual-patient &self <Patient> SmokingCessation) and "
+        "(project-risk-patient &self <Patient> SmokingCessation) both return a "
+        "real number instead of zero",
     ),
     "DNAmADM": MarkerSpec("DNAmADM", "grimage_component", "GrimAge component; no cause edge yet"),
     "DNAmB2M": MarkerSpec("DNAmB2M", "grimage_component", "GrimAge component; no cause edge yet"),
@@ -419,6 +424,23 @@ def build_patient(
             "baseline the multiplier applies to. Without them the risk queries "
             "return empty rather than guessing a baseline."
         )
+    # `smoking` used to be inert metadata — nothing consumed PatientSmoking.
+    # lifestyle_evidence.metta changed that, but the lever acts on DNAmPACKYRS,
+    # not on the status string, so a smoker with no DNAm pack-years measurement
+    # still gets zero from the smoking counterfactual. Say so rather than let
+    # the caller read a structural zero as "quitting would not help him".
+    if smoking in ("FormerSmoker", "CurrentSmoker") and not any(
+        m.name == "DNAmPACKYRS" for m in resolved
+    ):
+        warnings.append(
+            "Smoking status is recorded but no DNAmPACKYRS measurement was sent. "
+            "The smoking lever works through that GrimAge component, so "
+            "(counterfactual-patient &self <Patient> SmokingCessation) will "
+            "return an expected delta of 0 with an empty (Via ()) for this "
+            "patient. That zero means 'no measured pack-years signal to act on', "
+            "not 'quitting would not help'."
+        )
+
     inert = [m.name for m in resolved if m.note]
     if inert:
         warnings.append(

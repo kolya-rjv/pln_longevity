@@ -70,11 +70,23 @@ markdown fences, no extra keys:
         (grimage-share &self <Patient> <Component>)
       - "if <lever> were normalized/reduced/cleared, expected change in GrimAge" ->
         (counterfactual-patient &self <Patient> <Lever>)
-    <Lever> is a cause (ChronicInflammation, CellularSenescence, InsulinResistance),
-    an intervention (DasatinibPlusQuercetin, Metformin), or a marker (CRP) — pass it
-    as named; the engine resolves a marker to the shared upstream cause itself and
-    declines a lever with no mechanistic path (never invent a direct marker->clock
-    edge). A REDUCTION in a harmful clock is returned as (signed Neg …) (protective).
+    <Lever> is a cause (ChronicInflammation, CellularSenescence, InsulinResistance,
+    SmokingPackYears), an intervention (DasatinibPlusQuercetin, Metformin,
+    SmokingCessation), or a marker (CRP) — pass it as named; the engine resolves a
+    marker to the shared upstream cause itself and declines a lever with no
+    mechanistic path (never invent a direct marker->clock edge). A REDUCTION in a
+    harmful clock is returned as (signed Neg …) (protective).
+
+    SMOKING is a lever now. "What if <patient> had never smoked / had quit / if his
+    smoking were undone" -> (counterfactual-patient &self <Patient> SmokingCessation),
+    and the absolute-risk version -> (project-risk-patient &self <Patient>
+    SmokingCessation). It runs through the clock, not through a smoking->CHD edge:
+    SmokingCessation reduces SmokingPackYears, which raises DNAmPACKYRS, which is a
+    GrimAge component (lifestyle_evidence.metta). So it returns a real number ONLY
+    for a patient with a measured DNAmPACKYRS — Patient003 has one; Patient001 and
+    Patient002 do not, and for them the same query honestly returns an expected delta
+    of 0 with an empty (Via ()). (PatientSmoking is a demographic FACT with no
+    inference path of its own; never query it to answer a counterfactual.)
 
 12. RISK PREDICTION queries (Demo 5) map to dedicated functions, NOT to hand-built
     match patterns. Use them verbatim:
@@ -107,7 +119,34 @@ markdown fences, no extra keys:
     drug-supplement interaction with the patient's current medication is flagged. Set
     intent="inference" and requires_pln_inference=true.
 
-14. ONLY QUERY PREDICATES THAT HOLD FACTS. The ontology snapshot below opens
+14. HUMAN-EVIDENCE queries map to a dedicated accessor, NOT to a hand-built
+    match pattern and NEVER to prose:
+      - "what does the evidence say about <X> in humans", "are there human trials
+        of <X>", "has <X> been tested in people" ->
+        (human-evidence &self <Intervention>)
+      - "which interventions have human evidence here" ->
+        (human-evidence-interventions &self)
+    It always answers, in one of three shapes, and the difference between them
+    matters more than the answer itself:
+      (HumanEvidence <record> <intv> (design D) (n N) (outcome O) (measured "…")
+         (found "…") (result R) (tier T) (pmid "…"))  — a curated human study;
+      (HumanEvidenceCrossReferenced <intv> (tier T) (see "…"))  — recorded
+         elsewhere in this KB (omega-3), deliberately not duplicated;
+      (NoHumanEvidenceRecord <intv> "…")  — nothing curated here.
+    <result> is ReportedBenefit / ReportedNull / ReportedHarm / NotYetReported, and
+    <tier> can be NotStated. Read them literally when you explain the answer:
+      * ReportedNull means it WAS measured in people and nothing changed — do not
+        report it as a benefit or as missing data;
+      * NotYetReported with (tier NotStated) means the trial is PLANNED and has no
+        results. TAME is this case. Never quote TAME as evidence that metformin
+        extends human lifespan, and never attach a confidence number to it;
+      * NoHumanEvidenceRecord is an absence of a RECORD, not a null result and not
+        evidence of absence. Say which one it is.
+    The bulk data loaded here (DrugAge, GenAge, CellAge) is model-organism and cell
+    evidence and cannot answer a question about humans; this layer is the only place
+    that can. Set intent="retrieval" and requires_pln_inference=false.
+
+15. ONLY QUERY PREDICATES THAT HOLD FACTS. The ontology snapshot below opens
     with the runtime knowledge base's real contents: each grounded predicate
     with its arity and FACT COUNT, followed by a DECLARED BUT EMPTY list. A
     predicate on that second list exists in the vocabulary and holds no atoms —

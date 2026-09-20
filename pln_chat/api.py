@@ -66,6 +66,7 @@ from config import (
     PLN_RUNTIME_AVAILABLE,
 )
 from ontology.hallmarks import hallmark_index
+from ontology.human_evidence import human_evidence_index
 from ontology.inventory import inventory_for, schema_card, summarise_oversized
 from ontology.loader import load_specific_files, parse_metta_text
 from ontology.registry import BUILTIN_REGISTRY, OntologyRegistry
@@ -150,8 +151,12 @@ _INFERENCE_STACK: list[str] = [
     "pln_counterfactual.metta",
     "pln_risk_prediction.metta",
 
+    "lifestyle_evidence.metta",
+
     "supplement_evidence.metta",
     "pln_supplement_recommendation.metta",
+
+    "human_evidence.metta",
 ]
 
 
@@ -1318,6 +1323,78 @@ class HallmarksResponse(BaseModel):
     evidence_records: int
 
 
+class HumanPublicationOut(BaseModel):
+    symbol: str
+    title: Optional[str] = None
+    year: Optional[int] = None
+    journal: Optional[str] = None
+    doi: Optional[str] = None
+    pmid: Optional[str] = None
+
+
+class HumanStudyOut(BaseModel):
+    record_id: str
+    intervention: Optional[str] = None
+    outcome: Optional[str] = None
+    design: Optional[str] = Field(
+        default=None,
+        description="RandomizedControlledTrial | ObservationalCohort | "
+                    "OpenLabelPilot | PlannedTrial. Never flattened to \"a study\".",
+    )
+    n: Optional[int] = None
+    measured: Optional[str] = None
+    finding: Optional[str] = None
+    result: Optional[str] = Field(
+        default=None,
+        description="ReportedBenefit | ReportedNull | ReportedHarm | "
+                    "NotYetReported. `ReportedNull` means somebody measured it "
+                    "in people and found nothing — which is not the same as "
+                    "this KB holding no record.",
+    )
+    evidence_tier: Optional[str] = Field(
+        default=None,
+        description="An EvidenceCategory from epistemic_calibration.metta, or "
+                    "null. Null is meaningful: a PlannedTrial that has not "
+                    "reported has no tier, and inventing one for it would be "
+                    "the most consequential fabrication available here.",
+    )
+    caveat: Optional[str] = None
+    pmid: Optional[str] = Field(
+        default=None,
+        description="The PMID written in the record itself; `publication` "
+                    "carries the full citation it must agree with.",
+    )
+    publication: Optional[HumanPublicationOut] = None
+    source_file: Optional[str] = None
+
+
+class HumanCrossReferenceOut(BaseModel):
+    intervention: str
+    evidence_tier: str
+    where: str
+    source_file: Optional[str] = None
+    provenance: Literal["cross_reference"] = "cross_reference"
+
+
+class HumanEvidenceResponse(BaseModel):
+    intervention: Optional[str] = None
+    studies: list[HumanStudyOut]
+    cross_references: list[HumanCrossReferenceOut] = Field(
+        default_factory=list,
+        description="Human evidence this KB holds somewhere else, pointed at "
+                    "rather than copied — omega-3's tier lives in "
+                    "supplement_evidence.metta. One body of evidence, one home.",
+    )
+    covered_interventions: list[str] = Field(
+        description="Every intervention with a human record or cross-reference. "
+                    "This layer is a small hand-curated table, not a census: an "
+                    "absence here means no record was curated, not that no human "
+                    "study exists.",
+    )
+    covered_outcomes: list[str]
+    note: Optional[str] = None
+
+
 @app.get("/drugage/top", response_model=DrugAgeTopResponse)
 def drugage_top_endpoint(
     n: int = 20,
@@ -1492,6 +1569,68 @@ def hallmarks() -> HallmarksResponse:
             interventions=linked,
         ))
     return HallmarksResponse(hallmarks=out, evidence_records=len(index.records()))
+
+
+@app.get("/evidence/human", response_model=HumanEvidenceResponse)
+def human_evidence(intervention: Optional[str] = None) -> HumanEvidenceResponse:
+    """What HUMAN evidence the KB holds for an intervention. No LLM.
+
+    "What does the evidence say about metformin in humans?" used to be answered
+    in prose, because the answer was true but un-grounded: the bulk data loaded
+    here (DrugAge, GenAge, CellAge) is model-organism and cell evidence, and
+    there was nothing to point at. `human_evidence.metta` is the record set;
+    this is the way to read it without an LLM in the loop.
+
+    Each study carries its design, its n, what was measured, what was found, the
+    PMID and an evidence tier, and the endpoint keeps apart three states that a
+    summary sentence destroys:
+
+    * a study with `result="ReportedNull"` — measured in people, nothing found
+      (dasatinib + quercetin did not change pulmonary function in 14 people);
+    * a study with `evidence_tier=null` and `result="NotYetReported"` — TAME is
+      planned and has not reported, so there is no tier to give;
+    * no record at all — an explicit `note`, never an unexplained empty list.
+
+    Pass `intervention=Metformin`, or nothing to list the whole table.
+    """
+    index = human_evidence_index(_runtime_kb_paths())
+    if intervention:
+        studies = index.for_intervention(intervention)
+        crossrefs = index.cross_references_for(intervention)
+    else:
+        studies = index.records()
+        crossrefs = list(index.cross_references)
+
+    note = None
+    if intervention and not studies and not crossrefs:
+        note = (
+            f"No curated human study names '{intervention}'. This layer is a "
+            f"small hand-built table, so that is an absence of a RECORD, not "
+            f"evidence of absence — and it is emphatically not a null result. "
+            f"Interventions with human evidence here: "
+            f"{', '.join(index.interventions())}."
+        )
+    elif intervention and not studies and crossrefs:
+        note = (
+            f"'{intervention}' has no study record in human_evidence.metta: its "
+            f"human evidence is recorded elsewhere in the knowledge base and is "
+            f"cross-referenced rather than duplicated. See `cross_references`."
+        )
+    elif studies and all(s.result == "NotYetReported" for s in studies):
+        note = (
+            f"Every human record for '{intervention}' is a trial that has not "
+            f"reported. There is no result to quote and no evidence tier to "
+            f"attach."
+        )
+
+    return HumanEvidenceResponse(
+        intervention=intervention,
+        studies=[HumanStudyOut(**s.as_dict()) for s in studies],
+        cross_references=[HumanCrossReferenceOut(**x.as_dict()) for x in crossrefs],
+        covered_interventions=index.interventions(),
+        covered_outcomes=index.covered_outcomes(),
+        note=note,
+    )
 
 
 @app.get("/kb/schema", response_model=KbSchemaResponse)
