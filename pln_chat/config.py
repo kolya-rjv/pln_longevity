@@ -20,6 +20,17 @@ AVAILABLE_MODELS: list[str] = ["gpt-5.4-mini", "gpt-5.4", "gpt-4o", "gpt-4-turbo
 DEFAULT_TEMPERATURE: float = 0.2
 OPENAI_TIMEOUT_SECONDS: float = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60"))
 OPENAI_MAX_RETRIES: int = max(0, int(os.getenv("OPENAI_MAX_RETRIES", "1")))
+# Largest prompt (system + history + question) the API will SEND, in estimated
+# tokens. The default /query prompt pastes the curated .metta files verbatim and
+# already measures ~62k tokens; selecting a gene ETL file pushed it to 417k and
+# came back as an OpenAI 400 AFTER the request was billed and the caller waited.
+# Checking the estimate first turns that into an immediate, actionable 413 that
+# names the files responsible. Raise it for a larger-context model.
+PLN_MAX_PROMPT_TOKENS: int = int(os.getenv("PLN_MAX_PROMPT_TOKENS", "200000"))
+# Characters per token used by that estimate. 4.0 is the usual English rule of
+# thumb; MeTTa's punctuation density makes it conservative (i.e. it slightly
+# OVER-counts), which is the safe direction for a pre-flight guard.
+PLN_CHARS_PER_TOKEN: float = float(os.getenv("PLN_CHARS_PER_TOKEN", "4.0"))
 
 # ── PLN runtime ────────────────────────────────────────────────────────────────
 # Auto-detected: true when the `hyperon` package is importable.

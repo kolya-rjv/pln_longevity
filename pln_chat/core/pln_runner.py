@@ -52,6 +52,11 @@ class PLNRunResult:
     query_time_ms: int = 0
     mode: str = "stub"                       # "stub" | "runtime"
     error: Optional[str] = None
+    #: Machine-readable failure class when status == "error", so the HTTP layer
+    #: can pick a status code without grepping the message.
+    #:   runtime_error       — the hyperon interpreter raised
+    #:   drugage_build_missing — build/drugage_etl.metta has not been generated
+    error_code: Optional[str] = None
 
     @property
     def ok(self) -> bool:
@@ -375,7 +380,10 @@ def _hyperon_run(
             raw: list[list] = metta.run(normalized)  # every group is a query result
             elapsed = int((time.monotonic() - start) * 1000)
         except Exception as run_exc:
-            return PLNRunResult(status="error", mode="runtime", error=str(run_exc))
+            return PLNRunResult(
+                status="error", mode="runtime", error=str(run_exc),
+                error_code="runtime_error",
+            )
 
         results: list[PLNAtomResult] = []
         for result_group in raw:
@@ -391,7 +399,9 @@ def _hyperon_run(
             mode="runtime",
         )
     except Exception as exc:   # noqa: BLE001
-        return PLNRunResult(status="error", mode="runtime", error=str(exc))
+        return PLNRunResult(
+            status="error", mode="runtime", error=str(exc), error_code="runtime_error",
+        )
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────

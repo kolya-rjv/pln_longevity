@@ -115,6 +115,7 @@ def _missing_build_result() -> PLNRunResult:
             "reads the regenerated ETL rows — run `bash scripts/run_etl.sh` to "
             "generate them, then ask again."
         ),
+        error_code="drugage_build_missing",
     )
 
 

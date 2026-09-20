@@ -110,6 +110,47 @@ server is running.
 Invalid model names, ontology selections, MeTTa, and unsafe ontology target
 filenames return HTTP 422 before paid inference, PLN execution, or disk writes.
 
+### Failures are HTTP failures
+
+**This is a behaviour change.** A translator or runtime failure used to come
+back as HTTP 200 with `intent: "clarification"`, `validation_valid: true`,
+`pln_status: "empty"` and the upstream error text buried in `answer` — the
+exact shape of a successful-but-empty answer, so a client filtering on status
+never noticed. Every failure now carries its own status and a structured
+`detail` with a machine-readable `code`:
+
+| code                      | status | meaning                                           |
+|---------------------------|--------|---------------------------------------------------|
+| `prompt_too_large`        | 413    | the assembled prompt exceeds `PLN_MAX_PROMPT_TOKENS` — **checked before the call is made** |
+| `context_length_exceeded` | 413    | upstream rejected the prompt anyway                |
+| `rate_limit`              | 429    | upstream throttling (`Retry-After` is set)         |
+| `timeout`                 | 504    | upstream did not answer in time                    |
+| `pln_timeout`             | 504    | PLN execution passed its per-request budget        |
+| `connection`              | 502    | could not reach upstream                           |
+| `upstream_error`          | 502    | any other OpenAI-side failure                      |
+| `bad_json`                | 502    | the model answered with something unparseable      |
+| `runtime_error`           | 502    | the hyperon interpreter raised                     |
+| `pln_worker_crashed`      | 500    | the MeTTa worker process died (hyperon abort)      |
+| `missing_api_key` / `auth`| 503    | the service has no usable OpenAI credential        |
+| `drugage_build_missing`   | 503    | `build/drugage_etl.metta` has not been generated   |
+| `pln_overloaded`          | 503    | too many PLN tasks in flight (`Retry-After` is set)|
+
+Nothing is lost: `detail` carries the original message, the `stage` it failed
+at, and — for a translation failure — the token `usage` that was already
+spent.
+
+The **413 `prompt_too_large`** guard is the one that removes a whole class of
+wasted calls. The default `/query` prompt pastes the curated `.metta` files
+verbatim and already measures ~62,000 tokens; selecting a gene ETL file pushed
+it to 417,000 and came back as a billed upstream 400. The size is now estimated
+first (characters / `PLN_CHARS_PER_TOKEN`), the request is refused with the
+estimate, the limit and the largest selected files named, and every successful
+response reports its own `prompt_tokens_estimate`.
+
+A failed translation also sets `intent: "error"` rather than borrowing
+`clarification`, which is a real answer the engine gives when a question needs
+narrowing.
+
 **A note on KB size:** hyperon 0.2.10 panics once a space gets too large, so
 any `.metta` file over `PLN_MAX_KB_FILE_BYTES` (default 60 KB — currently
 just `drugage_etl_short.metta`) is excluded from execution (`run_query`,

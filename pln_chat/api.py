@@ -56,8 +56,10 @@ from config import (
     ONTOLOGY_DIR,
     OPENAI_API_KEY,
     PLN_CORS_ORIGINS,
+    PLN_CHARS_PER_TOKEN,
     PLN_MAX_KB_FILE_BYTES,
     PLN_MAX_ONTOLOGY_FILES,
+    PLN_MAX_PROMPT_TOKENS,
     PLN_MAX_RANK_COMPOUNDS,
     PLN_MAX_RANK_ROWS,
     PLN_RUNTIME_AVAILABLE,
@@ -371,6 +373,104 @@ async def log_api_request(request: Request, call_next):
         )
 
 
+#: Which HTTP status each translator failure class deserves. The evaluation's
+#: complaint was not that failures happen — it is that they arrived as HTTP 200
+#: with intent "clarification", indistinguishable from a successful-but-empty
+#: answer, so "a client filtering on status would never notice".
+_TRANSLATION_ERROR_STATUS: dict[str, int] = {
+    "missing_api_key":          503,   # the service is not configured to answer
+    "auth":                     503,   # ...and its credential is rejected
+    "rate_limit":               429,   # retry later
+    "context_length_exceeded":  413,   # the CALLER can fix this one
+    "timeout":                  504,
+    "connection":               502,
+    "upstream_error":           502,
+    "bad_json":                 502,
+}
+
+
+def _estimate_tokens(text: str) -> int:
+    return int(len(text) / max(1.0, PLN_CHARS_PER_TOKEN))
+
+
+def _guard_prompt_size(system_prompt: str, message: str, history: list[dict],
+                       selected: list[str]) -> int:
+    """Refuse an over-long prompt BEFORE spending an OpenAI call on it.
+
+    Selecting a gene ETL file as `ontology_files` produced a 417,000-token
+    prompt, which upstream rejected — after the round trip, and in a shape that
+    read like an ordinary empty result. The estimate is deliberately simple
+    (characters / PLN_CHARS_PER_TOKEN) so it needs no tokenizer dependency and
+    cannot itself fail; it over-counts slightly, which is the safe direction.
+    """
+    total = _estimate_tokens(system_prompt) + _estimate_tokens(message)
+    total += sum(_estimate_tokens(turn.get("content", "")) for turn in history)
+    if PLN_MAX_PROMPT_TOKENS and total > PLN_MAX_PROMPT_TOKENS:
+        files = _discover_metta_files()
+        biggest = sorted(
+            ((name, files[name].stat().st_size) for name in selected if name in files),
+            key=lambda pair: -pair[1],
+        )[:5]
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "code": "prompt_too_large",
+                "message": (
+                    f"The assembled prompt is about {total:,} tokens, over the "
+                    f"{PLN_MAX_PROMPT_TOKENS:,}-token limit, so it was not sent. "
+                    f"Narrow `ontology_files` (see GET /ontology/files) or shorten "
+                    f"`history`."
+                ),
+                "estimated_tokens": total,
+                "limit_tokens": PLN_MAX_PROMPT_TOKENS,
+                "largest_selected_files": [
+                    {"file": name, "bytes": size} for name, size in biggest
+                ],
+            },
+        )
+    return total
+
+
+#: The same idea for PLN execution failures: a hyperon exception or a missing
+#: DrugAge build are not "a successful query that happened to be empty".
+_PLN_ERROR_STATUS: dict[str, int] = {
+    "runtime_error":         502,
+    "drugage_build_missing": 503,   # the service is not ready, not the caller's fault
+}
+
+
+def _raise_pln_failure(pln_result, *, stage: str, extra: Optional[dict] = None) -> None:
+    """Turn a PLN execution failure into a real HTTP status."""
+    code = pln_result.error_code or "runtime_error"
+    detail = {
+        "code": code,
+        "message": pln_result.error,
+        "stage": stage,
+        "pln_mode": pln_result.mode,
+    }
+    if extra:
+        detail.update(extra)
+    raise HTTPException(
+        status_code=_PLN_ERROR_STATUS.get(code, 502), detail=detail
+    )
+
+
+def _raise_translation_failure(translation) -> None:
+    """Turn a failed translation into a real HTTP status."""
+    status = _TRANSLATION_ERROR_STATUS.get(translation.error_code or "", 502)
+    headers = {"Retry-After": "10"} if status == 429 else None
+    raise HTTPException(
+        status_code=status,
+        detail={
+            "code": translation.error_code or "upstream_error",
+            "message": translation.error,
+            "stage": "translation",
+            "usage": translation.usage,
+        },
+        headers=headers,
+    )
+
+
 # ── Failure handling ─────────────────────────────────────────────────────────
 # PLN execution runs in a worker process (core/executor.py). Its three failure
 # modes are real, distinguishable HTTP conditions — not 200s with a note.
@@ -500,7 +600,23 @@ class QueryResponse(BaseModel):
                     "DrugAge engine instead of the generic KB (see POST /drugage/rank).",
     )
     usage: Optional[dict] = None
-    error: Optional[str] = Field(default=None, description="Set when the LLM translation step failed.")
+    prompt_tokens_estimate: int = Field(
+        default=0,
+        description="Estimated prompt size (characters / PLN_CHARS_PER_TOKEN) checked "
+                    "BEFORE the call. A request over PLN_MAX_PROMPT_TOKENS is refused "
+                    "with 413 `prompt_too_large` instead of being billed and rejected "
+                    "upstream.",
+    )
+    error: Optional[str] = Field(
+        default=None,
+        description="Kept for compatibility. A translation failure is now an HTTP "
+                    "error (413/429/502/503/504) carrying the same message in "
+                    "`detail`, so this is null on every 2xx response.",
+    )
+    error_code: Optional[str] = Field(
+        default=None,
+        description="Machine-readable failure class; see core/llm_translator.ERROR_CODES.",
+    )
     history: list[HistoryTurn] = Field(description="Updated history — pass back verbatim for the next turn.")
 
 
@@ -861,6 +977,9 @@ def query(req: QueryRequest) -> QueryResponse:
     system_prompt = build_system_prompt(registry, raw_contents)
 
     history_msgs = [turn.model_dump() for turn in req.history]
+    prompt_tokens_estimate = _guard_prompt_size(
+        system_prompt, req.message, history_msgs, selected
+    )
 
     translation = translate(
         user_message=req.message,
@@ -869,6 +988,9 @@ def query(req: QueryRequest) -> QueryResponse:
         model=req.model,
         temperature=req.temperature,
     )
+
+    if not translation.ok:
+        _raise_translation_failure(translation)
 
     routed: Optional[str] = None
     drugage_compounds = parse_drugage_query(translation.metta_query)
@@ -905,6 +1027,16 @@ def query(req: QueryRequest) -> QueryResponse:
                 confidence_threshold=req.confidence_threshold,
                 kb_files=kb_files,
             ),
+        )
+
+    if pln_result.status == "error":
+        _raise_pln_failure(
+            pln_result,
+            stage="pln_execution",
+            extra={
+                "metta_query": translation.metta_query,
+                "explanation": translation.explanation,
+            },
         )
 
     answer = format_bot_response(
@@ -949,6 +1081,8 @@ def query(req: QueryRequest) -> QueryResponse:
         routed=routed,
         usage=translation.usage,
         error=translation.error,
+        error_code=translation.error_code,
+        prompt_tokens_estimate=prompt_tokens_estimate,
         history=[HistoryTurn(**m) for m in updated_history],
     )
 
@@ -1029,6 +1163,11 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
             ),
         )
 
+    if pln_result.status == "error":
+        _raise_pln_failure(
+            pln_result, stage="pln_execution", extra={"metta_query": req.metta_query}
+        )
+
     return MettaRunResponse(
         metta_query=req.metta_query,
         confidence_threshold_applied=req.confidence_threshold,
@@ -1076,6 +1215,10 @@ def drugage_rank(req: DrugAgeRankRequest) -> DrugAgeRankResponse:
         ),
     )
     result = ranking.result
+    if result.status == "error":
+        _raise_pln_failure(
+            result, stage="drugage_ranking", extra={"compounds": req.compounds}
+        )
     rows = [_row_out(r) for r in ranking.rows]
     truncated = len(rows) > PLN_MAX_RANK_ROWS
     if truncated:
