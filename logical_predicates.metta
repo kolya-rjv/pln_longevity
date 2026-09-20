@@ -167,6 +167,9 @@
 (: PublicationYear        (-> Publication Number Atom))
 (: JournalName            (-> Publication String Atom))
 (: DOI                    (-> Publication String Atom))
+;; PubMedID is kept as a String, not a Number: a PMID is an opaque
+;; identifier, never arithmetic, and leading zeros must survive.
+(: PubMedID              (-> Publication String Atom))
 
 ;; ==========================================
 ;; 13. STRUCTURED EMPIRICAL EVIDENCE RECORDS (GrimAge)

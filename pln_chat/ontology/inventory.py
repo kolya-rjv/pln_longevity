@@ -11,9 +11,12 @@ design choice produces both halves of the "valid but empty" failure the
 * **False positives.** `logical_predicates.metta` DECLARES a vocabulary —
   `(: TargetsHallmark (-> Intervention HallmarkOfAging Atom))` and about thirty
   more. The registry records the declaration, the symbol index shows it to the
-  LLM, and the validator waves it through. The runtime holds ZERO
-  `TargetsHallmark` facts, so the query validates and returns nothing. The
-  translator used `TargetsHallmark` three times.
+  LLM, and the validator waves it through. The runtime held ZERO
+  `TargetsHallmark` facts, so the query validated and returned nothing. The
+  translator used `TargetsHallmark` three times. (`hallmark_targeting.metta`
+  has since populated that one; roughly fifty predicates, `Predicts` among
+  them, are still declared and empty. This module is what tells them apart, and
+  it recomputes the answer rather than hard-coding it.)
 
 * **False negatives, which are worse.** An argument of an ordinary ground fact
   is never registered, so 71 symbols that genuinely exist in the runtime KB —

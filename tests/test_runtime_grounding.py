@@ -8,6 +8,12 @@ ordinary ground facts, so 71 symbols that really are in the KB — `MTORC1`,
 `AMPK`, `Mouse`, `Human` — were reported unknown, and `/metta/run` answered 422
 to queries the engine would have served.
 
+NOTE on the example predicate: this file used `TargetsHallmark` throughout as
+its specimen "declared but empty". `hallmark_targeting.metta` populated it — the
+evaluation asked for exactly that — so the specimen is now `Predicts`, which is
+still declared (logical_predicates.metta:36) and still holds zero facts. The
+assertions are unchanged in intent; only the predicate they point at moved.
+
 Run from the repository root:
     pytest tests/test_runtime_grounding.py -q
 """
@@ -74,8 +80,16 @@ def test_arguments_of_ordinary_ground_facts_are_known(inventory):
 
 def test_a_declared_predicate_with_no_facts_is_told_apart_from_a_populated_one(inventory):
     assert inventory.is_grounded("EvidenceIntervention")
-    assert not inventory.is_grounded("TargetsHallmark")
-    assert "TargetsHallmark" in inventory.declared_only
+    # `Predicts` stands in for what `TargetsHallmark` used to demonstrate here:
+    # declared at logical_predicates.metta:36, zero facts in the runtime. (The
+    # original example stopped being empty when hallmark_targeting.metta
+    # back-filled it — which is the point of that patch, not a regression.)
+    assert not inventory.is_grounded("Predicts")
+    assert "Predicts" in inventory.declared_only
+    # And the predicate that WAS the example is now grounded, so the same
+    # machinery has to put it on the other side of the line.
+    assert inventory.is_grounded("TargetsHallmark")
+    assert "TargetsHallmark" not in inventory.declared_only
     # A DrugAge row predicate is declared but deliberately absent from the
     # generic runtime KB — the translator emitted these three times.
     assert "UsesIntervention" in inventory.declared_only
@@ -130,10 +144,18 @@ def test_a_real_symbol_is_no_longer_rejected(inventory):
 
 def test_an_empty_predicate_is_flagged_rather_than_silently_returning_nothing(inventory):
     registry = api_module._runtime_registry()
-    result = validate("!(match &self (TargetsHallmark $i $h) $h)", registry, inventory)
+    result = validate("!(match &self (Predicts $b $o) $o)", registry, inventory)
     assert result.valid                                   # it IS well-formed MeTTa
-    assert result.ungrounded_predicates == ["TargetsHallmark"]
+    assert result.ungrounded_predicates == ["Predicts"]
     assert any("return nothing" in w for w in result.warnings)
+
+
+def test_the_predicate_the_evaluation_asked_us_to_populate_is_no_longer_flagged(inventory):
+    """TargetsHallmark used to be this file's headline empty predicate."""
+    registry = api_module._runtime_registry()
+    result = validate("!(match &self (TargetsHallmark $i $h) $h)", registry, inventory)
+    assert result.valid
+    assert result.ungrounded_predicates == []
 
 
 def test_the_correct_form_for_the_same_question_is_clean(inventory):
@@ -195,7 +217,7 @@ def test_a_curated_layer_is_left_verbatim(tmp_path):
 def test_the_schema_card_names_the_empty_predicates(inventory):
     card = schema_card(inventory, max_predicates=200)
     assert "DECLARED BUT EMPTY" in card
-    assert "TargetsHallmark" in card
+    assert "Predicts" in card
     assert "(EvidenceIntervention/2) x14" in card
 
 
@@ -223,8 +245,11 @@ def test_kb_schema_answers_list_your_data_sources_and_counts():
     assert body["files"]
     names = {p["name"] for p in body["grounded_predicates"]}
     assert "EvidenceIntervention" in names
-    assert "TargetsHallmark" in body["declared_but_empty_predicates"]
-    assert "TargetsHallmark" not in names
+    assert "Predicts" in body["declared_but_empty_predicates"]
+    assert "Predicts" not in names
+    # TargetsHallmark moved from the second list to the first in patch 08.
+    assert "TargetsHallmark" in names
+    assert "TargetsHallmark" not in body["declared_but_empty_predicates"]
     assert sum(body["facts_by_file"].values()) == body["ground_facts"]
     top = body["grounded_predicates"][0]
     assert top["fact_count"] >= body["grounded_predicates"][-1]["fact_count"]
@@ -243,10 +268,10 @@ def test_metta_run_reports_an_ungrounded_predicate_instead_of_an_empty_answer(mo
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
             return await c.post(
                 "/metta/run",
-                json={"metta_query": "!(match &self (TargetsHallmark $i $h) $h)"},
+                json={"metta_query": "!(match &self (Predicts $b $o) $o)"},
             )
 
     body = asyncio.run(send()).json()
     assert body["pln_status"] == "empty"
-    assert body["ungrounded_predicates"] == ["TargetsHallmark"]
+    assert body["ungrounded_predicates"] == ["Predicts"]
     assert body["validation_warnings"]

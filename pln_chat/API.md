@@ -99,7 +99,7 @@ to `pln_chat/logs/session_*.jsonl`. For browser clients, set
 | GET    | `/ontology/files`  | List discovered `.metta` files (+ default selection, + which are excluded from execution) |
 | GET    | `/kb/schema`       | What the KB actually holds: predicates, arities, fact counts, and which predicates are declared but empty |
 | GET    | `/drugage/top`     | Rank the **whole** DrugAge build by calibrated lifespan effect — no LLM, no compound list |
-| GET    | `/interventions`   | Which interventions target a hallmark of aging (and the reverse), with provenance |
+| GET    | `/interventions`   | Which interventions target a hallmark of aging (and the reverse), with provenance — review records and bare `TargetsHallmark` facts kept apart |
 | GET    | `/hallmarks`       | Every hallmark in the KB, its anchor components and its interventions |
 | GET    | `/patients`        | List the built-in patient profiles                            |
 | GET    | `/patients/markers`| Which biomarkers a caller-supplied patient may carry, and in what units |
@@ -251,32 +251,69 @@ constants out of `drugage_calibration.metta` / `epistemic_calibration.metta` /
 
 **"Which interventions target mitochondrial dysfunction?"** and **"which
 hallmarks does rapamycin target?"** — both directions of a relation that kept
-returning empty because the translator reached for `TargetsHallmark`, which the
-ontology declares and nothing populates:
+returning empty, for two separate reasons: the translator reached for
+`TargetsHallmark`, which the ontology declared and nothing populated, and
+`Rapamycin` did not exist as an atom anywhere in the runtime, so any query
+naming it was rejected with a 422.
 
 ```bash
 curl 'localhost:7860/interventions?hallmark=MitochondrialDysfunction'
+curl 'localhost:7860/interventions?intervention=Rapamycin'
 curl 'localhost:7860/interventions?intervention=Fisetin'
 curl localhost:7860/hallmarks
 ```
 
-Each record carries the species model, the reported outcome text, the review
-reference number and the publication. An intervention with no record gets an
-explicit `note` saying the curated layer is a review table rather than a census
-— not silence.
+`hallmark_targeting.metta` populates `TargetsHallmark` — one line per curated
+review record, plus Rapamycin (Harrison 2009, PMID 19587680; Saxton & Sabatini
+2017, PMID 28283069) and Metformin (Bannister 2014, PMID 25041462). So the
+predicate the translator kept reaching for is now the RIGHT form, in MeTTa too:
+
+```
+!(match &self (TargetsHallmark Rapamycin $h) $h)
+!(match &self (TargetsHallmark $i MitochondrialDysfunction) $i)
+!(hallmarks-of &self Rapamycin)
+!(interventions-for &self CellularSenescence)
+```
+
+The response keeps the two shapes apart, and this is deliberate:
+
+* `evidence` — a López-Otín 2023 review record, with the species model, the
+  reported outcome text, the review reference number and the publication;
+* `targeting` — a bare `(TargetsHallmark …)` fact, with its publications and
+  `provenance: "targeting_fact"`. It says WHAT the intervention acts on and
+  nothing else. Padding it out into an evidence record would mean inventing a
+  species model and an outcome sentence no source states.
+
+A link that a record already covers is not repeated under `targeting`. An
+intervention with no link of either kind (say `?intervention=Berberine`) still
+gets an explicit `note` saying the curated layer is a review table rather than
+a census — not silence.
+
+**`TargetsHallmark` is a targeting claim, not a causal edge.** It carries no
+truth value, and it does NOT put the intervention into a chain: `!(infer &self
+Rapamycin CoronaryHeartDisease)` still returns nothing, and rapamycin still
+does not appear in `rank-interventions`. That is correct, not a gap. The
+obvious shortcut — hanging rapamycin off the existing
+`DeregulatedNutrientSensing -> InsulinResistance -> FastingGlucose -> CHD` axis
+— would get the SIGN wrong: chronic rapamycin *causes* glucose intolerance in
+mice while extending lifespan (Weiss 2018, PMID 29579736), and the KB records
+that as a `Limitation` fact rather than a comment. An LLM will make that chain
+on request; the point of the deduction layer is that it will not.
 
 **"List your data sources and counts"** — `GET /kb/schema`, below.
 
 ### Valid, and guaranteed to return nothing
 
 The ontology DECLARES a much larger vocabulary than it populates.
-`logical_predicates.metta` declares `TargetsHallmark`, `Causes`, `Predicts`,
-`Extends`, the gene predicates and the DrugAge row predicates; the generic
-runtime space holds **zero** facts for any of them. A query over one of those
-is perfectly well-formed MeTTa and returns nothing — which reads exactly like
-"the answer is no". The translator emitted `TargetsHallmark` three times in the
-2026-09-18 evaluation, and `UsesIntervention` / `AvgLifespanChangePercent`
-three more.
+`logical_predicates.metta` declares `Predicts`, `Extends`, `HazardRatio`, the
+gene predicates and the DrugAge row predicates; the generic runtime space holds
+**zero** facts for any of them. A query over one of those is perfectly
+well-formed MeTTa and returns nothing — which reads exactly like "the answer is
+no". The translator emitted `TargetsHallmark` three times in the 2026-09-18
+evaluation, and `UsesIntervention` / `AvgLifespanChangePercent` three more.
+(`TargetsHallmark` and `Causes` have since been populated by
+`hallmark_targeting.metta` and are no longer on that list — `GET /kb/schema` is
+the live answer, not this paragraph.)
 
 Two changes remove that failure mode:
 
@@ -489,12 +526,16 @@ a known ID from `GET /patients` (currently `Patient001` / `Patient002`);
 | "what supplements should `<Patient>` take"                    | `(recommend-supplements-patient &self <Patient>)`           |
 | "should `<Patient>` take `<Supplement>`"                       | `(supplement-for-patient &self <Patient> <Supplement>)`      |
 | "rank omega3, fisetin and nmn for `<Patient>`"                | `(recommend-supplements &self <Patient> (<Supplement> …))`  |
+| "which hallmarks does `<Intervention>` target"                | `(hallmarks-of &self <Intervention>)`                        |
+| "which interventions target `<Hallmark>`"                     | `(interventions-for &self <Hallmark>)`                        |
 | "rank rapamycin, metformin by lifespan benefit"               | `(rank-drugage-lifespan (<Compound1> <Compound2> …))` — or just call `POST /drugage/rank` |
 
 A finding with no mechanistic path is omitted rather than invented; a
 compound with a negative gold-standard trial (e.g. `Resveratrol`, ITP
 negative) is still surfaced but flagged `NotRecommended`, never silently
-dropped.
+dropped. The last two forms are lookups, not inference: they answer what an
+intervention targets, and they deliberately do not make it rankable — see
+"Discovery without an LLM" above for why rapamycin has hallmarks but no chain.
 
 ## Pointing an agent at it
 

@@ -137,6 +137,7 @@ _INFERENCE_STACK: list[str] = [
     "hallmarks_core.metta",
     "hallmarks_lopezotin2023_anchors.metta",
     "hallmarks_lopezotin2023_intervention_evidence.metta",
+    "hallmark_targeting.metta",
 
     "mechanistic_bridges.metta",
     "pln_deduction.metta",
@@ -1273,12 +1274,31 @@ class HallmarkEvidenceOut(BaseModel):
     source_file: Optional[str] = None
 
 
+class HallmarkTargetingOut(BaseModel):
+    intervention: str
+    hallmark: str
+    source_file: Optional[str] = None
+    publications: list[str] = Field(default_factory=list)
+    provenance: Literal["targeting_fact"] = "targeting_fact"
+
+
 class InterventionsResponse(BaseModel):
     hallmark: Optional[str] = None
     intervention: Optional[str] = None
     evidence: list[HallmarkEvidenceOut]
+    targeting: list[HallmarkTargetingOut] = Field(
+        default_factory=list,
+        description="`(TargetsHallmark …)` facts with no review record behind them "
+                    "— currently rapamycin and metformin. A targeting fact says "
+                    "WHAT the intervention acts on and nothing more: no species "
+                    "model, no reported outcome, no effect size. It is listed "
+                    "separately rather than padded into `evidence`, because "
+                    "inventing those fields is exactly the failure this API "
+                    "exists to avoid. A link already carried by a record is not "
+                    "repeated here.",
+    )
     covered_interventions: list[str] = Field(
-        description="Every intervention with at least one hallmark evidence record. "
+        description="Every intervention with a hallmark link of either kind. "
                     "The curated layer is a REVIEW TABLE, not a census: an absence "
                     "here means no record was curated, not that no link exists.",
     )
@@ -1379,15 +1399,19 @@ def interventions(
 ) -> InterventionsResponse:
     """Which interventions target a hallmark of aging, and vice versa. No LLM.
 
-    Both directions of the question that kept returning empty. The translator
-    reached for `TargetsHallmark`, a predicate the ontology declares and nothing
-    populates; the relation actually lives in the López-Otín 2023 review-level
-    evidence records, which carry the species model, the reported outcome text
-    and the reference number.
+    Both directions of the question that kept returning empty. The answer now
+    comes from two shapes, reported separately:
 
-    Pass `hallmark=MitochondrialDysfunction` or `intervention=Fisetin`, or
-    neither to list the whole curated table. An intervention with no record
-    comes back as an explicit `note`, not as silence.
+    * `evidence` — the López-Otín 2023 review-level records, which carry the
+      species model, the reported outcome text and the reference number;
+    * `targeting` — plain `(TargetsHallmark …)` facts from
+      `hallmark_targeting.metta`, which carry a target and a publication and
+      nothing else. Rapamycin and metformin, the two drugs the KB held no
+      hallmark link for at all, arrive this way.
+
+    Pass `hallmark=MitochondrialDysfunction` or `intervention=Rapamycin`, or
+    neither to list the whole curated table. An intervention with no link of
+    either kind comes back as an explicit `note`, not as silence.
     """
     index = hallmark_index(_runtime_kb_paths())
     if hallmark and intervention:
@@ -1400,31 +1424,51 @@ def interventions(
         )
     if hallmark:
         records = index.for_hallmark(hallmark)
+        links = index.targeting_for_hallmark(hallmark)
     elif intervention:
         records = index.for_intervention(intervention)
+        links = index.targeting_for_intervention(intervention)
     else:
         records = index.records()
+        # The whole table: every targeting fact the records do not already say.
+        by_record = {
+            ((r.intervention or "").lower(), (r.hallmark or "").lower())
+            for r in records
+        }
+        links = [
+            t for t in index.targeting
+            if (t.intervention.lower(), t.hallmark.lower()) not in by_record
+        ]
 
+    subject = hallmark or intervention
     note = None
-    if hallmark and not records:
+    if subject and not records and not links:
+        if hallmark:
+            note = (
+                f"No curated intervention-evidence record and no TargetsHallmark "
+                f"fact names the hallmark '{hallmark}'. Known hallmarks with "
+                f"links: {', '.join(index.covered_hallmarks())}."
+            )
+        else:
+            note = (
+                f"'{intervention}' has no curated hallmark-evidence record. The "
+                f"hallmark layer is a review TABLE (López-Otín 2023, Table 1), not a "
+                f"census, so this means no record was curated — not that the "
+                f"intervention has no mechanism. Covered interventions: "
+                f"{', '.join(index.interventions())}."
+            )
+    elif subject and not records and links:
         note = (
-            f"No curated intervention-evidence record names the hallmark "
-            f"'{hallmark}'. Known hallmarks with records: "
-            f"{', '.join(index.covered_hallmarks())}."
-        )
-    elif intervention and not records:
-        note = (
-            f"'{intervention}' has no curated hallmark-evidence record. The "
-            f"hallmark layer is a review TABLE (López-Otín 2023, Table 1), not a "
-            f"census, so this means no record was curated — not that the "
-            f"intervention has no mechanism. Covered interventions: "
-            f"{', '.join(index.interventions())}."
+            f"'{subject}' is linked by TargetsHallmark facts only — no review "
+            f"record backs it, so there is no species model, reported outcome or "
+            f"reference number to show. See `targeting` and its `publications`."
         )
 
     return InterventionsResponse(
         hallmark=hallmark,
         intervention=intervention,
         evidence=[HallmarkEvidenceOut(**r.as_dict()) for r in records],
+        targeting=[HallmarkTargetingOut(**t.as_dict()) for t in links],
         covered_interventions=index.interventions(),
         covered_hallmarks=index.covered_hallmarks(),
         note=note,
@@ -1438,12 +1482,14 @@ def hallmarks() -> HallmarksResponse:
     names = sorted(index.hallmarks | set(index.components))
     out: list[HallmarkOut] = []
     for name in names:
-        records = index.for_hallmark(name)
+        # Both shapes, deduplicated: a hallmark whose only link to rapamycin is
+        # a TargetsHallmark fact still lists rapamycin here.
+        linked = index.interventions_for(name)
         out.append(HallmarkOut(
             name=name,
             components=sorted(index.components.get(name, [])),
-            intervention_count=len({r.intervention for r in records if r.intervention}),
-            interventions=sorted({r.intervention for r in records if r.intervention}),
+            intervention_count=len(linked),
+            interventions=linked,
         ))
     return HallmarksResponse(hallmarks=out, evidence_records=len(index.records()))
 
@@ -1454,10 +1500,13 @@ def kb_schema() -> KbSchemaResponse:
 
     The answer to "list your data sources and counts", and the reference a
     caller needs before trusting an empty result. The ontology DECLARES a larger
-    vocabulary than it populates — `TargetsHallmark`, `Causes`, `Predicts`,
-    `Extends`, the gene predicates and the DrugAge row predicates are all
-    declared with zero facts in the generic runtime — so a query over one of
-    them is well-formed and returns nothing. Those are listed separately here
+    vocabulary than it populates — `Predicts`, `Extends`, `HazardRatio`, the
+    gene predicates and the DrugAge row predicates are all declared with zero
+    facts in the generic runtime — so a query over one of them is well-formed
+    and returns nothing. (`TargetsHallmark` and `Causes` were on that list until
+    `hallmark_targeting.metta` populated them; the lists below are computed from
+    the ground atoms every time, so they never go stale the way this sentence
+    would.) Those are listed separately here
     (and flagged per-query as `ungrounded_predicates`), because "the KB has no
     such relation" and "the answer is no" are very different statements.
 

@@ -88,6 +88,7 @@ _INFERENCE_STACK: list[str] = [
     "hallmarks_core.metta",
     "hallmarks_lopezotin2023_anchors.metta",
     "hallmarks_lopezotin2023_intervention_evidence.metta",
+    "hallmark_targeting.metta",
 
     "mechanistic_bridges.metta",
     "pln_deduction.metta",

@@ -20,6 +20,23 @@ This module indexes those records (and the `HallmarkComponent` anchors) so the
 question can be answered directly, with provenance, and so an intervention with
 NO hallmark evidence is reported as exactly that rather than as silence.
 
+`TargetsHallmark` is no longer empty
+------------------------------------
+`hallmark_targeting.metta` back-fills the declared predicate: one line per
+review record, plus the two headline drugs the KB was missing entirely
+(rapamycin, metformin). So the index reads BOTH shapes now, and keeps them
+apart in the output:
+
+* an **evidence record** carries the species model, the reported outcome text
+  and the review reference number — the richer provenance, preserved;
+* a **targeting link** carries only "this intervention is studied as acting on
+  this hallmark", with the publication it was sourced to.
+
+A targeting link is reported as a targeting link. Dressing one up as an
+evidence record would invent a species model and an outcome sentence that no
+source states — the same fabrication the KB's honesty contract forbids in
+MeTTa, committed one layer up in Python instead.
+
 A text scan, not a MeTTa query: the records are a few dozen atoms, the answer
 needs no inference, and keeping it out of hyperon keeps it off the worker pool.
 """
@@ -61,6 +78,32 @@ class HallmarkEvidence:
 
 
 @dataclass
+class HallmarkTargeting:
+    """One `(TargetsHallmark <intervention> <hallmark>)` fact.
+
+    Deliberately thinner than `HallmarkEvidence`: that is the whole point. The
+    fact asserts a target and nothing else, so the record has nowhere to put a
+    species model or an outcome sentence, and cannot accidentally grow one.
+    """
+    intervention: str
+    hallmark: str
+    source_file: Optional[str] = None
+    #: every publication the KB attaches to this intervention, if any.
+    publications: list[str] = field(default_factory=list)
+
+    def as_dict(self) -> dict:
+        return {
+            "intervention": self.intervention,
+            "hallmark": self.hallmark,
+            "source_file": self.source_file,
+            "publications": list(self.publications),
+            # Named, not implied: a caller must be able to tell this apart from
+            # a review record without knowing which fields a record carries.
+            "provenance": "targeting_fact",
+        }
+
+
+@dataclass
 class HallmarkIndex:
     """Everything the hallmark questions need, already joined."""
     evidence: dict[str, HallmarkEvidence] = field(default_factory=dict)
@@ -68,11 +111,42 @@ class HallmarkIndex:
     components: dict[str, list[str]] = field(default_factory=dict)
     #: every hallmark symbol declared in hallmarks_core
     hallmarks: set[str] = field(default_factory=set)
+    #: (TargetsHallmark <intervention> <hallmark>) facts, in file order
+    targeting: list[HallmarkTargeting] = field(default_factory=list)
+    #: subject -> publications, from (SupportedByPublication <subject> <pub>)
+    publications: dict[str, list[str]] = field(default_factory=dict)
 
     def records(self) -> list[HallmarkEvidence]:
         return [
             e for e in self.evidence.values()
             if e.intervention and e.hallmark
+        ]
+
+    def targeting_for_hallmark(self, hallmark: str) -> list[HallmarkTargeting]:
+        """Targeting facts for a hallmark, minus the ones a record already covers.
+
+        A back-filled line and the record it was derived from are the same
+        claim; returning both would double-count the review table.
+        """
+        key = hallmark.lower()
+        covered = {
+            (e.intervention or "").lower()
+            for e in self.for_hallmark(hallmark)
+        }
+        return [
+            t for t in self.targeting
+            if t.hallmark.lower() == key and t.intervention.lower() not in covered
+        ]
+
+    def targeting_for_intervention(self, intervention: str) -> list[HallmarkTargeting]:
+        key = intervention.lower()
+        covered = {
+            (e.hallmark or "").lower()
+            for e in self.for_intervention(intervention)
+        }
+        return [
+            t for t in self.targeting
+            if t.intervention.lower() == key and t.hallmark.lower() not in covered
         ]
 
     def for_hallmark(self, hallmark: str) -> list[HallmarkEvidence]:
@@ -84,10 +158,21 @@ class HallmarkIndex:
         return [e for e in self.records() if (e.intervention or "").lower() == key]
 
     def interventions(self) -> list[str]:
-        return sorted({e.intervention for e in self.records() if e.intervention})
+        """Every intervention with a hallmark link of EITHER kind."""
+        names = {e.intervention for e in self.records() if e.intervention}
+        names |= {t.intervention for t in self.targeting}
+        return sorted(names)
 
     def covered_hallmarks(self) -> list[str]:
-        return sorted({e.hallmark for e in self.records() if e.hallmark})
+        names = {e.hallmark for e in self.records() if e.hallmark}
+        names |= {t.hallmark for t in self.targeting}
+        return sorted(names)
+
+    def interventions_for(self, hallmark: str) -> list[str]:
+        """Intervention names for a hallmark, from both shapes, deduplicated."""
+        names = {e.intervention for e in self.for_hallmark(hallmark) if e.intervention}
+        names |= {t.intervention for t in self.targeting_for_hallmark(hallmark)}
+        return sorted(names)
 
 
 def _unquote(value: str) -> str:
@@ -120,6 +205,12 @@ def build_hallmark_index(paths: Iterable[Path]) -> HallmarkIndex:
             if head == "HallmarkComponent" and len(args) == 2:
                 index.components.setdefault(args[1], []).append(args[0])
                 continue
+            if head == "TargetsHallmark" and len(args) == 2:
+                index.targeting.append(
+                    HallmarkTargeting(args[0], args[1], source_file=path.name)
+                )
+                index.hallmarks.add(args[1])
+                continue
             if head.startswith("Evidence") or head == "SupportedByPublication":
                 if len(args) < 2:
                     continue
@@ -142,6 +233,12 @@ def build_hallmark_index(paths: Iterable[Path]) -> HallmarkIndex:
                         pass
                 elif head == "SupportedByPublication":
                     rec.publication = value
+                    index.publications.setdefault(args[0], []).append(value)
+
+    # A targeting fact and its sources are separate atoms, and either can be
+    # read first, so the join happens once both files have been scanned.
+    for link in index.targeting:
+        link.publications = list(index.publications.get(link.intervention, []))
     return index
 
 

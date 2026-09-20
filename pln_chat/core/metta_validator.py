@@ -95,8 +95,11 @@ def validate(
       (`MTORC1`, `AMPK`, `Mouse`, `Human`) were reported as unknown and
       `/metta/run` answered 422 to queries the runtime would have served;
     * it cannot tell a declared predicate from a populated one, so a query over
-      `TargetsHallmark` — declared in logical_predicates.metta, zero facts —
-      validated cleanly and returned nothing.
+      `TargetsHallmark` — declared in logical_predicates.metta, zero facts at
+      the time — validated cleanly and returned nothing. (That predicate has
+      since been populated by `hallmark_targeting.metta`; `Predicts` is the
+      current example of the same shape. The bug was never about which
+      predicate it was.)
 
     When an inventory is supplied, an unknown symbol means unknown to the ACTUAL
     atoms, and using a declared-but-empty predicate becomes an explicit warning

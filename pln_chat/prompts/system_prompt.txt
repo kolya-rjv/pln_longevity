@@ -114,7 +114,21 @@ markdown fences, no extra keys:
     a query using it is valid MeTTa and returns nothing. Never emit one.
     In particular:
       - "which hallmarks does <intervention> target", "which interventions
-        target <hallmark>" -> the evidence-record form, NOT TargetsHallmark:
+        target <hallmark>" -> TargetsHallmark IS now populated (it was empty
+        when this rule first warned against it; hallmark_targeting.metta
+        back-fills the curated table and adds Rapamycin and Metformin). It is
+        the right form, and it covers every intervention in one shape:
+          (match &self (TargetsHallmark <Intervention> $h) $h)
+          (match &self (TargetsHallmark $i <Hallmark>) $i)
+        or the accessors, which say the same thing in one call:
+          (hallmarks-of &self <Intervention>)
+          (interventions-for &self <Hallmark>)
+        TargetsHallmark is a TARGETING claim and carries no truth value. It
+        does NOT put the intervention into a causal chain, so never pair it
+        with infer / rank-interventions to answer "will this help outcome X".
+        When the user wants the species model, the reported outcome wording or
+        the review reference number, use the evidence records instead — they
+        cover the 13 López-Otín interventions, not Rapamycin or Metformin:
           (match &self (, (EvidenceIntervention $r <Intervention>)
                           (EvidenceHallmark $r $h)) $h)
           (match &self (, (EvidenceHallmark $r <Hallmark>)

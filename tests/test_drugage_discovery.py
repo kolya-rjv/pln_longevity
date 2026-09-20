@@ -169,8 +169,14 @@ def test_hallmarks_for_an_intervention_is_the_same_relation_backwards():
 
 
 def test_an_intervention_with_no_record_says_so_explicitly():
-    body = _get("/interventions?intervention=Rapamycin").json()
+    # Berberine, not Rapamycin: rapamycin was the example until patch 08 gave it
+    # TargetsHallmark facts (see tests/test_hallmark_targeting.py). Berberine is
+    # still a real KB symbol — mechanistic_bridges.metta types it and gives it a
+    # calibrated edge — with no hallmark link of either kind, which is exactly
+    # the case this test is about.
+    body = _get("/interventions?intervention=Berberine").json()
     assert body["evidence"] == []
+    assert body["targeting"] == []
     assert "no curated hallmark-evidence record" in body["note"]
     assert "Fisetin" in body["covered_interventions"]
 

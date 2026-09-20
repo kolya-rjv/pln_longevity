@@ -61,9 +61,11 @@ def build_ontology_context(
         replaces the flat symbol index with a grounded schema card: predicate
         names carry their arity and FACT COUNT, and the predicates that are
         declared but empty are called out by name. A flat list cannot express
-        the difference between `EvidenceIntervention` (14 facts) and
-        `TargetsHallmark` (declared, zero) — and the translator used the empty
-        one three times in the 2026-09-18 evaluation.
+        the difference between `EvidenceIntervention` (14 facts) and a
+        declared-but-empty predicate such as `Predicts` — and the translator
+        used `TargetsHallmark`, empty at the time, three times in the
+        2026-09-18 evaluation. (It is populated now; the card reports whatever
+        is true at load, which is the whole point of reading it from the KB.)
     """
     sections: list[str] = ["# Loaded MeTTa Knowledge Base\n"]
 
