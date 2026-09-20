@@ -1184,6 +1184,48 @@ class ExtractedEntryOut(BaseModel):
     name: str
     metta: str
     description: str
+    identifier: Optional[str] = Field(
+        default=None,
+        description="PMID_<digits> or DOI the entry rests on. Never null for an "
+                    "accepted entry — an entry with neither is rejected.",
+    )
+    evidence_tier: Optional[str] = Field(
+        default=None,
+        description="The EvidenceCategory the extractor read off the paper. Its "
+                    "CONFIDENCE is not taken from the extractor: the emitted atom "
+                    "carries `(evidence-confidence <tier>)`, unevaluated.",
+    )
+    effect_size_pct: Optional[float] = Field(
+        default=None,
+        description="Reported percent lifespan change. Present means the Effect "
+                    "link's strength was DERIVED from it; absent means the "
+                    "strength is a curated prior.",
+    )
+    provisional: bool = Field(
+        default=False,
+        description="True when any value in this entry was proposed by the model "
+                    "rather than derived — see `provisional_fields`.",
+    )
+    provisional_fields: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(
+        default_factory=list,
+        description="Where each number came from; the same lines appear as `;;` "
+                    "comments above the entry in `metta_block`.",
+    )
+
+
+class RejectedEntryOut(BaseModel):
+    kind: str
+    name: str
+    metta: str
+    description: str
+    codes: list[str] = Field(
+        description="Machine-readable refusal codes: unknown_predicate, "
+                    "invented_truth_value, invented_confidence_constant, "
+                    "redefines_calibration, unknown_evidence_category, "
+                    "missing_identifier.",
+    )
+    reasons: list[str] = Field(description="The same refusals in prose.")
 
 
 class ExpandResponse(BaseModel):
@@ -1192,7 +1234,17 @@ class ExpandResponse(BaseModel):
     target_file: str
     new_entries: list[ExtractedEntryOut]
     duplicate_entries: list[ExtractedEntryOut]
+    rejected_entries: list[RejectedEntryOut] = Field(
+        default_factory=list,
+        description="Entries the schema gate refused, with the reason for each. "
+                    "Reported rather than silently dropped.",
+    )
     metta_block: str = Field(description="Generated MeTTa block for `new_entries`; pass to POST /ontology/apply.")
+    unconsumed_predicates: list[str] = Field(
+        default_factory=list,
+        description="Predicates in `metta_block` the runtime KB grounds nowhere "
+                    "else — the block would land them with zero facts to join.",
+    )
     applied: bool
     error: Optional[str] = None
 
@@ -2643,12 +2695,34 @@ def drugage_rank(req: DrugAgeRankRequest) -> DrugAgeRankResponse:
     )
 
 
+def _entry_out(entry) -> ExtractedEntryOut:
+    """One accepted entry, with the provenance the evaluation found missing."""
+    return ExtractedEntryOut(
+        kind=entry.kind,
+        name=entry.name,
+        metta=entry.metta,
+        description=entry.description,
+        identifier=entry.identifier,
+        evidence_tier=entry.evidence_tier,
+        effect_size_pct=entry.effect_size_pct,
+        provisional=entry.provisional,
+        provisional_fields=entry.provisional_fields,
+        notes=entry.notes,
+    )
+
+
 @app.post("/ontology/expand", response_model=ExpandResponse)
 def ontology_expand(req: ExpandRequest) -> ExpandResponse:
     """Extract new PLN ontology entries from pasted paper text.
 
     Equivalent to the "Ontology Expander" tab's Extract step (and, if
     `apply=true`, the Apply step too).
+
+    Every entry passes a schema gate before it can reach `metta_block`: it must
+    use predicates the rules actually read, must not carry a two-float truth
+    value or mint a confidence constant, must name an EvidenceCategory the
+    calibration table scores, and must carry a PMID or a DOI. Refusals come back
+    in `rejected_entries` with their reasons — they are never dropped quietly.
     """
     if not req.paper_text.strip():
         raise HTTPException(status_code=422, detail="paper_text must not be empty.")
@@ -2671,15 +2745,17 @@ def ontology_expand(req: ExpandRequest) -> ExpandResponse:
         paper_title=result.paper_title,
         paper_summary=result.paper_summary,
         target_file=result.target_file,
-        new_entries=[
-            ExtractedEntryOut(kind=e.kind, name=e.name, metta=e.metta, description=e.description)
-            for e in result.new_entries
-        ],
-        duplicate_entries=[
-            ExtractedEntryOut(kind=e.kind, name=e.name, metta=e.metta, description=e.description)
-            for e in result.duplicate_entries
+        new_entries=[_entry_out(e) for e in result.new_entries],
+        duplicate_entries=[_entry_out(e) for e in result.duplicate_entries],
+        rejected_entries=[
+            RejectedEntryOut(
+                kind=r.kind, name=r.name, metta=r.metta,
+                description=r.description, codes=r.codes, reasons=r.reasons,
+            )
+            for r in result.rejected_entries
         ],
         metta_block=result.metta_block,
+        unconsumed_predicates=result.unconsumed_predicates,
         applied=result.applied,
         error=result.error,
     )

@@ -112,7 +112,7 @@ to `pln_chat/logs/session_*.jsonl`. For browser clients, set
 | POST   | `/query`           | Ask a natural-language question of the KB (goes through the LLM translator) |
 | POST   | `/metta/run`       | Validate + execute a raw MeTTa query directly (no LLM call)  |
 | POST   | `/drugage/rank`    | Rank real DrugAge compounds by lifespan/mortality effect, no MeTTa needed |
-| POST   | `/ontology/expand` | Extract new ontology entries from pasted paper text          |
+| POST   | `/ontology/expand` | Extract new ontology entries from pasted paper text, gated against the KB's schema |
 | POST   | `/ontology/apply`  | Write a previously-previewed MeTTa block to disk             |
 
 Full request/response schemas are in `/docs` and `/openapi.json` once the
@@ -759,6 +759,8 @@ O(n^2) with a large constant — measured 1.1 s at n=5, 6.1 s at n=10, and the
 `tests/test_drugage_ranking_contract.py`); the compound list is capped at
 `PLN_MAX_RANK_COMPOUNDS` (default 60).
 
+## Expanding the KB from a paper
+
 ```bash
 curl -X POST localhost:7860/ontology/expand \
   -H 'Content-Type: application/json' \
@@ -773,6 +775,81 @@ curl -X POST localhost:7860/ontology/apply \
   -H 'Content-Type: application/json' \
   -d '{"metta_block": "...", "target_file": "my_paper_extract.metta"}'
 ```
+
+### Extracted knowledge now lands in a schema the rules read
+
+**This is a behaviour change.** Fed the taurine abstract, this endpoint used to
+return valid MeTTa that no rule could use: it minted `increases-life-span`,
+`declines-with-aging` and `reduces` instead of the KB's own predicates, wrote
+its own truth values (`(stv 0.93 0.9)`, plus a hand-rolled
+`(= (study-confidence …) 0.92)`) straight past the calibration tables, and put
+the PMID in a comment and nowhere else. Applied as-is, every atom in it was
+inert — `infer`, `explain`, `rank-interventions`, `recommend-supplements`,
+`patient-relevance` and `drugage-effect` all returned nothing for all of it.
+
+Three things changed.
+
+**The model is shown the schema, and only the schema.** The prompt used to
+paste in `existing_raw_content[:6000]` — an *alphabetical* 6 KB slice of ~290 KB
+of ontology, 2.1 % of the KB and not one example of the target form. It now
+carries ~4 KB of verbatim canonical forms (a `Publication` record, a typed
+intervention node, a raw `Experiment` row, a `HallmarkInterventionEvidence`
+audit record, an `Effect` link, `TargetsHallmark`, `EvidenceLevel` /
+`SafetyProfile`), a closed predicate list, and the eleven-value
+`EvidenceCategory` enum **read out of `epistemic_calibration.metta`** rather
+than restated. The two prompt lines that asked for invented confidences are
+gone.
+
+**Confidence is never the model's to propose.** It may name a *study type*; the
+emitted atom carries `(evidence-confidence <Tier>)` unevaluated, exactly as
+`mechanistic_bridges.metta` writes it, so the calibration table stays the single
+authority. Strength follows the same rule as everywhere else in this KB: when
+the paper reports a percent lifespan change, it is *derived* with
+`drugage_calibration.metta`'s own `|pct| / (|pct| + 20)` (the knob is read from
+that file, so retuning it retunes generated blocks); when it does not, the
+strength is a **curated prior** and says so, in the response and in a `;;`
+comment above the atom.
+
+**Nothing is refused quietly.** Every entry passes a gate before it can reach
+`metta_block`, and a refusal comes back in `rejected_entries`:
+
+| code                           | what tripped it                                     |
+|--------------------------------|------------------------------------------------------|
+| `unknown_predicate`            | a head no rule reads — including one nested inside `(Evaluation (pred …) …)`, or declared as a signature |
+| `invented_truth_value`         | a two-float `(stv x y)`; the confidence slot must be the lookup |
+| `invented_confidence_constant` | `(= (<name> …) <float>)` minting a new confidence knob |
+| `redefines_calibration`        | a redefinition of `evidence-confidence`, `sig-gate`, `calibrate-tv`, … |
+| `unknown_evidence_category`    | a tier `epistemic_calibration.metta` does not declare |
+| `missing_identifier`           | no PMID and no DOI — the entry cannot be traced to a paper |
+
+New response fields: `rejected_entries` (`kind`, `name`, `metta`, `codes`,
+`reasons`), `unconsumed_predicates` (heads in the block the runtime KB grounds
+nowhere else — not an error, but the difference between joining existing data
+and starting a table of one), and, on each accepted entry, `identifier`,
+`evidence_tier`, `effect_size_pct`, `provisional`, `provisional_fields` and
+`notes`. `provisional` is true whenever a value was *proposed* rather than
+derived; the same lines are written into the block as `PROVISIONAL` comments,
+because the reviewer who needs them may only ever see the file.
+
+The identifier reaches the atoms, not just the header comment: a measurement row
+that arrives without one is given `(ReportedIn <row> PMID_<digits>)`, the same
+provenance shape the DrugAge ETL emits, so
+`!(match &self (ReportedIn $r PMID_37289866) $r)` answers.
+
+Duplicate detection was fixed in the same pass, because the constrained output
+walks into both of its holes: expressions are now compared whole (the canonical
+`Effect` form is written over **two** lines, and the old line-anchored
+STV-stripper matched neither half, so re-extracting an existing bridge looked
+net-new), and the name fallback asks the runtime inventory instead of
+regex-searching 290 KB of raw text — which included `;;` comments and the 107 KB
+ETL dump the runtime excludes, so a symbol mentioned once in prose was reported
+as an existing duplicate and discarded.
+
+`tests/test_ontology_expansion.py` builds the canonical taurine block by hand
+(Singh 2023, *Science*, PMID 37289866, doi 10.1126/science.abn9257), loads it
+into hyperon beside the runtime KB and asserts that `infer`, `explain`,
+`rank-interventions`, `hallmarks-of` and `drugage-effect` all consume it — and
+that the evaluation's own block, in the same engine, still answers nothing.
 
 ## Demo query forms
 

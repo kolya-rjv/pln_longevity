@@ -313,6 +313,7 @@ def run_extraction(
 
     n_new = len(result.new_entries)
     n_dup = len(result.duplicate_entries)
+    n_rej = len(result.rejected_entries)
 
     status_lines = [
         f"### Extraction complete",
@@ -321,11 +322,17 @@ def run_extraction(
         f"",
         f"- **{n_new}** new entries ready to add",
         f"- **{n_dup}** duplicate(s) skipped (already in ontology)",
+        f"- **{n_rej}** refused by the schema gate (see the list below)",
         f"- Target file: `{target_path.name}`",
     ]
     if n_new == 0:
         status_lines.append(
             "\n_No new entries found — everything extracted already exists in the ontology._"
+        )
+    if result.unconsumed_predicates:
+        status_lines.append(
+            "\n_Predicates with no existing facts to join: "
+            + ", ".join(f"`{p}`" for p in result.unconsumed_predicates) + "._"
         )
 
     dup_lines: list[str] = []
@@ -335,11 +342,20 @@ def run_extraction(
             dup_lines.append(f"  → {e.description}")
         dup_lines.append("")
 
+    # Refusals are SHOWN, never dropped: a reviewer has to be able to see what
+    # the extractor proposed and why the knowledge base would not take it.
+    for r in result.rejected_entries:
+        dup_lines.append(f"[REJECTED {r.kind}] {r.name}")
+        for reason in r.reasons:
+            dup_lines.append(f"  ✗ {reason}")
+        dup_lines.append("")
+
     state = {
         "metta_block": result.metta_block,
         "target_path":  str(target_path),
         "n_new":  n_new,
         "n_dup":  n_dup,
+        "n_rejected": n_rej,
         "paper_title": result.paper_title,
     }
 
