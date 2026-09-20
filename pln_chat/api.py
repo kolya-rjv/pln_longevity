@@ -44,6 +44,7 @@ from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from config import (
@@ -56,6 +57,7 @@ from config import (
     OPENAI_API_KEY,
     PLN_CORS_ORIGINS,
     PLN_MAX_KB_FILE_BYTES,
+    PLN_MAX_ONTOLOGY_FILES,
     PLN_MAX_RANK_COMPOUNDS,
     PLN_MAX_RANK_ROWS,
     PLN_RUNTIME_AVAILABLE,
@@ -65,6 +67,13 @@ from ontology.registry import BUILTIN_REGISTRY, OntologyRegistry
 from ontology.expander import run_expansion_pipeline
 from ontology.drugage_selector import BUILD_DRUGAGE
 from core.context_builder import build_system_prompt
+from core.executor import (
+    PLNExecutionTimeout,
+    PLNOverloaded,
+    PLNWorkerCrashed,
+    executor_stats,
+    run_offloaded,
+)
 from core.drugage_router import (
     SCORE_SEMANTICS,
     _row_out,
@@ -171,6 +180,25 @@ def _build_context(selected_files: list[str]) -> tuple[OntologyRegistry, dict[st
     if paths:
         return load_specific_files(paths)
     return BUILTIN_REGISTRY, {}
+
+
+def _dedupe_ontology_files(value: Optional[list[str]]) -> Optional[list[str]]:
+    """Collapse repeats while preserving order.
+
+    `load_specific_files` reads and re-parses the list as given, so a caller
+    passing the same filename N times paid N times for it — inside the
+    GIL-holding request thread, with no ceiling. Order is preserved because the
+    selection order is the order the files appear in the LLM's context.
+    """
+    if value is None:
+        return None
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in value:
+        if name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
 
 
 def _validate_ontology_files(selected_files: list[str]) -> None:
@@ -343,6 +371,43 @@ async def log_api_request(request: Request, call_next):
         )
 
 
+# ── Failure handling ─────────────────────────────────────────────────────────
+# PLN execution runs in a worker process (core/executor.py). Its three failure
+# modes are real, distinguishable HTTP conditions — not 200s with a note.
+
+@app.exception_handler(PLNExecutionTimeout)
+async def _pln_timeout_handler(request: Request, exc: PLNExecutionTimeout):
+    return JSONResponse(
+        status_code=504,
+        content={"detail": {
+            "code": "pln_timeout",
+            "message": str(exc),
+            "timeout_seconds": exc.timeout_s,
+        }},
+    )
+
+
+@app.exception_handler(PLNOverloaded)
+async def _pln_overloaded_handler(request: Request, exc: PLNOverloaded):
+    return JSONResponse(
+        status_code=503,
+        headers={"Retry-After": "5"},
+        content={"detail": {
+            "code": "pln_overloaded",
+            "message": str(exc),
+            "max_inflight": exc.limit,
+        }},
+    )
+
+
+@app.exception_handler(PLNWorkerCrashed)
+async def _pln_worker_crashed_handler(request: Request, exc: PLNWorkerCrashed):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": {"code": "pln_worker_crashed", "message": str(exc)}},
+    )
+
+
 # ── Schemas ──────────────────────────────────────────────────────────────────
 
 class HistoryTurn(BaseModel):
@@ -362,6 +427,7 @@ class QueryRequest(BaseModel):
     )
     ontology_files: Optional[list[str]] = Field(
         default=None,
+        max_length=PLN_MAX_ONTOLOGY_FILES,
         description="Which .metta files to inject into the LLM's system-prompt context "
                     "(see GET /ontology/files for choices). Defaults to the curated inference "
                     "stack (calibration, deduction, diagnosis, ranking, patient grounding, "
@@ -385,6 +451,11 @@ class QueryRequest(BaseModel):
         if value not in AVAILABLE_MODELS:
             raise ValueError(f"model must be one of: {', '.join(AVAILABLE_MODELS)}")
         return value
+
+    @field_validator("ontology_files")
+    @classmethod
+    def ontology_files_are_deduped(cls, value):
+        return _dedupe_ontology_files(value)
 
 
 class PLNAtomOut(BaseModel):
@@ -444,6 +515,7 @@ class MettaRunRequest(BaseModel):
     )
     ontology_files: Optional[list[str]] = Field(
         default=None,
+        max_length=PLN_MAX_ONTOLOGY_FILES,
         description="Which .metta files to check symbols against for validation "
                     "(see GET /ontology/files). Defaults to every runtime-safe file — "
                     "unlike /query, there's no LLM context window to economize here, "
@@ -462,6 +534,12 @@ class MettaRunRequest(BaseModel):
                     "files and before the query runs — e.g. a scratch fact to test a "
                     "hypothetical without writing it to a .metta file.",
     )
+
+
+    @field_validator("ontology_files")
+    @classmethod
+    def ontology_files_are_deduped(cls, value):
+        return _dedupe_ontology_files(value)
 
 
 class MettaRunResponse(BaseModel):
@@ -731,6 +809,7 @@ def health() -> dict:
         "openai_key_configured": bool(OPENAI_API_KEY),
         "available_models": AVAILABLE_MODELS,
         "drugage_build_available": BUILD_DRUGAGE.exists(),
+        "pln_execution": executor_stats(),
     }
 
 
@@ -804,16 +883,28 @@ def query(req: QueryRequest) -> QueryResponse:
             )
         routed = "drugage_ranking"
         validation = ValidationResult(valid=True)
-        pln_result = route_drugage_ranking(
-            drugage_compounds,
-            confidence_threshold=req.confidence_threshold,
+        pln_result = run_offloaded(
+            "route_drugage_ranking",
+            {"compounds": drugage_compounds,
+             "confidence_threshold": req.confidence_threshold},
+            lambda: route_drugage_ranking(
+                drugage_compounds,
+                confidence_threshold=req.confidence_threshold,
+            ),
         )
     else:
         validation = validate(translation.metta_query, registry)
-        pln_result = run_query(
-            metta_query=translation.metta_query,
-            confidence_threshold=req.confidence_threshold,
-            kb_files=_runtime_kb_paths(),
+        kb_files = _runtime_kb_paths()
+        pln_result = run_offloaded(
+            "run_query",
+            {"metta_query": translation.metta_query,
+             "confidence_threshold": req.confidence_threshold,
+             "kb_files": kb_files},
+            lambda: run_query(
+                metta_query=translation.metta_query,
+                confidence_threshold=req.confidence_threshold,
+                kb_files=kb_files,
+            ),
         )
 
     answer = format_bot_response(
@@ -891,9 +982,14 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
             )
         routed = "drugage_ranking"
         validation = ValidationResult(valid=True)
-        pln_result = route_drugage_ranking(
-            drugage_compounds,
-            confidence_threshold=req.confidence_threshold,
+        pln_result = run_offloaded(
+            "route_drugage_ranking",
+            {"compounds": drugage_compounds,
+             "confidence_threshold": req.confidence_threshold},
+            lambda: route_drugage_ranking(
+                drugage_compounds,
+                confidence_threshold=req.confidence_threshold,
+            ),
         )
     else:
         if req.ontology_files is not None:
@@ -918,11 +1014,19 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
                     "issues": validation.issues,
                 },
             )
-        pln_result = run_query(
-            metta_query=req.metta_query,
-            confidence_threshold=req.confidence_threshold,
-            kb_files=_runtime_kb_paths(),
-            extra_atoms=req.extra_atoms,
+        kb_files = _runtime_kb_paths()
+        pln_result = run_offloaded(
+            "run_query",
+            {"metta_query": req.metta_query,
+             "confidence_threshold": req.confidence_threshold,
+             "kb_files": kb_files,
+             "extra_atoms": req.extra_atoms},
+            lambda: run_query(
+                metta_query=req.metta_query,
+                confidence_threshold=req.confidence_threshold,
+                kb_files=kb_files,
+                extra_atoms=req.extra_atoms,
+            ),
         )
 
     return MettaRunResponse(
@@ -958,11 +1062,18 @@ def drugage_rank(req: DrugAgeRankRequest) -> DrugAgeRankResponse:
     committed 201-row sample despite drugage_etl_short.metta existing in the
     repo; see GET /health's drugage_build_available before calling this.
     """
-    ranking = rank_drugage(
-        req.compounds,
-        confidence_threshold=req.confidence_threshold,
-        strategy=req.strategy,
-        include_all_rows=req.include_rows,
+    ranking = run_offloaded(
+        "rank_drugage",
+        {"compounds": req.compounds,
+         "confidence_threshold": req.confidence_threshold,
+         "strategy": req.strategy,
+         "include_all_rows": req.include_rows},
+        lambda: rank_drugage(
+            req.compounds,
+            confidence_threshold=req.confidence_threshold,
+            strategy=req.strategy,
+            include_all_rows=req.include_rows,
+        ),
     )
     result = ranking.result
     rows = [_row_out(r) for r in ranking.rows]

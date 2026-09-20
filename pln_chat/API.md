@@ -44,6 +44,47 @@ There is no authentication layer. The service is intended to run only in the
 private environment where the Gradio UI and invited agents can already reach
 it.
 
+## PLN execution runs in a worker process
+
+hyperon 0.2.10 holds the GIL for the whole of `MeTTa.run()` — measured, two
+MeTTa runs in two Python threads take exactly as long as two runs in sequence
+(ratio 0.998), and a canary thread gets 3 of ~386 expected ticks during one
+2.3-second query. So while a query runs, the event loop and every other caller
+is starved: a `GET /health` issued 0.4 s into a 3.9 s request took 3.5 s, and
+one 35-compound ranking blocked the whole service for 115 s. No threadpool
+size, `async def` conversion or asyncio timeout can fix that — you cannot
+preempt a Rust call that holds the GIL.
+
+MeTTa therefore runs in a `ProcessPoolExecutor` (`pln_chat/core/executor.py`).
+Three things follow:
+
+* **The API stays responsive.** `/health` during a 3.7 s hyperon call: 0.007 s.
+* **Deadlines are enforceable.** A query past `PLN_QUERY_TIMEOUT_SECONDS`
+  (default 60) returns **504** `pln_timeout`, and the worker is *killed* — an
+  abandoned divergent recursion pins a core and grows without bound (measured
+  3.7 GB within two minutes), so a signal is the only way to stop it.
+* **A hyperon abort no longer takes the API down.** hyperon aborts the
+  interpreter with a non-unwinding Rust panic on some query shapes past a few
+  hundred rows; `except Exception` cannot catch it. Out of process it is a
+  **500** `pln_worker_crashed` and the service keeps serving.
+
+When more than `PLN_MAX_INFLIGHT_QUERIES` PLN tasks are queued or running, new
+ones get **503** `pln_overloaded` with `Retry-After` rather than piling up
+behind a deadline they cannot meet. `GET /health` reports the live picture
+under `pln_execution`.
+
+| env var                     | default | meaning                                        |
+|-----------------------------|---------|------------------------------------------------|
+| `PLN_WORKER_POOL_SIZE`      | 2       | worker processes; **0 runs inline**, as before  |
+| `PLN_QUERY_TIMEOUT_SECONDS` | 60      | per-request PLN budget; 0 disables              |
+| `PLN_MAX_INFLIGHT_QUERIES`  | 0       | admission limit; 0 derives 4x the worker count  |
+| `PLN_WORKER_MAX_TASKS`      | 50      | recycle workers after N tasks; 0 never          |
+| `PLN_MAX_RANK_COMPOUNDS`    | 60      | cap on `/drugage/rank`'s compound list          |
+| `PLN_MAX_ONTOLOGY_FILES`    | 64      | cap on an `ontology_files` selection (deduped)  |
+
+Because the Gradio UI is mounted on the same ASGI app and drives the same
+pipeline, this also stops a UI query from freezing the REST API and vice versa.
+
 OpenAI calls have a 60-second timeout and one SDK retry by default; configure
 `OPENAI_TIMEOUT_SECONDS` / `OPENAI_MAX_RETRIES` as needed. Every HTTP request,
 its raw body, each raw chat prompt, and each translated MeTTa query are written

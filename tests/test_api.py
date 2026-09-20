@@ -28,6 +28,7 @@ if str(PLN_CHAT) not in sys.path:
 import api as api_module  # noqa: E402
 import fastapi.dependencies.utils as dependency_utils  # noqa: E402
 import fastapi.routing as fastapi_routing  # noqa: E402
+import core.executor as executor_module  # noqa: E402
 import core.llm_translator as translator_module  # noqa: E402
 import utils.logging as logging_module  # noqa: E402
 from core.llm_translator import TranslationResult  # noqa: E402
@@ -42,6 +43,12 @@ def deterministic_asgi_execution(monkeypatch):
         return function(*args, **kwargs)
 
     monkeypatch.setattr(api_module, "log_http_request", Mock())
+    # PLN work normally runs in a worker PROCESS (core/executor.py). A child
+    # re-imports the module and could never see the monkeypatched
+    # `api.run_query` / `api.route_drugage_ranking` these tests install, so the
+    # HTTP contract tests run the executor in inline mode — the same code path
+    # a deployment gets with PLN_WORKER_POOL_SIZE=0.
+    monkeypatch.setattr(executor_module, "PLN_WORKER_POOL_SIZE", 0)
     # Avoid coupling an in-process contract test to AnyIO's worker-thread
     # implementation. Production Uvicorn still uses FastAPI's normal threadpool.
     monkeypatch.setattr(fastapi_routing, "run_in_threadpool", run_inline)

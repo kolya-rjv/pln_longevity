@@ -59,6 +59,34 @@ PLN_MAX_RANK_COMPOUNDS: int = int(os.getenv("PLN_MAX_RANK_COMPOUNDS", "60"))
 # per-row listing). Rapamycin alone has 37 rows, so an unbounded list makes a
 # big response out of a small question.
 PLN_MAX_RANK_ROWS: int = int(os.getenv("PLN_MAX_RANK_ROWS", "120"))
+# Max entries in a request's `ontology_files` selection. The list is read and
+# re-parsed as given, so repeats used to amplify work with no ceiling; the API
+# now also de-duplicates it. There are ~30 .metta files in total, so 64 is
+# generous.
+PLN_MAX_ONTOLOGY_FILES: int = int(os.getenv("PLN_MAX_ONTOLOGY_FILES", "64"))
+
+# ── PLN execution workers ──────────────────────────────────────────────────────
+# hyperon 0.2.10 HOLDS THE GIL for the whole of MeTTa.run() (measured: two runs
+# in two threads take exactly as long as two runs in sequence, ratio 0.998), so
+# a MeTTa query starves the event loop and every other request with it — one
+# 35-compound ranking blocked the whole API for 115 s. A thread pool cannot fix
+# that; a process pool can, and it also makes a per-request timeout enforceable
+# and contains hyperon's non-unwinding Rust abort (which kills the interpreter
+# in-process but only a worker out-of-process).
+#   0 = run inline, in the request thread (the pre-2026-09 behaviour; used by
+#       the in-process contract tests, which monkeypatch module globals a child
+#       process could never see).
+PLN_WORKER_POOL_SIZE: int = max(0, int(os.getenv("PLN_WORKER_POOL_SIZE", "2")))
+# Per-request PLN budget in seconds. 0 disables. 60 s is deliberately generous:
+# a legitimate 20-compound ranking is a few seconds, so this only catches the
+# pathological shapes.
+PLN_QUERY_TIMEOUT_SECONDS: float = float(os.getenv("PLN_QUERY_TIMEOUT_SECONDS", "60"))
+# Max PLN tasks queued or running before new ones are refused with 503.
+# 0 = derive it (4x the worker count).
+PLN_MAX_INFLIGHT_QUERIES: int = max(0, int(os.getenv("PLN_MAX_INFLIGHT_QUERIES", "0")))
+# Recycle a worker after this many tasks (0 = never). A fresh hyperon
+# interpreter is cheap and does not inherit a previous query's space growth.
+PLN_WORKER_MAX_TASKS: int = max(0, int(os.getenv("PLN_WORKER_MAX_TASKS", "50")))
 
 # ── UI defaults ────────────────────────────────────────────────────────────────
 DEFAULT_CONFIDENCE_THRESHOLD: float = 0.0
