@@ -101,7 +101,9 @@ to `pln_chat/logs/session_*.jsonl`. For browser clients, set
 | GET    | `/drugage/top`     | Rank the **whole** DrugAge build by calibrated lifespan effect — no LLM, no compound list |
 | GET    | `/interventions`   | Which interventions target a hallmark of aging (and the reverse), with provenance |
 | GET    | `/hallmarks`       | Every hallmark in the KB, its anchor components and its interventions |
-| GET    | `/patients`        | List known patient profiles (for the `<Patient>` query forms below) |
+| GET    | `/patients`        | List the built-in patient profiles                            |
+| GET    | `/patients/markers`| Which biomarkers a caller-supplied patient may carry, and in what units |
+| POST   | `/patients/preview`| Validate your own patient and see the atoms it becomes — no inference |
 | POST   | `/query`           | Ask a natural-language question of the KB (goes through the LLM translator) |
 | POST   | `/metta/run`       | Validate + execute a raw MeTTa query directly (no LLM call)  |
 | POST   | `/drugage/rank`    | Rank real DrugAge compounds by lifespan/mortality effect, no MeTTa needed |
@@ -154,6 +156,67 @@ response reports its own `prompt_tokens_estimate`.
 A failed translation also sets `intent: "error"` rather than borrowing
 `clarification`, which is a real answer the engine gives when a question needs
 narrowing.
+
+## Bring your own patient
+
+The personalized stack — risk, decomposition, counterfactuals, intervention
+ranking, tiered supplements — used to work for exactly two people, so an app
+user's biomarkers could not be scored at all. The inference never needed
+changing: it reads `PatientAge`, `PatientSex` and `MeasuredZ` and nothing else.
+What was missing was a typed surface and sanitisation.
+
+`/query` and `/metta/run` now take a `patient` object. It is loaded into that
+request's space only and never written to disk:
+
+```bash
+curl -X POST localhost:7860/query -H 'Content-Type: application/json' -d '{
+  "message": "what is my 10-year CHD risk, and what should I do about it?",
+  "patient": {
+    "id": "W45", "age": 45, "sex": "Female", "smoking": "NeverSmoker",
+    "markers": {
+      "AgeAccelGrim": {"value": 2.1, "unit": "years"},
+      "CRP":          {"value": 4.0, "unit": "mg/L"},
+      "DNAmGDF15":    1.3
+    }
+  }
+}'
+```
+
+A bare number is a **z-score** — standard deviations from the age- and
+sex-adjusted mean, which is what the KB reasons in. A `value` is standardised
+server-side and the response says exactly how (`derived: true` plus the
+formula). `GET /patients/markers` lists what is supported; `POST
+/patients/preview` shows the atoms and each marker's Elevated/Normal/Low status
+without running anything.
+
+**Honesty about the conversions.** There is no calibrated age/sex-stratified
+reference table anywhere in this repository. The raw-value conversions use
+documented coarse priors, in the same "curated prior" tradition as
+`mechanistic_bridges.metta`, and are flagged `provisional: true` with their
+source text. Send `z` when you have a properly standardised measurement.
+Age acceleration in years is the exception — it is divided by the KB's own
+`grimaccel-sd-to-years` knob, so the two can never drift apart.
+
+**What it refuses, and why.** These are not pedantry; each one was reproduced
+against the raw `extra_atoms` path:
+
+* an id is namespaced `Caller_…` and must be alphanumeric. An id of
+  `Evil) (= (grimage-weight $m) 9.9) (PatientAge Zzz 10` redefined a
+  calibration knob and made `decompose-grimage` report weights of 9.9 for a
+  *different, pre-existing* patient.
+* a colliding id is refused. A second `Patient001` does not replace the first —
+  the engine unions both, and `predict-risk-patient` then took 63 seconds and
+  returned 512 answers, some pairing a point estimate from one age/sex branch
+  with a confidence interval from another.
+* `extra_atoms` may no longer carry `(= (…) …)` definitions unless
+  `allow_definitions: true`. A definition does not shadow the KB's own.
+* an unsupported marker (`LDL`) is rejected **with the supported list**, rather
+  than carried as an atom nothing reads.
+* a sex outside Male/Female is refused: the baseline CHD table is stratified by
+  exactly those two, and a third branch would be an invented number.
+* a query naming a patient the KB does not hold is flagged
+  `unpersonalized` — `rank-interventions-for-patient` otherwise returns a
+  confident population-level ranking for a typo'd id.
 
 ## Discovery without an LLM
 

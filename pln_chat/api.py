@@ -73,6 +73,13 @@ from ontology.expander import run_expansion_pipeline
 from ontology.drugage_scoring import load_knobs
 from ontology.drugage_selector import BUILD_DRUGAGE
 from core.context_builder import build_system_prompt
+from core.patient_builder import (
+    MARKERS,
+    BuiltPatient,
+    PatientSpecError,
+    build_patient,
+    marker_catalog,
+)
 from core.executor import (
     PLNExecutionTimeout,
     PLNOverloaded,
@@ -337,6 +344,122 @@ def _patient_summaries() -> list[dict]:
     ]
 
 
+# ── Caller-supplied patients ────────────────────────────────────────────────
+# Patients used to be KB facts only, so the whole personalized stack — risk,
+# decomposition, counterfactuals, ranking, supplements — worked for exactly two
+# people. The inference never needed that: it reads PatientAge / PatientSex /
+# MeasuredZ and nothing else, and run_query already injects caller-supplied
+# atoms into the same space. What was missing is a typed surface, a z-scoring
+# policy, and sanitisation — see core/patient_builder.py for why the last one is
+# load-bearing.
+
+_SD_TO_YEARS_RE = re.compile(r"\(=\s*\(grimaccel-sd-to-years\)\s*([\d.]+)\s*\)")
+_ELEVATED_Z_RE = re.compile(r"\(=\s*\(elevated-z-threshold\)\s*([\d.]+)\s*\)")
+
+
+def _patient_knobs() -> tuple[float, float]:
+    """`grimaccel-sd-to-years` and `elevated-z-threshold`, read off the KB.
+
+    Both are documented tunables of the MeTTa layer. Reading them rather than
+    copying them keeps a caller's years->z conversion and the Elevated/Low
+    labels in lockstep with the engine that will consume them.
+    """
+    sd_to_years, elevated = 4.2, 1.0
+    try:
+        risk = (ONTOLOGY_DIR / "pln_risk_prediction.metta").read_text(encoding="utf-8")
+        m = _SD_TO_YEARS_RE.search(risk)
+        if m:
+            sd_to_years = float(m.group(1))
+    except OSError:
+        pass
+    try:
+        profile = (ONTOLOGY_DIR / "patient_profile.metta").read_text(encoding="utf-8")
+        m = _ELEVATED_Z_RE.search(profile)
+        if m:
+            elevated = float(m.group(1))
+    except OSError:
+        pass
+    return sd_to_years, elevated
+
+
+def _known_patient_ids() -> set[str]:
+    return {p["id"] for p in _patient_summaries()}
+
+
+def _build_caller_patient(payload: Optional[dict]) -> Optional[BuiltPatient]:
+    """Validate and render a caller's patient, or raise a 422 explaining why."""
+    if payload is None:
+        return None
+    sd_to_years, elevated = _patient_knobs()
+    try:
+        return build_patient(
+            payload,
+            existing_ids=_known_patient_ids(),
+            sd_to_years=sd_to_years,
+            elevated_threshold=elevated,
+        )
+    except PatientSpecError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": exc.code, "message": exc.message, **exc.extra},
+        ) from None
+
+
+# Rule and constant REDEFINITIONS in caller-supplied atoms. `(= (f …) …)` does
+# not shadow the KB's definition — hyperon keeps both and every call becomes
+# non-deterministic — so a payload carrying one silently corrupts OTHER
+# patients' answers in the same request. Verified: injecting
+# `(= (baseline-risk-chd $a $s) 0.999)` made `patient-baseline` return two
+# values and a risk query return 256 atoms, one of them 5.4e11.
+_DEFINITION_RE = re.compile(r"\(\s*=\s*\(")
+
+
+def _guard_extra_atoms(text: Optional[str], *, allow_definitions: bool) -> None:
+    if not text or allow_definitions:
+        return
+    if _DEFINITION_RE.search(text):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "definition_in_extra_atoms",
+                "message": (
+                    "`extra_atoms` contains a rule or constant definition "
+                    "`(= (…) …)`. A definition does not replace the knowledge "
+                    "base's own — the engine keeps both and every affected "
+                    "answer, including other patients', becomes "
+                    "non-deterministic. Send facts only, or set "
+                    "`allow_definitions: true` if you are deliberately testing "
+                    "a redefinition."
+                ),
+            },
+        )
+
+
+_PATIENT_MENTION_RE = re.compile(r"\b((?:Patient|Caller_)[A-Za-z0-9_]*)\b")
+
+
+def _unknown_patient_warning(query: str, known: set[str]) -> Optional[str]:
+    """Catch a query about a patient nobody defined.
+
+    `rank-interventions-for-patient` returns a full, plausible ranking for an id
+    that does not exist: the personal term degenerates to zero and the
+    population ranking survives, so a typo produces a confident wrong-looking-
+    right answer instead of an error.
+    """
+    mentioned = {m for m in _PATIENT_MENTION_RE.findall(query)}
+    unknown = sorted(mentioned - known)
+    if not unknown:
+        return None
+    return (
+        "Query mentions patient id(s) the knowledge base does not hold: "
+        + ", ".join(unknown)
+        + ". Some personalized forms still return a population-level answer for "
+        "an unknown patient, so treat this result as unpersonalized. Known ids: "
+        + (", ".join(sorted(known)) or "none")
+        + ". Submit your own patient with the `patient` field."
+    )
+
+
 # ── App ──────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
@@ -533,6 +656,40 @@ class HistoryTurn(BaseModel):
     content: str = Field(min_length=1, max_length=50_000)
 
 
+class PatientIn(BaseModel):
+    """A patient the CALLER supplies, scored for this request only.
+
+    Nothing is written to disk: the atoms live in the query's hyperon space and
+    disappear with it. The id is namespaced `Caller_…` so it can never collide
+    with a curated patient — submitting a second `Patient001` does not replace
+    the first, it unions both and makes every answer non-deterministic.
+    """
+    id: Optional[str] = Field(
+        default=None, max_length=48,
+        description="Letters, digits and underscores. Prefixed with 'Caller_'.",
+    )
+    age: Optional[float] = Field(
+        default=None, ge=0, le=130,
+        description="Required for an ABSOLUTE risk — it selects the baseline.",
+    )
+    sex: Optional[str] = Field(
+        default=None,
+        description="Male | Female. Required for an absolute risk. The baseline "
+                    "CHD table is stratified by exactly these two; a third branch "
+                    "would be an invented number.",
+    )
+    smoking: Optional[str] = Field(
+        default=None, description="NeverSmoker | FormerSmoker | CurrentSmoker.",
+    )
+    markers: dict[str, object] = Field(
+        default_factory=dict,
+        description="Biomarker -> a z-score (a bare number), or an object with "
+                    "`z`, or `value` (+ optional `unit`) to be standardised "
+                    "server-side. See GET /patients/markers for what is supported "
+                    "and which conversions are curated priors.",
+    )
+
+
 class QueryRequest(BaseModel):
     message: str = Field(
         ..., max_length=50_000, description="Natural-language question for the KB."
@@ -558,6 +715,12 @@ class QueryRequest(BaseModel):
     confidence_threshold: float = Field(
         default=DEFAULT_CONFIDENCE_THRESHOLD, ge=0.0, le=1.0,
         description="PLN results below this confidence are filtered out.",
+    )
+    patient: Optional[PatientIn] = Field(
+        default=None,
+        description="Ask about YOUR patient instead of a built-in one. The atoms "
+                    "are injected into this request's space only. Mention the "
+                    "returned id (or just say 'my patient') in `message`.",
     )
     show_metta: bool = Field(default=True, description="Include the generated MeTTa query in `answer`.")
     show_explanation: bool = Field(default=True, description="Include the NL explanation in `answer`.")
@@ -631,6 +794,11 @@ class QueryResponse(BaseModel):
                     "DrugAge engine instead of the generic KB (see POST /drugage/rank).",
     )
     usage: Optional[dict] = None
+    patient: Optional["PatientPreviewResponse"] = Field(
+        default=None,
+        description="Set when the request carried a `patient`: the id it was given, "
+                    "the atoms injected, and how each marker was standardised.",
+    )
     prompt_tokens_estimate: int = Field(
         default=0,
         description="Estimated prompt size (characters / PLN_CHARS_PER_TOKEN) checked "
@@ -674,6 +842,21 @@ class MettaRunRequest(BaseModel):
         default=DEFAULT_CONFIDENCE_THRESHOLD, ge=0.0, le=1.0,
         description="PLN results below this confidence are filtered out.",
     )
+    patient: Optional[PatientIn] = Field(
+        default=None,
+        description="A caller-supplied patient, validated and rendered to atoms "
+                    "before the query runs. Safer than hand-writing the same "
+                    "atoms into `extra_atoms`: ids are namespaced, markers are "
+                    "checked against what the KB can reason about, and raw "
+                    "values are standardised with the KB's own knobs.",
+    )
+    allow_definitions: bool = Field(
+        default=False,
+        description="Permit `(= (…) …)` rule/constant definitions in `extra_atoms`. "
+                    "Off by default: a definition does not replace the KB's own, so "
+                    "it makes every affected answer — including other patients' — "
+                    "non-deterministic.",
+    )
     extra_atoms: Optional[str] = Field(
         default=None,
         max_length=500_000,
@@ -691,6 +874,11 @@ class MettaRunRequest(BaseModel):
 
 class MettaRunResponse(BaseModel):
     metta_query: str
+    patient_id: Optional[str] = Field(
+        default=None,
+        description="The id given to a caller-supplied `patient` for this request.",
+    )
+    warnings: list[str] = Field(default_factory=list)
     confidence_threshold_applied: float = Field(
         default=0.0,
         description="The `confidence_threshold` from the request, as applied to "
@@ -767,6 +955,40 @@ class PatientOut(BaseModel):
 
 class PatientsResponse(BaseModel):
     patients: list[PatientOut]
+
+
+class ResolvedMarkerOut(BaseModel):
+    marker: str
+    z: float
+    derived: bool = Field(description="True when the z was computed from a raw value here.")
+    raw_value: Optional[float] = None
+    unit: Optional[str] = None
+    formula: Optional[str] = Field(
+        default=None, description="Exactly how a derived z was computed.",
+    )
+    status: str = Field(description="Elevated | Normal | Low, at the KB's own threshold.")
+    note: Optional[str] = None
+
+
+class PatientPreviewResponse(BaseModel):
+    patient_id: str
+    atoms: str = Field(description="The MeTTa facts this patient becomes.")
+    markers: list[ResolvedMarkerOut]
+    warnings: list[str]
+    can_predict_risk: bool = Field(
+        description="False when age, sex or the AgeAccelGrim clock is missing — "
+                    "the risk model returns nothing rather than guessing.",
+    )
+    age: Optional[float] = None
+    sex: Optional[str] = None
+    smoking: Optional[str] = None
+
+
+class MarkerCatalogResponse(BaseModel):
+    markers: list[dict]
+    z_convention: str
+    elevated_threshold: float
+    raw_value_note: str
 
 
 class DrugAgeRankRequest(BaseModel):
@@ -1281,6 +1503,59 @@ def patients() -> PatientsResponse:
     return PatientsResponse(patients=[PatientOut(**p) for p in _patient_summaries()])
 
 
+@app.get("/patients/markers", response_model=MarkerCatalogResponse)
+def patient_markers() -> MarkerCatalogResponse:
+    """Which biomarkers a caller-supplied patient may carry, and in what units.
+
+    Read this before POSTing a patient. It also says which raw-value
+    conversions exist and flags them as provisional — there is no calibrated
+    age/sex-stratified reference table in this knowledge base, so a conversion
+    from mg/L or mg/dL uses a documented coarse prior. Sending `z` directly
+    bypasses that entirely and is always exact.
+    """
+    _, elevated = _patient_knobs()
+    return MarkerCatalogResponse(
+        markers=marker_catalog(),
+        z_convention=(
+            "z = standard deviations from the AGE- AND SEX-ADJUSTED population "
+            "mean for that marker. Positive is above the norm. Because the "
+            "adjustment is already baked into z, age and sex enter the risk "
+            "model only through the baseline table."
+        ),
+        elevated_threshold=elevated,
+        raw_value_note=(
+            "A `value` is standardised server-side with the reference shown here "
+            "and reported back with `derived: true` and the exact formula. Those "
+            "references are CURATED PRIORS, not calibrated cohort statistics — "
+            "this repository contains no reference table. Send `z` when you have "
+            "a properly standardised measurement."
+        ),
+    )
+
+
+@app.post("/patients/preview", response_model=PatientPreviewResponse)
+def patients_preview(patient: PatientIn) -> PatientPreviewResponse:
+    """Validate a patient and show exactly what it becomes — no inference, no LLM.
+
+    Use it to check a payload before spending a query on it: it returns the
+    generated atoms, each marker's z (and how it was derived), the
+    Elevated/Normal/Low status at the KB's own threshold, and whether the
+    patient carries enough to get an absolute risk.
+    """
+    built = _build_caller_patient(patient.model_dump())
+    assert built is not None
+    return PatientPreviewResponse(
+        patient_id=built.patient_id,
+        atoms=built.atoms,
+        markers=[ResolvedMarkerOut(**m.as_dict()) for m in built.markers],
+        warnings=built.warnings,
+        can_predict_risk=built.can_predict_risk,
+        age=built.age,
+        sex=built.sex,
+        smoking=built.smoking,
+    )
+
+
 @app.post("/query", response_model=QueryResponse)
 def query(req: QueryRequest) -> QueryResponse:
     """Ask a natural-language question of the PLN knowledge base.
@@ -1301,6 +1576,20 @@ def query(req: QueryRequest) -> QueryResponse:
         _validate_ontology_files(selected)
     registry, raw_contents = _build_context(selected)
     system_prompt = build_system_prompt(registry, raw_contents, _runtime_inventory())
+
+    patient = _build_caller_patient(req.patient.model_dump() if req.patient else None)
+    if patient is not None:
+        # The translator has to know the id exists, or it will answer "I cannot
+        # compute a personalized risk from the current KB" — which is what the
+        # evaluation saw for a 45-year-old woman with LDL 130 and CRP 4.
+        system_prompt += (
+            "\n\n--- THIS REQUEST'S PATIENT ---\n"
+            f"The caller submitted a patient, loaded for this request only:\n"
+            f"{patient.atoms}\n"
+            f"Treat `{patient.patient_id}` as a valid <Patient> for every "
+            f"dedicated patient form. When the question says 'me', 'my', 'this "
+            f"patient' or gives no id, it means {patient.patient_id}.\n"
+        )
 
     history_msgs = [turn.model_dump() for turn in req.history]
     prompt_tokens_estimate = _guard_prompt_size(
@@ -1345,15 +1634,18 @@ def query(req: QueryRequest) -> QueryResponse:
             translation.metta_query, registry, _runtime_inventory()
         )
         kb_files = _runtime_kb_paths()
+        extra_atoms = patient.atoms if patient is not None else None
         pln_result = run_offloaded(
             "run_query",
             {"metta_query": translation.metta_query,
              "confidence_threshold": req.confidence_threshold,
-             "kb_files": kb_files},
+             "kb_files": kb_files,
+             "extra_atoms": extra_atoms},
             lambda: run_query(
                 metta_query=translation.metta_query,
                 confidence_threshold=req.confidence_threshold,
                 kb_files=kb_files,
+                extra_atoms=extra_atoms,
             ),
         )
 
@@ -1376,6 +1668,16 @@ def query(req: QueryRequest) -> QueryResponse:
         show_debug=req.show_debug,
     )
 
+    known_ids = _known_patient_ids() | (
+        {patient.patient_id} if patient is not None else set()
+    )
+    patient_warning = _unknown_patient_warning(translation.metta_query, known_ids)
+    warnings = list(translation.warnings)
+    if patient_warning:
+        warnings.append(patient_warning)
+    if patient is not None:
+        warnings.extend(patient.warnings)
+
     log_turn(req.message, translation, pln_result)
 
     updated_history = history_msgs + [
@@ -1391,7 +1693,18 @@ def query(req: QueryRequest) -> QueryResponse:
         requires_pln_inference=translation.requires_pln_inference,
         confidence_filter=translation.confidence_filter,
         confidence_threshold_applied=req.confidence_threshold,
-        warnings=translation.warnings,
+        warnings=warnings,
+        patient=(
+            PatientPreviewResponse(
+                patient_id=patient.patient_id,
+                atoms=patient.atoms,
+                markers=[ResolvedMarkerOut(**m.as_dict()) for m in patient.markers],
+                warnings=patient.warnings,
+                can_predict_risk=patient.can_predict_risk,
+                age=patient.age, sex=patient.sex, smoking=patient.smoking,
+            )
+            if patient is not None else None
+        ),
         validation_valid=validation.valid,
         validation_issues=validation.issues,
         validation_warnings=validation.warnings,
@@ -1433,6 +1746,12 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
     if not req.metta_query.strip():
         raise HTTPException(status_code=422, detail="metta_query must not be empty.")
 
+    _guard_extra_atoms(req.extra_atoms, allow_definitions=req.allow_definitions)
+    patient = _build_caller_patient(req.patient.model_dump() if req.patient else None)
+    injected = "\n".join(
+        part for part in (patient.atoms if patient else None, req.extra_atoms) if part
+    ) or None
+
     routed: Optional[str] = None
     drugage_compounds = parse_drugage_query(req.metta_query)
     if drugage_compounds is not None:
@@ -1463,10 +1782,10 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
             if req.ontology_files is None
             else _build_context(req.ontology_files)[0]
         )
-        if req.extra_atoms:
-            registry.merge(parse_metta_text(req.extra_atoms, source_name="<api-extra-atoms>"))
+        if injected:
+            registry.merge(parse_metta_text(injected, source_name="<api-extra-atoms>"))
         validation = validate(
-            "\n".join(part for part in (req.extra_atoms, req.metta_query) if part),
+            "\n".join(part for part in (injected, req.metta_query) if part),
             registry,
             _runtime_inventory(),
         )
@@ -1485,12 +1804,12 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
             {"metta_query": req.metta_query,
              "confidence_threshold": req.confidence_threshold,
              "kb_files": kb_files,
-             "extra_atoms": req.extra_atoms},
+             "extra_atoms": injected},
             lambda: run_query(
                 metta_query=req.metta_query,
                 confidence_threshold=req.confidence_threshold,
                 kb_files=kb_files,
-                extra_atoms=req.extra_atoms,
+                extra_atoms=injected,
             ),
         )
 
@@ -1499,8 +1818,16 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
             pln_result, stage="pln_execution", extra={"metta_query": req.metta_query}
         )
 
+    known_ids = _known_patient_ids() | (
+        {patient.patient_id} if patient is not None else set()
+    )
+    patient_warning = _unknown_patient_warning(req.metta_query, known_ids)
+
     return MettaRunResponse(
         metta_query=req.metta_query,
+        patient_id=patient.patient_id if patient is not None else None,
+        warnings=([patient_warning] if patient_warning else [])
+                 + (patient.warnings if patient is not None else []),
         confidence_threshold_applied=req.confidence_threshold,
         validation_valid=validation.valid,
         validation_issues=validation.issues,
