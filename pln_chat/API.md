@@ -159,6 +159,60 @@ substance is worse than omitting one. The same table is injected into the LLM
 translator's system prompt, so `/query` and `/drugage/rank` agree on what a
 name means instead of each guessing separately.
 
+### The ranking response, as data
+
+`results` (the MeTTa atoms) is unchanged, but nothing needs to parse it any
+more:
+
+| field           | what it is                                                            |
+|-----------------|------------------------------------------------------------------------|
+| `ranked`        | most protective first: compound, score, sign, direction, strength, confidence |
+| `rows`          | **every** matching DrugAge row — species, **sex**, significance, change %, PMID |
+| `unscorable`    | compounds whose row reports no average lifespan change (no score exists) |
+| `filtered_out`  | compounds that scored but fell below `confidence_threshold`             |
+| `semantics`     | what the numbers mean (below)                                           |
+| `strategy`      | `linear` (default) or `metta_sort`                                      |
+| `source`        | which DrugAge file the rows came from                                   |
+
+**Sign convention: `Neg` is the good direction.** The lift is on the lifespan
+axis (extending lifespan is `Pos`), then chained through the curated
+`(Effect Lifespan Mortality Neg)` adapter, so a life-extender reads as `Neg`
+— protective — on the mortality axis every other ranking in this KB uses.
+`score` is `strength x confidence`, signed so that **higher is better**.
+
+**Strength** is `|change%| / (|change%| + 20)` — saturating, so +20 % reads
+0.50 and +80 % reads 0.80. **Confidence** is `min(evidence tier, significance
+gate) x 0.9`, where the 0.9 is the per-hop chain discount for the
+lifespan → mortality step. So the confidence you see is always 0.9 x the row's
+tier: **0.81** ITP, **0.45** non-ITP vertebrate, **0.315** invertebrate,
+**0.18** yeast. A score of exactly 0.0 is a reported null (metformin and
+resveratrol are ITP negatives at confidence 0.81), never a missing value.
+
+**One row per compound, and which one.** A compound usually has several rows —
+rapamycin has 37, astaxanthin 6. The score uses one representative: the
+highest evidence tier; within a tier a reported-significant result over an
+unreported one over a reported null; remaining ties broken by the *median*
+change, never the maximum. `rows` returns all of them so that choice is
+auditable — astaxanthin's ITP study reports +12 % in males (significant) and
++3 % in females (not), and the response now shows both.
+
+**`confidence_threshold` works.** A collapsed MeTTa result arrives as one atom
+holding a tuple of entries, each with its own truth value; the filter used to
+keep or drop the whole tuple on the leading entry's confidence. It now filters
+entry by entry, on `/drugage/rank`, `/query` and `/metta/run` alike, and
+`/query` reports the threshold it applied as `confidence_threshold_applied`
+(`confidence_filter` is the LLM translator's suggestion, which is
+informational only).
+
+**Ranking is linear in the pool size.** `strategy: "linear"` (the default)
+scores each compound separately and sorts in Python: ~70 ms per compound, and
+each compound carries its own truth value. `strategy: "metta_sort"` is the
+original single `rank-interventions` call, whose MeTTa insertion sort is
+O(n^2) with a large constant — measured 1.1 s at n=5, 6.1 s at n=10, and the
+115 s the evaluation saw at n=35. Both produce identical scores (asserted in
+`tests/test_drugage_ranking_contract.py`); the compound list is capped at
+`PLN_MAX_RANK_COMPOUNDS` (default 60).
+
 ```bash
 curl -X POST localhost:7860/ontology/expand \
   -H 'Content-Type: application/json' \

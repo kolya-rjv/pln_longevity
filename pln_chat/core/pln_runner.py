@@ -58,6 +58,65 @@ class PLNRunResult:
         return self.status != "error"
 
 
+@dataclass
+class ScoredCompound:
+    """One parsed `(scored <compound> <score> (signed <sign> (stv s c)))` tuple.
+
+    The MeTTa ranking returns its whole sorted pool as ONE atom, which is why
+    `confidence_threshold` never filtered anything: `_apply_threshold` reads the
+    FIRST `(stv …)` in that string and then keeps or drops the entire ranking on
+    that one number. Scoring each compound separately (see
+    `run_drugage_ranking`) gives one atom per compound, and this dataclass is
+    the structured form the HTTP layer returns.
+    """
+    compound: str
+    score: float
+    sign: str          # "Neg" = protective (lowers mortality) | "Pos" = harmful
+    strength: float
+    confidence: float
+    atom: str
+
+    @property
+    def protective(self) -> bool:
+        return self.sign == "Neg"
+
+    def as_dict(self) -> dict:
+        return {
+            "compound": self.compound,
+            "score": self.score,
+            "sign": self.sign,
+            "direction": "protective" if self.protective else "harmful",
+            "strength": self.strength,
+            "confidence": self.confidence,
+            "atom": self.atom,
+        }
+
+
+_SCORED_RE = re.compile(
+    r"\(scored\s+(?P<compound>\S+)\s+(?P<score>[-+\d.eE]+)\s+"
+    r"\(signed\s+(?P<sign>Pos|Neg)\s+"
+    r"\(stv\s+(?P<strength>[-+\d.eE]+)\s+(?P<confidence>[-+\d.eE]+)\)\)\)"
+)
+
+
+def parse_scored(atom: str) -> list[ScoredCompound]:
+    """Every `(scored …)` tuple inside `atom` (one, or a whole ranked tuple)."""
+    out: list[ScoredCompound] = []
+    for m in _SCORED_RE.finditer(atom):
+        try:
+            out.append(ScoredCompound(
+                compound=m.group("compound"),
+                score=float(m.group("score")),
+                sign=m.group("sign"),
+                strength=float(m.group("strength")),
+                confidence=float(m.group("confidence")),
+                atom=m.group(0),
+            ))
+        except ValueError:   # a malformed number never breaks a ranking
+            continue
+    return out
+
+
 # ── Stub mode ──────────────────────────────────────────────────────────────────
 
 _STUB_DATA: list[PLNAtomResult] = [
@@ -82,10 +141,81 @@ _STUB_DRUGS: list[PLNAtomResult] = [
 ]
 
 
+# A collapsed MeTTa result (a ranking, a diagnosis, a tiered recommendation)
+# arrives as ONE atom holding a TUPLE of sub-expressions, each with its own
+# `(stv s c)`. `_stv_from_atom` reads only the FIRST one, so an atom-level
+# filter keeps or drops the whole tuple on the leading entry's confidence —
+# which is why `confidence_threshold` looked like a no-op on /drugage/rank and
+# /query. When a threshold is actually requested we therefore descend one level
+# and filter the ENTRIES, re-assembling the tuple so the atom's shape (and every
+# caller that parses it) is unchanged.
+def _split_top_level(atom: str) -> Optional[list[str]]:
+    """Split `(a…) (b…) (c…)` wrapped in one outer pair of parens, else None."""
+    text = atom.strip()
+    if not (text.startswith("(") and text.endswith(")")):
+        return None
+    inner = text[1:-1].strip()
+    if not inner.startswith("("):
+        return None
+    parts: list[str] = []
+    depth = 0
+    start = 0
+    for i, ch in enumerate(inner):
+        if ch == "(":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                parts.append(inner[start:i + 1])
+            elif depth < 0:
+                return None
+    if depth != 0:
+        return None
+    # Only a genuine tuple (>1 element, nothing but sub-expressions) qualifies.
+    rebuilt = " ".join(parts)
+    if len(parts) < 2 or rebuilt != " ".join(inner.split()):
+        return None
+    return parts
+
+
+def _filter_tuple_entries(atom: str, threshold: float) -> Optional[str]:
+    """Drop the sub-expressions below `threshold`.
+
+    None means "nothing here survives" — either the atom is not a tuple (so its
+    own failing STV is the verdict) or every entry failed.
+    """
+    parts = _split_top_level(atom)
+    if parts is None:
+        return None
+    kept = []
+    for part in parts:
+        stv = _stv_from_atom(part)
+        if stv is None or stv.get("confidence", 1.0) >= threshold:
+            kept.append(part)
+    if not kept:
+        return None
+    return "(" + " ".join(kept) + ")"
+
+
 def _apply_threshold(results: list[PLNAtomResult], threshold: float) -> list[PLNAtomResult]:
     if threshold <= 0:
         return results
-    return [r for r in results if r.stv is None or r.stv.get("confidence", 1.0) >= threshold]
+    kept: list[PLNAtomResult] = []
+    for r in results:
+        if r.stv is not None and r.stv.get("confidence", 1.0) >= threshold:
+            kept.append(r)
+            continue
+        if r.stv is None:
+            kept.append(r)
+            continue
+        # The atom's leading STV failed. Before discarding it, check whether it
+        # is a collapsed tuple whose OTHER entries pass.
+        filtered = _filter_tuple_entries(r.atom, threshold)
+        if filtered is not None:
+            kept.append(PLNAtomResult(atom=filtered, stv=_stv_from_atom(filtered)))
+    return kept
 
 
 def _stub_run(metta_query: str, confidence_threshold: float) -> PLNRunResult:
@@ -301,24 +431,37 @@ def run_drugage_ranking(
     limit: Optional[int] = None,
     source: Optional[Path] = None,
     confidence_threshold: float = 0.0,
+    strategy: str = "linear",
 ) -> tuple[PLNRunResult, list]:
     """Rank real DrugAge compounds by calibrated, signed effect on lifespan.
 
     Assembles a QUERY-SCOPED hyperon space = the DrugAge inference stack
     (DRUGAGE_STACK) + only the DrugAge rows matching `compounds` (selected by
-    ontology.drugage_selector, capped under the panic threshold), then runs
-    `rank-interventions` against `outcome` (default Mortality — the compound ->
+    ontology.drugage_selector, capped under the panic threshold), then scores
+    each compound against `outcome` (default Mortality — the compound ->
     Lifespan -> Mortality chain keeps the Neg=beneficial convention; see
     docs/etl_inference_wiring.md).
 
-    Returns (PLNRunResult, selected_rows). The result's atoms are the ranked,
-    signed, uncertainty-quantified `(scored ...)` tuples; selected_rows carries
-    the provenance of exactly which rows were injected.
+    Two strategies, same arithmetic:
 
-    Keep the compound pool to a handful (Demo-2 scale): the underlying MeTTa
-    insertion sort in pln_intervention_ranking is ~O(n^2) with a high constant
-    (docs/etl_inference_wiring.md §7). best_per_compound (default) keeps the pool
-    at one entry per compound.
+    ``linear`` (default)
+        One `(score-candidate &self <C> <outcome>)` expression per compound, all
+        in ONE space, then sorted in Python. Cost is linear in the pool size and
+        each compound comes back as its OWN atom with its OWN truth value — so
+        `confidence_threshold` can finally filter per compound.
+    ``metta_sort``
+        The original single `(rank-interventions &self (…) <outcome>)` call,
+        which sorts inside MeTTa. Kept because it is the reference
+        implementation the ordering is defined by; `tests/test_drugage_ranking_
+        strategies.py` asserts the two agree. Its MeTTa insertion sort is O(n^2)
+        with a very large constant (measured: n=5 1.1 s, n=8 3.0 s, n=10 6.1 s
+        against the full build), which is what froze the API for 115 s on a
+        35-compound request.
+
+    Returns (PLNRunResult, selected_rows). The result's FIRST atom is the ranked
+    tuple (the long-standing contract the formatter and tests parse), followed by
+    one atom per scored compound. selected_rows carries the provenance of exactly
+    which rows were injected.
     """
     from ontology.drugage_selector import MAX_ROWS, build_drugage_slice
 
@@ -330,15 +473,67 @@ def run_drugage_ranking(
     )
     # Candidate atoms = the compounds actually present in the slice (a requested
     # compound with no matching row simply drops out — no false ranking).
-    cands = " ".join(sorted({r.compound for r in rows}))
+    cands = sorted({r.compound for r in rows})
     if not cands:
         return PLNRunResult(status="empty", mode="runtime" if PLN_RUNTIME_AVAILABLE else "stub"), rows
 
-    query = f"!(rank-interventions &self ({cands}) {outcome})"
-    result = run_query(
+    if strategy == "metta_sort":
+        query = f"!(rank-interventions &self ({' '.join(cands)}) {outcome})"
+        result = run_query(
+            query,
+            confidence_threshold=confidence_threshold,
+            kb_files=DRUGAGE_STACK,
+            extra_atoms=slice_text,
+        )
+        return result, rows
+
+    if strategy != "linear":
+        raise ValueError(f"unknown ranking strategy: {strategy!r}")
+
+    # One expression per compound. `_normalize_query` splits them and hyperon
+    # returns one result group each, so every compound arrives as its own atom.
+    query = "\n".join(f"!(score-candidate &self {c} {outcome})" for c in cands)
+    raw = run_query(
         query,
-        confidence_threshold=confidence_threshold,
+        confidence_threshold=0.0,          # filtered per compound below
         kb_files=DRUGAGE_STACK,
         extra_atoms=slice_text,
     )
-    return result, rows
+    if raw.status == "error":
+        return raw, rows
+
+    scored: list[ScoredCompound] = []
+    for atom in raw.results:
+        scored.extend(parse_scored(atom.atom))
+    # `infer` yields one derivation per matching row; best_per_compound keeps
+    # that at one, but de-duplicate defensively so a widened slice cannot
+    # produce two entries for the same compound.
+    by_compound: dict[str, ScoredCompound] = {}
+    for sc in scored:
+        best = by_compound.get(sc.compound)
+        if best is None or sc.score > best.score:
+            by_compound[sc.compound] = sc
+    kept = [
+        sc for sc in by_compound.values()
+        if confidence_threshold <= 0 or sc.confidence >= confidence_threshold
+    ]
+    # Descending by score = most protective first, identical to sort-scored.
+    kept.sort(key=lambda sc: (-sc.score, sc.compound))
+
+    if not kept:
+        return PLNRunResult(
+            status="empty",
+            mode=raw.mode,
+            query_time_ms=raw.query_time_ms,
+        ), rows
+
+    ranked_tuple = "(" + " ".join(sc.atom for sc in kept) + ")"
+    results = [PLNAtomResult(ranked_tuple, _stv_from_atom(ranked_tuple))]
+    results.extend(PLNAtomResult(sc.atom, {"strength": sc.strength, "confidence": sc.confidence})
+                   for sc in kept)
+    return PLNRunResult(
+        status="ok",
+        results=results,
+        query_time_ms=raw.query_time_ms,
+        mode=raw.mode,
+    ), rows

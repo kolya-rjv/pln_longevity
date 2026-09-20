@@ -48,6 +48,18 @@ PLN_RUNTIME_AVAILABLE: bool = _detect_hyperon()
 # Raise this (or set PLN_MAX_KB_FILE_BYTES) once the runtime handles larger spaces.
 PLN_MAX_KB_FILE_BYTES: int = int(os.getenv("PLN_MAX_KB_FILE_BYTES", "60000"))
 
+# ── DrugAge ranking ────────────────────────────────────────────────────────────
+# Hard cap on the compound pool one ranking request may ask for. The MeTTa
+# insertion sort behind `rank-interventions` is O(n^2) with a large constant
+# (measured: n=10 -> 6.1 s), which is how one 35-compound request blocked the
+# API for 115 s. The default `linear` strategy is ~70 ms per compound, so this
+# cap bounds a single request at a few seconds rather than minutes.
+PLN_MAX_RANK_COMPOUNDS: int = int(os.getenv("PLN_MAX_RANK_COMPOUNDS", "60"))
+# Max DrugAge source rows echoed back in a ranking response (0 disables the
+# per-row listing). Rapamycin alone has 37 rows, so an unbounded list makes a
+# big response out of a small question.
+PLN_MAX_RANK_ROWS: int = int(os.getenv("PLN_MAX_RANK_ROWS", "120"))
+
 # ── UI defaults ────────────────────────────────────────────────────────────────
 DEFAULT_CONFIDENCE_THRESHOLD: float = 0.0
 SHOW_METTA_DEFAULT: bool = True

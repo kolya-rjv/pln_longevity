@@ -62,6 +62,21 @@ class DrugAgeRow:
     significance: Optional[str]   # Significant | NotSignificant | Unreported | None
     avg_change: Optional[float]
     block: str                    # the verbatim MeTTa text for this row
+    # Appended LAST, with a default, because tests/test_drugage_calibration.py
+    # constructs DrugAgeRow positionally.
+    sex: Optional[str] = None     # Male | Female | Mixed | Hermaphrodite | Unknown | Pooled
+
+    @property
+    def scorable(self) -> bool:
+        """True when the calibration layer can actually lift this row.
+
+        `drugage-effect` (drugage_calibration.metta §7) matches
+        `(, (UsesIntervention …) (AvgLifespanChangePercent …))`, so a row with no
+        reported average-lifespan change produces NO Effect link and therefore no
+        score — silently. A row reporting exactly 0.0 IS scorable (that is the
+        ITP-negative story: full confidence, ~zero strength).
+        """
+        return self.avg_change is not None
 
     @property
     def evidence_rank(self) -> int:
@@ -88,6 +103,7 @@ _RE_ITP = re.compile(r"\(IsITPStudy\s+\S+\)")
 _RE_SIG = re.compile(r"\(AvgLifespanSignificance\s+\S+\s+(\S+?)\)")
 _RE_CHANGE = re.compile(r"\(AvgLifespanChangePercent\s+\S+\s+([-\d.eE]+)\)")
 _RE_PMID = re.compile(r"\(ReportedIn\s+\S+\s+(\S+?)\)")
+_RE_SEX = re.compile(r"\(HasSex\s+\S+\s+(\S+?)\)")
 
 
 def _parse_block(block: str) -> Optional[DrugAgeRow]:
@@ -98,6 +114,7 @@ def _parse_block(block: str) -> Optional[DrugAgeRow]:
     m_change = _RE_CHANGE.search(block)
     m_sig = _RE_SIG.search(block)
     m_sp = _RE_SPECIES.search(block)
+    m_sex = _RE_SEX.search(block)
     return DrugAgeRow(
         row_id=m_id.group(1),
         compound=m_c.group(1),
@@ -106,6 +123,7 @@ def _parse_block(block: str) -> Optional[DrugAgeRow]:
         significance=m_sig.group(1) if m_sig else None,
         avg_change=float(m_change.group(1)) if m_change else None,
         block=block.strip(),
+        sex=m_sex.group(1) if m_sex else None,
     )
 
 
@@ -239,18 +257,54 @@ def select_rows(
     return kept[:limit]
 
 
+#: The documented representative-row policy, in the order the rules apply. Kept
+#: as data so `/drugage/rank` can return it verbatim — the 2026-09-18 evaluation
+#: could not tell WHY astaxanthin came back as "+3%, not significant" when the
+#: cited paper headlines +12% (p = 0.003), because the policy was undocumented.
+REPRESENTATIVE_POLICY: tuple[str, ...] = (
+    "1. Only rows with a reported AvgLifespanChangePercent are eligible — a row "
+    "without one cannot be lifted into an Effect link and would score empty.",
+    "2. Highest evidence tier wins: an ITP row (replicated NIA mouse program) "
+    "beats any single-lab row.",
+    "3. Within a tier, a reported-significant result beats an unreported one, "
+    "which beats a reported null.",
+    "4. Remaining ties are broken by the MEDIAN average-lifespan change (the "
+    "lower median on even counts), never by the maximum — no cherry-picking.",
+    "5. If every row for a compound is ineligible under rule 1, the compound is "
+    "reported as unscorable rather than silently omitted.",
+)
+
+#: Preference among significance labels WITHIN one evidence tier (higher wins).
+#: For a non-ITP row the significance also caps confidence (`sig-gate`), but for
+#: an ITP row the gate is neutral — ITP folds significance into the TIER
+#: (ITP_Positive / ITP_Negative, both confidence 0.90). So without this rule the
+#: two ITP astaxanthin rows tie and the median tie-break picks the
+#: NotSignificant +3% female row over the Significant +12% male one.
+_SIGNIFICANCE_RANK = {"Significant": 2, "Unreported": 1, "NotSignificant": 0}
+
+
 def _collapse_best(rows: list[DrugAgeRow]) -> list[DrugAgeRow]:
-    """One representative row per compound: best evidence tier, median change."""
+    """One representative row per compound, per REPRESENTATIVE_POLICY."""
     by_compound: dict[str, list[DrugAgeRow]] = {}
     for r in rows:
         by_compound.setdefault(r.compound, []).append(r)
 
     picked: list[DrugAgeRow] = []
     for group in by_compound.values():
-        top = max(r.evidence_rank for r in group)
-        tier = [r for r in group if r.evidence_rank == top]
-        # Median-by-change representative (lower median on even counts); rows
-        # with no reported change sort as 0 so they don't dominate.
+        # Rule 1: a scoreless row can never produce a ranking entry, so it must
+        # never be the representative when a scorable row exists.
+        eligible = [r for r in group if r.scorable] or group
+        # Rules 2-3.
+        top = max(
+            (r.evidence_rank, _SIGNIFICANCE_RANK.get(r.significance or "Unreported", 1))
+            for r in eligible
+        )
+        tier = [
+            r for r in eligible
+            if (r.evidence_rank,
+                _SIGNIFICANCE_RANK.get(r.significance or "Unreported", 1)) == top
+        ]
+        # Rule 4: median-by-change representative (lower median on even counts).
         tier.sort(key=lambda r: (r.avg_change if r.avg_change is not None else 0.0, r.row_id))
         picked.append(tier[(len(tier) - 1) // 2])
     return picked

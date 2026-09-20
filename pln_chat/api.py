@@ -56,6 +56,8 @@ from config import (
     OPENAI_API_KEY,
     PLN_CORS_ORIGINS,
     PLN_MAX_KB_FILE_BYTES,
+    PLN_MAX_RANK_COMPOUNDS,
+    PLN_MAX_RANK_ROWS,
     PLN_RUNTIME_AVAILABLE,
 )
 from ontology.loader import load_specific_files, parse_metta_text
@@ -64,7 +66,10 @@ from ontology.expander import run_expansion_pipeline
 from ontology.drugage_selector import BUILD_DRUGAGE
 from core.context_builder import build_system_prompt
 from core.drugage_router import (
+    SCORE_SEMANTICS,
+    _row_out,
     parse_drugage_query,
+    rank_drugage,
     resolve_compounds,
     route_drugage_ranking,
 )
@@ -394,7 +399,18 @@ class QueryResponse(BaseModel):
     explanation: str
     intent: str
     requires_pln_inference: bool
-    confidence_filter: float
+    confidence_filter: float = Field(
+        description="The threshold the LLM TRANSLATOR suggested for this question — "
+                    "informational only, it is not applied. The threshold that was "
+                    "actually applied is `confidence_threshold_applied`.",
+    )
+    confidence_threshold_applied: float = Field(
+        description="The `confidence_threshold` from the request, as applied to "
+                    "`pln_results`. A collapsed result (a ranking, a diagnosis, a "
+                    "tiered recommendation) is filtered ENTRY BY ENTRY, not as a "
+                    "whole — before this it was kept or dropped on its leading "
+                    "entry's confidence, which made the parameter look inert.",
+    )
     warnings: list[str]
     validation_valid: bool
     validation_issues: list[str]
@@ -450,6 +466,11 @@ class MettaRunRequest(BaseModel):
 
 class MettaRunResponse(BaseModel):
     metta_query: str
+    confidence_threshold_applied: float = Field(
+        default=0.0,
+        description="The `confidence_threshold` from the request, as applied to "
+                    "`pln_results` (entry by entry inside a collapsed result).",
+    )
     validation_valid: bool
     validation_issues: list[str]
     pln_status: str
@@ -493,13 +514,33 @@ class DrugAgeRankRequest(BaseModel):
     compounds: list[str] = Field(
         ...,
         min_length=1,
+        max_length=PLN_MAX_RANK_COMPOUNDS,
         description="DrugAge intervention names, e.g. ['Rapamycin', 'Metformin', 'Resveratrol']. "
-                    "Matched case-/separator-insensitively against DrugAge rows. Keep the pool "
-                    "to a handful — the underlying ranking is ~O(n^2).",
+                    "Synonyms, abbreviations and Greek letters are resolved (see `resolutions` "
+                    f"in the response). At most {PLN_MAX_RANK_COMPOUNDS} per request.",
     )
     confidence_threshold: float = Field(
         default=DEFAULT_CONFIDENCE_THRESHOLD, ge=0.0, le=1.0,
-        description="Ranked results below this STV confidence are filtered out.",
+        description="Compounds whose calibrated STV confidence is below this are moved to "
+                    "`filtered_out` instead of being ranked. NB the confidence you see is "
+                    "always 0.9 x the row's evidence tier (the Lifespan -> Mortality chain "
+                    "discount): an ITP row reads 0.81, a non-ITP mouse row 0.45. See "
+                    "`semantics.confidence_tiers`.",
+    )
+    strategy: Literal["linear", "metta_sort"] = Field(
+        default="linear",
+        description="'linear' scores each compound separately and sorts in Python — "
+                    "~70 ms per compound, and each compound carries its own truth value "
+                    "so confidence_threshold can filter per compound. 'metta_sort' is the "
+                    "original single rank-interventions call whose MeTTa insertion sort "
+                    "is O(n^2) (n=10 takes ~6 s); it is the reference implementation, "
+                    "kept for parity checking.",
+    )
+    include_rows: bool = Field(
+        default=True,
+        description="Return every matching DrugAge row (species, sex, significance, "
+                    "change percent, PMID), not just the representative one the score "
+                    "was computed from.",
     )
 
 
@@ -524,6 +565,30 @@ class CompoundResolutionOut(BaseModel):
     )
 
 
+class ScoredCompoundOut(BaseModel):
+    """One compound's calibrated, signed effect on mortality."""
+    compound: str
+    score: float = Field(description="strength x confidence, signed so higher is better.")
+    sign: str = Field(description="'Neg' = protective (lowers mortality) | 'Pos' = harmful.")
+    direction: str = Field(description="'protective' | 'harmful' — the sign in words.")
+    strength: float
+    confidence: float
+    atom: str = Field(description="The MeTTa (scored ...) tuple this row was parsed from.")
+
+
+class DrugAgeRowOut(BaseModel):
+    """One raw DrugAge experiment row behind a ranked compound."""
+    row_id: str
+    compound: str
+    species: Optional[str] = None
+    sex: Optional[str] = None
+    is_itp: bool = False
+    significance: Optional[str] = None
+    avg_lifespan_change_percent: Optional[float] = None
+    pmid: Optional[str] = None
+    scorable: bool = True
+
+
 class DrugAgeRankResponse(BaseModel):
     status: str
     mode: str
@@ -539,6 +604,45 @@ class DrugAgeRankResponse(BaseModel):
         description="One entry per requested compound saying which DrugAge symbol it "
                     "was matched to and how. Read this before trusting an omission: "
                     "'sirolimus' is Rapamycin, 'NMN' is Nicotinamide_mononucleotide.",
+    )
+    ranked: list[ScoredCompoundOut] = Field(
+        default_factory=list,
+        description="The ranking as data, most protective first — no atom parsing needed.",
+    )
+    rows: list[DrugAgeRowOut] = Field(
+        default_factory=list,
+        description="Every DrugAge row behind the ranked compounds, with species and SEX. "
+                    "The score uses ONE representative row per compound (see "
+                    "`semantics.representative_row_policy`); this is how you audit that "
+                    "choice — e.g. astaxanthin's ITP study reports +12% in males "
+                    "(significant) and +3% in females (not significant).",
+    )
+    rows_truncated: bool = Field(
+        default=False,
+        description=f"True when more than {PLN_MAX_RANK_ROWS} rows matched and the list was cut.",
+    )
+    unscorable: list[str] = Field(
+        default_factory=list,
+        description="Compounds with a matching DrugAge row that reports no average "
+                    "lifespan change, so no Effect can be lifted and no score exists. "
+                    "Previously these came back as an empty score with no explanation.",
+    )
+    filtered_out: list[ScoredCompoundOut] = Field(
+        default_factory=list,
+        description="Compounds that scored but fell below `confidence_threshold`. "
+                    "Reported rather than silently dropped.",
+    )
+    strategy: str = Field(default="linear", description="Which scoring strategy ran.")
+    source: str = Field(
+        default="",
+        description="The DrugAge file the rows came from — the full ETL build or the "
+                    "committed 201-row sample are very different datasets.",
+    )
+    semantics: dict = Field(
+        default_factory=dict,
+        description="What the numbers mean: sign convention, the strength transform, the "
+                    "confidence tiers and the representative-row policy, read off the "
+                    ".metta calibration knobs.",
     )
     error: Optional[str] = Field(
         default=None,
@@ -735,6 +839,7 @@ def query(req: QueryRequest) -> QueryResponse:
         intent=translation.intent,
         requires_pln_inference=translation.requires_pln_inference,
         confidence_filter=translation.confidence_filter,
+        confidence_threshold_applied=req.confidence_threshold,
         warnings=translation.warnings,
         validation_valid=validation.valid,
         validation_issues=validation.issues,
@@ -822,6 +927,7 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
 
     return MettaRunResponse(
         metta_query=req.metta_query,
+        confidence_threshold_applied=req.confidence_threshold,
         validation_valid=validation.valid,
         validation_issues=validation.issues,
         pln_status=pln_result.status,
@@ -852,14 +958,31 @@ def drugage_rank(req: DrugAgeRankRequest) -> DrugAgeRankResponse:
     committed 201-row sample despite drugage_etl_short.metta existing in the
     repo; see GET /health's drugage_build_available before calling this.
     """
-    result = route_drugage_ranking(req.compounds, confidence_threshold=req.confidence_threshold)
-    resolutions = resolve_compounds(req.compounds)
+    ranking = rank_drugage(
+        req.compounds,
+        confidence_threshold=req.confidence_threshold,
+        strategy=req.strategy,
+        include_all_rows=req.include_rows,
+    )
+    result = ranking.result
+    rows = [_row_out(r) for r in ranking.rows]
+    truncated = len(rows) > PLN_MAX_RANK_ROWS
+    if truncated:
+        rows = rows[:PLN_MAX_RANK_ROWS]
 
     return DrugAgeRankResponse(
         status=result.status,
         mode=result.mode,
         query_time_ms=result.query_time_ms,
-        resolutions=[CompoundResolutionOut(**r.as_dict()) for r in resolutions],
+        resolutions=[CompoundResolutionOut(**r.as_dict()) for r in ranking.resolutions],
+        ranked=[ScoredCompoundOut(**s.as_dict()) for s in ranking.ranked],
+        rows=[DrugAgeRowOut(**r) for r in rows],
+        rows_truncated=truncated,
+        unscorable=ranking.unscorable,
+        filtered_out=[ScoredCompoundOut(**s.as_dict()) for s in ranking.filtered_out],
+        strategy=req.strategy,
+        source=ranking.source,
+        semantics=SCORE_SEMANTICS,
         results=[
             PLNAtomOut(
                 atom=r.atom,
