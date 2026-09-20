@@ -119,11 +119,17 @@ def _task_drugage_top(**kwargs) -> Any:
     return drugage_top(**kwargs)
 
 
+def _task_cellage_effects(**kwargs) -> Any:
+    from core.pln_runner import run_cellage_effects
+    return run_cellage_effects(**kwargs)
+
+
 _TASKS: dict[str, Callable[..., Any]] = {
     "run_query": _task_run_query,
     "rank_drugage": _task_rank_drugage,
     "route_drugage_ranking": _task_route_drugage_ranking,
     "drugage_top": _task_drugage_top,
+    "cellage_effects": _task_cellage_effects,
 }
 
 

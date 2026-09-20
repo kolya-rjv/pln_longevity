@@ -39,6 +39,28 @@ DRUGAGE_STACK: list[Path] = [
 ]
 
 
+# ── Scoped CellAge inference stack ───────────────────────────────────────────────
+# The MINIMAL set of layers needed to lift a CellAge curated senescence row into
+# an (Effect <gene> CellularSenescence <sign> (stv s c)) link, loaded into a
+# QUERY-SCOPED space alongside a filtered row slice (see run_cellage_effects).
+# It is even smaller than DRUGAGE_STACK: no species taxonomy (CellAge is human
+# cell lines only) and no intervention ranking (a gene is not an intervention,
+# and this layer deliberately does NOT bridge CellularSenescence to mortality —
+# see cellage_calibration.metta §2). Keeping the stack minimal is what keeps the
+# space under the hyperon abort boundary, which for this query shape is between
+# 125 and 150 data rows (measured; ontology.cellage_selector.MAX_ROWS).
+CELLAGE_STACK: list[Path] = [
+    ONTOLOGY_DIR / f for f in (
+        "system_types.metta",
+        "logical_predicates.metta",
+        "epistemic_calibration.metta",
+        "evidence_calibration.metta",
+        "pln_deduction.metta",
+        "cellage_calibration.metta",
+    )
+]
+
+
 @dataclass
 class PLNAtomResult:
     atom: str
@@ -547,3 +569,135 @@ def run_drugage_ranking(
         query_time_ms=raw.query_time_ms,
         mode=raw.mode,
     ), rows
+
+
+@dataclass
+class CellAgeEffect:
+    """One `(Effect <gene> CellularSenescence <sign> (stv s c))` the engine lifted."""
+    gene_atom: str
+    sign: str            # "Pos" = induces senescence | "Neg" = inhibits it
+    strength: float
+    confidence: float
+    atom: str
+    #: The CellAge row this link was lifted from, and the qualifiers that row
+    #: carries. The LINK itself is identical for every curated row of a gene (the
+    #: strength is a single curated prior), so without this a gene with three
+    #: rows comes back as three indistinguishable objects and the caller cannot
+    #: tell whether that is three findings or one repeated. None when the
+    #: engine's results could not be aligned to the injected rows one-to-one.
+    row_id: Optional[str] = None
+    senescence_type: Optional[str] = None
+    cell_context: Optional[str] = None
+    pmid: Optional[str] = None
+
+    @property
+    def direction(self) -> str:
+        return "induces_senescence" if self.sign == "Pos" else "inhibits_senescence"
+
+    def as_dict(self) -> dict:
+        return {
+            "gene_atom": self.gene_atom,
+            "sign": self.sign,
+            "direction": self.direction,
+            "strength": self.strength,
+            "confidence": self.confidence,
+            "atom": self.atom,
+            "row_id": self.row_id,
+            "senescence_type": self.senescence_type,
+            "cell_context": self.cell_context,
+            "pmid": self.pmid,
+            # Named so a caller can never mistake this for the ETL's own
+            # `(Causes … (stv 0.82 0.70))` numbers, which are not calibrated.
+            "confidence_source": "epistemic_calibration.metta: "
+                                 "(evidence-confidence InVitro)",
+            "strength_source": "cellage_calibration.metta §1: curated prior "
+                               "(CellAge records a direction, not a magnitude)",
+        }
+
+
+_CELLAGE_EFFECT_RE = re.compile(
+    r"\(Effect\s+(?P<gene>\S+)\s+CellularSenescence\s+(?P<sign>Pos|Neg)\s+"
+    r"\(stv\s+(?P<strength>[-+\d.eE]+)\s+(?P<confidence>[-+\d.eE]+)\)\)"
+)
+
+
+def parse_cellage_effects(atom: str) -> list[CellAgeEffect]:
+    """Every `(Effect … CellularSenescence …)` link inside `atom`."""
+    out: list[CellAgeEffect] = []
+    for m in _CELLAGE_EFFECT_RE.finditer(atom):
+        try:
+            out.append(CellAgeEffect(
+                gene_atom=m.group("gene"),
+                sign=m.group("sign"),
+                strength=float(m.group("strength")),
+                confidence=float(m.group("confidence")),
+                atom=m.group(0),
+            ))
+        except ValueError:   # a malformed number never breaks a lookup
+            continue
+    return out
+
+
+def run_cellage_effects(
+    genes: list[str],
+    *,
+    limit: Optional[int] = None,
+    source: Optional[Path] = None,
+    confidence_threshold: float = 0.0,
+) -> tuple[PLNRunResult, list, list[CellAgeEffect]]:
+    """Lift the CellAge rows for `genes` into calibrated senescence Effect links.
+
+    Assembles a QUERY-SCOPED hyperon space = CELLAGE_STACK + only the CellAge
+    rows naming one of `genes` (selected by ontology.cellage_selector, capped
+    under the abort boundary), then evaluates `(cellage-effect &self <row>)` once
+    per selected row — one expression per row, so each link comes back as its own
+    atom with its own truth value, exactly as the `linear` DrugAge strategy does.
+
+    Per-row rather than per-gene on purpose: a gene with three curated rows (TP53
+    has three, one per senescence type) yields three links, and merging them into
+    one verdict would report a number no row states.
+
+    Returns (PLNRunResult, selected_rows, parsed_effects). An empty selection is
+    reported as `status="empty"` — an absence of CURATED ROWS, never an assertion
+    that the gene does not affect senescence.
+    """
+    from ontology.cellage_selector import MAX_ROWS, build_cellage_slice
+
+    slice_text, rows = build_cellage_slice(
+        genes,
+        limit=limit if limit is not None else MAX_ROWS,
+        source=source,
+    )
+    if not rows:
+        return (
+            PLNRunResult(
+                status="empty",
+                mode="runtime" if PLN_RUNTIME_AVAILABLE else "stub",
+            ),
+            rows,
+            [],
+        )
+
+    query = "\n".join(f"!(cellage-effect &self {r.row_id})" for r in rows)
+    raw = run_query(
+        query,
+        confidence_threshold=confidence_threshold,
+        kb_files=CELLAGE_STACK,
+        extra_atoms=slice_text,
+    )
+    effects: list[CellAgeEffect] = []
+    for atom in raw.results:
+        effects.extend(parse_cellage_effects(atom.atom))
+
+    # Align each link to the row it came from. One expression per row, each
+    # yielding exactly one link (every selected row is `liftable`), so the
+    # engine's result order is the row order. The equal-length check is the
+    # guard: if that assumption ever breaks the links come back WITHOUT row
+    # provenance rather than with someone else's.
+    if len(effects) == len(rows):
+        for effect, row in zip(effects, rows):
+            effect.row_id = row.row_id
+            effect.senescence_type = row.senescence_type
+            effect.cell_context = row.cell_context
+            effect.pmid = row.pmid
+    return raw, rows, effects

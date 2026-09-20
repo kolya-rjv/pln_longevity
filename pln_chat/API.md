@@ -102,6 +102,10 @@ to `pln_chat/logs/session_*.jsonl`. For browser clients, set
 | GET    | `/interventions`   | Which interventions target a hallmark of aging (and the reverse), with provenance — review records and bare `TargetsHallmark` facts kept apart |
 | GET    | `/hallmarks`       | Every hallmark in the KB, its anchor components and its interventions |
 | GET    | `/evidence/human`  | What HUMAN evidence the KB holds for an intervention — design, n, what was measured, what was found, PMID, tier; a null result and a missing record kept apart |
+| GET    | `/genes/sources`   | Which gene tables this instance can answer from — CellAge curated + expression, GenAge human + models — with row counts and availability |
+| GET    | `/genes`           | Filtered listing across all four gene sources: "which genes drive cellular senescence", "GenAge human genes", cross-source membership |
+| GET    | `/genes/{symbol_or_entrez}` | Everything known about one gene, with provenance; `?infer=true` also lifts its CellAge rows into calibrated senescence `Effect` links |
+| GET    | `/genes/intersection` | Genes two sources share — the CellAge ∩ GenAge answer — joined on entrez, with a warning when a symbol join is asked for across species |
 | GET    | `/patients`        | List the built-in patient profiles                            |
 | GET    | `/patients/markers`| Which biomarkers a caller-supplied patient may carry, and in what units |
 | POST   | `/patients/preview`| Validate your own patient and see the atoms it becomes — no inference |
@@ -221,7 +225,7 @@ against the raw `extra_atoms` path:
 
 ## Discovery without an LLM
 
-Five questions that used to be unanswerable are now plain GETs. None of them
+The questions that used to be unanswerable are now plain GETs. None of them
 spends an OpenAI call, and none of them needs the caller to already know the
 answer.
 
@@ -415,6 +419,139 @@ Two consequences worth reading literally:
   beyond 5 years, and that Joehanes 2016 (PMID 27651444) still finds 185
   smoking-associated CpGs differentially methylated in former versus never
   smokers. A strength of 1.0 would assert the opposite of what both papers say.
+
+**"Which genes drive cellular senescence?"**, **"GenAge human genes"** and
+**"CellAge ∩ GenAge"** — the first returned four hallmark *components*
+(`TelomereAttrition`, `DNADamage`, …) and not one of CellAge's 927 curated
+genes; the second came back empty; the third could not be expressed at all. And
+the one workaround failed too: selecting `cellage_genes.metta` or
+`genage_models_etl.metta` as `ontology_files` took the prompt to 417k / 386k
+tokens, over OpenAI's limit.
+
+The prompt half is fixed (an oversized file becomes a schema card — see the KB
+size note below). `GET /genes` is the other half:
+
+```bash
+curl 'localhost:7860/genes?source=cellage_curated&effect=Induces'      # 417 rows
+curl 'localhost:7860/genes?source=cellage_curated&effect=Inhibits'     # 510 rows
+curl 'localhost:7860/genes?source=genage_human'                        # 307 rows
+curl 'localhost:7860/genes?source=genage_models&organism=Mus%20musculus'
+curl 'localhost:7860/genes/TP53'                                       # or /genes/7157
+curl 'localhost:7860/genes/intersection'                               # 113 genes
+curl localhost:7860/genes/sources
+```
+
+```
+GET /genes?source=cellage_curated&effect=Induces
+  AAK1    22848  Induces  UnspecifiedSenescenceType  NonCancerCellContext  PMID_26583757
+  ABCB1    5243  Induces  StressInducedSenescence    CancerCellContext     PMID_10825123
+  ...  total 417, truncated true
+```
+
+These are **curated experimental annotations, not inference.** A CellAge effect
+label means a curator read a paper reporting that gene inducing or inhibiting
+senescence in a cell line. Nothing in a plain `/genes` response is ranked,
+weighted or derived.
+
+Four things about the shape are deliberate:
+
+* **It is read from the CSVs under `data/`, not from the generated MeTTa.**
+  `build/` is gitignored and is not on `_discover_metta_files`'s path, the files
+  are 8-14x over `PLN_MAX_KB_FILE_BYTES`, and loading one into a hyperon space
+  aborts the interpreter. There is also a data reason:
+  `genage_models_parser.py:57` writes the sanitised atom back out as the gene
+  name, so `aak-2` is emitted as `(GeneSymbol aak_2 "aak_2")` and the real
+  symbol is gone. The index keeps `aak-2`. When the unpacked tables are missing
+  (they are gitignored) the committed `.zip` archives are read in memory
+  instead, and a source that cannot be read at all comes back
+  `available: false` with a note — never a silently short answer.
+* **One record per (source, row), not per gene.** CellAge annotates TP53 three
+  times, one per senescence type; collapsing those would pick a winner no source
+  picked. Records are *sparse* — a CellAge row has no `organism` key at all
+  rather than `organism: null`, because a null there would read as "looked and
+  found nothing". `GET /genes/sources` lists which keys each source contributes.
+* **Entrez is the join key.** CellAge ∩ GenAge human is 113 genes by entrez and
+  112 by symbol — close enough to look interchangeable, and it is not. Against
+  `genage_models` the gap stops being cosmetic: 1 gene by entrez, 67 by symbol,
+  and those 67 are worm/yeast/fly ORTHOLOGUES that happen to share a name
+  (`ATM`, `AKT1`, `BRCA1`), not the same gene measured twice. A symbol join
+  across that boundary always returns a `warnings` entry saying so.
+* **Every listing is capped** (200 max) and carries `total` with an explicit
+  `truncated` flag, so a page is never mistaken for the whole answer.
+
+Each record also carries `metta_row_id` — the atom the ETL gives that row
+(`CellAgeRow_869`, `GenAgeHumanRow_5`) — so a Python answer can be traced back
+to the MeTTa the engine would see. Rows the ETL filters out (an `Unclear`
+CellAge effect, an organism the models parser does not map) carry `null` there,
+which is how you can tell.
+
+**A real ETL defect, fixed in passing.** `cellage_etl.py` built its provenance
+token as `f"PMID_{atom(ref, 'PMID_')}"`, and `atom()` already prepends `PMID_`
+to an all-digit reference — which every CellAge reference is. So every CellAge
+provenance atom read `(ReportedIn CellAgeRow_0 PMID_PMID_26583757)`: a symbol
+matching no real PMID and joining to nothing. The ETL now emits
+`PMID_26583757`, **so regenerating it changes the generated symbol**; readers
+normalise both spellings, because a `build/` made before the fix is still on
+disk and still has to be readable.
+
+**Gene inference, opt-in:** `GET /genes/{gene}?infer=true`
+
+```bash
+curl 'localhost:7860/genes/TP53?infer=true'
+# -> (Effect Gene_TP53 CellularSenescence Pos (stv 0.7 0.35))  x3, one per row
+curl 'localhost:7860/genes/SIRT1?infer=true'
+# -> (Effect Gene_SIRT1 CellularSenescence Neg (stv 0.7 0.35))
+```
+
+This is the one place in the gene stack a number is produced. It selects the
+gene's CellAge rows, injects them into a query-scoped hyperon space with
+`cellage_calibration.metta`, and lifts each into a signed, calibrated link — the
+same architecture as the DrugAge lift, with a smaller stack
+(`pln_runner.CELLAGE_STACK`). In MeTTa:
+
+```
+!(cellage-effect &self CellAgeRow_869)
+!(cellage-gene-effects &self Gene_TP53)
+!(genes-affecting-senescence &self Increases)
+```
+
+The returned `semantics` block says where both numbers come from, every time:
+
+* **strength is a curated prior, identical for every curated row.** CellAge
+  records a direction and no effect size, so there is no magnitude to report and
+  none is invented. A per-row spread here would rank genes by a number no source
+  states.
+* **confidence is `(evidence-confidence InVitro)`** from
+  `epistemic_calibration.metta`, written as that lookup rather than as a
+  literal — retuning the tier retunes this layer, and a test proves it by
+  retuning it.
+* **the ETL's own numbers are not used.** `build/cellage_genes.metta` also
+  carries `(Causes Gene_TP53 (Increases CellularSenescence) (stv 0.82 0.70))`.
+  Those are computed by `cellage_etl.calibrated_stv` from the senescence type
+  and the cancer-cell flag; they do not come from `epistemic_calibration.metta`,
+  they are not calibrated, and this layer ignores them.
+
+Three absences are reported rather than papered over. An `Unclear` CellAge
+curation yields **no** link — the source declined to state a direction, so
+neither does the engine. A gene with no CellAge row says so instead of returning
+an empty list. And the expression signatures (1,259 genes differentially
+expressed in senescent cells) are deliberately **not** lifted: a gene going up
+in senescent cells is a correlation, and lifting it into `(Effect …)` would
+convert association into causation at scale.
+
+**This layer does not chain senescence to mortality.** `CellularSenescence` is a
+hallmark, not an outcome, and the obvious bridge would get the sign wrong in
+half the biology — senescence is tumour-suppressive in a cancer cell and
+damaging in an ageing tissue. The KB holds no evidence that fixes that sign, so
+no gene falls out of a mortality ranking on the strength of a CellAge row. Same
+stance as `TargetsHallmark`.
+
+The slice is capped at **100 rows**, enforced before hyperon is called, because
+the failure it prevents is an abort rather than an exception. Measured on this
+machine against `!(genes-affecting-senescence &self Increases)`: 125 rows fine,
+150 rows abort. `build/` being gitignored, the selector falls back to a
+committed 25-row fixture and the response says which one it used — a sample is
+never presented as the corpus.
 
 **"List your data sources and counts"** — `GET /kb/schema`, below.
 

@@ -55,6 +55,25 @@ def qstr(value: Any) -> str:
     return f'"{s}"'
 
 
+def pmid_atom(value: Any) -> str:
+    """A reference cell -> exactly one `PMID_` prefix.
+
+    DEFECT FIXED HERE. This used to be written inline as
+    ``f"PMID_{atom(row[ref], 'PMID_')}"``, and `atom`'s `prefix_if_numeric`
+    already prepends `PMID_` to an all-digit reference — which every CellAge
+    reference is. So every provenance atom in a `build/` generated before this
+    fix reads `(ReportedIn CellAgeRow_0 PMID_PMID_26583757)`: a symbol that
+    matches no real PMID and joins to nothing.
+
+    Regenerating the ETL therefore CHANGES the generated symbol, from
+    `PMID_PMID_26583757` to `PMID_26583757`. Readers normalise both spellings
+    (`ontology.gene_index.normalise_pmid`), because an older build is still on
+    disk and still has to be readable.
+    """
+    token = atom(value, "PMID_")
+    return token if token.startswith("PMID_") else f"PMID_{token}"
+
+
 def num_or_unknown(value: Any) -> str:
     if pd.isna(value) or str(value).strip() == "":
         return "0"
@@ -142,7 +161,7 @@ def write_curated(df: pd.DataFrame, out_path: Path, keep_unclear_effect: bool) -
 
         row_id = f"CellAgeRow_{i}"
         gene = f"Gene_{atom(row[symbol])}"
-        pub = f"PMID_{atom(row[ref], 'PMID_')}"
+        pub = pmid_atom(row[ref])
         stype = senescence_type_atom(row[sen_type])
         ctx = cancer_context_atom(row[cancer])
         effect_label = atom(row[effect], "SenescenceEffect_")

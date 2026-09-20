@@ -73,6 +73,12 @@ from ontology.registry import BUILTIN_REGISTRY, OntologyRegistry
 from ontology.expander import run_expansion_pipeline
 from ontology.drugage_scoring import load_knobs
 from ontology.drugage_selector import BUILD_DRUGAGE
+from ontology.gene_index import (
+    MAX_LIMIT as GENE_MAX_LIMIT,
+    NON_HUMAN_SOURCES,
+    SOURCE_KEYS,
+    gene_index,
+)
 from core.context_builder import build_system_prompt
 from core.patient_builder import (
     MARKERS,
@@ -99,7 +105,7 @@ from core.drugage_router import (
 )
 from core.llm_translator import translate
 from core.metta_validator import ValidationResult, validate
-from core.pln_runner import run_query
+from core.pln_runner import CELLAGE_STACK, run_cellage_effects, run_query
 from utils.formatting import format_bot_response
 from utils.logging import log_http_request, log_turn
 
@@ -1631,6 +1637,546 @@ def human_evidence(intervention: Optional[str] = None) -> HumanEvidenceResponse:
         covered_outcomes=index.covered_outcomes(),
         note=note,
     )
+
+
+# ── Gene queries: CellAge + GenAge ───────────────────────────────────────────
+# Evaluation §4: the gene data was on disk and unreachable. "Which genes drive
+# cellular senescence?" returned four hallmark components; "GenAge human genes"
+# was empty; "CellAge ∩ GenAge" could not be expressed; and selecting a gene ETL
+# as `ontology_files` blew the prompt past OpenAI's limit. The prompt half is
+# fixed (an oversized file becomes a schema card). These routes are the other
+# half: the data, answered directly, with no LLM and no hyperon in the default
+# path. See ontology/gene_index.py for why the CSVs and not the generated MeTTa.
+
+#: Which columns each source contributes to a gene record. Returned by
+#: GET /genes/sources because the record objects are SPARSE — a CellAge row has
+#: no `organism` key at all rather than `organism: null`, since a null there
+#: would read as "looked and found nothing" instead of "that table has no such
+#: column". This map is how an agent learns the shape instead.
+GENE_FIELDS_BY_SOURCE: dict[str, list[str]] = {
+    "cellage_curated": [
+        "senescence_effect", "senescence_direction", "senescence_type",
+        "cell_context", "pmids",
+    ],
+    "cellage_expression": [
+        "expression_direction", "expression_samples", "p_value",
+    ],
+    "genage_human": ["uniprot", "selection_basis"],
+    "genage_models": [
+        "organism", "lifespan_effect", "longevity_influence",
+        "avg_lifespan_change_percent",
+    ],
+}
+
+#: Every record also carries these.
+GENE_COMMON_FIELDS: list[str] = [
+    "source", "row_index", "symbol", "entrez", "gene_name", "metta_row_id",
+]
+
+#: What a lifted CellAge Effect link means, returned beside the links so the
+#: numbers can never travel without their provenance.
+CELLAGE_EFFECT_SEMANTICS: dict = {
+    "link": "(Effect <gene> CellularSenescence <sign> (stv <strength> <confidence>))",
+    "sign": "Pos = the gene INDUCES cellular senescence; Neg = it INHIBITS it.",
+    "strength": "A curated prior from cellage_calibration.metta §1, IDENTICAL for "
+                "every curated row. CellAge records a direction and no effect "
+                "size, so there is no magnitude to report and none is invented.",
+    "confidence": "(evidence-confidence InVitro) from epistemic_calibration.metta "
+                  "— CellAge curation is cell-line experimental evidence.",
+    "not_the_etl_numbers": "build/cellage_genes.metta also carries "
+                           "(Causes <gene> (Increases CellularSenescence) "
+                           "(stv 0.82 0.70)). Those are computed by "
+                           "cellage_etl.calibrated_stv from the senescence type "
+                           "and the cancer-cell flag; they are NOT calibrated and "
+                           "this layer ignores them.",
+    "one_link_per_row": "A gene with three curated rows yields three links, not a "
+                        "merged verdict. Averaging them would report a number no "
+                        "row states.",
+    "no_mortality_bridge": "CellularSenescence is a hallmark, not an outcome. This "
+                           "layer does NOT chain senescence to mortality: "
+                           "senescence is tumour-suppressive in a cancer cell and "
+                           "damaging in an ageing tissue, and the KB holds no "
+                           "evidence that fixes that sign.",
+}
+
+
+class GeneSourceOut(BaseModel):
+    source: str
+    label: str
+    available: bool = Field(
+        description="False means the table could not be read at all — an absence "
+                    "of DATA, never an assertion about a gene.",
+    )
+    rows: int
+    file: Optional[str] = None
+    origin: Optional[str] = Field(
+        default=None,
+        description="\"csv\" (the unpacked table under data/, gitignored) or "
+                    "\"zip\" (the committed archive, read in memory).",
+    )
+    note: Optional[str] = None
+    fields: list[str] = Field(
+        default_factory=list,
+        description="The source-specific keys a record from this source carries, "
+                    "on top of the common ones.",
+    )
+
+
+class GeneSourcesResponse(BaseModel):
+    sources: list[GeneSourceOut]
+    common_fields: list[str]
+    total_records: int
+    distinct_entrez: int
+    distinct_symbols: int
+    vocabularies: dict = Field(
+        description="The exact values the /genes filters accept, read off the "
+                    "data rather than hard-coded.",
+    )
+    note: str
+
+
+class GeneLookupResponse(BaseModel):
+    query: str
+    resolved_as: Optional[str] = Field(
+        default=None,
+        description="\"entrez\" when the key was all digits, else \"symbol\".",
+    )
+    entrez: Optional[int] = None
+    symbols: list[str] = Field(default_factory=list)
+    gene_name: Optional[str] = None
+    sources: list[str] = Field(
+        default_factory=list,
+        description="Every source holding this gene. Two entries that include "
+                    "both cellage_curated and genage_human ARE the intersection.",
+    )
+    records: list[dict] = Field(
+        default_factory=list,
+        description="One entry per (source, row). Sparse: a record carries only "
+                    "the keys its own table has — see GET /genes/sources.",
+    )
+    inference: Optional[dict] = Field(
+        default=None,
+        description="Present only with `infer=true`: the CellAge rows lifted into "
+                    "calibrated (Effect … CellularSenescence …) links by hyperon.",
+    )
+    unavailable_sources: list[str] = Field(default_factory=list)
+    note: Optional[str] = None
+
+
+class GeneListResponse(BaseModel):
+    records: list[dict]
+    total: int = Field(description="Records matching the filters, before paging.")
+    returned: int
+    truncated: bool = Field(
+        description="True when `total` exceeds what was returned, so an empty "
+                    "tail is never mistaken for the end of the data.",
+    )
+    limit: int
+    offset: int
+    filters: dict
+    unavailable_sources: list[str] = Field(default_factory=list)
+    note: Optional[str] = None
+
+
+class GeneIntersectionResponse(BaseModel):
+    a: str
+    b: str
+    key: str
+    genes: list[dict]
+    total: int
+    returned: int
+    truncated: bool
+    a_genes: int = Field(description="Distinct genes in `a` under this join key.")
+    b_genes: int
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="Reasons this particular join may not mean what it looks like.",
+    )
+    note: Optional[str] = None
+
+
+def _gene_source_error(value: str) -> HTTPException:
+    return HTTPException(
+        status_code=422,
+        detail={
+            "code": "unknown_source",
+            "message": f"Unknown gene source {value!r}.",
+            "known_sources": list(SOURCE_KEYS),
+        },
+    )
+
+
+def _unavailable(index) -> list[str]:
+    return [k for k, s in index.status.items() if not s.available]
+
+
+def _gene_limit(limit: int) -> int:
+    if limit < 1 or limit > GENE_MAX_LIMIT:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "invalid_limit",
+                "message": f"limit must be between 1 and {GENE_MAX_LIMIT}.",
+            },
+        )
+    return limit
+
+
+@app.get("/genes/sources", response_model=GeneSourcesResponse)
+def gene_sources() -> GeneSourcesResponse:
+    """What gene data this instance can actually answer from. No LLM.
+
+    Four tables — CellAge curated (927 senescence genes after the ETL's Unclear
+    filter, 949 rows in the source), CellAge expression signatures (1,259),
+    GenAge human (307) and GenAge model organisms (2,205) — read from
+    `data/`, or from the committed `.zip` archives when the unpacked tables are
+    absent, because `data/**/*.csv` is gitignored.
+
+    A source that cannot be read at all comes back `available: false` with a
+    note. Every other gene route then reports it in `unavailable_sources`
+    instead of returning a silently short answer.
+    """
+    index = gene_index()
+    return GeneSourcesResponse(
+        sources=[
+            GeneSourceOut(
+                **index.status[k].as_dict(),
+                fields=GENE_FIELDS_BY_SOURCE.get(k, []),
+            )
+            for k in SOURCE_KEYS if k in index.status
+        ],
+        common_fields=GENE_COMMON_FIELDS,
+        total_records=len(index.records),
+        distinct_entrez=len(index.by_entrez),
+        distinct_symbols=len(index.by_symbol),
+        vocabularies={
+            "effect": index.vocabulary("senescence_effect"),
+            "senescence_type": index.vocabulary("senescence_type"),
+            "cell_context": index.vocabulary("cell_context"),
+            "organism": index.vocabulary("organism"),
+            "lifespan_effect": index.vocabulary("lifespan_effect"),
+            "longevity_influence": index.vocabulary("longevity_influence"),
+            "expression_direction": index.vocabulary("expression_direction"),
+        },
+        note=(
+            "These are CURATED DATABASE ANNOTATIONS, not inference. A CellAge "
+            "effect label means a curator read a paper reporting that gene "
+            "inducing or inhibiting senescence in a cell line. Nothing here is "
+            "derived, ranked or weighted unless you ask for it with infer=true."
+        ),
+    )
+
+
+@app.get("/genes/intersection", response_model=GeneIntersectionResponse)
+def gene_intersection(
+    a: str = "cellage_curated",
+    b: str = "genage_human",
+    key: Literal["entrez", "symbol"] = "entrez",
+    limit: int = 100,
+    offset: int = 0,
+) -> GeneIntersectionResponse:
+    """Genes held by two sources at once — the "CellAge ∩ GenAge" answer. No LLM.
+
+    The evaluation could not express this question at all. The default pair is
+    the one it asked for, and the answer is **113 genes** joined on entrez id.
+
+    `key=entrez` is the default because it is the join that works. The symbol
+    join finds 112 for the same pair — close enough to look interchangeable, and
+    it is not: it loses one gene and would silently pick up aliases.
+
+    Against `genage_models` the difference stops being cosmetic. That table is
+    worm, yeast, fly and mouse, so entrez finds **1** shared gene (the id spaces
+    are per-species) while symbols find 67 — and those 67 are ORTHOLOGUES with
+    matching names (`ATM`, `AKT1`, `BRCA1`), not the same gene measured twice.
+    A symbol join involving GenAge models therefore always comes back with a
+    `warnings` entry saying so, and `genage_models_parser.py` destroys the real
+    symbols in its MeTTa output anyway (`aak-2` is emitted as `aak_2`), which is
+    the second reason this index is built from the CSVs.
+    """
+    limit = _gene_limit(limit)
+    if offset < 0:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "invalid_offset", "message": "offset must be >= 0."},
+        )
+    for value in (a, b):
+        if value not in SOURCE_KEYS:
+            raise _gene_source_error(value)
+    if a == b:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "invalid_filter",
+                "message": "a and b must name two different sources.",
+            },
+        )
+
+    index = gene_index()
+    genes = index.intersect(a, b, key=key)
+    table = index.sources_by_entrez if key == "entrez" else index.sources_by_symbol
+    a_genes = sum(1 for srcs in table.values() if a in srcs)
+    b_genes = sum(1 for srcs in table.values() if b in srcs)
+
+    warnings: list[str] = []
+    if key == "symbol" and NON_HUMAN_SOURCES & {a, b}:
+        warnings.append(
+            "A SYMBOL-KEYED JOIN AGAINST GenAge models IS AN ORTHOLOGY CLAIM, not "
+            "an identity. That table is Caenorhabditis elegans, Saccharomyces "
+            "cerevisiae, Drosophila melanogaster and Mus musculus; a shared "
+            "symbol means the two organisms' genes were given the same name, not "
+            "that the same gene appears twice. Joining the same pair on entrez "
+            "gives 1 gene, not 67."
+        )
+    elif key == "entrez" and NON_HUMAN_SOURCES & {a, b}:
+        warnings.append(
+            "Entrez ids are species-specific, so a human source and GenAge "
+            "models barely overlap by construction. A near-empty result here is "
+            "correct, and is not evidence that the two sets are unrelated."
+        )
+    for source in (a, b):
+        if not index.status.get(source) or not index.status[source].available:
+            warnings.append(
+                f"Source '{source}' could not be read, so this intersection is "
+                f"empty for want of data, not for want of shared genes."
+            )
+
+    page = genes[offset:offset + limit]
+    return GeneIntersectionResponse(
+        a=a, b=b, key=key,
+        genes=page,
+        total=len(genes),
+        returned=len(page),
+        truncated=len(genes) > offset + len(page),
+        a_genes=a_genes,
+        b_genes=b_genes,
+        warnings=warnings,
+        note=(
+            f"{len(genes)} genes are in both '{a}' and '{b}' by {key}. Each entry "
+            f"lists every symbol the two sides use, so a disagreement is visible "
+            f"rather than resolved silently."
+        ),
+    )
+
+
+@app.get("/genes", response_model=GeneListResponse)
+def gene_list(
+    source: Optional[str] = None,
+    effect: Optional[str] = None,
+    senescence_type: Optional[str] = None,
+    cell_context: Optional[str] = None,
+    organism: Optional[str] = None,
+    in_sources: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> GeneListResponse:
+    """Filtered listing across CellAge and GenAge. No LLM, no hyperon.
+
+    **"Which genes drive cellular senescence?"** is
+    `?source=cellage_curated&effect=Induces` — 417 curated rows, each with the
+    PMID it was curated from, the senescence type, the cell context and the
+    `CellAgeRow_…` atom it becomes in the ETL. `effect=Inhibits` is the other
+    510. These are CURATED EXPERIMENTAL ANNOTATIONS, not inferred: a curator
+    read a paper reporting that gene inducing or inhibiting senescence in a cell
+    line, and that is the entire claim. Nothing here is ranked or weighted.
+
+    **"GenAge human genes"** is `?source=genage_human` — 307 rows with their
+    uniprot id and the curators' selection basis (`human`, `mammal`,
+    `functional`, …), the same vocabulary `epistemic_calibration.metta` maps to a
+    confidence.
+
+    `in_sources` is the cross-source filter, comma-separated: a record is kept
+    when its gene appears in ALL the named sources, joined on entrez.
+    `?source=cellage_curated&in_sources=cellage_curated,genage_human` is the 113
+    shared genes as CellAge rows.
+
+    Every listing is capped and carries `total` with an explicit `truncated`
+    flag, so a page is never mistaken for the whole answer.
+    """
+    limit = _gene_limit(limit)
+    if offset < 0:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "invalid_offset", "message": "offset must be >= 0."},
+        )
+    if source is not None and source not in SOURCE_KEYS:
+        raise _gene_source_error(source)
+    wanted = [s.strip() for s in in_sources.split(",")] if in_sources else None
+    for value in (wanted or []):
+        if value and value not in SOURCE_KEYS:
+            raise _gene_source_error(value)
+
+    index = gene_index()
+    matched = index.select(
+        source=source,
+        effect=effect,
+        senescence_type=senescence_type,
+        cell_context=cell_context,
+        organism=organism,
+        in_sources=wanted,
+    )
+    page = matched[offset:offset + limit]
+
+    note = None
+    if not matched:
+        note = (
+            "No record matches these filters. Filter values are case-insensitive "
+            "but must come from the vocabularies in GET /genes/sources — they are "
+            "read off the data, so a value that is not there matches nothing by "
+            "construction."
+        )
+    return GeneListResponse(
+        records=[r.as_dict() for r in page],
+        total=len(matched),
+        returned=len(page),
+        truncated=len(matched) > offset + len(page),
+        limit=limit,
+        offset=offset,
+        filters={
+            "source": source, "effect": effect,
+            "senescence_type": senescence_type, "cell_context": cell_context,
+            "organism": organism, "in_sources": wanted,
+        },
+        unavailable_sources=_unavailable(index),
+        note=note,
+    )
+
+
+@app.get("/genes/{symbol_or_entrez}", response_model=GeneLookupResponse)
+def gene_lookup(symbol_or_entrez: str, infer: bool = False) -> GeneLookupResponse:
+    """Everything the KB knows about one gene, across all four sources. No LLM.
+
+    The key is a symbol (`TP53`, case-insensitive) or an entrez id (`7157`). The
+    response carries one record per (source, row) with its provenance — the PMID
+    CellAge curated it from, the senescence type and cell context it was seen in,
+    the organism and reported lifespan change for a GenAge models row, the
+    selection basis for a GenAge human row — plus `sources`, which is this gene's
+    membership across the four tables and therefore its own intersection answer.
+
+    A gene appears once per ROW, not once per gene: CellAge annotates TP53 three
+    times, one per senescence type, and collapsing those would pick a winner no
+    source picked.
+
+    `infer=true` additionally runs the ONE piece of real inference available
+    here: it selects this gene's CellAge rows, injects them into a query-scoped
+    hyperon space with `cellage_calibration.metta`, and lifts each into
+    `(Effect <gene> CellularSenescence <sign> (stv s c))`. The strength is a
+    curated prior identical for every row (CellAge reports a direction and no
+    effect size) and the confidence is `(evidence-confidence InVitro)` — the
+    returned `semantics` block says both, every time, so the numbers cannot
+    travel without their provenance. The ETL's own `(Causes … (stv 0.82 0.70))`
+    atoms are NOT that, and are not used.
+    """
+    index = gene_index()
+    records, resolved_as = index.lookup(symbol_or_entrez)
+
+    entrez = next((r.entrez for r in records if r.entrez is not None), None)
+    symbols = sorted({r.symbol for r in records})
+    sources = sorted({r.source for r in records})
+
+    note = None
+    if not records:
+        note = (
+            f"No record for '{symbol_or_entrez}' in any of "
+            f"{', '.join(SOURCE_KEYS)}. These are four curated tables, not a "
+            f"census of the genome, so this means the gene was not curated into "
+            f"any of them — it is not a statement about the gene. Try an entrez "
+            f"id if you passed an alias."
+        )
+
+    inference = None
+    if infer:
+        inference = _cellage_inference(symbols or [symbol_or_entrez], entrez, records)
+
+    return GeneLookupResponse(
+        query=symbol_or_entrez,
+        resolved_as=resolved_as if records else None,
+        entrez=entrez,
+        symbols=symbols,
+        gene_name=next((r.gene_name for r in records if r.gene_name), None),
+        sources=sources,
+        records=[r.as_dict() for r in records],
+        inference=inference,
+        unavailable_sources=_unavailable(index),
+        note=note,
+    )
+
+
+def _cellage_inference(symbols: list[str], entrez: Optional[int], records) -> dict:
+    """The `infer=true` block of GET /genes/{key}: lift this gene's CellAge rows.
+
+    Kept apart from the route so the honest failure cases stay readable. There
+    are three, and none of them is an exception:
+
+    * no CellAge curated record for this gene -> nothing to lift;
+    * `build/cellage_genes.metta` absent -> the slice comes off the committed
+      25-row fixture, which is said so in `source`, or off nothing at all;
+    * the hyperon runtime disabled -> reported, not faked.
+    """
+    from ontology.cellage_selector import MAX_ROWS, build_available, resolved_source
+
+    keys: list[str] = list(symbols)
+    if entrez is not None:
+        keys.append(str(entrez))
+    source = resolved_source()
+
+    if not any(r.source == "cellage_curated" for r in records):
+        return {
+            "requested": True,
+            "available": False,
+            "effects": [],
+            "rows_injected": 0,
+            "source": source,
+            "note": "No CellAge curated record names this gene, so there is no "
+                    "row to lift. CellAge is the only source this layer lifts: "
+                    "GenAge rows are lifespan phenotypes in model organisms, not "
+                    "senescence effects, and the expression signatures are "
+                    "correlations that must not become causal links.",
+        }
+    if source is None:
+        return {
+            "requested": True,
+            "available": False,
+            "effects": [],
+            "rows_injected": 0,
+            "source": None,
+            "note": "build/cellage_genes.metta has not been generated (run "
+                    "scripts/run_etl.sh) and no committed fixture is present, so "
+                    "there are no row blocks to inject.",
+        }
+
+    result, rows, effects = run_offloaded(
+        "cellage_effects",
+        {"genes": keys, "limit": MAX_ROWS},
+        lambda: run_cellage_effects(keys, limit=MAX_ROWS),
+    )
+    if result.status == "error":
+        _raise_pln_failure(result, stage="cellage_inference",
+                           extra={"genes": keys, "rows": len(rows)})
+
+    note = None
+    if not build_available():
+        note = (
+            f"build/cellage_genes.metta is absent, so the rows came from the "
+            f"committed sample at {source} — 25 rows of a 927-row table. Run "
+            f"scripts/run_etl.sh for the full set."
+        )
+    elif not effects:
+        note = ("CellAge holds rows for this gene but none carries a stated "
+                "direction, so no Effect link could be lifted. An `Unclear` "
+                "curation asserts nothing, and neither does the engine.")
+    return {
+        "requested": True,
+        "available": True,
+        "effects": [e.as_dict() for e in effects],
+        "rows_injected": len(rows),
+        "rows_cap": MAX_ROWS,
+        "source": source,
+        "mode": result.mode,
+        "query_time_ms": result.query_time_ms,
+        "stack": [p.name for p in CELLAGE_STACK],
+        "semantics": CELLAGE_EFFECT_SEMANTICS,
+        "note": note,
+    }
 
 
 @app.get("/kb/schema", response_model=KbSchemaResponse)
