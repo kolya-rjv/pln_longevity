@@ -265,7 +265,17 @@ def test_the_doubled_pmid_prefix_normalises_from_either_spelling():
 
 
 def test_the_etl_now_emits_exactly_one_pmid_prefix():
-    cellage_etl = pytest.importorskip("cellage_etl")
+    """Guards the `(ReportedIn CellAgeRow_0 PMID_PMID_26583757)` defect.
+
+    A plain import, NOT `pytest.importorskip`. That helper is for optional
+    third-party dependencies; `cellage_etl` is first-party code in this
+    repository, and skipping on it means a regression that breaks the ETL
+    module silently deletes its own regression test from the run instead of
+    failing it. `pandas`, which the module genuinely needs, is skipped for at
+    the top of this file.
+    """
+    import cellage_etl
+
     assert cellage_etl.pmid_atom("26583757") == "PMID_26583757"
     assert cellage_etl.pmid_atom(26583757) == "PMID_26583757"
 

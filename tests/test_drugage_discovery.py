@@ -296,3 +296,20 @@ def test_a_reported_null_is_not_labelled_protective():
     assert scored(0.0).score == 0.0
     assert scored(3.0).direction == "protective"
     assert scored(-3.0).direction == "harmful"
+
+
+def test_the_ranking_reports_how_many_compounds_it_could_not_score():
+    """"Ranks all 1,043 compounds" was 8 compounds too many.
+
+    `total_compounds` counted only compounds with a scorable row, while the
+    docs and the handler docstring both said 1,043 — the number of distinct
+    compounds DrugAge lists. The gap is 8 compounds with no reported lifespan
+    change on any row, which cannot be scored at all. Reporting one number and
+    naming it after the other hides them.
+    """
+    top = drugage_top(n=5, source=SAMPLE)
+    assert top.total_compounds_in_source >= top.total_compounds
+    assert (top.total_compounds_in_source - top.total_compounds
+            == top.unscorable_compounds)
+    # The sample fixture is known to contain at least one unscorable row.
+    assert top.unscorable_rows >= 1

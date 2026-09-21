@@ -333,3 +333,46 @@ def test_metta_run_accepts_a_patient_too(monkeypatch):
 
     assert body["patient_id"] == "Caller_W45"
     assert "(MeasuredZ Caller_W45" in run_query.call_args.kwargs["extra_atoms"]
+
+
+# ── a derived z is not an adjusted z, and the caller is told ─────────────────
+
+def test_a_server_derived_z_is_declared_unadjusted():
+    """GET /patients/markers publishes z as AGE- AND SEX-ADJUSTED. Derived ones aren't.
+
+    `Reference.to_z` standardises against a single POOLED mean and sd — this
+    repository has no stratified reference table — and the atom it produces,
+    `(MeasuredZ <patient> <marker> <z>)`, is indistinguishable from one built
+    from a properly adjusted z the caller sent. The provenance cannot go into
+    the space without inventing an adjustment that was never made, so it goes
+    into the response: `derived: true`, the formula, and this warning.
+    """
+    from core.patient_builder import build_patient
+
+    derived = build_patient({
+        "age": 45, "sex": "Female",
+        "markers": {"AgeAccelGrim": 1.2, "CRP": {"value": 4.0, "unit": "mg/L"}},
+    })
+    warning = next(
+        (w for w in derived.warnings if "NOT age- and sex-adjusted" in w), None
+    )
+    assert warning, derived.warnings
+    assert "CRP" in warning
+    # The marker that WAS sent as a z must not be named.
+    assert "AgeAccelGrim" not in warning
+    assert [m.derived for m in derived.markers if m.name == "CRP"] == [True]
+
+    # A patient whose every marker arrived as a z gets no such warning.
+    sent_as_z = build_patient({
+        "age": 45, "sex": "Female", "markers": {"AgeAccelGrim": 1.2, "CRP": 0.9},
+    })
+    assert not any("NOT age- and sex-adjusted" in w for w in sent_as_z.warnings)
+
+
+def test_the_published_z_convention_says_which_z_it_describes():
+    """The convention text is what an integrator reads before sending values."""
+    response = _request("GET", "/patients/markers")
+    convention = response.json()["z_convention"]
+    assert "AGE- AND SEX-ADJUSTED" in convention
+    # …and, since the server also PRODUCES z-scores, which of the two it means.
+    assert "DERIVES" in convention and "NOT" in convention

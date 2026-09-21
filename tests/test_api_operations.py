@@ -404,3 +404,35 @@ def test_a_callers_patient_is_appended_after_the_static_prompt_not_in_front(
         "the ontology snapshot would make every personalized request a cache miss"
     )
     assert "THIS REQUEST'S PATIENT" in personalized[len(static):]
+
+
+# ── the preflight an agent is told to call first is typed ────────────────────
+
+def test_health_is_described_in_the_openapi_schema(client):
+    """It was the one route with no `response_model`.
+
+    API.md tells integrators to hand an agent the base URL plus
+    `/openapi.json`, names `/health` the first call, and directs callers to
+    branch on `api_key_required` and `pln_execution` — none of which an
+    untyped `dict` return puts in the schema.
+    """
+    schema = client.get("/openapi.json").json()
+    ref = (schema["paths"]["/health"]["get"]["responses"]["200"]
+           ["content"]["application/json"]["schema"])
+    assert "$ref" in ref, "/health still returns an untyped object"
+
+    model = schema["components"]["schemas"][ref["$ref"].rsplit("/", 1)[-1]]
+    assert {"api_key_required", "pln_execution", "version", "runtime_ready"} \
+        <= set(model["properties"])
+
+    # …and the nested execution block, which is what tells a caller whether the
+    # deadline and the admission limit are actually being applied.
+    execution_ref = model["properties"]["pln_execution"]
+    name = execution_ref.get("$ref", "").rsplit("/", 1)[-1]
+    execution = schema["components"]["schemas"][name]
+    assert {"mode", "timeout_enforced", "admission_control", "timeout_seconds"} \
+        <= set(execution["properties"])
+
+    # The live response must satisfy the schema it advertises.
+    body = client.get("/health").json()
+    assert set(model["properties"]) <= set(body)

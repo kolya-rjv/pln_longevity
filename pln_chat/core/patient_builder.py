@@ -505,6 +505,25 @@ def build_patient(
             f"(pln_counterfactual.metta §3b)."
         )
 
+    # A DERIVED z is not an adjusted z, and the atom cannot say so. The space
+    # gets `(MeasuredZ <patient> <marker> <z>)` either way, so the inference
+    # layer cannot tell a caller's age/sex-adjusted z from one this service
+    # standardised against a single pooled mean and sd — and GET
+    # /patients/markers publishes the convention as "AGE- AND SEX-ADJUSTED".
+    # The provenance is in `derived`/`formula` on the response and in this
+    # warning; it deliberately is NOT invented into the KB as an adjustment
+    # that was never made.
+    derived = [m.name for m in resolved if m.derived and m.name not in YEARS_PER_SD_MARKERS]
+    if derived:
+        warnings.append(
+            "Standardised server-side from a raw value: " + ", ".join(derived) +
+            ". These z-scores come from a single POOLED reference mean and sd — "
+            "this repository has no age/sex-stratified table — so unlike a z you "
+            "send, they are NOT age- and sex-adjusted, and the atoms in the "
+            "space cannot be told apart from adjusted ones. Send `z` when you "
+            "have a properly standardised measurement."
+        )
+
     inert = [m.name for m in resolved if m.note]
     if inert:
         warnings.append(

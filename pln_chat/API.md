@@ -363,6 +363,19 @@ formula). `GET /patients/markers` lists what is supported; `POST
 /patients/preview` shows the atoms and each marker's Elevated/Normal/Low status
 without running anything.
 
+**A z you send and a z we derive are not the same thing, and the atom cannot
+say which is which.** `Reference.to_z` standardises against a single POOLED
+mean and sd — there is no age/sex-stratified reference table in this
+repository — so a derived z is *not* adjusted, while the convention published
+at `GET /patients/markers` says z means adjusted. Both end up as the same
+`(MeasuredZ <patient> <marker> <z>)`, and writing the difference into the space
+would mean inventing an adjustment that was never made. So it is reported
+instead: `derived: true` and the formula on the marker, a warning on the
+patient naming every marker it applies to, and the caveat in the convention
+text itself. Send `z` when you have a properly standardised measurement. The
+one exception is age acceleration in years, which is divided by the KB's own
+`grimaccel-sd-to-years` knob and is exact.
+
 **`/patients/preview` takes the patient object at the TOP LEVEL**, not wrapped
 in `{"patient": …}` the way `/query` and `/metta/run` take it. Send the wrapped
 shape and you now get a **422** naming the stray key; it used to be accepted
@@ -414,7 +427,10 @@ answer.
 **"Which drugs extend lifespan in mice with the strongest evidence?"** —
 `POST /drugage/rank` only ever scored a pool the caller supplied, so the
 translator invented a four-compound pool and ranked that. `GET /drugage/top`
-ranks all 1,043 compounds in the build:
+ranks every scorable compound in the build — **1,035** of the 1,043 DrugAge
+lists, the other 8 reporting no lifespan change on any row, and both numbers
+are in the response (`total_compounds`, `total_compounds_in_source`,
+`unscorable_compounds`):
 
 ```bash
 curl 'localhost:7860/drugage/top?n=10&species=Mus_musculus&itp_only=true'
@@ -1042,7 +1058,11 @@ curl -X POST localhost:7860/ontology/apply \
 The block arrives as text and nothing required it to be the one
 `/ontology/expand` produced, so it faces that endpoint's own schema gate here:
 predicates the rules consume, no hand-typed `(stv x y)`, no redefinition of a
-calibration constant, a tier the table scores, and a PMID or DOI. A refused
+calibration constant, a tier the table scores, and a PMID or DOI **in an atom**
+— a `;;` comment is not provenance, because comments are never loaded into the
+space, so nothing in the knowledge base would carry the citation. (The gate
+searched the raw text, comments included, which is the exact failure its own
+docstring lists as one of the four it exists to catch.) A refused
 block comes back **422 `block_failed_schema_gate`** with a `refusals` list
 naming what each entry broke — reported, never silently dropped.
 
@@ -1195,7 +1215,20 @@ listener within the intended private network.
 
 ## Testing
 
-The complete test matrix and commands are in
-[`docs/api_testing.md`](../docs/api_testing.md). The fast HTTP + combined-mount
-suite is `pytest tests/test_api.py tests/test_combined_app.py -q`;
+```bash
+python3 -m pytest tests/ -q          # everything: ~470 tests, ~90 s
+python3 -m pytest tests/ -q -m slow  # only the ones that drive a real engine
+```
+
+`tests/` is the matrix; each module's docstring says which finding it guards
+and what was measured. The fast HTTP + combined-mount subset is
+`pytest tests/test_api.py tests/test_combined_app.py -q`, and
 `scripts/test_pln_api.py` is the black-box runner for a live deployment.
+
+You need `hyperon==0.2.10`, `fastapi`, `httpx`, `pytest` and `pandas`. `gradio`
+is optional — its tests skip without it — and `bash scripts/run_etl.sh`
+generates `build/`, without which the DrugAge-ranking tests skip and the
+endpoints answer 503 rather than guessing.
+
+(This section used to link `docs/api_testing.md`, which has never existed in
+this repository.)

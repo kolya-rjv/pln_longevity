@@ -148,7 +148,13 @@ def guard_ontology_write(
     if schema_checked:
         return
 
-    findings = check_entry(metta_block, identifier_text=metta_block, inventory=inventory)
+    # NOT `identifier_text=metta_block`. That parameter is for the caller's own
+    # statement of where an entry came from — the paper's text on the extraction
+    # path. Passing the block as its own provenance lets a `;;` header line
+    # satisfy the mandatory-identifier rule, and a comment is not loaded into
+    # the space, so nothing in the knowledge base would carry it. On this path
+    # the block IS all there is, so the identifier has to be in an atom.
+    findings = check_entry(metta_block, inventory=inventory)
     if findings:
         raise OntologyWriteRefused(
             code="block_failed_schema_gate",

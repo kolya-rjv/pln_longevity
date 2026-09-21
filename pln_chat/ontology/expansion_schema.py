@@ -513,14 +513,33 @@ def check_entry(
                 category,
             ))
 
-    # -- 5. Provenance is mandatory -------------------------------------------
-    pmid, doi = find_identifier(identifier_text, metta)
+    # -- 5. Provenance is mandatory, and a COMMENT is not provenance -----------
+    # This searched the entry's RAW text, comments included, so an entry whose
+    # only identifier was a `;;` header line passed. That is the exact failure
+    # this module's docstring names as one of the four the gate exists to catch
+    # — "it recorded no PMID and no DOI in any generated fact, only in a header
+    # comment" — and the gate was satisfied by precisely that. `;;` lines do not
+    # reach the space, so a reader of the knowledge base cannot follow one.
+    #
+    # `identifier_text` is different and is still searched whole: it is the
+    # caller's own statement of where the entry came from (the paper's text, a
+    # supplied citation), not part of the emitted MeTTa.
+    atoms_only = "\n".join(_top_level_expressions(metta))
+    pmid, doi = find_identifier(identifier_text, atoms_only)
     if not pmid and not doi:
+        commented_pmid, commented_doi = find_identifier(metta)
+        extra = (
+            " An identifier appears in a `;;` comment only — comments are not "
+            "loaded into the space, so nothing in the knowledge base would "
+            "carry it. Put it in an atom: `(ReportedIn <subject> PMID_<digits>)` "
+            "or `(SupportedByPublication <subject> <Publication>)`."
+            if (commented_pmid or commented_doi) else ""
+        )
         findings.append(GateFinding(
             "missing_identifier",
             "No PMID and no DOI. A fact with no identifier cannot be traced "
             "back to the paper that justifies it, so it is refused rather than "
-            "appended.",
+            "appended." + extra,
         ))
 
     return findings

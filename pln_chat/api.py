@@ -1591,7 +1591,66 @@ class ApplyResponse(BaseModel):
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 
-@app.get("/health")
+class PLNExecutionOut(BaseModel):
+    """How this deployment executes MeTTa, and what it can therefore enforce."""
+    mode: str = Field(description="'process_per_query' | 'inline'.")
+    max_concurrent: int = Field(
+        description="Query processes allowed at once (PLN_WORKER_POOL_SIZE). "
+                    "0 means inline, in the request thread.",
+    )
+    timeout_seconds: Optional[float] = Field(
+        description="The per-request PLN budget, or null when it cannot be "
+                    "enforced. Inline mode CANNOT enforce it — you cannot "
+                    "preempt a GIL-holding Rust call — so it reports null "
+                    "rather than advertising a deadline it will not apply.",
+    )
+    timeout_enforced: bool
+    max_inflight: Optional[int] = Field(
+        description="Admission limit, or null when there is none.",
+    )
+    admission_control: bool
+    inflight: int = Field(description="Queries running right now.")
+
+
+class HealthResponse(BaseModel):
+    """The preflight an agent is told to call first — so it is typed.
+
+    `/health` was the one route with no `response_model`, which made it an
+    untyped object in `/openapi.json` — while API.md tells integrators to hand
+    an agent the base URL plus `/openapi.json` and to read `api_key_required`
+    and `pln_execution` from here. An agent reading the schema could not see
+    the fields it is instructed to branch on.
+    """
+    status: str
+    version: str = Field(
+        description="Same string as `info.version` and the X-API-Version "
+                    "header: one unauthenticated call tells you which contract "
+                    "you are talking to.",
+    )
+    api_key_required: bool = Field(
+        description="True when PLN_API_KEY/PLN_API_KEYS is set and every other "
+                    "route needs an `X-API-Key` header.",
+    )
+    rate_limit_per_minute: int = Field(description="0 when off (the default).")
+    pln_mode: str = Field(description="'runtime' | 'stub'.")
+    runtime_importable: bool = Field(description="Is `hyperon` importable here?")
+    runtime_ready: bool = Field(
+        description="Importable AND enabled AND at least one KB file loadable.",
+    )
+    runtime_kb_file_count: int
+    openai_key_configured: bool = Field(
+        description="False means /query returns 503; the LLM-free endpoints "
+                    "still work.",
+    )
+    available_models: list[str]
+    drugage_build_available: bool = Field(
+        description="False means the DrugAge rankings answer 503 — run "
+                    "`bash scripts/run_etl.sh`.",
+    )
+    pln_execution: PLNExecutionOut
+
+
+@app.get("/health", response_model=HealthResponse)
 def health() -> dict:
     """Liveness + config check — confirm the server is reachable before querying."""
     runtime_importable = importlib.util.find_spec("hyperon") is not None
@@ -1652,7 +1711,22 @@ class DrugAgeTopEntry(BaseModel):
 
 class DrugAgeTopResponse(BaseModel):
     entries: list[DrugAgeTopEntry]
-    total_compounds: int = Field(description="Distinct compounds matching the filters.")
+    total_compounds: int = Field(
+        description="Compounds matching the filters that have at least one "
+                    "SCORABLE row — the size of the ranking's real universe. "
+                    "Over the whole build that is 1,035, not the 1,043 distinct "
+                    "compounds DrugAge lists: 8 have no reported lifespan "
+                    "change on any row and cannot be scored at all.",
+    )
+    total_compounds_in_source: int = Field(
+        default=0,
+        description="Distinct compounds in the filtered rows, scorable or not.",
+    )
+    unscorable_compounds: int = Field(
+        default=0,
+        description="Compounds dropped because no row of theirs reports a "
+                    "lifespan change. Reported rather than silently missing.",
+    )
     total_rows: int
     scored_rows: int
     unscorable_rows: int = Field(
@@ -1805,7 +1879,8 @@ def drugage_top_endpoint(
 
     "Which drugs extend lifespan in mice with the strongest evidence?" — the
     question there was no way to ask. POST /drugage/rank scores a pool the
-    caller already knows; this scores all 1,043 compounds and returns the top n.
+    caller already knows; this scores every scorable compound in the build (1,035 of the 1,043 DrugAge lists — 8 report no lifespan change anywhere)
+    and returns the top n.
 
     Filters compose: `species=Mus_musculus&itp_only=true&min_confidence=0.5`
     is "gold-standard replicated mouse evidence only". `clade` takes
@@ -1858,6 +1933,8 @@ def drugage_top_endpoint(
             for i, e in enumerate(top.entries, 1)
         ],
         total_compounds=top.total_compounds,
+        total_compounds_in_source=top.total_compounds_in_source,
+        unscorable_compounds=top.unscorable_compounds,
         total_rows=top.total_rows,
         scored_rows=top.scored_rows,
         unscorable_rows=top.unscorable_rows,
@@ -2646,7 +2723,13 @@ def patient_markers() -> MarkerCatalogResponse:
             "z = standard deviations from the AGE- AND SEX-ADJUSTED population "
             "mean for that marker. Positive is above the norm. Because the "
             "adjustment is already baked into z, age and sex enter the risk "
-            "model only through the baseline table."
+            "model only through the baseline table. THAT HOLDS FOR A z YOU "
+            "SEND. A z the server DERIVES from a raw `value` is standardised "
+            "against a single pooled mean and sd — there is no age/sex-"
+            "stratified reference table in this repository — so it is NOT "
+            "adjusted, and for a marker that drifts with age the difference is "
+            "not small. Every derived marker comes back with `derived: true`, "
+            "the formula that produced it, and a warning on the patient."
         ),
         elevated_threshold=elevated,
         raw_value_note=(

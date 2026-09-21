@@ -468,7 +468,16 @@ def route_drugage_ranking(
 class DrugAgeTop:
     """A ranking over the WHOLE DrugAge build, not a caller-supplied pool."""
     entries: list[RowScore] = field(default_factory=list)
+    #: Compounds with AT LEAST ONE scorable row, i.e. the size of the ranking's
+    #: real universe. NOT the number of distinct compounds in the build — the
+    #: docs claimed "ranks all 1,043 compounds" while this counted 1,035,
+    #: because 8 compounds have no `AvgLifespanChangePercent` on any row and
+    #: therefore cannot be scored at all. Both numbers are now reported.
     total_compounds: int = 0
+    #: Distinct compounds present in the filtered rows, scorable or not.
+    total_compounds_in_source: int = 0
+    #: Compounds excluded from the ranking because no row of theirs is scorable.
+    unscorable_compounds: int = 0
     total_rows: int = 0
     scored_rows: int = 0
     unscorable_rows: int = 0
@@ -563,9 +572,12 @@ def drugage_top(
         representatives.sort(key=lambda s: (s.score, s.row.compound))
     else:
         representatives.sort(key=lambda s: (-s.score, s.row.compound))
+    in_source = {r.compound for r in rows}
     return DrugAgeTop(
         entries=representatives[: max(0, n)],
         total_compounds=len(by_compound),
+        total_compounds_in_source=len(in_source),
+        unscorable_compounds=len(in_source) - len(by_compound),
         total_rows=len(rows),
         scored_rows=len(scored),
         unscorable_rows=unscorable,

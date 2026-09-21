@@ -637,3 +637,60 @@ def test_split_args_backs_the_gate_rather_than_a_second_parser():
     parts = split_args(expr[1:-1])
     assert parts[0] == "Effect"
     assert parts[-1] == "(stv 0.35 (evidence-confidence InVitro))"
+
+
+# ── provenance must be in an atom, not in a comment ──────────────────────────
+
+def test_a_pmid_in_a_comment_does_not_satisfy_the_provenance_rule():
+    """The gate's own docstring names this failure, and the gate allowed it.
+
+    `check_entry` searched the entry's RAW text, comments included, so an entry
+    whose only identifier was a `;;` header line passed `missing_identifier` —
+    the exact case the module lists as one of the four it exists to catch
+    ("it recorded no PMID and no DOI in any generated fact, only in a header
+    comment"). `;;` lines never reach the space, so nothing in the knowledge
+    base would carry the citation.
+    """
+    from ontology.expansion_schema import check_entry
+
+    body = (
+        "(Inheritance Taurine Supplement)\n"
+        "(Effect Taurine Lifespan Pos "
+        "(stv 0.375 (evidence-confidence AnimalStudies_Single)))"
+    )
+    commented = ";; Singh 2023 (PMID 37289866) - taurine, mouse lifespan +12%\n" + body
+    in_an_atom = commented + "\n(ReportedIn Taurine PMID_37289866)"
+
+    codes = {f.code for f in check_entry(commented)}
+    assert "missing_identifier" in codes
+    # …and the refusal says where to put it, because "no PMID" is confusing
+    # when the author can see a PMID two lines up.
+    message = next(
+        f.message for f in check_entry(commented) if f.code == "missing_identifier"
+    )
+    assert "comment" in message.lower()
+
+    assert not check_entry(in_an_atom), "an atom-level PMID must be accepted"
+
+
+def test_the_write_gate_does_not_accept_a_block_as_its_own_provenance():
+    """`identifier_text` is the caller's SOURCE, not the block being written.
+
+    Passing the block as its own identifier_text re-opened the comment hole on
+    the /ontology/apply path, where the block is all there is.
+    """
+    from ontology.write_gate import OntologyWriteRefused, guard_ontology_write
+    from config import CUSTOM_ONTOLOGY_DIR
+
+    commented = (
+        ";; Singh 2023 (PMID 37289866)\n"
+        "(Inheritance Taurine Supplement)\n"
+        "(Effect Taurine Lifespan Pos "
+        "(stv 0.375 (evidence-confidence AnimalStudies_Single)))"
+    )
+    target = CUSTOM_ONTOLOGY_DIR / "never_written.metta"
+    with pytest.raises(OntologyWriteRefused) as excinfo:
+        guard_ontology_write(target, commented, allow_curated=False)
+    assert excinfo.value.code == "block_failed_schema_gate"
+    assert {f.code for f in excinfo.value.findings} >= {"missing_identifier"}
+    assert not target.exists()
