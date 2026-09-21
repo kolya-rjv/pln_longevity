@@ -21,6 +21,7 @@ from config import (
     DEFAULT_TEMPERATURE,
     ONTOLOGY_DIR,
     PLN_MAX_KB_FILE_BYTES,
+    PLN_PROMPT_FILE_MAX_BYTES,
     SHOW_DEBUG_DEFAULT,
     SHOW_EXPLANATION_DEFAULT,
     SHOW_METTA_DEFAULT,
@@ -28,11 +29,18 @@ from config import (
 from ontology.loader import load_specific_files, read_raw
 from ontology.registry import OntologyRegistry, BUILTIN_REGISTRY
 from ontology.expander import run_expansion_pipeline
+from ontology.inventory import inventory_for, summarise_oversized
 from core.context_builder import build_system_prompt
 from core.drugage_router import parse_drugage_query, route_drugage_ranking
+from core.executor import (
+    PLNExecutionTimeout,
+    PLNOverloaded,
+    PLNWorkerCrashed,
+    run_offloaded,
+)
 from core.llm_translator import translate
 from core.metta_validator import ValidationResult, validate
-from core.pln_runner import run_query
+from core.pln_runner import PLNRunResult, run_query
 from utils.formatting import format_bot_response
 from utils.logging import log_query, log_turn
 from utils.metta_highlight import highlight_metta
@@ -151,12 +159,26 @@ def _build_context(selected_files: list[str]) -> tuple[OntologyRegistry, dict[st
 
     The UI selection controls what the LLM sees (system prompt / symbol index).
     Execution always uses the full KB (_ALL_KB_PATHS) regardless of selection.
+
+    Mirrors api.py's `_build_context`, INCLUDING the oversized-file guard: a
+    selected file over PLN_PROMPT_FILE_MAX_BYTES is replaced by its schema card
+    rather than pasted verbatim. Without that, selecting a gene ETL file in the
+    UI's file picker builds a ~417,000-token prompt and the call comes back as a
+    billed upstream 400 — the same failure the HTTP API was fixed for.
     """
     paths = [_METTA_FILES[f] for f in selected_files if f in _METTA_FILES]
-    if paths:
-        registry, raw_contents = load_specific_files(paths)
-        return registry, raw_contents
-    return BUILTIN_REGISTRY, {}
+    if not paths:
+        return BUILTIN_REGISTRY, {}
+    registry, raw_contents = load_specific_files(paths)
+    raw_contents, _ = summarise_oversized(
+        raw_contents, paths, max_bytes=PLN_PROMPT_FILE_MAX_BYTES
+    )
+    return registry, raw_contents
+
+
+def _runtime_inventory():
+    """What the EXECUTION KB actually holds (see ontology/inventory.py)."""
+    return inventory_for(_ALL_KB_PATHS)
 
 
 # ── Core chat handler ──────────────────────────────────────────────────────────
@@ -178,7 +200,8 @@ def chat(
     log_query(user_message)
 
     registry, raw_contents = _build_context(selected_files)
-    system_prompt = build_system_prompt(registry, raw_contents)
+    inventory = _runtime_inventory()
+    system_prompt = build_system_prompt(registry, raw_contents, inventory)
 
     # Gradio 6 history is already a list of {role, content} dicts
     history_msgs: list[dict] = list(history)
@@ -191,34 +214,57 @@ def chat(
         temperature=temperature,
     )
 
-    # ─── TEMPORARY DEBUG ───
-    print("=" * 60)
-    print("GENERATED METTA QUERY:")
-    print(repr(translation.metta_query))
-    print("=" * 60)
-    # ─── END DEBUG ─────────
-
     # ── DrugAge lifespan/mortality ranking — dedicated scoped route ────────────
     # A `(rank-drugage-lifespan (C1 C2 …))` query must NOT go through the generic
     # run_query: that space excludes the DrugAge build/ rows and includes the
     # colliding CHD bridges (and would risk the hyperon panic). Detect the form
     # and dispatch to the scoped run_drugage_ranking instead; everything else
     # keeps the existing path. See core/drugage_router.py + docs §8.5.
+    # Every MeTTa call below goes through core.executor, exactly as the HTTP API
+    # does. It is the SAME PROCESS: Gradio is mounted on the FastAPI app, and
+    # hyperon holds the GIL for the whole of MeTTa.run() — so a query typed into
+    # this UI froze every REST caller, and a REST ranking froze this UI. Routing
+    # both through the worker pool is what makes the deadline, the admission
+    # limit and the abort containment apply to all of the traffic instead of
+    # half of it.
     drugage_compounds = parse_drugage_query(translation.metta_query)
-    if drugage_compounds is not None:
-        # The routed form is validated by the selector (does a row match?), not by
-        # the generic symbol index, which lacks the scoped DrugAge symbols/names.
+    try:
+        if drugage_compounds is not None:
+            # The routed form is validated by the selector (does a row match?), not by
+            # the generic symbol index, which lacks the scoped DrugAge symbols/names.
+            validation = ValidationResult(valid=True)
+            pln_result = run_offloaded(
+                "route_drugage_ranking",
+                {"compounds": drugage_compounds,
+                 "confidence_threshold": confidence_threshold},
+                lambda: route_drugage_ranking(
+                    drugage_compounds,
+                    confidence_threshold=confidence_threshold,
+                ),
+            )
+        else:
+            # The inventory is what tells a real symbol (MTORC1, Mouse) from an
+            # invented one, and a populated predicate from a declared-but-empty
+            # one — the UI used the registry alone and inherited both errors.
+            validation = validate(translation.metta_query, registry, inventory)
+            pln_result = run_offloaded(
+                "run_query",
+                {"metta_query": translation.metta_query,
+                 "confidence_threshold": confidence_threshold,
+                 "kb_files": _ALL_KB_PATHS},
+                lambda: run_query(
+                    metta_query=translation.metta_query,
+                    confidence_threshold=confidence_threshold,
+                    kb_files=_ALL_KB_PATHS,
+                ),
+            )
+    except (PLNExecutionTimeout, PLNOverloaded, PLNWorkerCrashed) as exc:
+        # A chat UI cannot return a status code, so the failure is rendered as
+        # the answer — but it is still a FAILURE, not an empty result.
         validation = ValidationResult(valid=True)
-        pln_result = route_drugage_ranking(
-            drugage_compounds,
-            confidence_threshold=confidence_threshold,
-        )
-    else:
-        validation = validate(translation.metta_query, registry)  # parsed registry for symbol checks
-        pln_result = run_query(
-            metta_query=translation.metta_query,
-            confidence_threshold=confidence_threshold,
-            kb_files=_ALL_KB_PATHS,
+        pln_result = PLNRunResult(
+            status="error", mode="runtime", error=str(exc),
+            error_code=type(exc).__name__,
         )
 
     bot_response = format_bot_response(

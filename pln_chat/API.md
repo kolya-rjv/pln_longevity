@@ -205,7 +205,12 @@ under `pln_execution`.
 | `PLN_MAX_ONTOLOGY_FILES`    | 64      | cap on an `ontology_files` selection (deduped)  |
 
 Because the Gradio UI is mounted on the same ASGI app and drives the same
-pipeline, this also stops a UI query from freezing the REST API and vice versa.
+pipeline, its chat handler routes through the same worker pool — so a query
+typed into the UI no longer freezes every REST caller, and a REST ranking no
+longer freezes the UI. The UI also builds its prompt with the same grounded
+schema card, validates against the same runtime inventory, and applies the same
+oversized-file guard, so the two surfaces cannot answer the same question
+differently.
 
 OpenAI calls have a 60-second timeout and one SDK retry by default; configure
 `OPENAI_TIMEOUT_SECONDS` / `OPENAI_MAX_RETRIES` as needed. Every HTTP request,
