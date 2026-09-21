@@ -37,7 +37,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from config import PLN_RUNTIME_AVAILABLE
+from config import PLN_MAX_RANK_COMPOUNDS, PLN_RUNTIME_AVAILABLE
 from core.pln_runner import (
     PLNAtomResult,
     PLNRunResult,
@@ -89,6 +89,43 @@ def parse_drugage_query(metta_query: str) -> Optional[list[str]]:
     if not m:
         return []
     return m.group(1).split()
+
+
+class DrugAgePoolTooLarge(ValueError):
+    """More compounds than the per-request cap allows.
+
+    `/drugage/rank` has enforced `PLN_MAX_RANK_COMPOUNDS` since patch 0002 —
+    through pydantic's `max_length`, which only ever looked at that one request
+    model. The SAME ranking is reachable from three other places, all of which
+    take the compound list out of a MeTTa form rather than a JSON field:
+    `/query` (whatever the translator emits), `/metta/run` (whatever the caller
+    writes by hand) and the Gradio chat tab. Measured: a hand-written
+    `(rank-drugage-lifespan (C1 … C400))` went straight past the cap into the
+    scoped engine at ~70 ms of GIL-held work per compound. The cap belongs next
+    to the ranking, not next to one of its four front doors.
+    """
+
+    def __init__(self, count: int, limit: int = PLN_MAX_RANK_COMPOUNDS) -> None:
+        self.count = count
+        self.limit = limit
+        super().__init__(
+            f"{count} compounds requested; at most {limit} per request "
+            f"(each one costs a separate scoped MeTTa call)."
+        )
+
+
+def guard_compound_pool(
+    compounds: list[str], *, limit: int = PLN_MAX_RANK_COMPOUNDS
+) -> list[str]:
+    """Return `compounds` unchanged, or raise `DrugAgePoolTooLarge`.
+
+    Deliberately NOT a truncation: silently ranking the first 60 of 400 names
+    and returning a ranking that looks complete is the failure mode this whole
+    series is about.
+    """
+    if len(compounds) > limit:
+        raise DrugAgePoolTooLarge(len(compounds), limit)
+    return compounds
 
 
 def resolve_compounds(
@@ -164,20 +201,35 @@ SCORE_SEMANTICS: dict = {
                 "Saturating, so +20% reads 0.50 and +80% reads 0.80; the "
                 "half-saturation constant is (lifespan-halfsat) in "
                 "drugage_calibration.metta.",
-    "confidence": "min(evidence tier, significance gate) x 0.9. The 0.9 is the "
-                  "per-hop chain discount for the Lifespan -> Mortality step, so "
-                  "the confidence you see is always 0.9 x the row's tier.",
+    "confidence": "evidence tier x significance gate x 0.9. The 0.9 is the "
+                  "per-hop chain discount for the Lifespan -> Mortality step. An "
+                  "ITP row folds significance into its tier, so its gate is 1.0 "
+                  "and it always reads 0.81; every other row is discounted by "
+                  "whether its result reached significance.",
+    "significance_gate": {
+        "Significant": 1.0,
+        "Unreported": 0.6,
+        "NotSignificant": 0.4,
+        "note": "Multiplicative, and it applies to non-ITP rows only. It was a "
+                "CAP — min(tier, gate) — which was inert for 3,107 of the "
+                "build's 3,208 non-ITP rows, because every non-ITP tier already "
+                "sits at or below every gate. Under the cap, a compound whose "
+                "only evidence reported NO significant change scored at exactly "
+                "the confidence of one that did.",
+    },
     "confidence_tiers": {
         "0.81": "ITP row (replicated NIA Interventions Testing Program mouse "
-                "study) — 0.90 x 0.9. Applies to a negative ITP result too: a "
-                "well-run null is high-confidence evidence of ~no effect.",
+                "study) — 0.90 x 1.0 x 0.9. Applies to a negative ITP result "
+                "too: a well-run null is high-confidence evidence of ~no effect.",
         "0.45": "non-ITP vertebrate (mouse, rat, fish), reported Significant — "
-                "0.50 x 0.9",
-        "0.315": "invertebrate (worm, fly) or an untaxonomised species — "
-                 "0.35 x 0.9",
-        "0.18": "fungi or protozoa (yeast) — 0.20 x 0.9",
-        "note": "A non-ITP row is additionally CAPPED by its significance: "
-                "Significant 1.0, Unreported 0.6, NotSignificant 0.4.",
+                "0.50 x 1.0 x 0.9",
+        "0.315": "invertebrate (worm, fly) or an untaxonomised species, "
+                 "reported Significant — 0.35 x 1.0 x 0.9",
+        "0.18": "fungi or protozoa (yeast), reported Significant — "
+                "0.20 x 1.0 x 0.9",
+        "note": "These are the SIGNIFICANT-row numbers. An Unreported row reads "
+                "0.6x them (0.27 / 0.189 / 0.108) and a NotSignificant row 0.4x "
+                "(0.18 / 0.126 / 0.072).",
     },
     "representative_row_policy": list(REPRESENTATIVE_POLICY),
     "zero_score": "A score of exactly 0.0 is a reported null, not a missing "
@@ -402,7 +454,7 @@ def route_drugage_ranking(
     or the engine raises.
     """
     return rank_drugage(
-        compounds,
+        guard_compound_pool(compounds),
         confidence_threshold=confidence_threshold,
         source=source,
         strategy=strategy,
@@ -494,10 +546,16 @@ def drugage_top(
 
     if min_confidence > 0:
         representatives = [s for s in representatives if s.confidence >= min_confidence]
+    # A reported null belongs to neither end. It used to be swept into
+    # `protective` because `sign` has no zero, so `direction=protective`
+    # returned compounds whose only evidence found no effect, labelled as
+    # protective, at score 0.0. They are reachable as direction="none".
     if direction == "protective":
-        representatives = [s for s in representatives if s.protective]
+        representatives = [s for s in representatives if s.direction == "protective"]
     elif direction == "harmful":
-        representatives = [s for s in representatives if not s.protective]
+        representatives = [s for s in representatives if s.direction == "harmful"]
+    elif direction == "none":
+        representatives = [s for s in representatives if s.direction == "no_effect"]
 
     # Most protective first; for `direction=harmful` the interesting end is the
     # other one, so sort ascending there rather than showing the least harmful.

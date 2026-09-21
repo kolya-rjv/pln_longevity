@@ -116,17 +116,30 @@
 ;; self-reported exposure, so the surrogate tracks the exposure with real
 ;; measurement error in both directions.
 ;;
-;; TIER: MultipleHumanTrials (0.85). Joehanes is a 16-cohort meta-analysis of
-;; HUMAN samples — stronger than anything the animal tiers describe, and stronger
-;; than a single human study. It is nonetheless observational, so it does not get
-;; RCT_Human (1.0). The EvidenceCategory enumeration has no meta-analysis tier;
-;; mapping conservatively onto the nearest existing tier is the same conservative
-;; choice mechanistic_bridges.metta documents for mechanistic consensus, and a
-;; dedicated MetaAnalysis_Human tier stays an OPEN QUESTION
-;; (docs/calibration_layer.md #4) rather than a number we invent here to hold one
-;; edge. See human_evidence.metta §0 for why we did not add it.
+;; TIER: Epidemiological (0.60).
+;;
+;; This was MultipleHumanTrials (0.85) on the argument that a 16-cohort
+;; meta-analysis is "stronger than a single human study". That argument is about
+;; SAMPLE SIZE, and this ladder is not a size ordering — it is a DESIGN ordering.
+;; `Epidemiological` (0.60) sits below `SingleHumanTrial` (0.70) precisely
+;; because observational evidence is not trial evidence however many cohorts it
+;; pools. Joehanes 2016 is typed "Meta-Analysis; Multicenter Study" in PubMed,
+;; not a trial: it compares current, former and never smokers in 15,907 blood
+;; samples with no intervention and no randomisation.
+;;
+;; The tell was internal. Thirty lines below, Duncan 2019 — also a prospective
+;; observational human cohort — is tiered Epidemiological, with the note "it is
+;; not a randomized trial of quitting, and no such trial exists". Two
+;; observational studies in one file cannot sit 0.25 apart on a design ladder,
+;; and promoting one of them onto a trials rung to reflect its size is the exact
+;; move the calibration layer exists to prevent.
+;;
+;; The EvidenceCategory enumeration still has no meta-analysis tier, and adding
+;; one to hold a single edge would be inventing a number. `MetaAnalysis_Human`
+;; stays an OPEN QUESTION (docs/calibration_layer.md #4); until it exists, the
+;; honest rung is the one that names this design.
 (Effect SmokingPackYears DNAmPACKYRS Pos
-   (stv 0.80 (evidence-confidence MultipleHumanTrials)))
+   (stv 0.80 (evidence-confidence Epidemiological)))
 (SupportedByPublication SmokingPackYears JoehanesEtAl2016_SmokingEWAS)
 
 ;; (b) cessation -> the exposure burden (protective, Neg).
@@ -159,6 +172,18 @@
 (Effect SmokingCessation SmokingPackYears Neg
    (stv 0.39 (evidence-confidence Epidemiological)))
 (SupportedByPublication SmokingCessation DuncanEtAl2019_CessationCVD)
+
+;; THE PRECONDITION. Quitting is worth nothing to someone who does not smoke,
+;; and the counterfactual keyed only on the DNAmPACKYRS z — so a never-smoker
+;; with an elevated surrogate got a smoker's answer, and `PatientSmoking`
+;; reached no inference path despite being what this layer exists to wire up.
+;; Declared as a fact so the gate (pln_counterfactual.metta §3b) is generic.
+;;
+;; CurrentSmoker, not "ever smoked": Duncan's HR 0.61 is for quitting versus
+;; CONTINUING. A former smoker has already taken that step; what remains for
+;; them is the residual the Limitation below describes, and no curated evidence
+;; here quantifies a second cessation for someone who has already quit.
+(LeverRequiresSmoking SmokingCessation CurrentSmoker)
 
 ;; The caveat above, as a FACT rather than only a comment, so a caller reading
 ;; the KB over HTTP sees it too (the hallmark_targeting.metta `Limitation`
@@ -194,7 +219,13 @@
 (InstanceOf Patient003 PatientProfile)
 (PatientAge     Patient003 64)          ; synthetic: puts him in the 60-69 male baseline band
 (PatientSex     Patient003 Male)        ; synthetic
-(PatientSmoking Patient003 FormerSmoker); synthetic: ~30 pack-years, quit ~6 years ago
+;; CurrentSmoker, and the reason is the lever itself: SmokingCessation now
+;; requires (LeverRequiresSmoking … CurrentSmoker), so a former smoker correctly
+;; gets zero from it. He was written FormerSmoker, which made the file's own
+;; flagship demo a case the lever does not apply to — it returned a full benefit
+;; only because the gate did not exist yet. A current smoker is who the
+;; cessation lever is for.
+(PatientSmoking Patient003 CurrentSmoker); synthetic: ~30 pack-years, still smoking
 
 (MeasuredZ Patient003 HorvathAgeAccel  0.1)   ; synthetic: first-gen clock ~ normal
 (MeasuredZ Patient003 AgeAccelGrim     1.6)   ; synthetic: GrimAge elevated (the discordance again)
@@ -210,26 +241,40 @@
 ;; ================================================================
 ;; Load order: the §"Load AFTER" list above, then this file.
 ;;
-;; The lever, named as the intervention. resolve-lever sees the outgoing Neg edge
-;; and routes SmokingCessation to the driver it reduces (SmokingPackYears), so
-;; the two spellings give the same answer — as they do for DasatinibPlusQuercetin
-;; and CellularSenescence:
+;; The lever, named as the INTERVENTION, and the driver it reduces. These are two
+;; different questions and they no longer give the same answer:
+;;
 ;; !(counterfactual-patient &self Patient003 SmokingCessation)
-;;   => (Counterfactual SmokingCessation AgeAccelGrim (expected-delta -0.21000000000000002)
-;;         (signed Neg (stv 0.21000000000000002 0.85)) (Via (DNAmPACKYRS)))
+;;   => (Counterfactual SmokingCessation AgeAccelGrim (expected-delta -0.08190000000000001)
+;;         (signed Neg (stv 0.08190000000000001 0.324)) (Via (DNAmPACKYRS)))
+;;   "if he quits": 0.39 (the cessation prior) x 0.125 (grimage-weight) x 0.80
+;;   (the §2a prior) x 2.1 (his z) = 0.0819, at 0.60 x 0.60 x 0.9 = 0.324 — the
+;;   two Epidemiological hops with the chain discount. It agrees, exactly, with
+;;   !(infer &self SmokingCessation DNAmPACKYRS) => (signed Neg (stv 0.312 0.324)).
 ;;
 ;; !(counterfactual-patient &self Patient003 SmokingPackYears)
 ;;   => (Counterfactual SmokingPackYears AgeAccelGrim (expected-delta -0.21000000000000002)
-;;         (signed Neg (stv 0.21000000000000002 0.85)) (Via (DNAmPACKYRS)))
-;;   0.125 (grimage-weight) x 0.80 (the §2a prior) x 2.1 (his z) = 0.21, at the
-;;   0.85 confidence of a single MultipleHumanTrials hop.
+;;         (signed Neg (stv 0.21000000000000002 0.6)) (Via (DNAmPACKYRS)))
+;;   "if the exposure burden were gone": the do-operator on the driver itself,
+;;   one hop, no cessation prior. 0.125 x 0.80 x 2.1 = 0.21 at 0.60.
+;;
+;;   The 2.56x gap between them IS the 0.39 prior, and until pln_counterfactual
+;;   §3b composed the lever edge it was discarded: both spellings returned -0.21
+;;   at 0.85, i.e. the engine asserted that quitting erases the exposure burden
+;;   entirely — the exact claim the Limitation fact below says it does not make.
 ;;
 ;; The same reduction as an ABSOLUTE 10-year CHD risk, via the clock:
 ;; !(project-risk-patient &self Patient003 SmokingCessation)
 ;;   => (ProjectedRisk SmokingCessation CoronaryHeartDisease
-;;         (point 0.2226556669863412) (reduction 0.013691415196626922)
-;;         (delta-clock -0.21000000000000002) (confidence 0.85) (Via (DNAmPACKYRS)))
-;;   i.e. 23.63% -> 22.27% absolute, a 1.37-percentage-point reduction.
+;;         (point 0.23091003826731654) (reduction 0.005437043915651585)
+;;         (delta-clock -0.08190000000000001) (confidence 0.324) (Via (DNAmPACKYRS)))
+;;   i.e. 23.63% -> 23.09% absolute, a 0.54-percentage-point reduction (it read
+;;   1.37 points at 0.85 confidence before the two corrections above).
+;;
+;; And the precondition. Patient001 is a NeverSmoker, so the lever is refused
+;; rather than priced:
+;; !(lever-applicable &self Patient001 SmokingCessation)   => False
+;; !(lever-applicable &self Patient003 SmokingCessation)   => True
 ;;
 ;; The decomposition credits the component and names NO hallmark cause — honestly.
 ;; `component-cause` searches (Inheritance $h HallmarkOfAging), and smoking is an
@@ -247,8 +292,9 @@
 ;;   => (Counterfactual CellularSenescence AgeAccelGrim (expected-delta 0.0)
 ;;         (signed Neg (stv 0.0 0.0)) (Via ()))
 ;;
-;; Patient001 has no DNAmPACKYRS measurement, so the new edge changes nothing for
-;; him — patient-elevated-z yields nothing and the component drops out:
+;; Patient001 is a never-smoker AND has no DNAmPACKYRS measurement, so the lever
+;; returns the honest zero for two independent reasons — the precondition gate
+;; and the absent measurement:
 ;; !(counterfactual-patient &self Patient001 SmokingCessation)
 ;;   => (Counterfactual SmokingCessation AgeAccelGrim (expected-delta 0.0)
 ;;         (signed Neg (stv 0.0 0.0)) (Via ()))

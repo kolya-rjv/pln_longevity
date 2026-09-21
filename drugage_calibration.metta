@@ -58,10 +58,28 @@
 ;; near 0.8. Raise k to be more conservative about large reported effects.
 (= (lifespan-halfsat) 20.0)
 
-;; Significance gate (confidence CAP applied to NON-ITP rows; §5). A non-ITP
-;; result that did not reach significance is weak evidence, so it caps confidence.
-;; Significant imposes no cap (1.0); an unreported test is worse than a reported
-;; significant one but better than a reported NULL.
+;; Significance gate — a MULTIPLIER on the evidence tier for NON-ITP rows (§5).
+;; A result that did not reach significance is weaker evidence than one that
+;; did, at the same design tier. Significant costs nothing (1.0); an unreported
+;; test is worse than a reported significant one but better than a reported NULL.
+;;
+;; IT WAS A CAP, AND A CAP DID NOTHING. `min(tier, gate)` only binds when the
+;; gate is BELOW the tier, and every non-ITP tier is already at or below every
+;; gate: Vertebrate 0.50, Invertebrate/untaxonomised 0.35, Fungi/Protozoa 0.20
+;; against gates of 1.0 / 0.6 / 0.4. Measured over the full 3,423-row build, the
+;; cap changed the confidence of 101 rows out of 3,208 non-ITP ones — all of
+;; them Vertebrate NotSignificant (0.50 -> 0.40). The other 995 NotSignificant
+;; rows and 187 Unreported rows scored at EXACTLY the confidence of a
+;; significant result on the same species, so in the whole-build ranking a
+;; compound whose only evidence reported NO significant change sat between two
+;; that did, at the same number. A multiplier binds at every tier:
+;;
+;;   invertebrate Significant     0.35 x 1.0 x 0.9 = 0.315   (unchanged)
+;;   invertebrate Unreported      0.35 x 0.6 x 0.9 = 0.189
+;;   invertebrate NotSignificant  0.35 x 0.4 x 0.9 = 0.126
+;;
+;; Every Significant row keeps its number exactly, because 1.0 is neutral under
+;; multiplication as it was under the min. Only the weak rows move, downward.
 (= (sig-gate Significant)    1.0)
 (= (sig-gate Unreported)     0.6)
 (= (sig-gate NotSignificant) 0.4)   ; NB: ETL emits NotSignificant (not the
@@ -126,15 +144,18 @@
      (/ $m $den)))
 
 ;; ================================================================
-;; 5. Confidence  <-  MIN(evidence tier, significance gate)   (weakest link)
+;; 5. Confidence  <-  evidence tier  x  significance gate
 ;; ================================================================
 ;; Tier: an ITP row is the gold-standard replicated-mouse program, so it earns
 ;; the ITP confidence (0.90) REGARDLESS of outcome — significance instead selects
 ;; ITP_Positive vs ITP_Negative (both 0.90: we trust a well-run NULL too, which
 ;; is precisely what down-weights resveratrol via near-zero STRENGTH, not low
-;; confidence). A non-ITP row earns its species tier and is additionally capped
-;; by the significance gate (§1). c = min(tier, gate): the weakest link governs
-;; (calibration_layer.md §3.2).
+;; confidence). A non-ITP row earns its species tier, DISCOUNTED by the
+;; significance gate (§1). c = tier x gate. It was min(tier, gate) — the
+;; weakest-link rule — but the two are not competing claims about one quantity:
+;; the tier says how good the DESIGN is, the gate says whether the RESULT held
+;; up, so they compose rather than override. The min was also inert for 97% of
+;; non-ITP rows (§1). calibration_layer.md §3.2.
 (= (itp-category $s $row)
    (if (drugage-significant? $s $row) ITP_Positive ITP_Negative))
 
@@ -149,12 +170,10 @@
        1.0
        (let $g (drugage-significance $s $row) (sig-gate $g))))
 
-(= (min-num $a $b) (if (< $a $b) $a $b))
-
 (= (drugage-confidence $s $row)
    (let* (($tier (drugage-tier-conf $s $row))
           ($gate (drugage-sig-gate $s $row)))
-     (min-num $tier $gate)))
+     (* $tier $gate)))
 
 ;; ================================================================
 ;; 6. Sign  <-  direction of the lifespan change   (THE SIGN DECISION)

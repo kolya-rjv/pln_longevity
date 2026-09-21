@@ -259,6 +259,37 @@ def _validate_id(raw_id: Optional[str], existing: Iterable[str]) -> str:
     return patient_id
 
 
+def _as_number(
+    value: object,
+    *,
+    code: str,
+    what: str,
+    **context: object,
+) -> float:
+    """Coerce a caller-supplied scalar to float, or raise a *typed* refusal.
+
+    `float("old")` raises a bare `ValueError`, and the API's patient path maps
+    only `PatientSpecError` — so `{"age": "old"}` escaped as an unhandled
+    exception and the caller got a 500 with no field name in it. A malformed
+    field is the caller's mistake, which is a 422 and has to say which field.
+    A bool is refused explicitly: Python makes `float(True)` 1.0, and silently
+    reading `{"age": true}` as "one year old" is worse than refusing it.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        raise PatientSpecError(code, f"{what} must be a number.", received=value)
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise PatientSpecError(
+            code, f"{what} must be a number.", received=value
+        ) from None
+    if not math.isfinite(number):
+        raise PatientSpecError(
+            code, f"{what} must be a finite number.", received=value
+        )
+    return number
+
+
 def _resolve_marker(
     name: str,
     payload: dict,
@@ -292,13 +323,22 @@ def _resolve_marker(
 
     if z is None:
         if name in YEARS_PER_SD_MARKERS:
-            z = float(value) / sd_to_years
+            z = _as_number(
+                value, code="invalid_marker_value",
+                what=f"Marker '{name}' value", marker=name,
+            ) / sd_to_years
             derived = True
             unit = unit or "years"
             formula = f"z = years / {sd_to_years:g}   [grimaccel-sd-to-years]"
         elif spec.reference is not None:
+            # Coerced OUTSIDE the try: PatientSpecError is a ValueError, so a
+            # coercion refusal caught here would be re-wrapped into itself.
+            numeric = _as_number(
+                value, code="invalid_marker_value",
+                what=f"Marker '{name}' value", marker=name,
+            )
             try:
-                z, formula = spec.reference.to_z(float(value))
+                z, formula = spec.reference.to_z(numeric)
             except ValueError as exc:
                 raise PatientSpecError(
                     "invalid_marker_value", f"Marker '{name}': {exc}", marker=name
@@ -314,7 +354,9 @@ def _resolve_marker(
                 marker=name,
             )
 
-    z = float(z)
+    z = _as_number(
+        z, code="invalid_marker_value", what=f"Marker '{name}' z", marker=name,
+    )
     if not math.isfinite(z) or abs(z) > Z_LIMIT:
         raise PatientSpecError(
             "implausible_z",
@@ -336,7 +378,13 @@ def _resolve_marker(
         note = "Recorded for the clock-discordance picture; no downstream edge."
     return ResolvedMarker(
         name=name, z=z, derived=derived,
-        raw_value=float(value) if value is not None else None,
+        raw_value=(
+            _as_number(
+                value, code="invalid_marker_value",
+                what=f"Marker '{name}' value", marker=name,
+            )
+            if value is not None else None
+        ),
         unit=unit, formula=formula, status=status, note=note,
     )
 
@@ -357,7 +405,7 @@ def build_patient(
 
     age = payload.get("age")
     if age is not None:
-        age = float(age)
+        age = _as_number(age, code="invalid_age", what="Age")
         if not (AGE_RANGE[0] <= age <= AGE_RANGE[1]):
             raise PatientSpecError(
                 "invalid_age",
@@ -398,7 +446,7 @@ def build_patient(
     resolved: list[ResolvedMarker] = []
     for name, entry in raw_markers.items():
         if isinstance(entry, (int, float)):
-            entry = {"z": float(entry)}
+            entry = {"z": float(entry)}   # already a real number
         if not isinstance(entry, dict):
             raise PatientSpecError(
                 "invalid_marker",
@@ -429,9 +477,8 @@ def build_patient(
     # not on the status string, so a smoker with no DNAm pack-years measurement
     # still gets zero from the smoking counterfactual. Say so rather than let
     # the caller read a structural zero as "quitting would not help him".
-    if smoking in ("FormerSmoker", "CurrentSmoker") and not any(
-        m.name == "DNAmPACKYRS" for m in resolved
-    ):
+    has_packyears = any(m.name == "DNAmPACKYRS" for m in resolved)
+    if smoking in ("FormerSmoker", "CurrentSmoker") and not has_packyears:
         warnings.append(
             "Smoking status is recorded but no DNAmPACKYRS measurement was sent. "
             "The smoking lever works through that GrimAge component, so "
@@ -439,6 +486,23 @@ def build_patient(
             "return an expected delta of 0 with an empty (Via ()) for this "
             "patient. That zero means 'no measured pack-years signal to act on', "
             "not 'quitting would not help'."
+        )
+    # The symmetric case, which used to be silent and was the worse one: an
+    # elevated DNAm pack-years surrogate in someone who does not smoke. The
+    # clock is an elastic-net estimate with real error and it responds to
+    # second-hand exposure, so this is an ordinary data state — but the lever
+    # requires (LeverRequiresSmoking SmokingCessation CurrentSmoker), so the
+    # zero it returns means something different again.
+    if smoking in ("NeverSmoker", "FormerSmoker") and has_packyears:
+        warnings.append(
+            f"DNAmPACKYRS was sent for a {smoking}. The measurement is kept and "
+            f"credited in the GrimAge decomposition, but the knowledge base "
+            f"declares (LeverRequiresSmoking SmokingCessation CurrentSmoker), so "
+            f"a SmokingCessation counterfactual for this patient computes the "
+            f"arithmetic of the exposure marker rather than a benefit they can "
+            f"obtain. /query and /metta/run repeat that warning next to the "
+            f"number; the engine itself does not yet enforce it "
+            f"(pln_counterfactual.metta §3b)."
         )
 
     inert = [m.name for m in resolved if m.note]

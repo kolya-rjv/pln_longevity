@@ -107,12 +107,28 @@ class ScoredCompound:
     def protective(self) -> bool:
         return self.sign == "Neg"
 
+    @property
+    def direction(self) -> str:
+        """'protective' | 'harmful' | 'no_effect' — the sign in words.
+
+        `sign` is the MeTTa Effect convention and has no zero: a row reporting
+        0.0% lifespan change is `Neg` because it is not negative. Reading that
+        straight out as "protective" put a contradiction inside one response —
+        `direction: "protective"` next to a `score` of exactly 0.0 and a
+        `semantics.zero_score` note saying that a 0.0 is a REPORTED NULL. The
+        most consequential rows in the build are exactly these: the ITP nulls
+        for metformin and resveratrol, at the highest confidence the KB gives.
+        """
+        if self.strength == 0.0:
+            return "no_effect"
+        return "protective" if self.protective else "harmful"
+
     def as_dict(self) -> dict:
         return {
             "compound": self.compound,
             "score": self.score,
             "sign": self.sign,
-            "direction": "protective" if self.protective else "harmful",
+            "direction": self.direction,
             "strength": self.strength,
             "confidence": self.confidence,
             "atom": self.atom,
@@ -287,8 +303,19 @@ def _stub_run(metta_query: str, confidence_threshold: float) -> PLNRunResult:
 
 # ── Runtime mode (Hyperon) ─────────────────────────────────────────────────────
 
+#: hyperon prints a small magnitude in scientific notation (0.00001 -> 1e-05),
+#: and `[\d.]+` cannot match an exponent or a sign. An unparsed truth value
+#: reads as "no STV", which `_apply_threshold` treats as "keep unconditionally"
+#: — so the lowest-confidence results were exactly the ones a confidence filter
+#: could not remove.
+_STV_RE = re.compile(
+    r"\(stv\s+([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)"
+    r"\s+([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\)"
+)
+
+
 def _stv_from_atom(atom_str: str) -> Optional[dict]:
-    m = re.search(r"\(stv\s+([\d.]+)\s+([\d.]+)\)", atom_str)
+    m = _STV_RE.search(atom_str)
     if m:
         return {"strength": float(m.group(1)), "confidence": float(m.group(2))}
     return None

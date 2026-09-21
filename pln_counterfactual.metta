@@ -190,16 +190,84 @@
           (car-atom $neg))))              ; (1) intervention -> the node it reduces
 
 ;; ================================================================
+;; 3b. Lever preconditions — DECLARED HERE, ENFORCED IN THE SERVICE LAYER
+;; ================================================================
+;; A lever whose whole meaning is "stop doing X" presupposes that the patient is
+;; doing X. The smoking lever keys only on the DNAmPACKYRS z-score, so a
+;; NEVER SMOKER with an elevated pack-years surrogate — an ordinary data state,
+;; since DNAmPACKYRS is an elastic-net estimate with real error that also
+;; responds to second-hand exposure — is quoted a benefit from quitting that is
+;; byte-identical to a smoker's.
+;;
+;; The precondition is a FACT, and lives in lifestyle_evidence.metta:
+;;
+;;     (LeverRequiresSmoking SmokingCessation CurrentSmoker)
+;;
+;; THE GATE THAT READS IT IS NOT IN THIS FILE, and the reason is measured, not
+;; stylistic. The curated runtime KB is AT hyperon 0.2.10's ceiling. Appending
+;; trivial rule definitions to this file and running an unrelated
+;; `!(predict-risk-patient &self <Patient>)` against the loaded stack:
+;;
+;;     +4 definitions -> answers normally
+;;     +5 definitions -> the interpreter ABORTS (a non-unwinding Rust panic at
+;;                       hyperon-space/src/index/trie.rs:179, which `except
+;;                       Exception` cannot catch)
+;;
+;; GROUND FACTS are cheap by comparison — the same probe tolerates 8,191 extra
+;; atoms and aborts at 8,192 — so the declaration above costs nothing and a rule
+;; to read it costs more than remains. The composition in §4 spends that entire
+;; remaining budget, which is why it is inlined into `cf-component` rather than
+;; given the accessor it deserves.
+;;
+;; So the enforcement lives in `pln_chat/ontology/lever_gate.py`, which reads
+;; these same two facts and warns on `/query` and `/metta/run`. A direct MeTTa
+;; caller does NOT get the gate. That is a real gap, recorded rather than
+;; papered over: it closes when the curated layers stop sharing one space.
+
+;; ================================================================
 ;; 4. The counterfactual do-operator
 ;; ================================================================
 ;; Per GrimAge component M that the resolved driver raises (Pos) AND the patient
 ;; presents elevated: the expected reduction in M ≈ (transmission strength) × (M's
 ;; current elevated z), and its GrimAge share (grimage-weight × reduction).
 ;;   (cf-part <M> (stv s c) <reduction> <deltaM>)
-(= (cf-component $space $patient $driver $m)
-   (let* (($z  (patient-elevated-z $space $patient $m))
-          ($tv (pos-transmission $space $driver $m)))
-      (let* (($s   (cf-tv-s $tv))
+;; THE LEVER'S OWN EDGE IS PART OF THE ANSWER.
+;;
+;; `resolve-lever` returns the driver and drops the tv of the
+;; (Effect lever driver Neg tv) edge it travelled, so the do-operator
+;; normalized the driver COMPLETELY and every intervention lever was scored as
+;; if it abolished its driver:
+;;
+;;   (Effect SmokingCessation       SmokingPackYears   Neg (stv 0.39 …)) -> 1.00
+;;   (Effect DasatinibPlusQuercetin CellularSenescence Neg (stv 0.70 …)) -> 1.00
+;;   (Effect Metformin              InsulinResistance  Neg (stv 0.75 …)) -> 1.00
+;;
+;; and the confidence reported was the MEASUREMENT edge's, never the
+;; intervention evidence's. Measured on Patient003: -0.21 at c=0.85 where the
+;; curated evidence says -0.0819 at c=0.324 — 2.6x the effect and 2.6x the
+;; confidence. `infer` over the same two hops already gave the smaller, correct
+;; number, so the KB disagreed with itself.
+;;
+;; Composed here with the same rule pln_deduction.metta uses (s_a x s_b;
+;; c_a x c_b x chain-discount), INLINE rather than in a named accessor: the
+;; curated stack is four trivial rule definitions away from hyperon 0.2.10's
+;; abort (measured — see §3b), and this composition plus the precondition gate
+;; does not fit in that budget twice.
+;;
+;; Cases 2 and 3 are untouched, deliberately: normalizing a driver IS the
+;; do-operator and there is no second edge to discount, so the three published
+;; scenarios keep their numbers exactly.
+(= (cf-component $space $patient $lever $driver $m)
+   (let* (($z    (patient-elevated-z $space $patient $m))
+          ($base (pos-transmission $space $driver $m))
+          ($lvs  (collapse (match $space (Effect $lever $driver Neg $ltv) $ltv))))
+      (let* (($tv  (if (== $lvs ())
+                       $base
+                       (let $l (car-atom $lvs)
+                          (stv (* (cf-tv-s $l) (cf-tv-s $base))
+                               (* (* (cf-tv-c $l) (cf-tv-c $base))
+                                  (chain-discount))))))
+             ($s   (cf-tv-s $tv))
              ($c   (cf-tv-c $tv))
              ($red (* $s $z))
              ($dm  (* (grimage-weight $m) $red)))
@@ -207,10 +275,10 @@
 
 ;; Collapse the per-component parts for a resolved driver (empty tuple when the
 ;; driver reaches no elevated GrimAge component — the honest "no path" case).
-(= (cf-parts $space $patient $driver)
+(= (cf-parts $space $patient $lever $driver)
    (collapse
       (let $m (match $space (PartOf $mm GrimAge) $mm)
-         (cf-component $space $patient $driver $m))))
+         (cf-component $space $patient $lever $driver $m))))
 
 ;; Folds over the collapsed ((cf-part …) …) tuple — all let*-forced.
 (= (cf-dm (cf-part $m $tv $red $dm)) $dm)
@@ -256,7 +324,7 @@
 ;;      (expected-delta d) (signed Neg (stv s c)) (Via (M …)))
 (= (counterfactual $space $patient $lever $outcome)
    (let $driver (resolve-lever $space $lever)
-      (let* (($ps    (cf-parts $space $patient $driver))
+      (let* (($ps    (cf-parts $space $patient $lever $driver))
              ($total (cf-sum-dm $ps))
              ($conf  (cf-conf $ps))
              ($vias  (cf-vias $ps))

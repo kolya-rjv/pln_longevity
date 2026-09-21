@@ -96,11 +96,27 @@ def test_the_chat_handler_makes_no_bare_metta_call(app_tree):
     assert not bare, f"unoffloaded MeTTa call(s) in app.chat: {bare}"
 
 
-def test_the_chat_handler_reports_an_execution_failure_as_a_failure(app_source):
-    """A UI cannot return 504, but it must not render a timeout as 'no results'."""
-    assert "PLNExecutionTimeout" in app_source
-    assert "PLNOverloaded" in app_source
-    assert "PLNWorkerCrashed" in app_source
+def test_the_chat_handler_reports_an_execution_failure_as_a_failure(app_tree, app_source):
+    """A UI cannot return 504, but it must not render a timeout as 'no results'.
+
+    Read off the handler's own `except` clause, not scanned for in the file.
+    The three names are imported at the top of app.py, so a substring check was
+    satisfied by the import block alone — narrowing the except tuple to one
+    exception would have left it green while the UI silently stopped handling
+    the other two.
+    """
+    chat = _function(app_tree, "chat")
+    caught: set[str] = set()
+    for node in ast.walk(chat):
+        if not isinstance(node, ast.ExceptHandler) or node.type is None:
+            continue
+        kinds = (
+            node.type.elts if isinstance(node.type, ast.Tuple) else [node.type]
+        )
+        caught.update(k.id for k in kinds if isinstance(k, ast.Name))
+    assert {"PLNExecutionTimeout", "PLNOverloaded", "PLNWorkerCrashed"} <= caught, (
+        f"app.chat does not catch every execution failure; it catches {sorted(caught)}"
+    )
     assert 'status="error"' in app_source
 
 

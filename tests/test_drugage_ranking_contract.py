@@ -49,6 +49,23 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 REAL_ROWS = FIXTURES / "drugage_real_rows.metta"
 
 
+def _post(path: str, body: dict):
+    """One HTTP call against the in-process ASGI app."""
+    import asyncio
+
+    httpx = pytest.importorskip("httpx")
+    import api as api_module
+
+    async def send():
+        transport = httpx.ASGITransport(app=api_module.app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
+            return await client.post(path, json=body)
+
+    return asyncio.run(send())
+
+
 def _row(row_id, compound, species, itp, sig, pct, sex=None) -> DrugAgeRow:
     block = "\n".join(
         [f"(InstanceOf {row_id} Experiment)", f"(UsesIntervention {row_id} {compound})"]
@@ -204,3 +221,80 @@ def test_selector_still_honours_an_explicit_compound_filter():
     rows = load_rows(REAL_ROWS)
     picked = select_rows(rows, compounds=["Rapamycin"], best_per_compound=True)
     assert [r.compound for r in picked] == ["Rapamycin"]
+
+
+# ── confidence_threshold, end to end ─────────────────────────────────────────
+
+@pytest.mark.slow
+def test_confidence_threshold_removes_low_confidence_atoms_from_run_query():
+    """The runtime path, not the helper.
+
+    The evaluation's finding was that "a 0.5 threshold still returned
+    confidence-0.315 rows". The tests that pinned the repair all called the
+    private `_apply_threshold` directly, so deleting its call from `run_query`
+    left the whole suite green — the defect could return on `/query` and
+    `/metta/run` with nothing noticing. This drives the real function.
+    """
+    pytest.importorskip("hyperon")
+    from core.pln_runner import run_query
+
+    kb = [REPO / f for f in (
+        "system_types.metta", "logical_predicates.metta",
+        "epistemic_calibration.metta", "pln_deduction.metta",
+    )]
+    # Two independent two-hop chains: one lands at c=0.648, one at c=0.054.
+    extra = (
+        "(Effect ProbeA ProbeB Pos (stv 0.9 0.8))\n"
+        "(Effect ProbeB ProbeC Pos (stv 0.9 0.9))\n"
+        "(Effect ProbeD ProbeE Pos (stv 0.9 0.2))\n"
+        "(Effect ProbeE ProbeF Pos (stv 0.9 0.3))"
+    )
+    query = "!(superpose ((infer &self ProbeA ProbeC) (infer &self ProbeD ProbeF)))"
+
+    def confidences(threshold: float) -> list[float]:
+        result = run_query(
+            metta_query=query, kb_files=kb, extra_atoms=extra,
+            confidence_threshold=threshold,
+        )
+        assert result.status == "ok", result.error
+        return sorted((r.stv or {}).get("confidence") for r in result.results)
+
+    unfiltered = confidences(0.0)
+    assert len(unfiltered) == 2
+    assert unfiltered[0] == pytest.approx(0.054)
+    assert unfiltered[1] == pytest.approx(0.648)
+
+    filtered = confidences(0.3)
+    assert filtered == [pytest.approx(0.648)], (
+        "the sub-threshold derivation survived; confidence_threshold is inert "
+        "on the runtime path again"
+    )
+
+
+def test_confidence_threshold_moves_a_compound_to_filtered_out_over_http():
+    """And the HTTP contract: filtered, not dropped — the caller is told.
+
+    Needs `build/drugage_etl.metta`, which is gitignored; without it the
+    endpoint correctly answers 503 `drugage_build_missing` and there is nothing
+    to rank. `bash scripts/run_etl.sh` generates it.
+    """
+    body = {"compounds": ["Rapamycin", "Trimethadione"], "include_rows": False}
+
+    response = _post("/drugage/rank", {**body, "confidence_threshold": 0.0})
+    if response.status_code == 503:
+        pytest.skip("build/drugage_etl.metta not generated (run scripts/run_etl.sh)")
+    unfiltered = response.json()
+
+    ranked = {e["compound"]: e["confidence"] for e in unfiltered["ranked"]}
+    # An ITP row (0.90 x 1.0 x 0.9) against an invertebrate Significant row
+    # (0.35 x 1.0 x 0.9) — a threshold between them must separate them.
+    assert ranked == {"Rapamycin": pytest.approx(0.81),
+                      "Trimethadione": pytest.approx(0.315)}
+    assert unfiltered["filtered_out"] == []
+
+    filtered = _post("/drugage/rank", {**body, "confidence_threshold": 0.5}).json()
+    assert [e["compound"] for e in filtered["ranked"]] == ["Rapamycin"]
+    # Removed from the ranking and REPORTED, with the confidence that removed
+    # it — an omission a caller cannot see is how a ranking starts lying.
+    assert [e["compound"] for e in filtered["filtered_out"]] == ["Trimethadione"]
+    assert filtered["filtered_out"][0]["confidence"] == pytest.approx(0.315)

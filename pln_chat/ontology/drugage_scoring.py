@@ -33,7 +33,7 @@ The arithmetic, for the record (drugage_calibration.metta §4-§8):
     strength   = |pct| / (|pct| + halfsat)
     tier       = ITP ? conf(ITP_Positive|ITP_Negative) : conf(clade_category(species))
     gate       = ITP ? 1.0 : sig_gate(significance)
-    confidence = min(tier, gate) * chain_discount        # the Lifespan->Mortality hop
+    confidence = tier * gate * chain_discount            # the Lifespan->Mortality hop
     sign       = pct < 0 ? "Pos" (harmful) : "Neg" (protective)
     score      = sign == "Neg" ? +strength*confidence : -strength*confidence
 """
@@ -133,6 +133,22 @@ class RowScore:
     def protective(self) -> bool:
         return self.sign == "Neg"
 
+    @property
+    def direction(self) -> str:
+        """'protective' | 'harmful' | 'no_effect' — the sign in words.
+
+        `sign` is the MeTTa Effect convention and has no zero: a row reporting
+        0.0% lifespan change is `Neg` because it is not negative. Reading that
+        straight out as "protective" put a contradiction inside one response —
+        `direction: "protective"` next to a `score` of exactly 0.0 and a
+        `semantics.zero_score` note saying that a 0.0 is a REPORTED NULL. The
+        most consequential rows in the build are exactly these: the ITP nulls
+        for metformin and resveratrol, at the highest confidence the KB gives.
+        """
+        if self.strength == 0.0:
+            return "no_effect"
+        return "protective" if self.protective else "harmful"
+
 
 def score_row(row: DrugAgeRow, knobs: Optional[ScoringKnobs] = None) -> Optional[RowScore]:
     """Score ONE row, or None when the row reports no lifespan change.
@@ -161,7 +177,7 @@ def score_row(row: DrugAgeRow, knobs: Optional[ScoringKnobs] = None) -> Optional
         tier = k.evidence_confidence.get(category, 0.35)
         gate = k.sig_gates.get(row.significance or "Unreported", 0.6)
 
-    confidence = min(tier, gate) * k.chain_discount
+    confidence = tier * gate * k.chain_discount
     # pct > 0 raises Lifespan (Pos), chained through the curated
     # (Effect Lifespan Mortality Neg) adapter => net Neg = protective.
     sign = "Pos" if row.avg_change < 0 else "Neg"

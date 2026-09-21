@@ -29,9 +29,17 @@ from config import (
 from ontology.loader import load_specific_files, read_raw
 from ontology.registry import OntologyRegistry, BUILTIN_REGISTRY
 from ontology.expander import run_expansion_pipeline
+from ontology.lever_gate import lever_warnings
+from ontology.scoped_forms import scoped_form_warnings
+from ontology.write_gate import OntologyWriteRefused, guard_ontology_write
 from ontology.inventory import inventory_for, summarise_oversized
 from core.context_builder import build_system_prompt
-from core.drugage_router import parse_drugage_query, route_drugage_ranking
+from core.drugage_router import (
+    DrugAgePoolTooLarge,
+    guard_compound_pool,
+    parse_drugage_query,
+    route_drugage_ranking,
+)
 from core.executor import (
     PLNExecutionTimeout,
     PLNOverloaded,
@@ -233,6 +241,10 @@ def chat(
             # The routed form is validated by the selector (does a row match?), not by
             # the generic symbol index, which lacks the scoped DrugAge symbols/names.
             validation = ValidationResult(valid=True)
+            # Cap the pool HERE, in the parent: the guard inside
+            # route_drugage_ranking would otherwise fire in the worker process
+            # and come back as an opaque crash instead of a usable message.
+            guard_compound_pool(drugage_compounds)
             pln_result = run_offloaded(
                 "route_drugage_ranking",
                 {"compounds": drugage_compounds,
@@ -258,7 +270,12 @@ def chat(
                     kb_files=_ALL_KB_PATHS,
                 ),
             )
-    except (PLNExecutionTimeout, PLNOverloaded, PLNWorkerCrashed) as exc:
+    except (
+        PLNExecutionTimeout,
+        PLNOverloaded,
+        PLNWorkerCrashed,
+        DrugAgePoolTooLarge,
+    ) as exc:
         # A chat UI cannot return a status code, so the failure is rendered as
         # the answer — but it is still a FAILURE, not an empty result.
         validation = ValidationResult(valid=True)
@@ -275,6 +292,16 @@ def chat(
         show_explanation=show_explanation,
         show_debug=show_debug,
     )
+    # The same qualification the REST surfaces attach. A lever the named patient
+    # cannot pull returns a number the engine cannot gate
+    # (pln_counterfactual.metta §3b), so the gate is applied here — and it has
+    # to be applied on BOTH surfaces or they answer the same question
+    # differently, which is the whole point of this file's parity tests.
+    for warning in (
+        lever_warnings(translation.metta_query)
+        + scoped_form_warnings(translation.metta_query, _ALL_KB_PATHS, inventory)
+    ):
+        bot_response += f"\n\n> **Note.** {warning}"
 
     log_turn(user_message, translation, pln_result)
 
@@ -423,6 +450,15 @@ def apply_to_ontology(state: dict) -> tuple[str, gr.Button]:
 
     metta_block: str = state["metta_block"]
     target_path = Path(state["target_path"])
+
+    # The same gate POST /ontology/apply passes. This button is mounted on the
+    # public ASGI app, so "it is only the local UI" was never true: appending to
+    # a curated file here changes every future answer for every REST caller too.
+    # schema_checked, because these entries came from the extraction pipeline.
+    try:
+        guard_ontology_write(target_path, metta_block, schema_checked=True)
+    except OntologyWriteRefused as exc:
+        return f"**Refused:** {exc}", gr.update(interactive=True)
 
     try:
         target_path.parent.mkdir(parents=True, exist_ok=True)

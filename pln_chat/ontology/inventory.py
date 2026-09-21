@@ -403,6 +403,55 @@ def file_card(path: Path, *, max_predicates: int = 20) -> str:
     return header + "\n" + schema_card(inv, max_predicates=max_predicates)
 
 
+def merged_inventory(base: RuntimeInventory, extra_text: str) -> RuntimeInventory:
+    """`base` plus whatever `extra_text` grounds, without touching `base`.
+
+    Caller-supplied atoms are real atoms for the length of one request: the
+    query that follows them runs against a space that holds both. The symbol
+    check has to agree, or a caller who injects a scratch fact and then queries
+    it is told their own symbols do not exist.
+    """
+    from copy import deepcopy
+
+    if not extra_text or not extra_text.strip():
+        return base
+
+    import tempfile
+
+    with tempfile.NamedTemporaryFile("w", suffix=".metta", delete=False,
+                                     encoding="utf-8") as handle:
+        handle.write(extra_text)
+        path = Path(handle.name)
+    try:
+        addition = build_inventory([path])
+    finally:
+        try:
+            path.unlink()
+        except OSError:       # pragma: no cover
+            pass
+
+    merged = deepcopy(base)
+    for name, info in addition.predicates.items():
+        existing = merged.predicates.get(name)
+        if existing is None:
+            merged.predicates[name] = info
+        else:
+            existing.fact_count += info.fact_count
+            existing.arities.update(info.arities)
+            existing.sources |= info.sources
+    for symbol, preds in addition.entities.items():
+        merged.entities.setdefault(symbol, set()).update(preds)
+    merged.functions.update(addition.functions)
+    merged.types |= addition.types
+    merged.defined |= addition.defined
+    # A predicate the injected atoms GROUND is no longer declared-but-empty.
+    merged.declared_only = {
+        name for name in merged.declared_only
+        if not merged.predicates.get(name, PredicateInfo(name)).fact_count
+    }
+    return merged
+
+
 def summarise_oversized(
     raw_contents: dict[str, str],
     paths: Iterable[Path],

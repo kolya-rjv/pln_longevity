@@ -121,6 +121,10 @@ def test_top_n_ranks_the_whole_build_not_a_caller_supplied_pool():
     scores = [e.score for e in top.entries]
     assert scores == sorted(scores, reverse=True)
     assert all(e.protective for e in top.entries)
+    # GROUND TRUTH, not just internal consistency: the top of a "protective"
+    # ranking must be compounds that EXTENDED lifespan. Every other assertion
+    # here is sign-symmetric and passes just as well on an inverted scorer.
+    assert all(e.row.avg_change > 0 for e in top.entries)
 
 
 def test_filters_narrow_the_evidence_rather_than_the_ranking():
@@ -129,10 +133,17 @@ def test_filters_narrow_the_evidence_rather_than_the_ranking():
     assert 0 < flies.total_compounds < everything.total_compounds
     assert all(e.row.species == "Drosophila_melanogaster" for e in flies.entries)
 
+    # `all()` over an empty list is True, so a filter that drops EVERY row was
+    # indistinguishable from one that works. Each of these must return a
+    # non-empty, strict subset of the unfiltered ranking.
     strong = drugage_top(n=500, min_confidence=0.4, source=SAMPLE)
+    assert strong.entries
+    assert len(strong.entries) < len(everything.entries)
     assert all(e.confidence >= 0.4 for e in strong.entries)
 
     significant = drugage_top(n=500, significant_only=True, source=SAMPLE)
+    assert significant.entries
+    assert len(significant.entries) < len(everything.entries)
     assert all(e.row.significance == "Significant" for e in significant.entries)
 
 
@@ -219,3 +230,69 @@ def test_interventions_endpoint_rejects_both_filters_at_once():
     response = _get("/interventions?hallmark=CellularSenescence&intervention=Fisetin")
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "invalid_filter"
+
+
+# ── the significance gate, pinned per (tier, significance) ───────────────────
+
+def test_the_significance_gate_binds_at_every_tier_not_just_one():
+    """Each combination, by arithmetic, with no engine and no `slow` marker.
+
+    The parity test above compares Python against hyperon, but its fixture had
+    no non-ITP non-significant row until this change, so the two
+    implementations agreed about the gate by never reaching it — while the gate
+    itself was inert for 3,107 of the build's 3,208 non-ITP rows. `min(tier,
+    gate)` binds only when the gate is below the tier, and every non-ITP tier
+    is at or below every gate.
+    """
+    from ontology.drugage_selector import DrugAgeRow
+
+    knobs = load_knobs(force=True)
+
+    def confidence(species: str, significance: str, itp: bool = False) -> float:
+        row = DrugAgeRow(
+            row_id="E", compound="X", species=species,
+            significance=significance, avg_change=10.0, is_itp=itp, block="",
+        )
+        return score_row(row, knobs).confidence
+
+    # tier x gate x chain-discount, per design tier. The Significant column is
+    # the published confidence_tiers table and must not move.
+    assert confidence("Mus_musculus", "Significant") == pytest.approx(0.45)
+    assert confidence("Caenorhabditis_elegans", "Significant") == pytest.approx(0.315)
+    assert confidence("Saccharomyces_cerevisiae", "Significant") == pytest.approx(0.18)
+
+    # …and every one of them is now discounted by a null or an unreported test.
+    for species, significant in (
+        ("Mus_musculus", 0.45),
+        ("Caenorhabditis_elegans", 0.315),
+        ("Saccharomyces_cerevisiae", 0.18),
+    ):
+        assert confidence(species, "Unreported") == pytest.approx(significant * 0.6)
+        assert confidence(species, "NotSignificant") == pytest.approx(significant * 0.4)
+
+    # An ITP row folds significance into its tier, so its gate stays neutral:
+    # a well-run null is high-confidence evidence of ~no effect.
+    assert confidence("Mus_musculus", "Significant", itp=True) == pytest.approx(0.81)
+    assert confidence("Mus_musculus", "NotSignificant", itp=True) == pytest.approx(0.81)
+
+
+def test_a_reported_null_is_not_labelled_protective():
+    """`sign` has no zero; `direction` must not borrow one.
+
+    A row at 0.0% change scores 0.0 and reads `sign: "Neg"`, because it is not
+    negative. Rendering that as `direction: "protective"` contradicted the
+    `semantics.zero_score` note shipped in the same response — and the rows it
+    hits hardest are the ITP nulls, the highest-confidence evidence in the KB.
+    """
+    from ontology.drugage_selector import DrugAgeRow
+
+    def scored(pct: float):
+        return score_row(DrugAgeRow(
+            row_id="E", compound="X", species="Mus_musculus",
+            significance="NotSignificant", avg_change=pct, is_itp=True, block="",
+        ), load_knobs())
+
+    assert scored(0.0).direction == "no_effect"
+    assert scored(0.0).score == 0.0
+    assert scored(3.0).direction == "protective"
+    assert scored(-3.0).direction == "harmful"

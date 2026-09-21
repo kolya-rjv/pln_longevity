@@ -45,14 +45,13 @@ from __future__ import annotations
 import atexit
 import multiprocessing
 import threading
-from concurrent.futures import BrokenExecutor, Future, ProcessPoolExecutor, TimeoutError as FutureTimeout
+import time
 from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar
 
 from config import (
     PLN_MAX_INFLIGHT_QUERIES,
     PLN_QUERY_TIMEOUT_SECONDS,
-    PLN_WORKER_MAX_TASKS,
     PLN_WORKER_POOL_SIZE,
 )
 
@@ -146,122 +145,100 @@ def _child_init(sys_path_entry: str) -> None:
         sys.path.insert(0, sys_path_entry)
 
 
-# ── Pool lifecycle ───────────────────────────────────────────────────────────
+# ── One process per query ────────────────────────────────────────────────────
+# NOT a shared ProcessPoolExecutor. A pool looks like the obvious fit and is the
+# wrong one here, for a reason that only shows up under concurrency: a pool has
+# no way to kill ONE task. `future.cancel()` does nothing to a task that has
+# already started, and the only lever that stops a GIL-holding Rust call is a
+# signal to the process running it — which a pool does not let you aim.
+#
+# Measured, with a shared pool: while an eight-compound ranking was running
+# normally (3 s, well inside its budget), a DIFFERENT caller's runaway query hit
+# its 1 s deadline. Killing the pool to stop the runaway killed the healthy
+# request too, and that caller got a 500 blaming a hyperon abort that never
+# happened to them.
+#
+# Forking one process per query makes the deadline exact: the timeout kills the
+# process running THAT query and nothing else. On Linux the fork is copy-on-
+# write and costs single-digit milliseconds against a 10-600 ms query, which is
+# a cheap price for not failing other people's requests. `fork` also avoids the
+# __main__ re-import that spawn/forkserver would do in every child — under
+# `python app.py` that would rebuild the whole Gradio UI per query.
 
-_pool_lock = threading.Lock()
-_pool: Optional[ProcessPoolExecutor] = None
-_pool_tasks = 0                      # tasks run by the CURRENT pool
 _inflight = 0
 _inflight_lock = threading.Lock()
+_slots: Optional[threading.BoundedSemaphore] = None
+_slots_size = -1
+_slots_lock = threading.Lock()
 
 
-def _mp_context(name: str):
-    try:
-        return multiprocessing.get_context(name)
-    except ValueError:      # pragma: no cover - start method unavailable here
-        return None
-
-
-def _new_pool(size: int) -> ProcessPoolExecutor:
-    """Build the worker pool.
-
-    `fork` is deliberately preferred over `spawn`/`forkserver`. Those two
-    RE-IMPORT the parent's __main__ module in every child: under `python app.py`
-    that rebuilds the whole Gradio UI per worker, and under a bare script it can
-    fail outright. Forked children inherit sys.path and the loaded modules and
-    start in milliseconds. The cost is that CPython refuses
-    `max_tasks_per_child` under `fork`, so worker recycling is done by hand in
-    `run_offloaded` (discard the pool every PLN_WORKER_MAX_TASKS tasks) instead.
-    """
-    base: dict[str, Any] = {
-        "max_workers": size,
-        "initializer": _child_init,
-        "initargs": (str(Path(__file__).resolve().parent.parent),),
-    }
+def _mp_context():
+    """fork where available; spawn only as a last resort (see above)."""
     for name in ("fork", "forkserver", "spawn"):
-        ctx = _mp_context(name)
-        if ctx is not None:
-            return ProcessPoolExecutor(mp_context=ctx, **base)
-    return ProcessPoolExecutor(**base)   # pragma: no cover - last resort
+        try:
+            return multiprocessing.get_context(name)
+        except ValueError:          # pragma: no cover - platform dependent
+            continue
+    return multiprocessing          # pragma: no cover
 
 
 def pool_size() -> int:
-    """Configured worker count; 0 means inline execution."""
+    """Max queries running at once; 0 means inline execution."""
     return max(0, PLN_WORKER_POOL_SIZE)
 
 
-def _get_pool() -> ProcessPoolExecutor:
-    global _pool, _pool_tasks
-    with _pool_lock:
-        if _pool is None:
-            _pool = _new_pool(pool_size())
-            _pool_tasks = 0
-        return _pool
+def _acquire_slot(timeout: float) -> bool:
+    """Bound concurrent MeTTa processes, since each one pins a core."""
+    global _slots, _slots_size
+    with _slots_lock:
+        if _slots is None or _slots_size != pool_size():
+            _slots = threading.BoundedSemaphore(max(1, pool_size()))
+            _slots_size = pool_size()
+        slots = _slots
+    return slots.acquire(timeout=max(0.0, timeout))
 
 
-def _note_task_done() -> None:
-    """Recycle the pool every PLN_WORKER_MAX_TASKS tasks (see _new_pool)."""
-    global _pool_tasks
-    if PLN_WORKER_MAX_TASKS <= 0:
-        return
-    with _pool_lock:
-        _pool_tasks += 1
-        recycle = _pool_tasks >= PLN_WORKER_MAX_TASKS
-    if recycle:
-        _discard_pool()
-
-
-def _kill_workers(pool: ProcessPoolExecutor) -> None:
-    """SIGKILL every worker of `pool`.
-
-    Abandoning a timed-out task is NOT enough. `shutdown(wait=False)` leaves the
-    running child alive, and a runaway MeTTa evaluation is not merely slow — a
-    divergent recursion pins a core at 100% and grows without bound (measured:
-    3.7 GB resident and climbing within ~2 minutes). Since the child is inside a
-    GIL-holding Rust call it cannot be asked to stop politely, so the deadline
-    has to be enforced with a signal.
-    """
-    processes = getattr(pool, "_processes", None) or {}
-    for proc in list(processes.values()):
+def _release_slot() -> None:
+    with _slots_lock:
+        slots = _slots
+    if slots is not None:
         try:
-            if proc.is_alive():
-                proc.kill()
-        except Exception:   # noqa: BLE001 - never mask the original failure
+            slots.release()
+        except ValueError:          # pragma: no cover - resized mid-flight
             pass
 
 
-def _discard_pool(*, kill: bool = False) -> None:
-    """Throw the pool away after a timeout or a worker abort, and start fresh."""
-    global _pool, _pool_tasks
-    with _pool_lock:
-        dead, _pool = _pool, None
-        _pool_tasks = 0
-    if dead is None:
-        return
-    if kill:
-        _kill_workers(dead)
-    # Do not wait: the point of the deadline is to stop blocking the caller.
+def _child_main(conn, task: str, kwargs: dict) -> None:
+    """The forked child: run one task, send one message back, exit."""
     try:
-        dead.shutdown(wait=False, cancel_futures=True)
-    except Exception:   # noqa: BLE001 - shutdown must never mask the real error
+        conn.send(("ok", _dispatch(task, kwargs)))
+    except BaseException as exc:    # noqa: BLE001 - relayed to the parent verbatim
+        conn.send(("error", f"{type(exc).__name__}: {exc}"))
+    finally:
+        try:
+            conn.close()
+        except Exception:           # pragma: no cover
+            pass
+
+
+def _terminate(proc) -> None:
+    """SIGKILL one worker.
+
+    Not SIGTERM: the child is inside a Rust call that does not check signals
+    politely, and a runaway MeTTa evaluation grows without bound while it waits
+    (measured: 3.7 GB resident within two minutes).
+    """
+    try:
+        if proc.is_alive():
+            proc.kill()
+            proc.join(timeout=5)
+    except Exception:               # pragma: no cover - never mask the real error
         pass
 
 
 def shutdown() -> None:
-    """Release the pool (tests, and a clean process exit)."""
-    _discard_pool(kill=True)
-
-
-def executor_stats() -> dict:
-    """What `GET /health` reports about PLN execution."""
-    return {
-        "mode": "inline" if pool_size() == 0 else "process_pool",
-        "workers": pool_size(),
-        "timeout_seconds": PLN_QUERY_TIMEOUT_SECONDS,
-        "max_inflight": _effective_inflight_limit(),
-        "inflight": _inflight,
-        "pool_started": _pool is not None,
-    }
+    """Nothing to release: every query's process exits with the query."""
+    return None
 
 
 def _effective_inflight_limit() -> int:
@@ -270,7 +247,22 @@ def _effective_inflight_limit() -> int:
     return max(1, pool_size() * 4)
 
 
-# ── The one function callers use ─────────────────────────────────────────────
+def executor_stats() -> dict:
+    """What `GET /health` reports about PLN execution."""
+    inline = pool_size() == 0
+    return {
+        "mode": "inline" if inline else "process_per_query",
+        "max_concurrent": pool_size(),
+        # A deadline and an admission limit are only enforceable out of process.
+        # Saying so is the point: inline mode is the escape hatch, and a caller
+        # reading /health should not believe it is protected when it is not.
+        "timeout_seconds": None if inline else PLN_QUERY_TIMEOUT_SECONDS,
+        "timeout_enforced": not inline,
+        "max_inflight": None if inline else _effective_inflight_limit(),
+        "admission_control": not inline,
+        "inflight": _inflight,
+    }
+
 
 def run_offloaded(
     task: str,
@@ -279,7 +271,7 @@ def run_offloaded(
     *,
     timeout: Optional[float] = None,
 ) -> T:
-    """Run `task` in a worker process, or `inline()` when the pool is disabled.
+    """Run `task` in a dedicated worker process, or `inline()` when disabled.
 
     Parameters
     ----------
@@ -296,7 +288,10 @@ def run_offloaded(
     Raises
     ------
     PLNOverloaded, PLNExecutionTimeout, PLNWorkerCrashed
-        Mapped to 503 / 504 / 500 by the HTTP layer.
+        Mapped to 503 / 504 / 500 by the HTTP layer. Nothing else escapes: an
+        exception raised by the task itself comes back as PLNWorkerCrashed with
+        its original type name in the message, so a caller never gets a bare
+        500 from a path this function was supposed to classify.
     """
     if task not in _TASKS:
         raise KeyError(f"unknown offload task: {task!r}")
@@ -310,29 +305,68 @@ def run_offloaded(
         if _inflight >= limit:
             raise PLNOverloaded(limit)
         _inflight += 1
+
+    budget = PLN_QUERY_TIMEOUT_SECONDS if timeout is None else timeout
+    budget = budget if budget and budget > 0 else None
+
+    slot = False
+    proc = None
+    parent_conn = None
     try:
-        budget = PLN_QUERY_TIMEOUT_SECONDS if timeout is None else timeout
+        # Waiting for a slot is part of the budget, not extra to it.
+        slot = _acquire_slot(budget if budget is not None else 30.0)
+        if not slot:
+            raise PLNOverloaded(pool_size())
+
+        ctx = _mp_context()
+        parent_conn, child_conn = ctx.Pipe(duplex=False)
+        proc = ctx.Process(
+            target=_child_main, args=(child_conn, task, kwargs), daemon=True
+        )
+        started = time.monotonic()
+        proc.start()
+        child_conn.close()          # the parent keeps only the read end
+
+        remaining = None if budget is None else max(
+            0.0, budget - (time.monotonic() - started)
+        )
+        if not parent_conn.poll(remaining):
+            # Still inside a GIL-holding Rust call, so it cannot be asked to
+            # stop. Kill THIS query's process — and only this one.
+            _terminate(proc)
+            raise PLNExecutionTimeout(budget or 0.0)
+
         try:
-            future: Future = _get_pool().submit(_dispatch, task, kwargs)
-        except BrokenExecutor:
-            _discard_pool()
-            future = _get_pool().submit(_dispatch, task, kwargs)
-        try:
-            out = future.result(timeout=budget if budget and budget > 0 else None)
-            _note_task_done()
-            return out
-        except FutureTimeout:
-            # The worker is still inside a GIL-holding Rust call, so it cannot be
-            # interrupted — kill it and let the next request build a clean pool.
-            _discard_pool(kill=True)
-            raise PLNExecutionTimeout(budget) from None
-        except BrokenExecutor as exc:
-            _discard_pool(kill=True)
-            raise PLNWorkerCrashed(str(exc)) from None
+            status, payload = parent_conn.recv()
+        except EOFError:
+            # The child died without sending anything: a hyperon abort.
+            exit_code = proc.exitcode
+            _terminate(proc)
+            raise PLNWorkerCrashed(
+                f"worker exited with code {exit_code} and no result"
+            ) from None
+
+        proc.join(timeout=5)
+        if proc.is_alive():         # pragma: no cover - the child already answered
+            _terminate(proc)
+
+        if status == "ok":
+            return payload
+        raise PLNWorkerCrashed(f"the query raised in the worker: {payload}")
     finally:
+        if parent_conn is not None:
+            try:
+                parent_conn.close()
+            except Exception:       # pragma: no cover
+                pass
+        if proc is not None and proc.is_alive():
+            _terminate(proc)
+        if slot:
+            _release_slot()
         with _inflight_lock:
             _inflight -= 1
 
 
-# Best-effort cleanup so a reloading dev server does not leak workers.
+# Kept so an importer that calls it keeps working; there is nothing to release
+# now that a query's process exits with the query.
 atexit.register(shutdown)

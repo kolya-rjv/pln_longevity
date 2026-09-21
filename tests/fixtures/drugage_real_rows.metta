@@ -85,3 +85,53 @@
 (MaxLifespanChangePercent DrugAgeRow_754 57.0)
 (MaxLifespanSignificance DrugAgeRow_754 Unreported)
 (WeightChangeSignificance DrugAgeRow_754 Unreported)
+
+; ── Rows that exercise the SIGNIFICANCE GATE ────────────────────────────────
+; Added because the fixture could not see it. Every row above is either ITP
+; (whose gate is fixed at 1.0) or non-ITP Significant (whose gate is 1.0), so
+; the engine-vs-Python parity test agreed on the gate by never reaching it —
+; and the gate was, at the time, inert for 3,107 of the build's 3,208 non-ITP
+; rows. These three are verbatim from build/drugage_etl.metta and cover the
+; combinations that matter: a VERTEBRATE NotSignificant (the only case the old
+; min(tier, gate) cap ever bound, 0.50 -> 0.40), an INVERTEBRATE NotSignificant
+; and an INVERTEBRATE Unreported (both of which the cap left untouched at the
+; significant row's own confidence).
+
+(InstanceOf DrugAgeRow_145 Experiment)
+(UsesIntervention DrugAgeRow_145 Butylated_hydroxytoluene)
+(UsesSpecies DrugAgeRow_145 Mus_musculus)
+(UsesStrain DrugAgeRow_145 BaLB_c)
+(HasSex DrugAgeRow_145 Male)
+(ReportedIn DrugAgeRow_145 PMID_448040)
+(Concentration DrugAgeRow_145 (Measure 7500.0 ppm))
+(DeliveryMedium DrugAgeRow_145 food)
+(AgeAtInitiation DrugAgeRow_145 (Measure 2.0 Months))
+(TreatmentDuration DrugAgeRow_145 (Measure 2.6 Months))
+(AvgLifespanChangePercent DrugAgeRow_145 6.0)
+(AvgLifespanSignificance DrugAgeRow_145 NotSignificant)
+(MaxLifespanChangePercent DrugAgeRow_145 0.0)
+(MaxLifespanSignificance DrugAgeRow_145 NotSignificant)
+(WeightChangeSignificance DrugAgeRow_145 Unreported)
+
+(InstanceOf DrugAgeRow_123 Experiment)
+(UsesIntervention DrugAgeRow_123 Floxuridine)
+(UsesSpecies DrugAgeRow_123 Caenorhabditis_elegans)
+(UsesStrain DrugAgeRow_123 N2)
+(HasSex DrugAgeRow_123 Hermaphrodite)
+(ReportedIn DrugAgeRow_123 PMID_153363)
+(Dosage DrugAgeRow_123 (Measure 6000.0 uM))
+(AvgLifespanChangePercent DrugAgeRow_123 -2.66)
+(AvgLifespanSignificance DrugAgeRow_123 NotSignificant)
+(MaxLifespanSignificance DrugAgeRow_123 Unreported)
+(WeightChangeSignificance DrugAgeRow_123 Unreported)
+
+(InstanceOf DrugAgeRow_772 Experiment)
+(UsesIntervention DrugAgeRow_772 Dauer_inducing_Pheromone)
+(UsesSpecies DrugAgeRow_772 Caenorhabditis_elegans)
+(UsesStrain DrugAgeRow_772 N2)
+(HasSex DrugAgeRow_772 Unknown)
+(ReportedIn DrugAgeRow_772 PMID_16377915)
+(AvgLifespanChangePercent DrugAgeRow_772 26.7)
+(AvgLifespanSignificance DrugAgeRow_772 Unreported)
+(MaxLifespanSignificance DrugAgeRow_772 Unreported)
+(WeightChangeSignificance DrugAgeRow_772 Unreported)

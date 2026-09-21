@@ -205,12 +205,26 @@ def test_itp_raises_confidence_over_single_study(kb):
     assert itp > single                                  # ITP is gold-standard
 
 
-def test_significance_gate_caps_confidence(kb):
-    sig = _num(kb, "!(drugage-confidence &self E2)")     # Significant
-    nonsig = _num(kb, "!(drugage-confidence &self E5)")  # NotSignificant
-    assert sig == pytest.approx(0.50)
-    assert nonsig == pytest.approx(0.40)                 # gated below the tier
+def test_significance_gate_discounts_confidence(kb):
+    """The gate multiplies the tier; it used to cap it, which did almost nothing.
+
+    min(tier, gate) only binds when the gate is BELOW the tier, and every
+    non-ITP tier already sits at or below every gate. Over the full 3,423-row
+    build the cap changed 101 rows out of 3,208 non-ITP ones — all of them
+    vertebrate NotSignificant, the one case here. The other 3,107 scored at
+    exactly the confidence of a significant result.
+    """
+    sig = _num(kb, "!(drugage-confidence &self E2)")     # Significant, vertebrate
+    nonsig = _num(kb, "!(drugage-confidence &self E5)")  # NotSignificant, vertebrate
+    assert sig == pytest.approx(0.50)                    # 0.50 x 1.0
+    assert nonsig == pytest.approx(0.20)                 # 0.50 x 0.4
     assert nonsig < sig
+    # And the case the cap could not reach: an invertebrate tier (0.35) is
+    # already below every gate, so under min() a null scored identically to a
+    # significant result. E3 is the significant worm row.
+    worm_sig = _num(kb, "!(drugage-confidence &self E3)")
+    assert worm_sig == pytest.approx(0.35)
+    assert worm_sig * 0.4 == pytest.approx(0.14)         # what a null worm now reads
 
 
 def test_strength_saturates_monotonically(kb):
@@ -266,7 +280,11 @@ def test_species_can_trade_off_against_magnitude(kb):
 def test_selector_parses_and_filters_by_compound():
     rows = load_rows(REAL_ROWS)
     assert {r.compound for r in rows} == {
-        "Rapamycin", "Acarbose", "Resveratrol", "Metformin", "Trimethadione"}
+        # the ITP pair + their nulls, and one non-ITP significant worm row…
+        "Rapamycin", "Acarbose", "Resveratrol", "Metformin", "Trimethadione",
+        # …plus the three rows that exercise the significance gate, which the
+        # fixture previously could not reach at all (see its header comment).
+        "Butylated_hydroxytoluene", "Floxuridine", "Dauer_inducing_Pheromone"}
     rap = select_rows(rows, compounds=["rapamycin"])   # loose, case-insensitive
     assert rap and all(r.compound == "Rapamycin" for r in rap)
 

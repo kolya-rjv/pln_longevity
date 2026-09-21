@@ -184,8 +184,12 @@
 ;; link, so "which hallmarks does metformin target?" was empty too.
 ;; Honest reading of the source: Bannister 2014 is an OBSERVATIONAL survival
 ;; comparison (78,241 metformin-initiated T2D patients vs. 90,463 matched
-;; non-diabetic controls; adjusted median survival 15% LONGER on metformin than
-;; in the non-diabetic controls). It is the mortality finding that put metformin
+;; non-diabetic controls; adjusted median survival time was 15% LOWER in the
+;; matched non-diabetic controls — survival time ratio 0.85, 95% CI 0.81-0.90).
+;; The wording is human_evidence.metta's, verbatim, because this file said the
+;; reciprocal — "15% longer on metformin" — which is a different number (0.85
+;; inverted is 17.6%) and left the KB carrying two framings of one finding.
+;; It is the mortality finding that put metformin
 ;; on the geroprotector list — it is not itself a mechanism paper. The hallmark
 ;; assignment rests on the mechanism the KB already holds: AMPK is an anchor of
 ;; DeregulatedNutrientSensing (anchors.metta:74) and §4 records the activation.

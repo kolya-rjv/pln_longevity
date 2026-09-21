@@ -118,7 +118,17 @@ def test_the_tiers_used_exist_in_the_single_calibration_authority():
         if len(args) >= 2 and args[1] == "EvidenceCategory"
     }
     used = set(re.findall(r"\(evidence-confidence\s+(\w+)\)", _body(LIFESTYLE)))
-    assert used == {"MultipleHumanTrials", "Epidemiological"}
+    # BOTH edges are Epidemiological, and that is the point. Joehanes 2016 sat on
+    # MultipleHumanTrials (0.85) on a sample-size argument — it pools 16 cohorts
+    # — while Duncan 2019, in this same file, sat on Epidemiological (0.60) with
+    # the note that it "is not a randomized trial". Both are observational human
+    # studies. This ladder orders DESIGNS, not sample sizes: `Epidemiological`
+    # (0.60) sits below `SingleHumanTrial` (0.70) precisely because pooling
+    # observational cohorts does not make them a trial.
+    assert used == {"Epidemiological"}, (
+        "an observational study must not be tiered onto a trials rung; if a "
+        "MetaAnalysis_Human tier is added, give it a value first"
+    )
     assert used <= declared
 
 
@@ -194,15 +204,35 @@ def test_a_caller_smoker_without_packyears_is_warned_not_silently_zeroed():
     assert any("not 'quitting would not help'" in w for w in built.warnings)
 
 
-def test_a_caller_smoker_with_packyears_gets_no_such_warning():
+def test_a_current_smoker_with_packyears_gets_no_warning_at_all():
+    """The one patient the lever is actually for."""
     from core.patient_builder import build_patient
 
     built = build_patient({
-        "id": "Smoker2", "age": 64, "sex": "Male", "smoking": "FormerSmoker",
+        "id": "Smoker2", "age": 64, "sex": "Male", "smoking": "CurrentSmoker",
         "markers": {"AgeAccelGrim": 1.6, "DNAmPACKYRS": 2.1},
     })
     assert not any("DNAmPACKYRS" in w for w in built.warnings)
     assert "(MeasuredZ Caller_Smoker2 DNAmPACKYRS 2.1)" in built.atoms
+
+
+@pytest.mark.parametrize("status", ["NeverSmoker", "FormerSmoker"])
+def test_packyears_without_current_smoking_is_warned_in_the_other_direction(status):
+    """The symmetric case, which used to be silent and is the worse one.
+
+    The builder warned about a smoker WITHOUT the marker. A non-smoker WITH the
+    marker — the case that gets handed a stranger's benefit — said nothing.
+    A former smoker is included: Duncan's HR 0.61 is for quitting versus
+    CONTINUING, so it does not price a second cessation for someone who has
+    already quit.
+    """
+    from core.patient_builder import build_patient
+
+    built = build_patient({
+        "id": "X", "age": 64, "sex": "Male", "smoking": status,
+        "markers": {"AgeAccelGrim": 1.6, "DNAmPACKYRS": 2.1},
+    })
+    assert any("LeverRequiresSmoking" in w for w in built.warnings), built.warnings
 
 
 def test_the_marker_catalog_says_what_packyears_now_reaches():
@@ -253,21 +283,140 @@ def test_the_lever_returns_a_real_delta_through_the_packyears_component(kb):
     assert m, "no Counterfactual atom"
     lever, outcome, delta, sign, strength, conf, via = m.groups()
     assert (lever, outcome, sign) == ("SmokingCessation", "AgeAccelGrim", "Neg")
-    # 0.125 (grimage-weight) x 0.80 (the curated prior) x 2.1 (his z) = 0.21
-    assert float(delta) == pytest.approx(-0.21)
-    assert float(strength) == pytest.approx(0.21)
-    # one hop at the MultipleHumanTrials tier
-    assert float(conf) == pytest.approx(0.85)
+    # 0.39 (the cessation prior) x 0.125 (grimage-weight) x 0.80 (the exposure
+    # prior) x 2.1 (his z) = 0.0819. The 0.39 is the number the file's own
+    # Limitation fact says encodes the residual burden quitting does NOT take
+    # back — and until the counterfactual composed the lever edge, it was
+    # discarded and this read -0.21, i.e. cessation erasing the burden entirely.
+    assert float(delta) == pytest.approx(-0.0819)
+    assert float(strength) == pytest.approx(0.0819)
+    # TWO Epidemiological hops with the chain discount: 0.60 x 0.60 x 0.9.
+    assert float(conf) == pytest.approx(0.324)
     assert via.split() == ["DNAmPACKYRS"]
 
 
 @pytest.mark.slow
-def test_naming_the_driver_and_naming_the_intervention_agree(kb):
-    """resolve-lever routes SmokingCessation to the burden it reduces."""
-    as_intervention = _one(kb, "!(counterfactual-patient &self Patient003 SmokingCessation)")
-    as_driver = _one(kb, "!(counterfactual-patient &self Patient003 SmokingPackYears)")
-    assert as_intervention.replace("SmokingCessation", "X", 1) == \
-        as_driver.replace("SmokingPackYears", "X", 1)
+def test_the_intervention_and_the_driver_differ_by_exactly_the_cessation_prior(kb):
+    """Two different questions, which used to return the same answer.
+
+    "If the exposure burden were gone" (the driver) is the do-operator on
+    SmokingPackYears. "If he quit" (the intervention) is that, times how much of
+    the burden quitting actually takes back. resolve-lever routed both to the
+    driver and dropped the lever edge, so the engine answered the first question
+    for both — asserting that cessation abolishes a lifetime of pack-years.
+    """
+    intervention = _CF_RE.search(
+        _one(kb, "!(counterfactual-patient &self Patient003 SmokingCessation)"))
+    driver = _CF_RE.search(
+        _one(kb, "!(counterfactual-patient &self Patient003 SmokingPackYears)"))
+    assert intervention and driver
+    i_delta, i_conf = float(intervention.group(3)), float(intervention.group(6))
+    d_delta, d_conf = float(driver.group(3)), float(driver.group(6))
+
+    # The ratio IS the curated prior, not approximately.
+    assert i_delta / d_delta == pytest.approx(0.39)
+    # And the extra hop costs its own confidence: 0.60 x chain-discount 0.9.
+    assert i_conf / d_conf == pytest.approx(0.60 * 0.9)
+    # Both still travel the same component.
+    assert intervention.group(7).split() == driver.group(7).split() == ["DNAmPACKYRS"]
+
+
+def test_the_lever_declares_the_exposure_it_presupposes():
+    """`PatientSmoking` finally reaches something that reads it.
+
+    DNAmPACKYRS is an elastic-net estimate with real error and it responds to
+    second-hand exposure, so an elevated value in a never-smoker is an ordinary
+    data state — and it bought them a quantified benefit from quitting,
+    byte-identical to a smoker's, with no warning at all.
+
+    The precondition is a FACT in this file. The rule that reads it is NOT in
+    the knowledge base: see `test_the_curated_kb_is_at_the_engines_ceiling`
+    below for the measurement that forced that, and
+    `pln_chat/ontology/lever_gate.py` for where it went instead.
+    """
+    from ontology.lever_gate import lever_preconditions, lever_warnings
+
+    declared = {(r.lever, r.required) for r in lever_preconditions()}
+    assert ("SmokingCessation", "CurrentSmoker") in declared
+
+    # Patient001 is a NeverSmoker; Patient003 is the current smoker the lever
+    # is for; a lever that declares no precondition warns for nobody.
+    assert lever_warnings("!(counterfactual-patient &self Patient001 SmokingCessation)")
+    assert not lever_warnings("!(counterfactual-patient &self Patient003 SmokingCessation)")
+    assert not lever_warnings("!(counterfactual-patient &self Patient001 ChronicInflammation)")
+
+
+def test_a_caller_supplied_never_smoker_is_warned_over_http():
+    """The gap the KB cannot close is closed on the surface that was evaluated."""
+    pytest.importorskip("httpx")
+    import asyncio
+
+    import httpx
+    import api as api_module
+
+    async def send():
+        transport = httpx.ASGITransport(app=api_module.app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
+            return await client.post("/patients/preview", json={
+                "id": "NS", "age": 72, "sex": "Male", "smoking": "NeverSmoker",
+                "markers": {"AgeAccelGrim": 1.6, "DNAmPACKYRS": 2.1},
+            })
+
+    warnings = asyncio.run(send()).json()["warnings"]
+    assert any("LeverRequiresSmoking" in w for w in warnings), warnings
+
+
+@pytest.mark.slow
+def test_the_curated_kb_is_at_the_engines_ceiling():
+    """The constraint that decided where the precondition gate lives.
+
+    hyperon 0.2.10's abort is a non-unwinding Rust panic, so it kills the test
+    process rather than failing a test — which is why this runs the probe in a
+    SUBPROCESS and reads its return code. Appending trivial rule definitions to
+    a runtime KB file and running an unrelated `predict-risk-patient`:
+
+        +4 definitions -> answers normally
+        +5 definitions -> SIGABRT
+
+    If this test starts failing because the headroom GREW, something was
+    removed from the runtime KB and that is worth knowing too. If it fails
+    because the headroom shrank to zero, the next curated layer cannot be added
+    at all until the layers stop sharing one space.
+    """
+    pytest.importorskip("hyperon")
+    import subprocess
+    import sys
+
+    probe = "\n".join([
+        "import sys",
+        f"sys.path.insert(0, {str(PLN_CHAT)!r})",
+        "import api as api_module",
+        "from core.pln_runner import run_query",
+        "n = int(sys.argv[1])",
+        r'pad = "\n".join(f"(= (budget-probe-{i} $x) $x)" for i in range(n))',
+        "r = run_query('!(predict-risk-patient &self Patient001)',",
+        "              kb_files=api_module._runtime_kb_paths(), extra_atoms=pad)",
+        "print(r.status)",
+    ])
+
+    failures: list[str] = []
+
+    def survives(n: int) -> bool:
+        done = subprocess.run(
+            [sys.executable, "-c", probe, str(n)],
+            capture_output=True, text=True, timeout=300, cwd=str(REPO),
+        )
+        if done.returncode != 0:
+            failures.append(f"n={n} rc={done.returncode}: {done.stderr[-400:]}")
+        return done.returncode == 0
+
+    assert survives(0), f"the curated KB does not load at all: {failures}"
+    assert survives(4), (
+        "the runtime KB no longer tolerates 4 extra rule definitions; the next "
+        "curated layer cannot be added until the layers stop sharing one space"
+    )
 
 
 @pytest.mark.slow
@@ -276,10 +425,12 @@ def test_the_clock_reduction_becomes_an_absolute_risk_reduction(kb):
     assert m, "no ProjectedRisk atom"
     lever, outcome, point, reduction, delta, conf, via = m.groups()
     assert (lever, outcome) == ("SmokingCessation", "CoronaryHeartDisease")
-    assert float(delta) == pytest.approx(-0.21)
-    assert float(point) == pytest.approx(0.22266, abs=1e-4)
-    assert float(reduction) == pytest.approx(0.01369, abs=1e-4)
-    assert float(conf) == pytest.approx(0.85)
+    assert float(delta) == pytest.approx(-0.0819)
+    assert float(point) == pytest.approx(0.23091, abs=1e-4)
+    # 0.54 percentage points. It read 1.37 at confidence 0.85 while the lever
+    # edge was discarded and Joehanes sat on a trials tier.
+    assert float(reduction) == pytest.approx(0.00544, abs=1e-4)
+    assert float(conf) == pytest.approx(0.324)
     assert via.split() == ["DNAmPACKYRS"]
     # The untreated risk, for the comparison the number is only meaningful against.
     assert "(point 0.23634" in _one(kb, "!(predict-risk-patient &self Patient003)")

@@ -250,15 +250,42 @@ def test_unconnected_lever_is_omitted(kb):
     assert _is_empty(kb.run("!(counterfactual-patient &self Patient001 Elamipretide)"))
 
 
-# ── Intervention levers resolve to the driver they target ────────────────────────
+# ── Intervention levers carry their OWN evidence, not just their driver's ───────
 
-def test_intervention_lever_matches_its_target_driver(kb):
-    # D+Q normalizes CellularSenescence, so as a lever it reproduces scenario B;
-    # Metformin normalizes InsulinResistance, reproducing the metabolic ~0.
+def test_an_intervention_lever_is_discounted_by_its_own_edge(kb):
+    """An intervention is not the same claim as normalizing what it targets.
+
+    D+Q routes to CellularSenescence and used to return that driver's answer
+    byte-for-byte — the engine asserting that D+Q abolishes senescence, at the
+    confidence of the senescence->clock route alone. The KB says otherwise:
+
+        (Effect DasatinibPlusQuercetin CellularSenescence Neg
+           (stv 0.70 (evidence-confidence AnimalStudies_Replicated)))
+
+    so the lever's delta is 0.70 of the driver's, and its confidence carries the
+    extra hop (x 0.70 x chain-discount). Same components, different magnitude:
+    the intervention evidence is now in the answer instead of being dropped.
+    """
     dq = _counterfactual(kb, "DasatinibPlusQuercetin")
     b = _counterfactual(kb, "CellularSenescence")
-    assert dq["delta"] == pytest.approx(b["delta"])
     assert dq["via"] == b["via"]
+    assert dq["delta"] / b["delta"] == pytest.approx(0.70)
+    assert abs(dq["delta"]) < abs(b["delta"])
+    assert dq["c"] < b["c"]
+
+
+def test_a_driver_lever_is_unchanged_by_that_composition(kb):
+    """The do-operator on a driver has no second edge, so it must not move.
+
+    The composition applies to resolve-lever case (1) only. Pinned so a future
+    change to the lever path cannot quietly re-price the three published
+    scenarios (casestudy §5.2) that carry no intervention.
+    """
+    assert _counterfactual(kb, "ChronicInflammation")["delta"] == pytest.approx(-0.121875)
+    assert _counterfactual(kb, "ChronicInflammation")["c"] == pytest.approx(0.65)
+    assert _counterfactual(kb, "CellularSenescence")["delta"] == pytest.approx(-0.2219296875)
+    # CRP is a co-effect marker (case 2), also unchanged.
+    assert _counterfactual(kb, "CRP")["delta"] == pytest.approx(-0.121875)
 
 
 # ── The scenario runner returns all three, in the expected magnitude order ───────

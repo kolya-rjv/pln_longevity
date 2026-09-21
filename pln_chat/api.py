@@ -48,7 +48,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from fastapi.security import APIKeyHeader
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from config import (
     AVAILABLE_MODELS,
@@ -67,13 +67,22 @@ from config import (
     PLN_MAX_ONTOLOGY_FILES,
     PLN_MAX_PROMPT_TOKENS,
     PLN_PROMPT_FILE_MAX_BYTES,
+    PLN_MAX_METTA_SORT_COMPOUNDS,
     PLN_MAX_RANK_COMPOUNDS,
     PLN_MAX_RANK_ROWS,
     PLN_RUNTIME_AVAILABLE,
 )
 from ontology.hallmarks import hallmark_index
 from ontology.human_evidence import human_evidence_index
-from ontology.inventory import inventory_for, schema_card, summarise_oversized
+from ontology.lever_gate import lever_warnings
+from ontology.scoped_forms import scoped_form_warnings
+from ontology.write_gate import OntologyWriteRefused, guard_ontology_write
+from ontology.inventory import (
+    inventory_for,
+    merged_inventory,
+    schema_card,
+    summarise_oversized,
+)
 from ontology.loader import load_specific_files, parse_metta_text
 from ontology.registry import BUILTIN_REGISTRY, OntologyRegistry
 from ontology.expander import run_expansion_pipeline
@@ -105,6 +114,8 @@ from core.drugage_router import (
     SCORE_SEMANTICS,
     _row_out,
     drugage_top,
+    DrugAgePoolTooLarge,
+    guard_compound_pool,
     parse_drugage_query,
     rank_drugage,
     resolve_compounds,
@@ -215,7 +226,12 @@ def _build_context(selected_files: list[str]) -> tuple[OntologyRegistry, dict[st
     metta_files = _discover_metta_files()
     paths = [metta_files[f] for f in selected_files if f in metta_files]
     if not paths:
-        return BUILTIN_REGISTRY, {}
+        # A COPY: /metta/run merges caller-supplied atoms into whatever registry
+        # it gets, and handing out the process-global singleton would let one
+        # request's scratch facts leak into every later request's symbol table.
+        fresh = OntologyRegistry()
+        fresh.merge(BUILTIN_REGISTRY)
+        return fresh, {}
     registry, raw_contents = load_specific_files(paths)
     raw_contents, _ = summarise_oversized(
         raw_contents, paths, max_bytes=PLN_PROMPT_FILE_MAX_BYTES
@@ -226,6 +242,29 @@ def _build_context(selected_files: list[str]) -> tuple[OntologyRegistry, dict[st
 def _runtime_inventory():
     """What the EXECUTION KB actually holds (ground facts, not declarations)."""
     return inventory_for(_runtime_kb_paths())
+
+
+def _guard_drugage_pool(compounds: list[str]) -> list[str]:
+    """Apply the ranking's per-request cap to a pool that arrived as MeTTa.
+
+    `DrugAgeRankRequest.compounds` carries `max_length=PLN_MAX_RANK_COMPOUNDS`,
+    but that only guards `/drugage/rank`. A `(rank-drugage-lifespan (…))` form
+    reaching `/query` or `/metta/run` supplies its pool as a MeTTa list, which
+    pydantic never sees — so the same engine was reachable uncapped. Same limit,
+    same 422 shape, one message that says which door it came through.
+    """
+    try:
+        return guard_compound_pool(compounds)
+    except DrugAgePoolTooLarge as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "too_many_compounds",
+                "message": str(exc),
+                "requested": exc.count,
+                "limit": exc.limit,
+            },
+        ) from exc
 
 
 def _dedupe_ontology_files(value: Optional[list[str]]) -> Optional[list[str]]:
@@ -331,6 +370,34 @@ def _resolve_target_path(target_file: Optional[str], new_filename: Optional[str]
     return _ensure_allowed_target(CUSTOM_ONTOLOGY_DIR / name)
 
 
+def _guard_ontology_write(target_path: Path, block: str, *, schema_checked: bool) -> None:
+    """Refuse an unsafe ontology append as HTTP, not as a silent success."""
+    try:
+        guard_ontology_write(
+            target_path, block,
+            inventory=_runtime_inventory(),
+            schema_checked=schema_checked,
+        )
+    except OntologyWriteRefused as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.as_detail()) from exc
+
+
+def _append_metta_block(target_path: Path, block: str) -> Optional[str]:
+    """Append `block` to `target_path`; return an error message, or None.
+
+    The single place either ontology endpoint touches the disk, so the guard
+    above cannot be bypassed by adding a third caller that forgets it.
+    """
+    try:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        separator = "\n\n" if target_path.exists() and target_path.stat().st_size else ""
+        with open(target_path, "a", encoding="utf-8") as fh:
+            fh.write(separator + block)
+    except OSError as exc:
+        return str(exc)
+    return None
+
+
 # ── Patient profile discovery ───────────────────────────────────────────────
 # Patients are hardcoded facts in patient_profile.metta (part of the runtime KB
 # set), not something a caller submits — a query just names one (e.g.
@@ -433,10 +500,40 @@ def _build_caller_patient(payload: Optional[dict]) -> Optional[BuiltPatient]:
 _DEFINITION_RE = re.compile(r"\(\s*=\s*\(")
 
 
+def _strip_metta_comments(text: str) -> str:
+    """Blank out `;` comments and string literals before a structural check.
+
+    MeTTa treats everything after an unquoted `;` as a comment, so
+    `(;\n= (baseline-risk-chd $a $s) 0.999)` is a rule definition that no regex
+    over the raw text can see — the comment sits between the `(` and the `=`.
+    Blanking comments first is what makes the guard below structural rather
+    than textual.
+    """
+    out: list[str] = []
+    in_string = False
+    in_comment = False
+    for ch in text:
+        if in_comment:
+            out.append("\n" if ch == "\n" else " ")
+            if ch == "\n":
+                in_comment = False
+            continue
+        if ch == '"':
+            in_string = not in_string
+            out.append(ch)
+            continue
+        if ch == ";" and not in_string:
+            in_comment = True
+            out.append(" ")
+            continue
+        out.append(ch)
+    return "".join(out)
+
+
 def _guard_extra_atoms(text: Optional[str], *, allow_definitions: bool) -> None:
     if not text or allow_definitions:
         return
-    if _DEFINITION_RE.search(text):
+    if _DEFINITION_RE.search(_strip_metta_comments(text)):
         raise HTTPException(
             status_code=422,
             detail={
@@ -465,7 +562,12 @@ def _unknown_patient_warning(query: str, known: set[str]) -> Optional[str]:
     population ranking survives, so a typo produces a confident wrong-looking-
     right answer instead of an error.
     """
+    inventory = _runtime_inventory()
     mentioned = {m for m in _PATIENT_MENTION_RE.findall(query)}
+    # `PatientAge`, `PatientSex`, `PatientSmoking` and `PatientProfile` all start
+    # with "Patient" and are predicates and types, not patients. Anything the KB
+    # knows as a predicate, function or type is not a missing patient id.
+    mentioned -= set(inventory.predicates) | set(inventory.functions) | inventory.types
     unknown = sorted(mentioned - known)
     if not unknown:
         return None
@@ -686,13 +788,33 @@ async def log_api_request(request: Request, call_next):
     including Gradio's — is stamped with `X-API-Version`.
     """
     started = time.monotonic()
+    # The guards run FIRST, before the body is read or written to the log. An
+    # unauthenticated or rate-limited caller should not be able to put a
+    # megabyte of their choosing into this service's session log, and a refused
+    # request has no business being buffered into memory at all.
+    refusal = _guard_request(request)
+    if refusal is not None:
+        refusal.headers["X-API-Version"] = PLN_API_VERSION
+        log_http_request(
+            method=request.method,
+            path=request.url.path,
+            query=request.url.query,
+            body="<not read: request refused before the body was consumed>",
+            status_code=refusal.status_code,
+            duration_ms=int((time.monotonic() - started) * 1000),
+            client=request.client.host if request.client else None,
+            content_type=request.headers.get("content-type"),
+            user_agent=request.headers.get("user-agent"),
+            error=None,
+        )
+        return refusal
+
     raw_body = await request.body()
     body = raw_body.decode("utf-8", errors="replace")
     status_code = 500
     error: Optional[str] = None
     try:
-        refusal = _guard_request(request)
-        response = refusal if refusal is not None else await call_next(request)
+        response = await call_next(request)
         response.headers["X-API-Version"] = PLN_API_VERSION
         status_code = response.status_code
         return response
@@ -864,7 +986,18 @@ class PatientIn(BaseModel):
     disappear with it. The id is namespaced `Caller_…` so it can never collide
     with a curated patient — submitting a second `Patient001` does not replace
     the first, it unions both and makes every answer non-deterministic.
+
+    `extra="forbid"` is load-bearing. `/query` and `/metta/run` take this object
+    NESTED, under a `patient` key; `/patients/preview` takes it at the top
+    level. With extras ignored, posting the nested shape to /patients/preview
+    returned 200 and a confident, well-formed description of an EMPTY patient —
+    the whole payload silently discarded, every documented refusal
+    (`unknown_marker`, `invalid_sex`) bypassed because nothing was ever read.
+    An endpoint whose stated job is "check a payload before spending a query on
+    it" must not answer for a payload it did not look at.
     """
+    model_config = ConfigDict(extra="forbid")
+
     id: Optional[str] = Field(
         default=None, max_length=48,
         description="Letters, digits and underscores. Prefixed with 'Caller_'.",
@@ -1215,8 +1348,10 @@ class DrugAgeRankRequest(BaseModel):
                     "~70 ms per compound, and each compound carries its own truth value "
                     "so confidence_threshold can filter per compound. 'metta_sort' is the "
                     "original single rank-interventions call whose MeTTa insertion sort "
-                    "is O(n^2) (n=10 takes ~6 s); it is the reference implementation, "
-                    "kept for parity checking.",
+                    "is O(n^2) (n=10 takes ~6 s, n=20 ~53 s); it is the reference "
+                    "implementation, kept for parity checking, and is capped at "
+                    f"{PLN_MAX_METTA_SORT_COMPOUNDS} compounds per request because "
+                    "beyond that it cannot finish inside the query deadline.",
     )
     include_rows: bool = Field(
         default=True,
@@ -1252,7 +1387,12 @@ class ScoredCompoundOut(BaseModel):
     compound: str
     score: float = Field(description="strength x confidence, signed so higher is better.")
     sign: str = Field(description="'Neg' = protective (lowers mortality) | 'Pos' = harmful.")
-    direction: str = Field(description="'protective' | 'harmful' — the sign in words.")
+    direction: str = Field(
+        description="'protective' | 'harmful' | 'no_effect' — the sign in words. "
+                    "'no_effect' is a row that reported 0.0% lifespan change: a "
+                    "measured null, which `sign` cannot express (the Effect "
+                    "convention has only Pos and Neg). See `semantics.zero_score`.",
+    )
     strength: float
     confidence: float
     atom: str = Field(description="The MeTTa (scored ...) tuple this row was parsed from.")
@@ -1494,7 +1634,10 @@ class DrugAgeTopEntry(BaseModel):
     compound: str
     score: float
     sign: str
-    direction: str
+    direction: str = Field(
+        description="'protective' | 'harmful' | 'no_effect'. See "
+                    "ScoredCompoundOut.direction.",
+    )
     strength: float
     confidence: float
     evidence_tier: str = Field(description="The EvidenceCategory the confidence came from.")
@@ -1656,7 +1799,7 @@ def drugage_top_endpoint(
     min_confidence: float = 0.0,
     itp_only: bool = False,
     significant_only: bool = False,
-    direction: Literal["protective", "harmful", "any"] = "protective",
+    direction: Literal["protective", "harmful", "none", "any"] = "protective",
 ) -> DrugAgeTopResponse:
     """Rank the WHOLE DrugAge build by calibrated effect on mortality. No LLM.
 
@@ -1667,7 +1810,9 @@ def drugage_top_endpoint(
     Filters compose: `species=Mus_musculus&itp_only=true&min_confidence=0.5`
     is "gold-standard replicated mouse evidence only". `clade` takes
     Vertebrate / Invertebrate / Fungi / Protozoa. `direction=harmful` ranks the
-    other end — compounds that SHORTENED lifespan — most harmful first.
+    other end — compounds that SHORTENED lifespan — most harmful first, and
+    `direction=none` returns the measured NULLS (0.0% change), which used to be
+    counted as protective because the MeTTa sign convention has no zero.
 
     Scoring is done in Python because it cannot be done in the engine: 1,043
     compounds would be 1,043 MeTTa calls, and loading the rows to rank them in
@@ -1698,7 +1843,7 @@ def drugage_top_endpoint(
                 compound=e.row.compound,
                 score=e.score,
                 sign=e.sign,
-                direction="protective" if e.protective else "harmful",
+                direction=e.direction,
                 strength=e.strength,
                 confidence=e.confidence,
                 evidence_tier=e.tier_category,
@@ -2548,7 +2693,11 @@ def query(req: QueryRequest) -> QueryResponse:
     scoped DrugAge engine instead (see `routed` in the response).
     """
     if not req.message.strip():
-        raise HTTPException(status_code=422, detail="message must not be empty.")
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "empty_message",
+                    "message": "message must not be empty."},
+        )
 
     selected = req.ontology_files
     if selected is None:
@@ -2599,6 +2748,7 @@ def query(req: QueryRequest) -> QueryResponse:
                     "message": "rank-drugage-lifespan requires at least one compound.",
                 },
             )
+        drugage_compounds = _guard_drugage_pool(drugage_compounds)
         routed = "drugage_ranking"
         validation = ValidationResult(valid=True)
         pln_result = run_offloaded(
@@ -2658,6 +2808,19 @@ def query(req: QueryRequest) -> QueryResponse:
         warnings.append(patient_warning)
     if patient is not None:
         warnings.extend(patient.warnings)
+    # A lever the named patient cannot pull. The engine cannot check this
+    # (pln_counterfactual.metta §3b: the KB is at hyperon's ceiling), so the
+    # number comes back unqualified and the qualification is attached here.
+    warnings.extend(lever_warnings(
+        translation.metta_query,
+        extra_atoms=patient.atoms if patient is not None else None,
+        known_patients=known_ids,
+    ))
+    # A rule whose data lives in a scoped space. Without this the response is
+    # a well-formed, validated, structurally empty answer that reads as "no".
+    warnings.extend(scoped_form_warnings(
+        translation.metta_query, _runtime_kb_paths(), _runtime_inventory()
+    ))
 
     log_turn(req.message, translation, pln_result)
 
@@ -2725,7 +2888,11 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
     since that data is deliberately excluded from the generic runtime KB.
     """
     if not req.metta_query.strip():
-        raise HTTPException(status_code=422, detail="metta_query must not be empty.")
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "empty_metta_query",
+                    "message": "metta_query must not be empty."},
+        )
 
     _guard_extra_atoms(req.extra_atoms, allow_definitions=req.allow_definitions)
     patient = _build_caller_patient(req.patient.model_dump() if req.patient else None)
@@ -2744,6 +2911,7 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
                     "message": "rank-drugage-lifespan requires at least one compound.",
                 },
             )
+        drugage_compounds = _guard_drugage_pool(drugage_compounds)
         routed = "drugage_ranking"
         validation = ValidationResult(valid=True)
         pln_result = run_offloaded(
@@ -2763,12 +2931,20 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
             if req.ontology_files is None
             else _build_context(req.ontology_files)[0]
         )
+        inventory = _runtime_inventory()
         if injected:
             registry.merge(parse_metta_text(injected, source_name="<api-extra-atoms>"))
+            # `parse_metta_text` harvests only five shapes, so a perfectly
+            # ordinary scratch fact — `(MeasuredZ Probe NewMarker 1.2)`, which
+            # is the documented use of extra_atoms — left its own symbols
+            # unknown and 422'd the query that was about to use them. Build an
+            # inventory over the injected text too and union it in, so the
+            # symbols a caller just defined count as defined.
+            inventory = merged_inventory(inventory, injected)
         validation = validate(
             "\n".join(part for part in (injected, req.metta_query) if part),
             registry,
-            _runtime_inventory(),
+            inventory,
         )
         if not validation.valid:
             raise HTTPException(
@@ -2803,12 +2979,23 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
         {patient.patient_id} if patient is not None else set()
     )
     patient_warning = _unknown_patient_warning(req.metta_query, known_ids)
+    run_warnings = (
+        ([patient_warning] if patient_warning else [])
+        + (patient.warnings if patient is not None else [])
+        + lever_warnings(
+            req.metta_query,
+            extra_atoms=injected,
+            known_patients=known_ids,
+        )
+        + scoped_form_warnings(
+            req.metta_query, _runtime_kb_paths(), _runtime_inventory()
+        )
+    )
 
     return MettaRunResponse(
         metta_query=req.metta_query,
         patient_id=patient.patient_id if patient is not None else None,
-        warnings=([patient_warning] if patient_warning else [])
-                 + (patient.warnings if patient is not None else []),
+        warnings=run_warnings,
         confidence_threshold_applied=req.confidence_threshold,
         validation_valid=validation.valid,
         validation_issues=validation.issues,
@@ -2842,6 +3029,30 @@ def drugage_rank(req: DrugAgeRankRequest) -> DrugAgeRankResponse:
     committed 201-row sample despite drugage_etl_short.metta existing in the
     repo; see GET /health's drugage_build_available before calling this.
     """
+    if req.strategy == "metta_sort" and len(req.compounds) > PLN_MAX_METTA_SORT_COMPOUNDS:
+        # The reference implementation's insertion sort is O(n^2) in MeTTa:
+        # 6.1 s at n=10, 52.6 s at n=20, past the 60 s deadline by n=40. The
+        # published 60-compound cap is the `linear` cap, so every request
+        # between 40 and 60 on this strategy was advertised as legal and
+        # answered with a 504.
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "too_many_compounds_for_strategy",
+                "message": (
+                    f"strategy='metta_sort' ranks at most "
+                    f"{PLN_MAX_METTA_SORT_COMPOUNDS} compounds: its MeTTa "
+                    f"insertion sort is O(n^2) and exceeds the query deadline "
+                    f"well inside the {PLN_MAX_RANK_COMPOUNDS}-compound cap that "
+                    f"applies to strategy='linear'. Use 'linear' (the default) "
+                    f"for a pool this size — the two agree bit for bit."
+                ),
+                "requested": len(req.compounds),
+                "limit": PLN_MAX_METTA_SORT_COMPOUNDS,
+                "strategy": req.strategy,
+            },
+        )
+
     ranking = run_offloaded(
         "rank_drugage",
         {"compounds": req.compounds,
@@ -2920,21 +3131,41 @@ def ontology_expand(req: ExpandRequest) -> ExpandResponse:
     in `rejected_entries` with their reasons — they are never dropped quietly.
     """
     if not req.paper_text.strip():
-        raise HTTPException(status_code=422, detail="paper_text must not be empty.")
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "empty_paper_text",
+                    "message": "paper_text must not be empty."},
+        )
 
     target_path = _resolve_target_path(req.target_file, req.new_filename)
 
+    # Extraction never writes. The write is done HERE, after the same gate
+    # /ontology/apply passes, so both doors refuse the same things — and so an
+    # `apply=true` request that is going to be refused is refused after the
+    # caller can see what was extracted, not silently applied.
     result = run_expansion_pipeline(
         paper_data=req.paper_text.encode("utf-8"),
         filename=req.filename,
         target_file_path=target_path,
         model=req.model,
         temperature=req.temperature,
-        apply=req.apply,
+        apply=False,
     )
 
     if not result.ok:
-        raise HTTPException(status_code=400, detail=result.error)
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "extraction_failed", "message": result.error},
+        )
+
+    if req.apply and result.metta_block.strip():
+        # schema_checked: every entry in this block already passed check_entry
+        # inside the pipeline; what is re-checked is the target and the size.
+        _guard_ontology_write(target_path, result.metta_block, schema_checked=True)
+        write_error = _append_metta_block(target_path, result.metta_block)
+        result.applied = write_error is None
+        if write_error is not None:
+            result.error = f"Failed to write to {target_path.name}: {write_error}"
 
     return ExpandResponse(
         paper_title=result.paper_title,
@@ -2964,21 +3195,23 @@ def ontology_apply(req: ApplyRequest) -> ApplyResponse:
     POST /ontology/expand call made with apply=false.
     """
     if not req.metta_block.strip():
-        raise HTTPException(status_code=422, detail="metta_block must not be empty.")
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "empty_metta_block",
+                    "message": "metta_block must not be empty."},
+        )
 
     metta_files = _discover_metta_files()
     name = _normalise_metta_name(req.target_file, field="target_file")
     target_path = metta_files.get(name) or (CUSTOM_ONTOLOGY_DIR / name)
     target_path = _ensure_allowed_target(target_path)
+    # The block arrived as text. Nothing so far has required it to be the one
+    # /ontology/expand produced, so it faces that endpoint's schema gate here.
+    _guard_ontology_write(target_path, req.metta_block, schema_checked=False)
 
-    try:
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(target_path, "a", encoding="utf-8") as fh:
-            if target_path.exists() and target_path.stat().st_size > 0:
-                fh.write("\n\n")
-            fh.write(req.metta_block)
-    except OSError as exc:
-        return ApplyResponse(applied=False, target_file=target_path.name, error=str(exc))
+    error = _append_metta_block(target_path, req.metta_block)
+    if error is not None:
+        return ApplyResponse(applied=False, target_file=target_path.name, error=error)
 
     return ApplyResponse(applied=True, target_file=target_path.name)
 

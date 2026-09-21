@@ -17,6 +17,7 @@ import sys
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
@@ -81,7 +82,11 @@ def test_an_unknown_task_is_a_programming_error_not_a_silent_inline_run(inline):
 def test_executor_stats_describe_the_active_mode(inline):
     stats = executor.executor_stats()
     assert stats["mode"] == "inline"
-    assert stats["workers"] == 0
+    assert stats["max_concurrent"] == 0
+    # Inline mode cannot enforce either protection, and must not claim to.
+    assert stats["timeout_enforced"] is False
+    assert stats["admission_control"] is False
+    assert stats["timeout_seconds"] is None
 
 
 # ── the process pool: real work, real deadline, real recovery ────────────────
@@ -134,6 +139,58 @@ def test_a_runaway_query_is_abandoned_at_the_deadline_and_the_pool_recovers(pool
 
 
 @pytest.mark.slow
+def test_a_timeout_kills_only_the_query_that_timed_out(pooled):
+    """A shared pool could not aim the kill; one process per query can.
+
+    Measured before the fix: a healthy 3-second ranking, well inside its own
+    budget, was SIGKILLed by an unrelated caller's 1-second timeout and the
+    victim got a 500 blaming a hyperon abort that never happened to them.
+    """
+    pytest.importorskip("hyperon")
+    import threading
+
+    outcome: dict = {}
+
+    def healthy():
+        try:
+            outcome["result"] = run_offloaded(
+                "run_query",
+                {
+                    # ~1.5 s of real work (measured), so it is still running
+                    # when the other query hits its 1 s deadline.
+                    "metta_query": "!(slow 14)",
+                    "kb_files": [],
+                    "extra_atoms": "(= (slow $n) (if (< $n 2) 1 (+ (slow (- $n 1)) (slow (- $n 2)))))",
+                },
+                lambda: pytest.fail("should not run inline"),
+                timeout=30,
+            )
+        except Exception as exc:                      # noqa: BLE001
+            outcome["error"] = f"{type(exc).__name__}: {exc}"
+
+    worker = threading.Thread(target=healthy)
+    worker.start()
+    time.sleep(0.3)
+    with pytest.raises(PLNExecutionTimeout):
+        run_offloaded(
+            "run_query",
+            {
+                "metta_query": "!(spin 1)",
+                "kb_files": [],
+                "extra_atoms": "(= (spin $n) (spin (+ $n 1)))",
+            },
+            lambda: pytest.fail("should not run inline"),
+            timeout=1.0,
+        )
+    worker.join(timeout=90)
+
+    assert "error" not in outcome, (
+        f"an unrelated caller's timeout failed a healthy query: {outcome.get('error')}"
+    )
+    assert outcome["result"].status in {"ok", "empty"}
+
+
+@pytest.mark.slow
 def test_the_event_loop_keeps_serving_while_a_query_runs(pooled):
     """The headline finding: /health must not queue behind a MeTTa call."""
     pytest.importorskip("hyperon")
@@ -173,6 +230,17 @@ def test_too_many_inflight_queries_are_refused_rather_than_queued(monkeypatch):
 
 # ── the HTTP layer maps each failure to its own status code ──────────────────
 
+# Every endpoint that does PLN work, and the request that reaches its offload.
+# It was `/metta/run` alone, which meant `/query` — the endpoint the evaluation
+# actually measured the 115 s freeze on — could be reverted to a direct
+# in-process MeTTa call with the whole suite still green.
+PLN_ENDPOINTS = [
+    ("/query", {"message": "what lowers CHD risk?"}),
+    ("/metta/run", {"metta_query": "!(predict-risk-patient &self Patient001)"}),
+    ("/drugage/rank", {"compounds": ["Rapamycin"]}),
+]
+
+
 @pytest.mark.parametrize(
     "exc, status, code",
     [
@@ -181,23 +249,70 @@ def test_too_many_inflight_queries_are_refused_rather_than_queued(monkeypatch):
         (PLNWorkerCrashed("worker died"), 500, "pln_worker_crashed"),
     ],
 )
-def test_execution_failures_are_not_reported_as_success(monkeypatch, exc, status, code):
+@pytest.mark.parametrize("path, body", PLN_ENDPOINTS, ids=[p for p, _ in PLN_ENDPOINTS])
+def test_execution_failures_are_not_reported_as_success(
+    monkeypatch, exc, status, code, path, body
+):
     def boom(*args, **kwargs):
         raise exc
 
     monkeypatch.setattr(api_module, "run_offloaded", boom)
-    response = _client_request(
-        "POST", "/metta/run", json={"metta_query": "!(predict-risk-patient &self Patient001)"}
+    # /query translates before it runs; stub that out so the failure under test
+    # is the execution one, not a missing OpenAI key.
+    monkeypatch.setattr(
+        api_module, "translate",
+        lambda **kw: SimpleNamespace(
+            ok=True, metta_query="!(predict-risk-patient &self Patient001)",
+            explanation="", intent="inference", requires_pln_inference=True,
+            confidence_filter=None, warnings=[], usage=None, error=None,
+            error_code=None,
+        ),
     )
+    response = _client_request("POST", path, json=body)
     assert response.status_code == status
     assert response.json()["detail"]["code"] == code
+
+
+def test_no_endpoint_calls_metta_without_going_through_the_executor():
+    """The structural guard, mirroring tests/test_ui_api_parity.py for the UI.
+
+    The parametrised test above proves each endpoint offloads TODAY. This one
+    fails the moment a new endpoint is added that calls the engine directly —
+    which is exactly how the UI ended up bypassing the whole series (patch
+    0013) while every API test stayed green.
+    """
+    import ast
+
+    tree = ast.parse((PLN_CHAT / "api.py").read_text(encoding="utf-8"))
+    engine_calls = {
+        "run_query", "route_drugage_ranking", "rank_drugage", "drugage_top",
+        "run_drugage_ranking",
+    }
+    lambdas = [n for n in ast.walk(tree) if isinstance(n, ast.Lambda)]
+    inside_a_lambda = {id(n) for lam in lambdas for n in ast.walk(lam)}
+
+    bare = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
+            continue
+        if node.func.id not in engine_calls:
+            continue
+        # A call inside a lambda is run_offloaded's inline fallback — correct.
+        if id(node) not in inside_a_lambda:
+            bare.append(f"{node.func.id}:{node.lineno}")
+    assert not bare, f"MeTTa call(s) in api.py outside the executor: {bare}"
 
 
 def test_health_reports_how_pln_work_is_executed():
     body = _client_request("GET", "/health").json()
     assert "pln_execution" in body
-    assert body["pln_execution"]["mode"] in {"inline", "process_pool"}
-    assert isinstance(body["pln_execution"]["timeout_seconds"], (int, float))
+    execution = body["pln_execution"]
+    assert execution["mode"] in {"inline", "process_per_query"}
+    # The deadline is reported as enforced only when it can be enforced.
+    if execution["timeout_enforced"]:
+        assert isinstance(execution["timeout_seconds"], (int, float))
+    else:
+        assert execution["timeout_seconds"] is None
 
 
 # ── bounded inputs ───────────────────────────────────────────────────────────

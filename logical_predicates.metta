@@ -73,6 +73,10 @@
 ;; ==========================================
 (: Interaction (-> Intervention Intervention String Atom))
 (: Limitation  (-> Intervention String Atom))
+;; What a lever presupposes about the patient. A "stop doing X" lever is worth
+;; nothing to someone not doing X, and the counterfactual used to hand them the
+;; full benefit anyway (pln_counterfactual.metta §3b).
+(: LeverRequiresSmoking (-> Intervention SmokingStatus Atom))
 (: EnhancedBy  (-> Intervention Atom Atom))
 
 ;; ==========================================

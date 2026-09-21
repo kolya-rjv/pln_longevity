@@ -72,6 +72,16 @@ PLN_MAX_KB_FILE_BYTES: int = int(os.getenv("PLN_MAX_KB_FILE_BYTES", "60000"))
 # API for 115 s. The default `linear` strategy is ~70 ms per compound, so this
 # cap bounds a single request at a few seconds rather than minutes.
 PLN_MAX_RANK_COMPOUNDS: int = int(os.getenv("PLN_MAX_RANK_COMPOUNDS", "60"))
+# The SAME cap does not fit both strategies, and one number for both was a
+# quiet promise the service could not keep: `metta_sort` is the O(n^2) MeTTa
+# insertion sort, measured at 6.1 s for n=10, 52.6 s for n=20 and past the 60 s
+# deadline by n=40 — so every request between 40 and the 60 published here was
+# advertised as legal and answered with a 504. `linear` is ~70 ms per compound
+# and is the default. metta_sort is kept because it is the reference
+# implementation the parity test scores against, not because it scales.
+PLN_MAX_METTA_SORT_COMPOUNDS: int = int(
+    os.getenv("PLN_MAX_METTA_SORT_COMPOUNDS", "10")
+)
 # Max DrugAge source rows echoed back in a ranking response (0 disables the
 # per-row listing). Rapamycin alone has 37 rows, so an unbounded list makes a
 # big response out of a small question.
@@ -82,6 +92,24 @@ PLN_MAX_RANK_ROWS: int = int(os.getenv("PLN_MAX_RANK_ROWS", "120"))
 # generous.
 PLN_MAX_ONTOLOGY_FILES: int = int(os.getenv("PLN_MAX_ONTOLOGY_FILES", "64"))
 
+# ── Ontology writes ────────────────────────────────────────────────────────────
+# The curated .metta files ARE the service's reasoning: its rules, its evidence
+# tiers, its calibration constants. `POST /ontology/apply` (and the Gradio
+# "Apply to Ontology" button, which is mounted on the same app) appended a
+# caller-supplied block to any of them. Verified on this checkout: one
+# unauthenticated request appending `(= (evidence-confidence RCT_Human) 0.05)`
+# to epistemic_calibration.metta silently re-tiers every human trial for every
+# subsequent caller. Caller-generated entries belong in CUSTOM_ONTOLOGY_DIR;
+# writing a curated file is an operator decision, made here.
+PLN_ALLOW_CURATED_WRITES: bool = os.getenv(
+    "PLN_ALLOW_CURATED_WRITES", "0"
+).strip().lower() in {"1", "true", "yes", "on"}
+# Largest block a single write may append. Generous for an extracted paper
+# (the canonical taurine block is ~2 KB) and far below PLN_MAX_KB_FILE_BYTES,
+# so no one write can push a file past the size at which the runtime stops
+# loading it.
+PLN_MAX_APPLY_BYTES: int = int(os.getenv("PLN_MAX_APPLY_BYTES", "32000"))
+
 # ── PLN execution workers ──────────────────────────────────────────────────────
 # hyperon 0.2.10 HOLDS THE GIL for the whole of MeTTa.run() (measured: two runs
 # in two threads take exactly as long as two runs in sequence, ratio 0.998), so
@@ -90,9 +118,13 @@ PLN_MAX_ONTOLOGY_FILES: int = int(os.getenv("PLN_MAX_ONTOLOGY_FILES", "64"))
 # that; a process pool can, and it also makes a per-request timeout enforceable
 # and contains hyperon's non-unwinding Rust abort (which kills the interpreter
 # in-process but only a worker out-of-process).
+# The value is the number of MeTTa queries that may run AT ONCE — each one gets
+# its own forked process, because a shared pool cannot kill a single task and a
+# timeout there takes other callers' healthy requests down with it (measured).
 #   0 = run inline, in the request thread (the pre-2026-09 behaviour; used by
 #       the in-process contract tests, which monkeypatch module globals a child
-#       process could never see).
+#       process could never see). Inline mode CANNOT enforce the timeout or the
+#       admission limit — GET /health says so under pln_execution.
 PLN_WORKER_POOL_SIZE: int = max(0, int(os.getenv("PLN_WORKER_POOL_SIZE", "2")))
 # Per-request PLN budget in seconds. 0 disables. 60 s is deliberately generous:
 # a legitimate 20-compound ranking is a few seconds, so this only catches the
@@ -101,9 +133,8 @@ PLN_QUERY_TIMEOUT_SECONDS: float = float(os.getenv("PLN_QUERY_TIMEOUT_SECONDS", 
 # Max PLN tasks queued or running before new ones are refused with 503.
 # 0 = derive it (4x the worker count).
 PLN_MAX_INFLIGHT_QUERIES: int = max(0, int(os.getenv("PLN_MAX_INFLIGHT_QUERIES", "0")))
-# Recycle a worker after this many tasks (0 = never). A fresh hyperon
-# interpreter is cheap and does not inherit a previous query's space growth.
-PLN_WORKER_MAX_TASKS: int = max(0, int(os.getenv("PLN_WORKER_MAX_TASKS", "50")))
+# (PLN_WORKER_MAX_TASKS was removed: every query now runs in its own process,
+#  which exits when the query does, so there is nothing left to recycle.)
 
 # ── UI defaults ────────────────────────────────────────────────────────────────
 DEFAULT_CONFIDENCE_THRESHOLD: float = 0.0

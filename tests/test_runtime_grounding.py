@@ -275,3 +275,58 @@ def test_metta_run_reports_an_ungrounded_predicate_instead_of_an_empty_answer(mo
     assert body["pln_status"] == "empty"
     assert body["ungrounded_predicates"] == ["Predicts"]
     assert body["validation_warnings"]
+
+
+# ── a rule whose data lives elsewhere must not answer "no" ───────────────────
+
+def test_a_form_with_no_rows_in_the_generic_space_says_so():
+    """The silent-empty that API.md's own reading rule turns into a wrong answer.
+
+    `!(genes-affecting-senescence &self Increases)` validates, executes, and
+    returns `pln_status: "empty"` with `ungrounded_predicates: []` — and
+    API.md tells an agent that an empty result WITHOUT ungrounded predicates is
+    a real "no". The data exists: `GET /genes/TP53?infer=true` returns three
+    `(Effect Gene_TP53 CellularSenescence Pos …)` links from the same rules.
+    """
+    from ontology.scoped_forms import dataless_forms, scoped_form_warnings
+
+    inventory = api_module._runtime_inventory()
+    kb = api_module._runtime_kb_paths()
+
+    # Derived, not listed: every CellAge and DrugAge accessor whose predicates
+    # hold no facts in the generic space.
+    dataless = dataless_forms(kb, inventory)
+    assert "genes-affecting-senescence" in dataless
+    assert "cellage-effect" in dataless
+    assert "drugage-effect" in dataless
+    # …and nothing that IS backed by facts.
+    assert "predict-risk-patient" not in dataless
+    assert "counterfactual-patient" not in dataless
+
+    warned = scoped_form_warnings(
+        "!(genes-affecting-senescence &self Increases)", kb, inventory
+    )
+    assert warned and "GET /genes" in warned[0]
+    assert not scoped_form_warnings(
+        "!(predict-risk-patient &self Patient001)", kb, inventory
+    )
+
+
+def test_the_warning_reaches_the_http_response():
+    async def send():
+        transport = httpx.ASGITransport(app=api_module.app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
+            return await client.post(
+                "/metta/run",
+                json={"metta_query": "!(genes-affecting-senescence &self Increases)"},
+            )
+
+    response = asyncio.run(send())
+    assert response.status_code == 200
+    body = response.json()
+    assert body["pln_status"] == "empty"
+    assert any("no rows" in w.lower() or "NO facts" in w for w in body["warnings"]), (
+        "an empty result from a data-less form must not look like a real 'no'"
+    )

@@ -394,6 +394,19 @@ def test_ontology_writes_reject_path_traversal(client, monkeypatch, endpoint):
     pipeline.assert_not_called()
 
 
+# A block that passes the same gate POST /ontology/expand applies: predicates
+# the rules consume, a truth value whose confidence is an (evidence-confidence
+# <Tier>) LOOKUP rather than a hand-typed float, a tier the calibration table
+# scores, and a paper it rests on.
+CONFORMING_BLOCK = (
+    ";; Singh 2023 (PMID 37289866) - taurine, mouse lifespan +12%\n"
+    "(Inheritance Taurine Supplement)\n"
+    "(Effect Taurine Lifespan Pos "
+    "(stv 0.375 (evidence-confidence AnimalStudies_Single)))\n"
+    "(ReportedIn Taurine PMID_37289866)"
+)
+
+
 def test_ontology_apply_writes_safe_name_inside_custom_dir(client, monkeypatch, tmp_path):
     custom = tmp_path / "custom"
     monkeypatch.setattr(api_module, "CUSTOM_ONTOLOGY_DIR", custom)
@@ -401,10 +414,7 @@ def test_ontology_apply_writes_safe_name_inside_custom_dir(client, monkeypatch, 
 
     response = client.post(
         "/ontology/apply",
-        json={
-            "metta_block": "(InstanceOf Probe Type)",
-            "target_file": "agent_notes",
-        },
+        json={"metta_block": CONFORMING_BLOCK, "target_file": "agent_notes"},
     )
 
     assert response.status_code == 200
@@ -413,6 +423,83 @@ def test_ontology_apply_writes_safe_name_inside_custom_dir(client, monkeypatch, 
         "target_file": "agent_notes.metta",
         "error": None,
     }
-    assert (custom / "agent_notes.metta").read_text(encoding="utf-8") == (
-        "(InstanceOf Probe Type)"
+    assert (custom / "agent_notes.metta").read_text(encoding="utf-8") == CONFORMING_BLOCK
+
+
+def test_ontology_apply_refuses_a_block_that_never_passed_the_schema_gate(
+    client, monkeypatch, tmp_path
+):
+    """`/ontology/expand` gates what it extracts; this endpoint did not.
+
+    The path was confined, but the CONTENT was appended verbatim — nothing
+    required the block to be the one the expander produced. `(InstanceOf Probe
+    Type)` mints a fact on a predicate no rule reads and cites no paper, which
+    is precisely what the expander refuses.
+    """
+    custom = tmp_path / "custom"
+    monkeypatch.setattr(api_module, "CUSTOM_ONTOLOGY_DIR", custom)
+    monkeypatch.setattr(api_module, "_discover_metta_files", lambda: {})
+
+    response = client.post(
+        "/ontology/apply",
+        json={"metta_block": "(InstanceOf Probe Type)", "target_file": "agent_notes"},
     )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert detail["code"] == "block_failed_schema_gate"
+    assert detail["refusals"], "a refusal must say which rule it broke"
+    assert not (custom / "agent_notes.metta").exists()
+
+
+def test_ontology_apply_will_not_rewrite_a_curated_file(client):
+    """The critical one: the calibration layer is not caller-writable.
+
+    Verified before the gate: one unauthenticated request appending
+    `(= (evidence-confidence RCT_Human) 0.05)` to epistemic_calibration.metta
+    re-tiers every human trial in the knowledge base, permanently, for every
+    later caller — and the response says `applied: true` and nothing else.
+    """
+    from config import ONTOLOGY_DIR
+
+    target = ONTOLOGY_DIR / "epistemic_calibration.metta"
+    before = target.read_text(encoding="utf-8")
+
+    response = client.post(
+        "/ontology/apply",
+        json={
+            "metta_block": "(= (evidence-confidence RCT_Human) 0.05)",
+            "target_file": "epistemic_calibration.metta",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "curated_file_is_read_only"
+    assert target.read_text(encoding="utf-8") == before
+
+
+def test_ontology_apply_will_not_grow_a_file_out_of_the_knowledge_base(
+    client, monkeypatch, tmp_path
+):
+    """A write that silently un-loads a layer is worse than a refusal.
+
+    The runtime skips any .metta file over PLN_MAX_KB_FILE_BYTES, because
+    hyperon aborts on large spaces. An append that crosses that line does not
+    error — it just removes the file from the knowledge base, and answers get
+    quietly thinner.
+    """
+    custom = tmp_path / "custom"
+    monkeypatch.setattr(api_module, "CUSTOM_ONTOLOGY_DIR", custom)
+    monkeypatch.setattr(api_module, "_discover_metta_files", lambda: {})
+
+    response = client.post(
+        "/ontology/apply",
+        json={
+            "metta_block": "(Inheritance Taurine Supplement)\n" * 4000,
+            "target_file": "agent_notes",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "block_too_large"
+    assert not (custom / "agent_notes.metta").exists()

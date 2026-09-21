@@ -22,7 +22,19 @@ from ontology.registry import OntologyRegistry
 # ── Always-valid built-in MeTTa / PLN symbols ─────────────────────────────────
 _BUILTINS: set[str] = {
     # Control flow
-    "match", "let", "if", "empty", "case",
+    "match", "let", "let*", "if", "empty", "case",
+    # Non-determinism and tuple surgery. These are hyperon stdlib names the
+    # CURATED LAYERS THEMSELVES use — `resolve-lever` is built out of
+    # `collapse`/`car-atom`/`superpose`, `cf-vias` out of `cons-atom` — so a
+    # caller writing an idiomatic query against this KB got a 422 naming a
+    # symbol the engine ships. Same false negative as the 71 ground-fact
+    # arguments the registry did not harvest, in a different place. Each name
+    # below was checked against `!(get-type …)` on hyperon 0.2.10 and has a
+    # real arrow type; `flip` was checked too and does NOT, so it is absent.
+    "superpose", "collapse", "car-atom", "cdr-atom", "cons-atom", "decons-atom",
+    "size-atom", "index-atom", "min-atom", "max-atom", "quote", "unify",
+    # Spaces and types — a caller inspecting the KB rather than querying it.
+    "get-type", "get-atoms", "new-space", "add-atom", "remove-atom",
     # Logic
     "not", "and", "or",
     # PLN links
@@ -30,7 +42,8 @@ _BUILTINS: set[str] = {
     "ImplicationLink", "AndLink", "OrLink", "NotLink",
     # Arithmetic / comparison
     ">", "<", ">=", "<=", "=", "!=", "+", "-", "*", "/",
-    "pair", "fst", "snd",
+    "pair", "fst", "snd", "==",
+    "pow-math", "sqrt-math", "abs-math", "sin-math", "log-math", "xor",
     # Atoms / types
     "&self",
     # "&self" is written as the token `&self` in MeTTa but the symbol regex
@@ -49,6 +62,13 @@ _VARIABLE_RE = re.compile(r"\$[A-Za-z][A-Za-z0-9_\-]*")
 # rejected for two "unknown symbols" that are not symbols at all. Blank numeric
 # literals out before tokenising.
 _NUMBER_RE = re.compile(r"(?<![A-Za-z0-9_])[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
+
+# String literals are DATA, not symbols. The KB is full of them — every
+# publication title, every reported-outcome phrase — so tokenising inside them
+# turned an ordinary query like
+#   (match &self (PublicationTitle $p "DNA methylation GrimAge predicts lifespan") $p)
+# into four "unknown symbols" and a 422 on /metta/run.
+_STRING_RE = re.compile(r'"[^"]*"')
 
 # The head of each top-level application in the query — i.e. the predicates and
 # functions the query actually calls.
@@ -115,8 +135,9 @@ def validate(
     if not _balanced_parens(metta_query):
         issues.append("Unbalanced parentheses in MeTTa query.")
 
-    # Blank out numeric literals first so `2.0e-75` cannot contribute `e-75`.
-    scrubbed = _NUMBER_RE.sub(" ", metta_query)
+    # Blank out string and numeric literals first: the words inside a quoted
+    # string are data, and `2.0e-75` must not contribute `e-75`.
+    scrubbed = _NUMBER_RE.sub(" ", _STRING_RE.sub(' "" ', metta_query))
 
     if inventory is not None or not registry.is_empty():
         variable_names = {v.lstrip("$") for v in _VARIABLE_RE.findall(metta_query)}

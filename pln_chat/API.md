@@ -156,8 +156,15 @@ an oversized `.metta` selection is replaced by a schema card rather than pasted
 verbatim (`PLN_PROMPT_FILE_MAX_BYTES`, default 25 KB — measured on this
 checkout, `drugage_etl_short.metta` is ~26,900 estimated tokens verbatim and
 ~340 as a card), and anything still too large is refused with **413
-`prompt_too_large`** before a call is billed. The default selection measures
-292,550 characters, about 73,100 estimated tokens.
+`prompt_too_large`** before a call is billed.
+
+The default selection measures **301,035 characters, about 75,250 estimated
+tokens** (25 files; `tests/test_prompt_size.py` pins that figure against the
+real `build_system_prompt`, so this sentence cannot drift from the code again).
+Every `/query` response also reports its own `prompt_tokens_estimate`, which is
+the number to size `PLN_MAX_PROMPT_TOKENS` against — it must be comfortably
+ABOVE this figure or every default query is refused with a 413 before the LLM
+is called. The default limit is 200,000.
 
 **Streaming and batching for `/query` are not implemented.** They were part of
 the same recommendation and are deliberately left out: they need their own
@@ -177,7 +184,14 @@ one 35-compound ranking blocked the whole service for 115 s. No threadpool
 size, `async def` conversion or asyncio timeout can fix that — you cannot
 preempt a Rust call that holds the GIL.
 
-MeTTa therefore runs in a `ProcessPoolExecutor` (`pln_chat/core/executor.py`).
+MeTTa therefore runs in a separate PROCESS — one forked per query
+(`pln_chat/core/executor.py`). Not a shared pool: a pool cannot aim a kill. A
+timed-out query there forced a pool-wide shutdown, and a healthy 3-second
+ranking well inside its own budget was SIGKILLed by an unrelated caller's
+1-second deadline, then handed a 500 blaming a hyperon abort that never
+happened to it. One process per query makes the kill precise; a
+`BoundedSemaphore` caps how many run at once (`PLN_WORKER_POOL_SIZE`).
+
 Three things follow:
 
 * **The API stays responsive.** `/health` during a 3.7 s hyperon call: 0.007 s.
@@ -195,14 +209,39 @@ ones get **503** `pln_overloaded` with `Retry-After` rather than piling up
 behind a deadline they cannot meet. `GET /health` reports the live picture
 under `pln_execution`.
 
-| env var                     | default | meaning                                        |
-|-----------------------------|---------|------------------------------------------------|
-| `PLN_WORKER_POOL_SIZE`      | 2       | worker processes; **0 runs inline**, as before  |
-| `PLN_QUERY_TIMEOUT_SECONDS` | 60      | per-request PLN budget; 0 disables              |
-| `PLN_MAX_INFLIGHT_QUERIES`  | 0       | admission limit; 0 derives 4x the worker count  |
-| `PLN_WORKER_MAX_TASKS`      | 50      | recycle workers after N tasks; 0 never          |
-| `PLN_MAX_RANK_COMPOUNDS`    | 60      | cap on `/drugage/rank`'s compound list          |
-| `PLN_MAX_ONTOLOGY_FILES`    | 64      | cap on an `ontology_files` selection (deduped)  |
+| env var                          | default | meaning                                              |
+|----------------------------------|---------|------------------------------------------------------|
+| `PLN_WORKER_POOL_SIZE`           | 2       | concurrent query processes; **0 runs inline** (below) |
+| `PLN_QUERY_TIMEOUT_SECONDS`      | 60      | per-request PLN budget; 0 disables                    |
+| `PLN_MAX_INFLIGHT_QUERIES`       | 0       | admission limit; 0 derives 4x `PLN_WORKER_POOL_SIZE`  |
+| `PLN_MAX_RANK_COMPOUNDS`         | 60      | cap on a ranking's compound pool, at every entrance    |
+| `PLN_MAX_METTA_SORT_COMPOUNDS`   | 10      | the much smaller cap for `strategy="metta_sort"`       |
+| `PLN_MAX_ONTOLOGY_FILES`         | 64      | cap on an `ontology_files` selection (deduped)        |
+| `PLN_ALLOW_CURATED_WRITES`       | 0       | let `/ontology/apply` append to a CURATED `.metta`     |
+| `PLN_MAX_APPLY_BYTES`            | 32000   | largest block one ontology write may append            |
+
+**`PLN_WORKER_POOL_SIZE=0` turns off the deadline and the admission limit**, not
+just the subprocess. Neither is enforceable in-process — you cannot preempt a
+GIL-holding Rust call — so inline mode gets no 504 and no 503, and a hyperon
+abort takes the whole service down again. `GET /health` says so rather than
+advertising protections it is not applying: `pln_execution.timeout_enforced` and
+`admission_control` read `false`, and `timeout_seconds` is `null`. Inline mode
+exists for the in-process contract tests (a forked child cannot see a
+monkeypatched module global) and for debugging; it is not a deployment setting.
+
+`PLN_MAX_RANK_COMPOUNDS` is now applied at every entrance to the ranking engine,
+not just on `DrugAgeRankRequest`. The pool can arrive as a JSON field
+(`POST /drugage/rank`) or inside a `(rank-drugage-lifespan (C1 … Cn))` form that
+pydantic never sees — from `/query`, from a hand-written `/metta/run` body, or
+from the chat tab. A hand-written 400-compound form went straight past the cap
+into ~70 ms of GIL-held work per compound; it is now a 422 `too_many_compounds`
+wherever it comes from.
+
+`strategy="metta_sort"` gets its own, much smaller cap. Its MeTTa insertion sort
+is O(n²): 6.1 s at n=10, 52.6 s at n=20, past the 60-second deadline by n=40 —
+so requests between 40 and the published 60 were advertised as legal and
+answered with a 504. Over `PLN_MAX_METTA_SORT_COMPOUNDS` it is a 422 naming
+`linear`, which is the default and agrees with it bit for bit.
 
 Because the Gradio UI is mounted on the same ASGI app and drives the same
 pipeline, its chat handler routes through the same worker pool — so a query
@@ -323,6 +362,19 @@ server-side and the response says exactly how (`derived: true` plus the
 formula). `GET /patients/markers` lists what is supported; `POST
 /patients/preview` shows the atoms and each marker's Elevated/Normal/Low status
 without running anything.
+
+**`/patients/preview` takes the patient object at the TOP LEVEL**, not wrapped
+in `{"patient": …}` the way `/query` and `/metta/run` take it. Send the wrapped
+shape and you now get a **422** naming the stray key; it used to be accepted
+with a 200 and a confident, well-formed description of an EMPTY patient — the
+whole payload discarded, and every documented refusal (`unknown_marker`,
+`invalid_sex`) bypassed because nothing was ever read. An endpoint whose job is
+to check a payload must not answer for one it did not look at.
+
+A malformed field is a 422 that names it, too: `{"markers": {"AgeAccelGrim":
+{"z": "high"}}}` returns `invalid_marker_value` with the value it received,
+where it used to escape as an unhandled `ValueError` and a 500 with no field
+name in it.
 
 **Honesty about the conversions.** There is no calibrated age/sex-stratified
 reference table anywhere in this repository. The raw-value conversions use
@@ -526,29 +578,58 @@ Not one line of the counterfactual or risk layer changed.
 ```
 
 `Patient003` is a new, **synthetic** smoking-dominant profile in
-`lifestyle_evidence.metta` — a 64-year-old male former smoker with a strongly
+`lifestyle_evidence.metta` — a 64-year-old male CURRENT smoker with a strongly
 elevated `DNAmPACKYRS` and normal senescence, inflammation and metabolic
 markers, the third axis alongside senescence-dominant `Patient001` and
 metabolic-dominant `Patient002`. `Patient002` was NOT edited to demo this,
-although he is already a `FormerSmoker`: his numbers are quoted in the
-evaluation and pinned by a test, and rewriting a published patient to make a
-new feature look good is how a knowledge base stops being trustworthy.
+although he is a `FormerSmoker`: his numbers are quoted in the evaluation and
+pinned by a test, and rewriting a published patient to make a new feature look
+good is how a knowledge base stops being trustworthy. (`Patient003` was written
+a former smoker too, at first — which made the file's own flagship demo a case
+the lever does not apply to, and it returned the full benefit only because the
+precondition did not exist yet.)
 `Patient001`'s and `Patient002`'s answers are byte-identical before and after.
 
 Two consequences worth reading literally:
 
 * The lever acts on `DNAmPACKYRS`, not on the status string. A caller-supplied
   smoker who sends no `DNAmPACKYRS` gets an expected delta of 0 and an empty
-  `(Via ())`, and `POST /patients/preview` now warns about exactly that — the
-  zero means "no measured pack-years signal to act on", not "quitting would not
+  `(Via ())`, and `POST /patients/preview` warns about exactly that — the zero
+  means "no measured pack-years signal to act on", not "quitting would not
   help".
-* Quitting does not restore a never-smoker. The cessation edge's strength is
+* **And the symmetric case, which is the one that mattered.** `DNAmPACKYRS` is
+  an elastic-net estimate with real error that also responds to second-hand
+  exposure, so an elevated value in a NEVER SMOKER is an ordinary data state —
+  and it used to buy them a quantified benefit from quitting, byte-identical to
+  a smoker's, silently. The knowledge base now declares
+  `(LeverRequiresSmoking SmokingCessation CurrentSmoker)`, and `/query`,
+  `/metta/run`, `/patients/preview` and the chat tab all warn when a query
+  names a lever the patient cannot pull. The ENGINE does not yet enforce it:
+  the curated KB is at hyperon 0.2.10's ceiling (four more trivial rule
+  definitions before it aborts — measured, and asserted by
+  `tests/test_smoking_lever.py`), and the composition below spends that budget.
+  A caller talking to hyperon directly still gets the ungated number. That gap
+  is recorded in `pln_counterfactual.metta` §3b rather than papered over.
+* Quitting does not restore a never-smoker, and **the engine now applies that
+  discount instead of only documenting it.** The cessation edge's strength is
   0.39, anchored on Duncan 2019's HR of 0.61 (95% CI 0.49–0.76) for quitting
-  within 5 years versus continuing (PMID 31429895) — and the KB records as a
-  `Limitation` fact that risk stays significantly elevated versus never smokers
-  beyond 5 years, and that Joehanes 2016 (PMID 27651444) still finds 185
-  smoking-associated CpGs differentially methylated in former versus never
-  smokers. A strength of 1.0 would assert the opposite of what both papers say.
+  within 5 years versus continuing (PMID 31429895). `resolve-lever` routed the
+  lever to the driver it reduces and DROPPED that edge, so the counterfactual
+  answered "if the exposure burden vanished" for a question that asked "if he
+  quits" — the exact claim the file's own `Limitation` fact says it does not
+  make. Measured on Patient003: **−0.21 at confidence 0.85 before, −0.0819 at
+  0.324 now**, and a projected 10-year CHD reduction of 0.54 percentage points
+  rather than 1.37. It agrees exactly with
+  `!(infer &self SmokingCessation DNAmPACKYRS)`, which it used to contradict.
+  The same silent discard affected every intervention lever:
+  `DasatinibPlusQuercetin` returned the senescence driver's number byte for
+  byte, and now carries its own `(stv 0.70 …)`.
+* Joehanes 2016 is tiered **Epidemiological (0.60)**, not `MultipleHumanTrials`
+  (0.85). It is an observational 16-cohort EWAS meta-analysis, and this ladder
+  orders DESIGNS, not sample sizes — `Epidemiological` sits below
+  `SingleHumanTrial` precisely because pooling observational cohorts does not
+  make them a trial. Duncan 2019, in the same file, was already tiered that way.
+  Two observational studies cannot sit 0.25 apart on a design ladder.
 
 **"Which genes drive cellular senescence?"**, **"GenAge human genes"** and
 **"CellAge ∩ GenAge"** — the first returned four hallmark *components*
@@ -645,6 +726,20 @@ same architecture as the DrugAge lift, with a smaller stack
 !(genes-affecting-senescence &self Increases)
 ```
 
+**These three run inside the query-scoped space that `GET /genes/{symbol}
+?infer=true` builds — not through `POST /metta/run`.** The rules are loaded in
+the generic space, but the CellAge rows they match are not (a variable-slot
+match over ~900 of them aborts hyperon 0.2.10, which is why the slice is capped
+at 100 and built per query). Sent to `/metta/run`, the first two are a 422
+naming `CellAgeRow_869` / `Gene_TP53` — symbols the generic space does not hold
+— and the third used to be the worse case: a 200 with `pln_status: "empty"`,
+`pln_results: []` and an EMPTY `ungrounded_predicates`, which by the reading
+rule two sections below says "no genes increase senescence". It now carries a
+warning saying the space holds no rows for that rule and naming the endpoint
+that does. The same warning covers the `drugage-*` accessors, and is derived
+from the runtime inventory rather than a hand-kept list, so a new scoped layer
+is covered the day it lands.
+
 The returned `semantics` block says where both numbers come from, every time:
 
 * **strength is a curated prior, identical for every curated row.** CellAge
@@ -706,6 +801,13 @@ Two changes remove that failure mode:
 * every `/query` and `/metta/run` response carries `ungrounded_predicates` and
   `validation_warnings`. An empty `pln_results` next to a non-empty
   `ungrounded_predicates` means *the KB cannot express this relation*, not *no*.
+* and the third case, which this rule used to misread: a rule that IS loaded
+  whose DATA lives in a scoped space. `ungrounded_predicates` is empty there,
+  because the predicate is declared and the rule is real — so those responses
+  now carry an explicit `warnings` entry naming the predicates that hold no
+  facts here and the endpoint that does serve them. **An empty `pln_results` is
+  only a real "no" when `ungrounded_predicates` AND `warnings` are both
+  empty.**
 
 The same inventory now backs the validator and the LLM's system prompt. That
 also fixes the **opposite** bug, which was quietly worse: the symbol registry
@@ -747,10 +849,15 @@ billed upstream 400. A selected file over `PLN_PROMPT_FILE_MAX_BYTES`
 goes from ~131,000 tokens to ~215, and says which predicates it holds and how
 many facts each has, which is more useful to a translator than the rows are.
 Every hand-written layer in this repo is under that limit and is still pasted
-verbatim, because its prose is what the translator reasons from. The default
-prompt also drops from ~62,400 to ~57,400 tokens, because the grounded schema
-card replaces a flat ~7,000-token symbol index in which a declaration and 400
+verbatim, because its prose is what the translator reasons from. The grounded
+schema card also replaces a flat symbol index in which a declaration and 400
 facts looked identical.
+
+Earlier drafts of this section carried "~62,400 to ~57,400 tokens" for the
+default prompt. Those figures were wrong — the measured value is the ~75,250
+above — and an operator sizing `PLN_MAX_PROMPT_TOKENS` off them (say, 60,000 as
+generous headroom) gets a **413 on every default query**. The number is now
+asserted by a test rather than written down twice.
 
 ## Examples
 
@@ -857,12 +964,34 @@ axis (extending lifespan is `Pos`), then chained through the curated
 `score` is `strength x confidence`, signed so that **higher is better**.
 
 **Strength** is `|change%| / (|change%| + 20)` — saturating, so +20 % reads
-0.50 and +80 % reads 0.80. **Confidence** is `min(evidence tier, significance
-gate) x 0.9`, where the 0.9 is the per-hop chain discount for the
-lifespan → mortality step. So the confidence you see is always 0.9 x the row's
-tier: **0.81** ITP, **0.45** non-ITP vertebrate, **0.315** invertebrate,
-**0.18** yeast. A score of exactly 0.0 is a reported null (metformin and
-resveratrol are ITP negatives at confidence 0.81), never a missing value.
+0.50 and +80 % reads 0.80.
+
+**Confidence** is `evidence tier x significance gate x 0.9`, where the 0.9 is
+the per-hop chain discount for the lifespan → mortality step. For a row whose
+result was reported **Significant** the gate is 1.0, so the familiar numbers
+hold: **0.81** ITP, **0.45** non-ITP vertebrate, **0.315** invertebrate,
+**0.18** yeast. An **Unreported** row reads 0.6x those and a **NotSignificant**
+row 0.4x. An ITP row folds significance into its tier, so its gate stays 1.0 —
+a well-run null is high-confidence evidence of ~no effect, and it is the
+near-zero STRENGTH that sinks it, not low confidence.
+
+That gate used to be a CAP — `min(tier, gate)` — and a cap did almost nothing,
+because every non-ITP tier already sits at or below every gate. Measured over
+the full 3,423-row build: the cap changed the confidence of **101 rows out of
+3,208** non-ITP ones, all of them vertebrate NotSignificant. The other 995
+NotSignificant and 187 Unreported rows scored at *exactly* the confidence of a
+significant result on the same species, so a compound whose only evidence found
+no significant change sat in the whole-build ranking between two that did, at
+the same number. Every Significant row keeps its old value under the
+multiplier; only the weak rows moved, downward.
+
+A score of exactly 0.0 is a reported null (metformin and resveratrol are ITP
+negatives at confidence 0.81), never a missing value — and it now reads
+`direction: "no_effect"`. `sign` is the MeTTa Effect convention and has no
+zero, so a 0.0 % row is `Neg` because it is not negative; rendering that as
+`"protective"` put `direction: "protective"` next to `score: 0.0` and a
+`semantics.zero_score` note calling it a measured null, in one response.
+`GET /drugage/top?direction=none` lists them.
 
 **One row per compound, and which one.** A compound usually has several rows —
 rapamycin has 37, astaxanthin 6. The score uses one representative: the
@@ -887,7 +1016,9 @@ original single `rank-interventions` call, whose MeTTa insertion sort is
 O(n^2) with a large constant — measured 1.1 s at n=5, 6.1 s at n=10, and the
 115 s the evaluation saw at n=35. Both produce identical scores (asserted in
 `tests/test_drugage_ranking_contract.py`); the compound list is capped at
-`PLN_MAX_RANK_COMPOUNDS` (default 60).
+`PLN_MAX_RANK_COMPOUNDS` (default 60) at every entrance to the engine, and
+`metta_sort` additionally at `PLN_MAX_METTA_SORT_COMPOUNDS` (default 10),
+because beyond that its O(n²) sort cannot finish inside the query deadline.
 
 ## Expanding the KB from a paper
 
@@ -905,6 +1036,35 @@ curl -X POST localhost:7860/ontology/apply \
   -H 'Content-Type: application/json' \
   -d '{"metta_block": "...", "target_file": "my_paper_extract.metta"}'
 ```
+
+### What `/ontology/apply` will not do
+
+The block arrives as text and nothing required it to be the one
+`/ontology/expand` produced, so it faces that endpoint's own schema gate here:
+predicates the rules consume, no hand-typed `(stv x y)`, no redefinition of a
+calibration constant, a tier the table scores, and a PMID or DOI. A refused
+block comes back **422 `block_failed_schema_gate`** with a `refusals` list
+naming what each entry broke — reported, never silently dropped.
+
+Three further refusals, each with a measured reason:
+
+* **403 `curated_file_is_read_only`.** The path was already confined to the two
+  ontology roots; the CONTENT was not. One unauthenticated request appending
+  `(= (evidence-confidence RCT_Human) 0.05)` to `epistemic_calibration.metta`
+  re-tiers every human trial in the knowledge base, permanently, for every
+  later caller — and the response says `applied: true` and nothing else.
+  Caller-generated entries go to `pln_chat/ontology/metta_files/`, which is
+  loaded the same way. Set `PLN_ALLOW_CURATED_WRITES=1` to override, knowing
+  what it means.
+* **422 `block_too_large`** over `PLN_MAX_APPLY_BYTES` (32 KB; the canonical
+  taurine block is ~2 KB).
+* **422 `file_would_exceed_kb_cap`** when the append would push the file past
+  `PLN_MAX_KB_FILE_BYTES`. Over that size the runtime stops loading the file —
+  no error, the layer just leaves the knowledge base and answers get quietly
+  thinner. A refusal is the better failure.
+
+The Gradio "Apply to Ontology" button goes through the identical gate: it is
+mounted on this same ASGI app, so "it is only the local UI" was never true.
 
 ### Extracted knowledge now lands in a schema the rules read
 

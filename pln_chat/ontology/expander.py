@@ -412,7 +412,7 @@ def _normalise_metta(expr: str) -> str:
 
 
 def _strip_stv(expr: str) -> str:
-    """Remove a trailing `(stv …)` — however it is written.
+    r"""Remove a trailing `(stv …)` — however it is written.
 
     HAZARD THIS FIXES. The old implementation was a regex anchored to the end of
     a LINE and matching two bare floats:
