@@ -106,12 +106,24 @@ def _result(atom: str = "(answer)") -> PLNRunResult:
     )
 
 
-def test_openapi_is_agent_discoverable_and_has_no_authentication(client):
+def test_openapi_is_agent_discoverable_and_declares_auth_only_when_configured(
+    client, monkeypatch
+):
+    """The schema describes THIS deployment, in either of its two states.
+
+    This test used to assert, flatly, that the API has no authentication. The
+    2026-09-18 evaluation asked for the capability ("API keys, rate limits ...
+    needed before anything beyond an ngrok demo"), so the assertion it replaces
+    is the two-state contract: open when PLN_API_KEY is unset — which is still
+    the default, and what every other test in this file relies on — and
+    advertised in the schema, header name and all, when it is set.
+    """
     response = client.get("/openapi.json")
     assert response.status_code == 200
     schema = response.json()
 
     assert schema["info"]["title"] == "PLN Longevity Query API"
+    assert schema["info"]["version"] == api_module.PLN_API_VERSION
     for path in (
         "/health",
         "/ontology/files",
@@ -122,13 +134,34 @@ def test_openapi_is_agent_discoverable_and_has_no_authentication(client):
     ):
         assert path in schema["paths"]
 
+    # Default state: no key configured, so nothing to declare.
+    assert schema["x-pln-api-key-required"] is False
     assert not schema.get("components", {}).get("securitySchemes")
     assert "security" not in schema["paths"]["/query"]["post"]
+
+    # Configured state: the same document now names the header an agent needs.
+    monkeypatch.setattr(api_module, "PLN_API_KEYS", ["shared-secret"])
+    protected = client.get("/openapi.json").json()
+
+    assert protected["x-pln-api-key-required"] is True
+    scheme = protected["components"]["securitySchemes"]["PLNApiKey"]
+    assert scheme == {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": scheme["description"],
+    }
+    assert protected["paths"]["/query"]["post"]["security"] == [{"PLNApiKey": []}]
+    # ...except on the routes that must answer an agent that has no key yet.
+    assert "security" not in protected["paths"]["/health"]["get"]
 
 
 def test_health_reports_agent_preflight_fields(client):
     body = client.get("/health").json()
     assert body["status"] == "ok"
+    assert body["version"] == api_module.PLN_API_VERSION
+    assert body["api_key_required"] is False
+    assert body["rate_limit_per_minute"] == 0
     assert body["pln_mode"] in {"runtime", "stub"}
     assert isinstance(body["runtime_importable"], bool)
     assert isinstance(body["runtime_ready"], bool)

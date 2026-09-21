@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+import secrets
 import sys
 import time
 from pathlib import Path
@@ -45,6 +46,8 @@ from typing import Literal, Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field, field_validator
 
 from config import (
@@ -55,7 +58,10 @@ from config import (
     DEFAULT_TEMPERATURE,
     ONTOLOGY_DIR,
     OPENAI_API_KEY,
+    PLN_API_KEYS,
+    PLN_API_VERSION,
     PLN_CORS_ORIGINS,
+    PLN_RATE_LIMIT_PER_MINUTE,
     PLN_CHARS_PER_TOKEN,
     PLN_MAX_KB_FILE_BYTES,
     PLN_MAX_ONTOLOGY_FILES,
@@ -87,6 +93,7 @@ from core.patient_builder import (
     build_patient,
     marker_catalog,
 )
+from core.rate_limit import TokenBucketLimiter
 from core.executor import (
     PLNExecutionTimeout,
     PLNOverloaded,
@@ -481,30 +488,212 @@ app = FastAPI(
         "the same logic behind the Gradio chat UI (app.py), for scripts and agents. "
         "See /docs for interactive testing."
     ),
-    version="1.1.0",
+    version=PLN_API_VERSION,
 )
 
 # Permissive by default so a local agent/script can call this without CORS
 # friction during experimentation. Set PLN_CORS_ORIGINS to a comma-separated
 # allowlist when a browser client reaches this beyond localhost.
+# `expose_headers` matters for the two headers a browser client has to act on:
+# the version it is coded against, and how long to wait after a 429.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=PLN_CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-API-Version", "Retry-After"],
 )
+
+
+# ── Operational guards: optional key auth, optional rate limit ───────────────
+# The evaluation's recommendation 12 asked for "API keys, rate limits ...
+# versioned responses. Needed before anything beyond an ngrok demo." Both
+# controls below are OFF unless an operator configures them, because the
+# service IS still an ngrok demo and every existing caller — the Gradio UI, the
+# contract tests, the acceptance runner — sends no credential today.
+#
+# They live in the logging middleware rather than in a FastAPI dependency for
+# two reasons: the Gradio UI is mounted on this same app at `/` and is NOT a
+# FastAPI route (a dependency could not see it), and a refusal recorded here is
+# still recorded by `log_http_request`, so a 401 storm is visible in the log
+# like everything else.
+
+#: The header name has been promised by `pln_chat/.env.example` since the API
+#: was split out of app.py ("# PLN_API_KEY=some-shared-secret   # if set,
+#: requests need header: X-API-Key: <value>"). Nothing read it until now.
+API_KEY_HEADER_NAME = "X-API-Key"
+_API_KEY_SCHEME_NAME = "PLNApiKey"
+_API_KEY_HEADER = APIKeyHeader(
+    name=API_KEY_HEADER_NAME,
+    auto_error=False,
+    description=(
+        "Shared secret, required only when the deployment sets PLN_API_KEY / "
+        "PLN_API_KEYS. When it is unset this scheme is absent from the schema "
+        "and every endpoint is open."
+    ),
+)
+
+#: Reachable without a key AND never metered, in every configuration.
+#: `/health` is a readiness probe — one that needs a secret reports the wrong
+#: thing when the secret is wrong, and one that can be rate-limited reports the
+#: service as down when it is merely busy (observed: with the limit at 3/min, a
+#: six-call smoke test left `GET /health` answering 429). The schema and docs
+#: routes are how an agent DISCOVERS that it needs a key at all. None of the
+#: five touch the LLM, the knowledge base or the disk, so exempting them costs
+#: nothing a cap would have protected.
+_OPEN_PATHS = frozenset({
+    "/health", "/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect",
+})
+
+_HTTP_OPERATIONS = frozenset({
+    "get", "put", "post", "delete", "options", "head", "patch", "trace",
+})
+
+#: Per-process token bucket; see the HONESTY CONTRACT in core/rate_limit.py.
+#: Rebuilt only at import, so changing PLN_RATE_LIMIT_PER_MINUTE needs a
+#: restart (tests replace this object directly).
+_RATE_LIMITER = TokenBucketLimiter(per_minute=PLN_RATE_LIMIT_PER_MINUTE)
+
+
+def _is_api_path(path: str) -> bool:
+    """True when `path` is one of THIS module's routes.
+
+    Gradio is mounted at `/` on the same application (see app.create_combined_app),
+    so "every request" and "every API request" are different sets: the UI issues
+    a stream of static-asset and queue-poll requests that must not be metered by
+    an API rate limit. Gradio's mount is a Starlette `Mount`, never an
+    `APIRoute`, so asking the router which routes are APIRoutes separates the
+    two without hard-coding a path list that would rot as endpoints are added.
+    """
+    for route in app.routes:
+        if isinstance(route, APIRoute) and route.path_regex.match(path):
+            return True
+    return False
+
+
+def _api_key_accepted(presented: Optional[str]) -> bool:
+    if not presented:
+        return False
+    # Constant-time compare: the keys are shared secrets, and `==` on a str
+    # leaks a prefix-length oracle to anyone who can time the response.
+    # Compared as BYTES, not str: Starlette decodes headers as latin-1, and
+    # `compare_digest` raises TypeError on a non-ASCII str — which would turn a
+    # header containing one high byte into a 500 instead of a 401.
+    offered = presented.encode("utf-8", "surrogateescape")
+    return any(
+        secrets.compare_digest(offered, key.encode("utf-8")) for key in PLN_API_KEYS
+    )
+
+
+def _guard_request(request: Request) -> Optional[JSONResponse]:
+    """Refuse a request before it reaches a route, or return None to let it pass.
+
+    Returns a fully-formed JSONResponse in the same `{"detail": {"code", ...}}`
+    shape as every other failure in this API (see API.md "Failures are HTTP
+    failures"), so a caller needs no new parsing for these two.
+    """
+    path = request.url.path
+    # A CORS preflight carries no credentials by construction and must reach
+    # CORSMiddleware, or a browser client sees an opaque failure instead of the
+    # 401/429 the real request would get.
+    if request.method == "OPTIONS":
+        return None
+
+    if PLN_API_KEYS and path not in _OPEN_PATHS:
+        presented = request.headers.get(API_KEY_HEADER_NAME)
+        if not _api_key_accepted(presented):
+            code = "api_key_invalid" if presented else "api_key_required"
+            return JSONResponse(
+                status_code=401,
+                content={"detail": {
+                    "code": code,
+                    "message": (
+                        f"This deployment requires a shared secret in the "
+                        f"{API_KEY_HEADER_NAME} header."
+                        if code == "api_key_required"
+                        else f"The {API_KEY_HEADER_NAME} header was not recognised."
+                    ),
+                    "header": API_KEY_HEADER_NAME,
+                    "open_paths": sorted(_OPEN_PATHS),
+                }},
+            )
+
+    if _RATE_LIMITER.enabled and path not in _OPEN_PATHS and _is_api_path(path):
+        client = request.client.host if request.client else "unknown"
+        retry_after = _RATE_LIMITER.check(client)
+        if retry_after is not None:
+            return JSONResponse(
+                status_code=429,
+                headers={"Retry-After": str(retry_after)},
+                content={"detail": {
+                    "code": "rate_limited",
+                    "message": (
+                        f"More than {_RATE_LIMITER.per_minute} requests per "
+                        f"minute from this address; retry in {retry_after}s."
+                    ),
+                    "limit_per_minute": _RATE_LIMITER.per_minute,
+                    "retry_after_seconds": retry_after,
+                }},
+            )
+    return None
+
+
+#: FastAPI caches `app.openapi_schema` after the first build. The schema has to
+#: track whether auth is configured, so the cache is keyed on that flag instead
+#: of being a one-shot: a deployment that sets PLN_API_KEY publishes a document
+#: in which every non-open operation carries `security`, and one that does not
+#: publishes a document with no `securitySchemes` at all. Both are true
+#: statements about that deployment, which is the point — an agent pointed at
+#: /openapi.json discovers the header it needs, or discovers it needs none.
+_AUTH_FLAG = "x-pln-api-key-required"
+_default_openapi = app.openapi
+
+
+def _openapi_with_optional_auth() -> dict:
+    enabled = bool(PLN_API_KEYS)
+    cached = app.openapi_schema
+    if cached is not None and cached.get(_AUTH_FLAG) == enabled:
+        return cached
+    app.openapi_schema = None
+    schema = _default_openapi()
+    schema[_AUTH_FLAG] = enabled
+    if enabled:
+        components = schema.setdefault("components", {})
+        components.setdefault("securitySchemes", {})[_API_KEY_SCHEME_NAME] = (
+            _API_KEY_HEADER.model.model_dump(
+                by_alias=True, exclude_none=True, mode="json"
+            )
+        )
+        requirement = [{_API_KEY_SCHEME_NAME: []}]
+        for path, item in schema.get("paths", {}).items():
+            if path in _OPEN_PATHS:
+                continue
+            for method, operation in item.items():
+                if method.lower() in _HTTP_OPERATIONS and isinstance(operation, dict):
+                    operation["security"] = requirement
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = _openapi_with_optional_auth
 
 
 @app.middleware("http")
 async def log_api_request(request: Request, call_next):
-    """Record every API request, including raw JSON/text bodies and failures."""
+    """Record every API request, including raw JSON/text bodies and failures.
+
+    Also the place the two operational guards run, and where every response —
+    including Gradio's — is stamped with `X-API-Version`.
+    """
     started = time.monotonic()
     raw_body = await request.body()
     body = raw_body.decode("utf-8", errors="replace")
     status_code = 500
     error: Optional[str] = None
     try:
-        response = await call_next(request)
+        refusal = _guard_request(request)
+        response = refusal if refusal is not None else await call_next(request)
+        response.headers["X-API-Version"] = PLN_API_VERSION
         status_code = response.status_code
         return response
     except Exception as exc:
@@ -1269,6 +1458,12 @@ def health() -> dict:
     runtime_ready = PLN_RUNTIME_AVAILABLE and runtime_importable and bool(_runtime_kb_paths())
     return {
         "status": "ok",
+        # Same string as `info.version` in /openapi.json and the X-API-Version
+        # header, so one unauthenticated call tells a caller which contract it
+        # is talking to — and whether it has to send a key to talk further.
+        "version": PLN_API_VERSION,
+        "api_key_required": bool(PLN_API_KEYS),
+        "rate_limit_per_minute": _RATE_LIMITER.per_minute,
         "pln_mode": "runtime" if PLN_RUNTIME_AVAILABLE else "stub",
         "runtime_importable": runtime_importable,
         "runtime_ready": runtime_ready,

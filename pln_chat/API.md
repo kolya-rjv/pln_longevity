@@ -40,9 +40,131 @@ The resulting origin serves Gradio at `/` and the JSON API at `/query`,
 `/metta/run`, `/patients`, etc. For an API-only process, `python api.py` still
 listens on port 8000 by default.
 
-There is no authentication layer. The service is intended to run only in the
-private environment where the Gradio UI and invited agents can already reach
-it.
+## Operational controls: keys, rate limit, version
+
+**Both controls below are off by default.** Unset, the service behaves exactly
+as it always has: no credential, no metering, every endpoint open. That is
+still the intended shape for a private environment where the Gradio UI and
+invited agents can already reach the listener. They exist so a deployment that
+leaves that environment does not have to be rewritten first.
+
+### Optional API key
+
+```bash
+# one shared secret...
+PLN_API_KEY=some-shared-secret
+# ...or one per consumer, so a single agent can be revoked on its own
+PLN_API_KEYS=key-for-agent-a,key-for-agent-b
+```
+
+With either set, every request must carry the secret in `X-API-Key`:
+
+```bash
+curl -s localhost:7860/patients -H 'X-API-Key: some-shared-secret'
+```
+
+| behaviour                     | key unset (default)      | key set                                  |
+|-------------------------------|--------------------------|------------------------------------------|
+| an ordinary request           | 200                      | 401 `api_key_required` without the header |
+| a wrong header value          | —                        | 401 `api_key_invalid`                     |
+| `/openapi.json` `components`  | no `securitySchemes`     | `securitySchemes.PLNApiKey` (`apiKey`, header `X-API-Key`) |
+| `/openapi.json` per-operation | no `security`            | `security: [{PLNApiKey: []}]` on everything but the open paths |
+| `GET /health`                 | `api_key_required: false`| `api_key_required: true`                  |
+
+The schema tracks the deployment rather than describing a fixed ideal, so an
+agent pointed at `/openapi.json` discovers the header it needs — or discovers
+it needs none.
+
+**Always open, and never metered:** `/health`, `/docs`, `/redoc`,
+`/openapi.json` and CORS preflights (`OPTIONS`). A readiness probe that needs a
+secret reports the wrong thing when the secret is wrong; one that can be
+rate-limited reports the service as *down* when it is merely busy (observed
+against a live listener with the limit at 3/min — a six-call smoke test left
+`GET /health` answering 429). An agent that cannot read the schema cannot find
+out what it is missing, either. None of those routes touch the LLM, the
+knowledge base or the disk, so exempting them costs nothing a limit would have
+protected.
+
+**Setting a key also locks the browser UI.** Gradio is mounted at `/` on the
+same application and cannot send the header, so a combined deployment is either
+open or API-only. That is deliberate: exempting the UI's own routes would leave
+the whole pipeline reachable without a key and make "authentication" a word
+rather than a control.
+
+### Optional rate limit
+
+```bash
+PLN_RATE_LIMIT_PER_MINUTE=60   # per client address; 0 = off (the default)
+```
+
+A stdlib token bucket keyed on `request.client.host`, capacity one minute's
+allowance, refilling continuously — so a burst of the full budget is allowed
+once and the caller is metered after that. Over the limit:
+
+```
+HTTP/1.1 429 Too Many Requests
+Retry-After: 30
+{"detail": {"code": "rate_limited", "limit_per_minute": 2,
+            "retry_after_seconds": 30, "message": "…"}}
+```
+
+Only this API's own routes are metered, and not the always-open ones above;
+Gradio's static assets and queue polls are not metered either (its mount is not
+a FastAPI route). `slowapi` is deliberately not a dependency.
+
+**This is a courtesy limit, not a security control** — the honesty contract is
+in [`core/rate_limit.py`](core/rate_limit.py). It is per process, so two
+uvicorn workers mean twice the configured rate. Behind ngrok or any reverse
+proxy, `request.client.host` is the proxy, so every caller shares one bucket;
+nothing here reads `X-Forwarded-For`, because trusting a client-settable header
+would make the limit both evadable and abusable. It stops one enthusiastic
+agent or a runaway retry loop, which is the failure mode the evaluation hit. It
+does not stop an adversary.
+
+### Versioned responses
+
+Every response carries `X-API-Version`; `GET /health` reports the same string
+as `version`, and so does `info.version` in `/openapi.json`. It is **2.0.0**,
+and the major bump is not cosmetic: in 1.x an upstream outage, a hyperon
+exception or an oversized prompt came back as HTTP 200 with
+`intent: "clarification"`. They are 4xx/5xx with a machine-readable `code` now
+(see "Failures are HTTP failures"), which breaks any client that branched on
+the status code. The same release added the discovery endpoints, caller-
+supplied patients and the two controls above.
+
+`X-API-Version` and `Retry-After` are in the CORS `expose_headers` list, so a
+browser client can actually read them.
+
+### Prompt caching — what was already true
+
+The evaluation asked for "prompt caching of the fixed system prompt". The
+honest answer is that there is nothing to build here and a hand-rolled cache
+would be the wrong thing: OpenAI applies automatic prefix caching to a stable
+prompt prefix, and the system prompt **is** static for a given ontology
+selection — the ontology snapshot, the schema card, the alias table and the
+few-shot examples are all assembled the same way on every request.
+
+The ordering was checked rather than assumed, and it is already cache-friendly:
+the static prompt is the `system` message, the conversation history and the
+question follow as separate messages, and the one genuinely per-request piece —
+a caller-supplied `patient` — is **appended after** the static block, never
+inserted before it. `tests/test_api_operations.py` pins both properties so a
+future edit cannot quietly move dynamic text in front of the cacheable prefix.
+
+The lever that actually mattered was prompt **size**, and it is already pulled:
+an oversized `.metta` selection is replaced by a schema card rather than pasted
+verbatim (`PLN_PROMPT_FILE_MAX_BYTES`, default 25 KB — measured on this
+checkout, `drugage_etl_short.metta` is ~26,900 estimated tokens verbatim and
+~340 as a card), and anything still too large is refused with **413
+`prompt_too_large`** before a call is billed. The default selection measures
+292,550 characters, about 73,100 estimated tokens.
+
+**Streaming and batching for `/query` are not implemented.** They were part of
+the same recommendation and are deliberately left out: they need their own
+response contract (an SSE or chunked shape that the current
+`QueryResponse` model cannot express), and the LLM call is only part of a
+request's wall time, so streaming would improve *perceived* latency and nothing
+else. It belongs in its own change.
 
 ## PLN execution runs in a worker process
 
@@ -134,6 +256,9 @@ never noticed. Every failure now carries its own status and a structured
 |---------------------------|--------|---------------------------------------------------|
 | `prompt_too_large`        | 413    | the assembled prompt exceeds `PLN_MAX_PROMPT_TOKENS` — **checked before the call is made** |
 | `context_length_exceeded` | 413    | upstream rejected the prompt anyway                |
+| `api_key_required`        | 401    | the deployment sets `PLN_API_KEY` and none was sent |
+| `api_key_invalid`         | 401    | the `X-API-Key` header was not recognised          |
+| `rate_limited`            | 429    | this address' own budget (`Retry-After` is set)    |
 | `rate_limit`              | 429    | upstream throttling (`Retry-After` is set)         |
 | `timeout`                 | 504    | upstream did not answer in time                    |
 | `pln_timeout`             | 504    | PLN execution passed its per-request budget        |
@@ -894,11 +1019,14 @@ call `/query` on their own. Good first calls: `/health` (confirms the server
 is ready before it starts spending OpenAI calls) and `/patients` (valid
 `<Patient>` IDs for the forms above).
 
-This satisfies a local or otherwise network-reachable agent integration. It
-does not itself provision a public URL, TLS, process supervision, rate limits,
-or a reverse proxy; add those deployment controls before giving a remote agent
-access. Keep the listener within the intended private network because endpoints
-are intentionally unauthenticated.
+This satisfies a local or otherwise network-reachable agent integration. A
+shared-secret key check and a per-address rate limit ship with it, both off by
+default — see "Operational controls" above for how to turn them on and what
+they are worth. Neither replaces the rest of a deployment: a public URL, TLS,
+process supervision and a reverse proxy are still yours to provide, and the
+rate limit in particular is a per-process courtesy limit, not a defence. With
+`PLN_API_KEY` unset the endpoints are unauthenticated by design, so keep the
+listener within the intended private network.
 
 ## Testing
 

@@ -125,3 +125,47 @@ PLN_CORS_ORIGINS: list[str] = [
     for origin in os.getenv("PLN_CORS_ORIGINS", "*").split(",")
     if origin.strip()
 ] or ["*"]
+
+# ── HTTP API: version ────────────────────────────────────────────────────────
+# Reported three ways: the FastAPI `info.version` in /openapi.json, a `version`
+# field on GET /health, and an `X-API-Version` response header on every reply.
+# A client that caches a schema or hard-codes a response shape can watch one
+# string instead of diffing the OpenAPI document.
+#
+# 2.0.0 is a deliberate MAJOR bump, not a courtesy one. 1.1.0 answered an
+# upstream outage, a hyperon exception and an oversized prompt with HTTP 200 and
+# `intent: "clarification"`; those are now 4xx/5xx with a machine-readable
+# `code` (see API.md "Failures are HTTP failures"). Any client that branched on
+# `status == 200` is broken by that, which is exactly what a major version is
+# for. The same release adds the discovery endpoints (/drugage/top,
+# /interventions, /hallmarks, /kb/schema, /patients/markers), caller-supplied
+# patients, and the optional auth + rate limiting below.
+PLN_API_VERSION: str = "2.0.0"
+
+# ── HTTP API: optional access control ────────────────────────────────────────
+# BOTH CONTROLS ARE OFF BY DEFAULT. Unset, the service behaves exactly as it
+# did before this file grew these lines — that is the shape the Gradio UI, the
+# contract tests and every existing agent integration expect.
+#
+# `.env.example` has documented `PLN_API_KEY` since the API was first split out
+# of app.py; until now nothing read it. It does now. Set it (or the plural
+# `PLN_API_KEYS`, comma-separated, to issue one key per consumer and revoke
+# them independently) and every request must carry `X-API-Key: <value>`.
+# /health, /docs, /redoc, /openapi.json and CORS preflights stay open: a
+# readiness probe that needs a secret is a readiness probe that reports the
+# wrong thing, and an agent that cannot read the schema cannot find the header
+# it is missing.
+def _collect_api_keys() -> list[str]:
+    keys: list[str] = []
+    for raw in (os.getenv("PLN_API_KEY", ""), os.getenv("PLN_API_KEYS", "")):
+        for candidate in raw.split(","):
+            value = candidate.strip()
+            if value and value not in keys:
+                keys.append(value)
+    return keys
+
+PLN_API_KEYS: list[str] = _collect_api_keys()
+# Requests per minute per client address, 0 = off (the default). This is a
+# per-process courtesy limit keyed on `request.client.host`; see the HONESTY
+# CONTRACT in core/rate_limit.py for what it does and does not defend against.
+PLN_RATE_LIMIT_PER_MINUTE: int = max(0, int(os.getenv("PLN_RATE_LIMIT_PER_MINUTE", "0")))

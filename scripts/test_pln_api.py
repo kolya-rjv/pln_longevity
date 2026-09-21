@@ -9,6 +9,7 @@ Examples:
     python scripts/test_pln_api.py
     python scripts/test_pln_api.py --base-url https://example.ngrok-free.app
     python scripts/test_pln_api.py --require-drugage --require-llm
+    python scripts/test_pln_api.py --api-key "$PLN_API_KEY"   # protected deployment
 """
 
 from __future__ import annotations
@@ -70,9 +71,15 @@ class APIClient:
         self,
         base_url: str,
         timeout: float,
+        api_key: str = "",
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        # Sent on every request when present. A deployment that sets
+        # PLN_API_KEY answers 401 to everything except /health and the schema
+        # routes, so without this the runner reports a healthy service whose
+        # every other check fails for the wrong reason.
+        self.api_key = api_key.strip()
 
     def request(
         self,
@@ -87,6 +94,8 @@ class APIClient:
             "User-Agent": "pln-api-acceptance/1.0",
             "ngrok-skip-browser-warning": "1",
         }
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
         data = None
         if payload is not None:
             data = json.dumps(payload).encode("utf-8")
@@ -164,6 +173,15 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument(
+        "--api-key",
+        default=os.getenv("PLN_API_KEY", ""),
+        help=(
+            "Shared secret for a deployment that sets PLN_API_KEY / "
+            "PLN_API_KEYS; sent as the X-API-Key header. The PLN_API_KEY env "
+            "var is used when set. Unauthenticated deployments need neither."
+        ),
+    )
+    parser.add_argument(
         "--allow-stub",
         action="store_true",
         help="Do not fail when the service is in canned stub mode.",
@@ -196,7 +214,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    runner = Runner(APIClient(args.base_url, args.timeout))
+    runner = Runner(APIClient(args.base_url, args.timeout, args.api_key))
 
     health = runner.check(
         "health",
