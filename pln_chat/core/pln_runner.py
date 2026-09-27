@@ -61,6 +61,58 @@ CELLAGE_STACK: list[Path] = [
 ]
 
 
+# ── NHANES patient-grounding stack ────────────────────────────────────────────
+#
+# A QUERY-SCOPED space, for the same reason CELLAGE_STACK is one, and measured rather
+# than assumed. hyperon 0.2.10 aborts the process — a non-unwinding Rust panic in its
+# space trie, uncatchable from Python — once one space carries too many DISTINCT HEAD
+# SYMBOLS. The app's shared execution space already holds 201 of them with no margin:
+# adding the ~9 the NHANES layers introduce aborts it at once, while thousands of extra
+# rule DEFINITIONS in that same space are harmless. Head symbols and definitions are
+# different budgets, and only the first is exhausted.
+#
+# So the NHANES grounding does not join the shared space. This list is the minimal set
+# that answers a patient question, and with both NHANES layers in it the space runs
+# patient-z, diagnose-patient and predict-risk-patient cleanly (verified in
+# tests/test_nhanes_integration.py).
+#
+# Add a file here only if a patient query needs it: the whole point is that this space
+# stays small enough for the engine.
+NHANES_PATIENT_STACK: list[Path] = [
+    ONTOLOGY_DIR / f for f in (
+        "system_types.metta",
+        "logical_predicates.metta",
+        "epistemic_calibration.metta",
+        "grim_age_core.metta",
+        "grim_age_lu2019_evidence.metta",
+        "evidence_calibration.metta",
+        "hallmarks_core.metta",
+        "hallmarks_lopezotin2023_intervention_evidence.metta",
+        "mechanistic_bridges.metta",
+        "pln_deduction.metta",
+        "pln_intervention_ranking.metta",
+        "pln_abductive_diagnosis.metta",
+        "patient_profile.metta",
+        "nhanes_reference.metta",
+        "pln_counterfactual.metta",
+        "pln_risk_prediction.metta",
+        "nhanes_baseline.metta",
+    )
+]
+
+
+def nhanes_patient_kb(*generated: Path) -> list[Path]:
+    """NHANES_PATIENT_STACK plus any ETL-generated record files that exist.
+
+    The generated files (build/nhanes_reference.metta, build/nhanes_mortality_baseline
+    .metta, build/nhanes_dnam_clocks.metta) are what carry the actual numbers; without
+    them the layers are inert and every lookup correctly yields nothing. Missing paths
+    are skipped rather than raising, so a partial ETL run still works for what it did
+    produce.
+    """
+    return list(NHANES_PATIENT_STACK) + [p for p in generated if p.exists()]
+
+
 @dataclass
 class PLNAtomResult:
     atom: str

@@ -172,13 +172,12 @@ _INFERENCE_STACK: list[str] = [
     "drugage_calibration.metta",
 
     "patient_profile.metta",
-    # NHANES grounding + baseline layers. Types and rules only: they carry no NHANES
-    # numbers, so with no generated file loaded they change nothing. Listed next to the
-    # layers they extend for readability; the position is not a constraint, since every
-    # file lands in one space and `=` rules do not care about load order. Verified by
-    # loading both orders: all lookups stayed single-valued and identical.
-    "nhanes_reference.metta",
-    "nhanes_baseline.metta",
+    # The NHANES grounding and baseline layers are NOT here. They run in their own
+    # query-scoped space (core.pln_runner.NHANES_PATIENT_STACK), for the reason measured
+    # below _runtime_kb_paths: this shared space is saturated on DISTINCT HEAD SYMBOLS,
+    # 201 of them, with no margin — adding the ~9 those layers introduce aborts the
+    # process. Narrowing execution to this stack bought thousands of rule definitions of
+    # headroom but no head-symbol headroom, which is a different budget.
     "pln_counterfactual.metta",
     "pln_risk_prediction.metta",
 
@@ -207,9 +206,36 @@ def _default_selection(choices: list[str]) -> list[str]:
 # once a space exceeds a few thousand atoms, and e.g. the ~107 KB
 # drugage_etl_short.metta dump trips it. Mirrors app.py's _runtime_kb_paths();
 # excluded files stay queryable in stub mode and are listed by GET /ontology/files.
+# EXECUTION RUNS THE CURATED STACK, not every .metta in the repo root.
+#
+# This used to load every discovered file under PLN_MAX_KB_FILE_BYTES, which left the
+# engine almost no room: hyperon 0.2.10 aborts the process — a non-unwinding Rust panic in
+# its space trie, uncatchable from Python — once one space holds too many rule
+# definitions. Measured on this KB, appending trivial definitions:
+#
+#     full repo root (26 files)   -> aborts with NO padding at all
+#     curated stack  (25 files)   -> still answering at +4,096 definitions
+#
+# Three orders of magnitude, from ONE file: cellage_calibration.metta was in the root set
+# but not in the curated stack, so execution paid for it while the translator never saw
+# it. It does not need to be here — the CellAge feature builds its own query-scoped space
+# (core.pln_runner.CELLAGE_STACK) and loads that file itself, which is the pattern that
+# makes this safe, and is why /genes inference keeps working.
+#
+# A per-file byte limit cannot express this constraint, because the failure belongs to the
+# whole space rather than to any one file. Scoping execution to the stack the translator
+# is shown is both the smaller space and the more honest one: what runs is now what the
+# LLM was told exists. The byte filter is kept as a second line of defence.
+#
+# Mirrors app.py; keep in sync. Files outside the stack stay discoverable and queryable in
+# stub mode, and a feature needing one at runtime should scope its own space.
 def _runtime_kb_paths() -> list[Path]:
+    discovered = _discover_metta_files()
     kept: list[Path] = []
-    for path in _discover_metta_files().values():
+    for name in _INFERENCE_STACK:
+        path = discovered.get(name)
+        if path is None:
+            continue                      # a stack entry that is not on disk (generated)
         try:
             too_big = path.stat().st_size > PLN_MAX_KB_FILE_BYTES
         except OSError:

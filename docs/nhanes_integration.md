@@ -379,48 +379,70 @@ record, which either validates that 4.2 or replaces it with a sourced number. Th
 deliberately does **not** override the knob silently: the point is that a sourced number
 becomes visible next to the curated one.
 
-## 8. The real KB limit is distinct head symbols, not atoms
+## 8. Two engine budgets, and the scoped space that follows from them
 
-`scripts/run_etl.sh` notes that "hyperon 0.2.10 panics when querying a space past a few
-thousand atoms". That framing turns out to be wrong, and the correction matters because
-the failure mode is an **abort, not an exception** — a non-unwinding Rust panic in
-hyperon's space trie during `match`, which no Python guard can catch.
+`scripts/run_etl.sh` used to say "hyperon 0.2.10 panics when querying a space past a few
+thousand atoms". That is the wrong quantity, and getting it right is what decided this
+layer's architecture. The failure is an **abort, not an exception** — a non-unwinding Rust
+panic in hyperon's space trie during `match`, which no Python guard can catch.
 
-What triggers it is the number of **distinct head symbols** in the space. Measured
-against the KB the chat app actually executes (every repo-root `.metta` under
-`PLN_MAX_KB_FILE_BYTES` — 24 files, ~137 distinct head symbols):
+There turn out to be **two independent budgets**, and only one of them was ever the
+problem.
 
-| added to that KB | result |
+**Rule definitions.** Plentiful, once the space is sensibly sized. Measured by appending
+trivial `(= (probe-i $x) $x)` definitions and running a real `predict-risk-patient`:
+
+| execution space | definitions tolerated |
 |---|---|
-| 400 atoms under **one** new head symbol | fine |
-| 400 atoms under **three** new head symbols | fine |
-| 8 atoms under **8** distinct new head symbols | fine |
-| 12 atoms under **12** distinct new head symbols | **abort** |
+| every repo-root `.metta` under the byte limit (26 files) | **0** — aborts immediately |
+| the curated inference stack (25 files) | **2,048+** |
 
-So the margin is roughly 8–12 new head symbols, and each generated NHANES file
-introduces 12–21 — every `Ref*`/`Base*`/`Spread*` field predicate becomes a head symbol
-the moment a record atom uses it. (The type declarations alone do not: their head is
-`:`.) Loading any one generated file into the app's KB therefore aborts it on the first
-inference query, while `!(+ 1 2)` still answers.
+Three orders of magnitude, and the whole difference was one file:
+`cellage_calibration.metta` sat in the root set but not in the curated stack, so execution
+paid for it while the LLM translator was never shown it. It does not need to be there —
+the CellAge feature already builds its own query-scoped space
+(`core.pln_runner.CELLAGE_STACK`) and loads that file itself. So `_runtime_kb_paths()` now
+returns the curated stack rather than everything it can find, in both `app.py` and
+`api.py`. A per-file byte limit could never have expressed this constraint, because the
+failure belongs to the whole space rather than to any one file.
 
-Three consequences, all acted on:
+**Distinct head symbols.** Saturated, and this is the one that binds. A head symbol is the
+first element of an atom — `RefMarker` in `(RefMarker R1 CRP)`. Type declarations do *not*
+add one (their head is `:`), and neither do rules (theirs is `=`), which is why thousands
+of definitions are harmless. Only actual record and fact atoms introduce them.
 
-- **Generated files stay out of the repo root.** The ETLs default to `build/`, which the
-  app does not scan, and `run_etl.sh` no longer advertises `OUT_DIR=.` — that was the
-  documented workflow, and it was the crashing one.
-- **`MettaWriter`'s atom budget is not the guarantee it looks like.** It was measured
-  against the 14-file stack the tests build (fine at +3,456 atoms, abort at +4,608) and is
-  worth keeping as a bound on runaway emission, but it does not certify that a file is
-  safe to load into the app. `nhanes_common.py` now says so.
-- **A per-file byte limit cannot bound a whole-space failure.** `pln_chat/app.py` decides
-  what to execute by filtering individual files on `PLN_MAX_KB_FILE_BYTES`, which cannot
-  express a constraint on the union. This is **pre-existing and not fixed here**: the app
-  works today, but on roughly 8–12 head symbols of margin, so the next `.metta` file added
-  to the repo root may break it with no NHANES involvement. Changing what the app executes
-  (to `_INFERENCE_STACK` only, say) is a real behaviour change affecting other query
-  paths, so it is flagged for the maintainer rather than made silently here.
+The shared execution space already carries **201** distinct head symbols with **no
+margin**: the NHANES layers introduce about nine — `RefSex`, `RefAgeBand`, `BaseSex`,
+`BaseAgeBand`, and the outcome-semantics atoms `OutcomeAscertainment`, `OutcomeICD10Range`,
+`IncludesDeathsFrom`, `NotSubstitutableFor` — and adding any of them aborts the process at
+once. Even a single new one-clause `match` against that space aborts, while 2,048 extra
+rule definitions do not.
 
-## 9. Open questions / next increments## 9. Open questions / next increments
+**So the grounding layers do not join the shared space.** They run in
+`core.pln_runner.NHANES_PATIENT_STACK`, a 17-file query-scoped space that is the minimal
+set answering a patient question, with both layers in it. Verified: `patient-z`,
+`diagnose-patient` and `predict-risk-patient` all run cleanly there. This is the same
+pattern `CELLAGE_STACK` and the DrugAge slice already use, and it is the condition the
+API branch's own ceiling test names in its docstring — *"the next curated layer cannot be
+added at all until the layers stop sharing one space."* This layer is that next one, and
+it stopped sharing.
+
+Consequences worth stating plainly:
+
+- `tests/test_smoking_lever.py::test_the_curated_kb_is_at_the_engines_ceiling` still
+  passes, because the shared space is unchanged in what it carries.
+- The edits to `patient_profile.metta`, `pln_counterfactual.metta` and
+  `pln_risk_prediction.metta` *are* in the shared space, and are safe there: they add only
+  rules and type declarations, no head symbols. With the NHANES layers absent,
+  `derived-z`'s leading `MeasuredRaw` match is empty, so `standardize-z` is never reached
+  and behaviour is exactly as before.
+- Reaching raw-value grounding from the chat app needs one more step — routing a patient
+  query to the scoped stack, as `drugage_router.py` does for its slice. The space exists
+  and is tested; the routing is the open work (§9).
+- `MettaWriter`'s atom budget is a bound on runaway emission, not a safety certificate. It
+  was measured against the test stack, and `nhanes_common.py` says so.
+
+## 9. Open questions / next increments## 9. Open questions / next increments## 9. Open questions / next increments
 
 1. **Run it.** Nothing here has touched real NHANES data. The first run on real files
    should be treated as part of the work: verify every registry entry against the actual
@@ -442,10 +464,15 @@ Three consequences, all acted on:
 5. **`grimaccel-sd-to-years`.** Once §7's measured spread exists, decide whether it
    replaces the 4.2 prior, and whether the residual or the difference convention is the one
    the Lu 2019 HR should be paired with.
-6. **An incidence source.** §5 establishes that NHANES cannot calibrate incident CHD. If
+6. **Route a chat query to the scoped stack.** `NHANES_PATIENT_STACK` exists and is
+   tested, but nothing in `app.py` / `api.py` sends a patient question to it yet, so
+   raw-value grounding is reachable from the ETLs, tests and scripts but not from the chat
+   UI. `core/drugage_router.py` is the pattern to copy. This is the last step between the
+   layer working and the layer being usable end to end.
+7. **An incidence source.** §5 establishes that NHANES cannot calibrate incident CHD. If
    the CHD baseline is to become data-backed, it needs Framingham/ARIC/MESA or the Pooled
    Cohort Equations, each with its own licensing and provenance story.
-7. **Wearables.** Out of scope here, and worth stating why it is a separate increment: the
+8. **Wearables.** Out of scope here, and worth stating why it is a separate increment: the
    methylation cycles (1999-2002) and the accelerometry cycles (2003-2006 waist,
    2011-2014 wrist) **do not overlap**, so no NHANES participant has both a clock and
    wearable data. A behavioural-marker layer would need its clock edges from outside

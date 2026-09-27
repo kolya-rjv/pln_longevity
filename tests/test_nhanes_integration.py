@@ -372,3 +372,46 @@ def test_the_clock_etl_defaults_to_the_residual_convention():
     """Emitting both by default put two cells on one key, which now declines entirely."""
     source = (REPO / "nhanes_dnam_etl.py").read_text(encoding="utf-8")
     assert '"--accel-definition", default="residual"' in source
+
+
+# ═══════════════ the scoped space the layers actually run in ════════════════
+def test_the_nhanes_layers_run_in_their_own_scoped_space():
+    """The shared execution space is saturated on distinct head symbols, so the grounding
+    layers get a query-scoped space instead -- the same pattern CELLAGE_STACK uses."""
+    import sys as _sys
+    _sys.path.insert(0, str(REPO / "pln_chat"))
+    from core.pln_runner import NHANES_PATIENT_STACK, nhanes_patient_kb, run_query
+
+    assert all(p.exists() for p in NHANES_PATIENT_STACK), "a stack entry is missing"
+    names = {p.name for p in NHANES_PATIENT_STACK}
+    assert "nhanes_reference.metta" in names and "nhanes_baseline.metta" in names
+
+    for query in (
+        "!(predict-risk-patient &self Patient001)",
+        "!(diagnose-patient &self Patient001 "
+        "(CellularSenescence MitochondrialDysfunction ChronicInflammation))",
+    ):
+        assert run_query(query, kb_files=nhanes_patient_kb()).status == "ok", query
+
+
+def test_the_shared_execution_space_excludes_the_nhanes_layers():
+    """Regression guard: putting them back aborts the process, so the exclusion is load
+    bearing rather than tidiness. Asserted on the file lists, not by provoking a SIGABRT."""
+    import sys as _sys
+    _sys.path.insert(0, str(REPO / "pln_chat"))
+    import api as api_module
+
+    runtime = {p.name for p in api_module._runtime_kb_paths()}
+    assert "nhanes_reference.metta" not in runtime
+    assert "nhanes_baseline.metta" not in runtime
+    # and execution is the curated stack, not every file in the repo root
+    assert "cellage_calibration.metta" not in runtime
+
+
+def test_generated_record_files_are_optional_and_skipped_when_absent():
+    import sys as _sys
+    _sys.path.insert(0, str(REPO / "pln_chat"))
+    from core.pln_runner import NHANES_PATIENT_STACK, nhanes_patient_kb
+
+    absent = REPO / "build" / "definitely-not-here.metta"
+    assert nhanes_patient_kb(absent) == list(NHANES_PATIENT_STACK)
