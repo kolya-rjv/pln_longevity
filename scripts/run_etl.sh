@@ -89,10 +89,21 @@ if [[ -d "$NHANES_DIR" ]] && [[ -n "$(nhanes_files)" ]]; then
     --output   "$OUT_DIR/nhanes_reference.metta" \
     || echo "WARNING: NHANES reference ETL failed — see the message above" >&2
 
-  log "NHANES linked mortality → nhanes_mortality_baseline.metta"
-  "$PYTHON" nhanes_mortality_etl.py \
-    --output "$OUT_DIR/nhanes_mortality_baseline.metta" \
-    || echo "WARNING: NHANES mortality ETL failed — see the message above" >&2
+  # The mortality ETL takes explicit file paths (it must pair each DEMO with its own
+  # linkage file), unlike the reference ETL's --data-dir. Discover them here rather
+  # than invoking it bare, which would exit on an argparse error.
+  mapfile -t NH_DEMO < <(find "$NHANES_DIR" -maxdepth 1 -type f -iname 'DEMO*.XPT' | sort)
+  mapfile -t NH_MORT < <(find "$NHANES_DIR" -maxdepth 1 -type f -iname '*MORT*.dat' | sort)
+  if [[ ${#NH_DEMO[@]} -gt 0 && ${#NH_MORT[@]} -gt 0 ]]; then
+    log "NHANES linked mortality → nhanes_mortality_baseline.metta"
+    "$PYTHON" nhanes_mortality_etl.py \
+      --demo      "${NH_DEMO[@]}" \
+      --mortality "${NH_MORT[@]}" \
+      --output    "$OUT_DIR/nhanes_mortality_baseline.metta" \
+      || echo "WARNING: NHANES mortality ETL failed — see the message above" >&2
+  else
+    log "NHANES linked mortality: skipped (need DEMO*.XPT and *MORT*.dat in $NHANES_DIR)"
+  fi
 
   if [[ -f "$NHANES_DIR/DNMEPI.xpt" || -f "$NHANES_DIR/dnmepi.sas7bdat" ]]; then
     log "NHANES DNA methylation clocks → nhanes_dnam_reference.metta"
