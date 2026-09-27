@@ -313,6 +313,16 @@ def test_a_form_with_no_rows_in_the_generic_space_says_so():
 
 
 def test_the_warning_reaches_the_http_response():
+    """The warning has to survive the trip through the HTTP layer.
+
+    Needs a working engine, unlike its companion above, which drives the pure
+    Python helpers. `/metta/run` has to EXECUTE for a MettaRunResponse (and so
+    for `warnings`) to come back at all; without hyperon the query fails and the
+    caller gets 502 `runtime_error` instead, with no response body to inspect.
+    Reported on macOS as `assert 502 == 200` before this guard existed.
+    """
+    pytest.importorskip("hyperon")
+
     async def send():
         transport = httpx.ASGITransport(app=api_module.app)
         async with httpx.AsyncClient(
