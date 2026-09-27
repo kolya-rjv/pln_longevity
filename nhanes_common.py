@@ -326,6 +326,51 @@ AGE_BANDS: tuple[tuple[str, float, float], ...] = (
 SEX_CODES = {1: "Male", 2: "Female"}
 
 
+# ---------------------------------------------------------------------------
+# Compact record identifiers
+# ---------------------------------------------------------------------------
+#
+# Every field of an emitted record repeats the record's identifier, so the identifier
+# length is multiplied by ~15 and is the dominant term in the file size — and the file
+# size, not the atom count, is what binds (see the BYTE BUDGET note). Measured on the
+# first real build artifact: a 63-character identifier gave 1,650 bytes per record, so a
+# 32-record file reached 88% of the size at which pln_chat silently drops the file.
+#
+# The identifiers can be terse without losing anything, because each record already
+# spells out its marker, sex, band and cycles in its own field atoms, and the emitters
+# write a human-readable comment above each record. The identifier only has to be unique
+# and stable.
+
+BAND_CODES = {"Age_lt50": "lt50", "Age_50_59": "5059", "Age_60_69": "6069", "Age_70p": "70p"}
+SEX_SHORT = {"Male": "M", "Female": "F"}
+
+
+def short_band(band: str) -> str:
+    try:
+        return BAND_CODES[band]
+    except KeyError:
+        raise ValueError(f"unknown age band {band!r}; known: {sorted(BAND_CODES)}") from None
+
+
+def short_sex(sex: str) -> str:
+    try:
+        return SEX_SHORT[sex]
+    except KeyError:
+        raise ValueError(f"unknown sex {sex!r}; known: {sorted(SEX_SHORT)}") from None
+
+
+def short_cycles(tag: str) -> str:
+    """"1999_2002" / "1999-2002" -> "9902"; a single cycle "2001_2002" -> "0102".
+
+    Falls back to the tag with separators stripped when it is not a year pair, so an
+    unexpected shape stays unique rather than collapsing two cells onto one identifier.
+    """
+    years = re.findall(r"(?:19|20)(\d{2})", str(tag))
+    if len(years) == 2:
+        return years[0] + years[1]
+    return re.sub(r"[^A-Za-z0-9]", "", str(tag))
+
+
 def age_band(age: float) -> Optional[str]:
     """Half-open band [lo, hi) containing ``age``; None if age is missing."""
     if age is None or (isinstance(age, float) and math.isnan(age)):

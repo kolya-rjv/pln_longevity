@@ -79,6 +79,12 @@ log "CellAge → cellage_genes.metta / cellage_expression.metta / cellage_metada
 # silently rather than loudly. The ETLs refuse to write one, but build/ keeps
 # them out of the app's auto-load path regardless.
 NHANES_DIR="${NHANES_DIR:-$ROOT/data/nhanes}"
+# NHANES_CYCLES has NO default, deliberately. It selects the survey weight and is written
+# into the emitted provenance, so an unstated cycle would become an unverifiable claim
+# about which sample the numbers describe — and NHANES files do not carry their cycle in
+# any readable field, so inferring it from a filename would be exactly the sort of guess
+# this integration refuses. Set it explicitly, e.g. NHANES_CYCLES=1999-2000,2001-2002.
+NHANES_CYCLES="${NHANES_CYCLES:-}"
 
 nhanes_files() { find "$NHANES_DIR" -maxdepth 1 -type f \( -iname '*.XPT' -o -iname '*.dat' -o -iname '*.sas7bdat' \) 2>/dev/null; }
 
@@ -94,11 +100,14 @@ if [[ -d "$NHANES_DIR" ]] && [[ -n "$(nhanes_files)" ]]; then
   # than invoking it bare, which would exit on an argparse error.
   mapfile -t NH_DEMO < <(find "$NHANES_DIR" -maxdepth 1 -type f -iname 'DEMO*.XPT' | sort)
   mapfile -t NH_MORT < <(find "$NHANES_DIR" -maxdepth 1 -type f -iname '*MORT*.dat' | sort)
-  if [[ ${#NH_DEMO[@]} -gt 0 && ${#NH_MORT[@]} -gt 0 ]]; then
+  if [[ -z "$NHANES_CYCLES" ]]; then
+    log "NHANES linked mortality: skipped (set NHANES_CYCLES, e.g. NHANES_CYCLES=2001-2002)"
+  elif [[ ${#NH_DEMO[@]} -gt 0 && ${#NH_MORT[@]} -gt 0 ]]; then
     log "NHANES linked mortality → nhanes_mortality_baseline.metta"
     "$PYTHON" nhanes_mortality_etl.py \
       --demo      "${NH_DEMO[@]}" \
       --mortality "${NH_MORT[@]}" \
+      --cycles    "$NHANES_CYCLES" \
       --output    "$OUT_DIR/nhanes_mortality_baseline.metta" \
       || echo "WARNING: NHANES mortality ETL failed — see the message above" >&2
   else
