@@ -280,12 +280,34 @@
 ;; makes `patient-baseline` fall through to the curated prior for CHD, and yield
 ;; nothing at all for an outcome that has no curated prior either. The layer declines
 ;; rather than invents.
+;;
+;; AMBIGUITY DECLINES; it is not resolved by picking. This match does not key on
+;; `BaseHorizonMonths`, so two runs of the same cycle at different horizons both land on
+;; one (outcome, band, sex) — and putting the horizon into the record IDENTIFIER, as an
+;; earlier commit did, makes them distinct individuals without making this lookup
+;; distinguish them. Measured: with a 60-month and a 120-month record both loaded, the
+;; consumer collapsed and took the first, serving a five-year baseline into a rule its own
+;; documentation calls a ten-year risk.
+;;
+;; Picking one would be the same mistake as taking `car-atom` of a collapse in
+;; `reference-cell`: single-valued but not single-MEANING, an ambiguity converted into a
+;; confident wrong answer. So more than one candidate yields NOTHING, and §6's
+;; `baseline-cells` stays available for seeing what the space actually holds.
 (= (baseline-cell $space $outcome $band $sex)
-   (match $space
-      (, (BaseOutcome $bid $outcome)
-         (BaseAgeBand $bid $band)
-         (BaseSex     $bid $sex))
-      $bid))
+   (let $cells (collapse
+                  (match $space
+                     (, (BaseOutcome $bid $outcome)
+                        (BaseAgeBand $bid $band)
+                        (BaseSex     $bid $sex))
+                     $bid))
+      (if (== $cells ())
+          (superpose ())                                   ; no record -> nothing
+          ;; `==` does not evaluate its arguments, so the tail is let-forced first;
+          ;; comparing an unreduced (cdr-atom …) would make even a single record decline.
+          (let $rest (cdr-atom $cells)
+             (if (== $rest ())
+                 (car-atom $cells)                         ; exactly one -> use it
+                 (superpose ()))))))                       ; ambiguous -> nothing
 
 ;; The data-backed baseline absolute risk for (outcome, age, sex), or NOTHING.
 ;;

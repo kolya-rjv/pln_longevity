@@ -212,11 +212,20 @@
 ;; and a hypothesis's coverage — exactly the double-counting `patient-z`'s precedence rule
 ;; exists to prevent for the MeasuredZ-versus-derived case, which covered only that case.
 ;;
-;; So the matches are collapsed and the first is taken, the same idiom `patient-z` uses
-;; (MeTTa has no cut). Which cell wins among duplicates is load-order dependent and so
-;; arbitrary; that is the right trade, because the alternative is arithmetic that is
-;; silently wrong, whereas an arbitrary-but-single choice is at worst one of two
-;; defensible references. A caller that cares should not load overlapping reference files.
+;; So the matches are collapsed — and then, if there is more than one, this REFUSES.
+;;
+;; An earlier version took the first cell instead. That was wrong, and measurably so.
+;; The methylation ETL emits a record per acceleration convention, and the two differ
+;; only in `RefAccelDefinition`, which this lookup does not key on. Taking the first
+;; therefore let the answer depend on the order records happened to appear in a
+;; generated file: the same patient, same query, came out as z 1.12 or z 2.51 — a 48%
+;; swing in the reported ten-year risk — purely by text order. Collapsing to one value
+;; satisfied the letter of single-valuedness while turning an ambiguity into a confident
+;; wrong answer, which is the exact failure this repository exists to prevent.
+;;
+;; So ambiguity yields NOTHING, like every other thing this layer cannot resolve. A
+;; caller that wants a specific cell must disambiguate at the source: run the clock ETL
+;; with a single `--accel-definition`, or do not load overlapping reference files.
 (= (reference-cell $space $marker $band $sex)
    (let $cells (collapse
                   (match $space
@@ -224,7 +233,16 @@
                         (RefAgeBand $rid $band)
                         (RefSex     $rid $sex))
                      $rid))
-      (if (== $cells ()) (superpose ()) (car-atom $cells))))
+      (if (== $cells ())
+          (superpose ())                                   ; no cell -> nothing
+          ;; `==` does not evaluate its arguments, so the tail must be let*-forced to a
+          ;; concrete tuple before it is compared — the grounded-op discipline every
+          ;; layer here documents. Comparing the unreduced (cdr-atom …) silently fails
+          ;; the test and would make even an unambiguous cell yield nothing.
+          (let $rest (cdr-atom $cells)
+             (if (== $rest ())
+                 (car-atom $cells)                         ; exactly one -> use it
+                 (superpose ()))))))                       ; ambiguous -> nothing
 
 ;; ================================================================
 ;; 5. Standardization  —  z = (value - mean) / sd, ON THE RECORD'S SCALE

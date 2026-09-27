@@ -12,8 +12,15 @@
 # the runtime can handle it.
 #
 #   scripts/run_etl.sh                 # regenerate into ./build
-#   OUT_DIR=. scripts/run_etl.sh       # write straight to the repo root
 #   PYTHON=python3.11 scripts/run_etl.sh
+#
+# DO NOT set OUT_DIR=. to write into the repo root. The chat app executes against EVERY
+# repo-root *.metta under PLN_MAX_KB_FILE_BYTES, and hyperon 0.2.10 aborts the process
+# (SIGABRT, uncatchable) on the first match query once the space carries too many
+# DISTINCT head symbols. Measured: the root KB already holds ~137, the margin is between
+# 8 and 12 more, and each generated NHANES file introduces 12-21. The per-file byte limit
+# the app applies cannot bound this, because the failure is a property of the whole space
+# rather than of any one file.
 #
 set -euo pipefail
 

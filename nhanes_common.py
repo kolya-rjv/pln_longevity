@@ -921,20 +921,34 @@ def suppressed_reason(
 # 5. MeTTa emission
 # ════════════════════════════════════════════════════════════════════════════
 #
-# ATOM BUDGET — measured, not guessed. hyperon 0.2.10 does not merely slow down on a
-# large space: it ABORTS the process with a non-unwinding Rust panic in
-# hyperon-space/src/index/trie.rs (TrieKeyStorage::get_atom_unchecked unwrapping None)
-# during `match`. Measured on this repo's full inference stack + patient layer:
+# BUDGETS — and a warning that the atom count is NOT the real constraint.
 #
-#     +3,456 emitted atoms  -> loads and queries fine
-#     +4,608 emitted atoms  -> hard abort (SIGABRT, uncatchable from Python)
+# hyperon 0.2.10 does not slow down on a large space: it ABORTS the process with a
+# non-unwinding Rust panic in hyperon-space/src/index/trie.rs during `match`. Because it
+# is an abort and not an exception, no Python guard can catch it; the only protection is
+# not building such a space.
 #
-# Because the failure is an abort rather than an exception, no amount of defensive
-# Python catches it — the only protection is to not emit that many atoms. The default
-# budget below sits under the measured-good point with headroom. This is the same
-# constraint scripts/run_etl.sh documents for the HAGR ETLs ("hyperon 0.2.10 panics
-# when querying a space past a few thousand atoms"), now quantified.
-
+# What triggers it is the number of DISTINCT HEAD SYMBOLS in the space, not the number of
+# atoms. Measured against this repo's chat-app execution KB (every repo-root .metta under
+# PLN_MAX_KB_FILE_BYTES, 24 files, ~137 distinct head symbols):
+#
+#     +400 atoms under ONE new head symbol          -> fine
+#     +400 atoms under THREE new head symbols       -> fine
+#     +8   atoms under 8 distinct new head symbols  -> fine
+#     +12  atoms under 12 distinct new head symbols -> ABORT
+#
+# So the margin is roughly 8-12 new head symbols, and every generated NHANES file
+# introduces 12-21 of them (each Ref*/Base*/Spread* field predicate becomes a head symbol
+# the moment a record atom uses it — the type declarations alone do not, since their head
+# is `:`). Loading any one of them into the app's KB aborts it on the first inference
+# query, which is why the ETLs write to build/ and scripts/run_etl.sh no longer offers to
+# write into the repo root.
+#
+# The atom budget below therefore protects a DIFFERENT, weaker limit: it was measured
+# against the 14-file stack the tests build (fine at +3,456 atoms, abort at +4,608), and
+# it is worth keeping as a sanity bound on runaway emission. Do NOT read it as a
+# guarantee that an emitted file is safe to load anywhere. See docs/nhanes_integration.md
+# for the full measurement.
 DEFAULT_ATOM_BUDGET = 3000
 
 # BYTE BUDGET — the constraint that actually binds for a file at the repo ROOT, and the

@@ -371,24 +371,48 @@ record, which either validates that 4.2 or replaces it with a sourced number. Th
 deliberately does **not** override the knob silently: the point is that a sourced number
 becomes visible next to the curated one.
 
-## 8. The atom budget is measured
+## 8. The real KB limit is distinct head symbols, not atoms
 
 `scripts/run_etl.sh` notes that "hyperon 0.2.10 panics when querying a space past a few
-thousand atoms". Quantified, on this repo's full inference stack plus the patient layer:
+thousand atoms". That framing turns out to be wrong, and the correction matters because
+the failure mode is an **abort, not an exception** — a non-unwinding Rust panic in
+hyperon's space trie during `match`, which no Python guard can catch.
 
-| extra atoms | result |
+What triggers it is the number of **distinct head symbols** in the space. Measured
+against the KB the chat app actually executes (every repo-root `.metta` under
+`PLN_MAX_KB_FILE_BYTES` — 24 files, ~137 distinct head symbols):
+
+| added to that KB | result |
 |---|---|
-| +2,304 | loads and queries fine |
-| +3,456 | loads and queries fine |
-| +4,608 | **hard abort** — non-unwinding Rust panic in `hyperon-space/src/index/trie.rs`, `SIGABRT` |
+| 400 atoms under **one** new head symbol | fine |
+| 400 atoms under **three** new head symbols | fine |
+| 8 atoms under **8** distinct new head symbols | fine |
+| 12 atoms under **12** distinct new head symbols | **abort** |
 
-Because it **aborts rather than raises**, no defensive Python can catch it; the only
-protection is not emitting that many atoms. `MettaWriter` enforces a default budget of
-3,000. Realistic emission is ~600 atoms (a handful of markers × 4 age bands × 2 sexes ×
-~13 fields), so there is ample headroom — the guard exists so that a careless expansion of
-the marker set fails with an explanation instead of an unexplainable crash.
+So the margin is roughly 8–12 new head symbols, and each generated NHANES file
+introduces 12–21 — every `Ref*`/`Base*`/`Spread*` field predicate becomes a head symbol
+the moment a record atom uses it. (The type declarations alone do not: their head is
+`:`.) Loading any one generated file into the app's KB therefore aborts it on the first
+inference query, while `!(+ 1 2)` still answers.
 
-## 9. Open questions / next increments
+Three consequences, all acted on:
+
+- **Generated files stay out of the repo root.** The ETLs default to `build/`, which the
+  app does not scan, and `run_etl.sh` no longer advertises `OUT_DIR=.` — that was the
+  documented workflow, and it was the crashing one.
+- **`MettaWriter`'s atom budget is not the guarantee it looks like.** It was measured
+  against the 14-file stack the tests build (fine at +3,456 atoms, abort at +4,608) and is
+  worth keeping as a bound on runaway emission, but it does not certify that a file is
+  safe to load into the app. `nhanes_common.py` now says so.
+- **A per-file byte limit cannot bound a whole-space failure.** `pln_chat/app.py` decides
+  what to execute by filtering individual files on `PLN_MAX_KB_FILE_BYTES`, which cannot
+  express a constraint on the union. This is **pre-existing and not fixed here**: the app
+  works today, but on roughly 8–12 head symbols of margin, so the next `.metta` file added
+  to the repo root may break it with no NHANES involvement. Changing what the app executes
+  (to `_INFERENCE_STACK` only, say) is a real behaviour change affecting other query
+  paths, so it is flagged for the maintainer rather than made silently here.
+
+## 9. Open questions / next increments## 9. Open questions / next increments
 
 1. **Run it.** Nothing here has touched real NHANES data. The first run on real files
    should be treated as part of the work: verify every registry entry against the actual

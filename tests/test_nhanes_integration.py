@@ -299,3 +299,76 @@ def test_an_explicitly_standardized_marker_still_wins_over_a_derived_one(kb):
     """Patient001 has an explicit CRP z of 1.7; reference cells exist for CRP too."""
     z = _one_number(kb, "!(patient-z &self Patient001 CRP)")
     assert z == pytest.approx(1.7, rel=1e-9)
+
+
+# ═════════════════ ambiguity declines rather than being picked ═════════════
+_STACK_WITH_BASELINE = KB_FILES + ["pln_counterfactual.metta", "pln_risk_prediction.metta",
+                                   "nhanes_baseline.metta"]
+
+
+def _space(extra: str, files=None) -> MeTTa:
+    text = "\n".join((REPO / f).read_text(encoding="utf-8") for f in (files or KB_FILES))
+    metta = MeTTa()
+    metta.run(text + "\n" + extra)
+    return metta
+
+
+_PATIENT = ("(InstanceOf PX PatientProfile)(PatientAge PX 58)(PatientSex PX Male)"
+            "(MeasuredRaw PX HbA1c 6.200000)")
+
+
+def _ref(rid: str, mean: str, sd: str) -> str:
+    return (f"(: {rid} ReferenceDistribution)\n"
+            f"(RefMarker {rid} HbA1c)(RefSex {rid} Male)(RefAgeBand {rid} Age_50_59)\n"
+            f"(RefScale {rid} Identity)(RefMean {rid} {mean})(RefSD {rid} {sd})\n")
+
+
+def test_one_reference_cell_resolves():
+    kb = _space(_ref("RA", "5.400000", "0.500000") + _PATIENT)
+    assert _results(kb, "!(patient-z &self PX HbA1c)")
+
+
+def test_two_reference_cells_decline_rather_than_pick_one():
+    """Single-valued is not enough: it must be single-MEANING. Taking the first cell made
+    the answer depend on the order records happened to appear in a generated file."""
+    both = _ref("RA", "5.400000", "0.500000") + _ref("RB", "5.900000", "1.000000")
+    assert _results(_space(both + _PATIENT), "!(patient-z &self PX HbA1c)") == []
+    reversed_order = _ref("RB", "5.900000", "1.000000") + _ref("RA", "5.400000", "0.500000")
+    assert _results(_space(reversed_order + _PATIENT), "!(patient-z &self PX HbA1c)") == []
+
+
+def _baseline(rid: str, horizon: str, risk: str) -> str:
+    return (f"(: {rid} BaselineRiskRecord)\n"
+            f"(BaseOutcome {rid} AllCauseMortality)(BaseSex {rid} Male)"
+            f"(BaseAgeBand {rid} Age_50_59)\n"
+            f"(BaseHorizonMonths {rid} {horizon})(BaseRisk {rid} {risk})\n"
+            f"(BaseEstimator {rid} WeightedKaplanMeier)"
+            f"(BaseProvenance {rid} NHANES_Microdata)\n")
+
+
+def test_one_baseline_record_resolves():
+    kb = _space(_baseline("NB_A", "120", "0.214324"), _STACK_WITH_BASELINE)
+    assert _results(kb, "!(patient-baseline &self Patient001 AllCauseMortality)")
+
+
+def test_two_horizons_decline_rather_than_serve_the_shorter_one():
+    """A 60-month baseline must never be served into a rule documented as ten-year."""
+    both = _baseline("NB_A", "120", "0.214324") + _baseline("NB_B", "60", "0.094011")
+    assert _results(_space(both, _STACK_WITH_BASELINE),
+                    "!(patient-baseline &self Patient001 AllCauseMortality)") == []
+    flipped = _baseline("NB_B", "60", "0.094011") + _baseline("NB_A", "120", "0.214324")
+    assert _results(_space(flipped, _STACK_WITH_BASELINE),
+                    "!(patient-baseline &self Patient001 AllCauseMortality)") == []
+
+
+def test_curated_chd_baseline_is_unaffected_by_ambiguous_mortality_records():
+    both = _baseline("NB_A", "120", "0.214324") + _baseline("NB_B", "60", "0.094011")
+    kb = _space(both, _STACK_WITH_BASELINE)
+    chd = _results(kb, "!(patient-baseline &self Patient001 CoronaryHeartDisease)")
+    assert len(chd) == 1 and float(str(chd[0])) == pytest.approx(0.08)
+
+
+def test_the_clock_etl_defaults_to_the_residual_convention():
+    """Emitting both by default put two cells on one key, which now declines entirely."""
+    source = (REPO / "nhanes_dnam_etl.py").read_text(encoding="utf-8")
+    assert '"--accel-definition", default="residual"' in source

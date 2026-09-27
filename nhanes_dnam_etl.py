@@ -1350,7 +1350,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--clocks", default=None,
                     help="comma-separated clock symbols to emit (default: every "
                          "registry entry whose symbol is declared in the KB)")
-    ap.add_argument("--accel-definition", default="both",
+    ap.add_argument("--accel-definition", default="residual",
                     choices=("residual", "difference", "both"),
                     help="acceleration convention(s) to emit. 'residual' is the one "
                          "that matches (ResidualOf AgeAccelGrim GrimAge) and the "
