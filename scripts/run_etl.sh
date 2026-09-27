@@ -67,5 +67,46 @@ log "CellAge → cellage_genes.metta / cellage_expression.metta / cellage_metada
   --expression data/cellage/signatures1.csv \
   --outdir     "$OUT_DIR"
 
+# ── NHANES (optional) ─────────────────────────────────────────────────────────
+# NHANES microdata is public but is NOT redistributed in this repo, so these two
+# ETLs are SKIPPED unless the files are present under data/nhanes/. See
+# docs/nhanes_integration.md and data/nhanes/README.md for how to obtain them —
+# the download needs network access to wwwn.cdc.gov and ftp.cdc.gov.
+#
+# Unlike the HAGR outputs above, staging these under $OUT_DIR is not merely
+# tidiness: pln_chat drops a root-level .metta file over PLN_MAX_KB_FILE_BYTES
+# from execution with only a print(), so an oversized KB file at the root fails
+# silently rather than loudly. The ETLs refuse to write one, but build/ keeps
+# them out of the app's auto-load path regardless.
+NHANES_DIR="${NHANES_DIR:-$ROOT/data/nhanes}"
+
+nhanes_files() { find "$NHANES_DIR" -maxdepth 1 -type f \( -iname '*.XPT' -o -iname '*.dat' -o -iname '*.sas7bdat' \) 2>/dev/null; }
+
+if [[ -d "$NHANES_DIR" ]] && [[ -n "$(nhanes_files)" ]]; then
+  log "NHANES reference distributions → nhanes_reference.metta"
+  "$PYTHON" nhanes_reference_etl.py \
+    --data-dir "$NHANES_DIR" \
+    --output   "$OUT_DIR/nhanes_reference.metta" \
+    || echo "WARNING: NHANES reference ETL failed — see the message above" >&2
+
+  log "NHANES linked mortality → nhanes_mortality_baseline.metta"
+  "$PYTHON" nhanes_mortality_etl.py \
+    --output "$OUT_DIR/nhanes_mortality_baseline.metta" \
+    || echo "WARNING: NHANES mortality ETL failed — see the message above" >&2
+
+  if [[ -f "$NHANES_DIR/DNMEPI.xpt" || -f "$NHANES_DIR/dnmepi.sas7bdat" ]]; then
+    log "NHANES DNA methylation clocks → nhanes_dnam_reference.metta"
+    "$PYTHON" nhanes_dnam_etl.py \
+      --output "$OUT_DIR/nhanes_dnam_reference.metta" \
+      || echo "WARNING: NHANES DNAm ETL failed — see the message above" >&2
+  fi
+else
+  log "NHANES: skipped (no data files under $NHANES_DIR)"
+  echo "    NHANES microdata is not bundled with this repo. To generate the" >&2
+  echo "    reference-distribution and baseline-risk KBs, fetch the files listed in" >&2
+  echo "    data/nhanes/MANIFEST.tsv into $NHANES_DIR and re-run. Details:" >&2
+  echo "    docs/nhanes_integration.md" >&2
+fi
+
 log "ETL complete — outputs in $OUT_DIR"
 ls -1 "$OUT_DIR"/*.metta
