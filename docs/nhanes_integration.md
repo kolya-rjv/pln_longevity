@@ -367,10 +367,11 @@ the marker set fails with an explanation instead of an unexplainable crash.
    argument for regressing the analyte on age within sex and standardizing the residual —
    which would also make the blood z and the clock z the same construction. It costs cell
    size and a documented model.
-3. **Emit the design-based SE into the records, and use it.** The estimator is implemented
-   and tested but v1's emitted records carry n and Σw rather than an SE. Carrying the SE
-   would let the calibration layer widen `stv` confidence for a thin cell instead of
-   suppressing on a hard count.
+3. **Consume the design-based SE.** Reference records now carry `(RefDesignSE …)` and
+   `(RefDesignDF …)` whenever the demographics file supplies `SDMVSTRA`/`SDMVPSU`, and
+   honestly omit them when it does not. Nothing reads them yet: the natural use is for the
+   calibration layer to widen `stv` confidence for an imprecise cell, rather than the
+   current hard suppression on an unweighted count.
 4. **NCHS presentation standards properly.** v1 suppresses on a minimum unweighted n. The
    published standard for proportions (Series 2 No. 175) also involves effective sample
    size, Korn-Graubard interval width and degrees of freedom; the SE estimator above is the

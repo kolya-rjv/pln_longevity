@@ -234,3 +234,8 @@ data/nhanes/*.dat
 data/nhanes/*.DAT
 data/nhanes/*.sas7bdat
 data/nhanes/*.zip
+
+# ...but MANIFEST.tsv is metadata, not data: it records which files to fetch and what
+# this repo claims is inside them, and data/nhanes/README.md points at it. An earlier
+# rule for the HAGR extracts (data/**/*.tsv) would otherwise swallow it.
+!data/nhanes/MANIFEST.tsv

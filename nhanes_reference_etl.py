@@ -105,6 +105,7 @@ from nhanes_common import (
     run_inspect,
     sex_symbol,
     suppressed_reason,
+    design_se_of_weighted_mean,
     weighted_moments,
 )
 
@@ -124,6 +125,14 @@ URL_PATTERN = (
 )
 
 DEMOGRAPHIC_VARS = ("SEQN", "RIAGENDR", "RIDAGEYR")
+
+# The masked variance stratum and PSU. These are what make a DESIGN-BASED standard error
+# possible (nhanes_common.design_se_of_weighted_mean): the naive SE of a weighted mean
+# ignores clustering, which inflates variance, and stratification, which deflates it.
+# They are OPTIONAL on purpose — a pre-converted extract may not carry them, and a missing
+# SE is honest where a naive one would not be. When both are present the SE is computed
+# and emitted; when either is absent the record simply carries no SE.
+DESIGN_VARS = ("SDMVSTRA", "SDMVPSU")
 
 
 def file_url(first_year: str, basename: str) -> str:
@@ -595,6 +604,9 @@ class Cell:
 
     values: list[float] = field(default_factory=list)
     weights: list[float] = field(default_factory=list)
+    strata: list[str] = field(default_factory=list)
+    psu: list[str] = field(default_factory=list)
+    design_available: bool = True      # cleared if any contributing cycle lacked the columns
 
 
 @dataclass
@@ -732,6 +744,9 @@ def collect(
             )
 
             demo_cols = ["SEQN", "RIAGENDR", "RIDAGEYR"]
+            has_design = all(v in demo.columns for v in DESIGN_VARS)
+            if has_design:
+                demo_cols.extend(DESIGN_VARS)
             if weight.source == "DEMO":
                 demo_cols.append(weight.variable)
             lab_cols = ["SEQN", spec.variable]
@@ -757,6 +772,11 @@ def collect(
                 if not (np.isfinite(value) and np.isfinite(w)) or w <= 0.0:
                     continue
                 cell = result.cells.setdefault((sex, band), Cell())
+                if has_design:
+                    cell.strata.append(str(record["SDMVSTRA"]))
+                    cell.psu.append(str(record["SDMVPSU"]))
+                else:
+                    cell.design_available = False
                 cell.values.append(value)
                 cell.weights.append(w)
 
@@ -866,11 +886,22 @@ def emit(
                         (spec.symbol, sex, band, "zero spread — SD of 0 cannot standardize"))
                     continue
 
+                design = None
+                if cell.design_available and len(cell.strata) == len(cell.values):
+                    strata = np.asarray(cell.strata, dtype=object)[keep]
+                    psu = np.asarray(cell.psu, dtype=object)[keep]
+                    design = design_se_of_weighted_mean(
+                        transformed[keep], weights, strata, psu
+                    )
+
                 rid = record_id(spec, sex, band, tag)
                 writer.comment(
                     f"n={moments.n}  sum(w)={moments.sum_w:,.0f}  "
                     f"sd_estimator={moments.sd_estimator}"
                     + (f"  dropped_nonpositive={dropped}" if dropped else "")
+                    + (f"  design_se={design.se:.6g} df={design.degrees_of_freedom}"
+                       f" singleton_strata={design.singleton_strata}" if design else
+                       "  design_se=unavailable (SDMVSTRA/SDMVPSU absent)")
                 )
                 writer.atom(f"(: {rid} ReferenceDistribution)")
                 writer.atom(f"(RefMarker         {rid} {spec.symbol})")
@@ -880,6 +911,12 @@ def emit(
                 writer.atom(f"(RefMean           {rid} {num(moments.mean)})")
                 writer.atom(f"(RefSD             {rid} {num(moments.sd)})")
                 writer.atom(f"(RefUnweightedN    {rid} {num(moments.n, places=0)})")
+                if design is not None:
+
+                    writer.atom(f"(RefDesignSE       {rid} {num(design.se)})")
+
+                    writer.atom(f"(RefDesignDF       {rid} {num(design.degrees_of_freedom, places=0)})")
+
                 writer.atom(f"(RefUnit           {rid} {mstr(spec.unit)})")
                 writer.atom(f"(RefWeightVariable {rid} {mstr(result.weight.variable)})")
                 writer.atom(f"(RefSourceVariable {rid} {mstr(spec.variable)})")
@@ -925,7 +962,9 @@ def manifest_rows(registry: Sequence[MarkerSpec]) -> list[tuple[str, ...]]:
         mec = WEIGHT_TABLE[("WTMEC", "1999-2002")].variable
         rows.append((
             cycle, spec.demo_file, file_url(spec.first_year, spec.demo_file),
-            "(demographics)", ";".join(DEMOGRAPHIC_VARS), "", mec, "", "",
+            "(demographics)",
+            ";".join(DEMOGRAPHIC_VARS) + ";" + ";".join(DESIGN_VARS) + " (design vars optional)",
+            "", mec, "", "",
             spec.confidence,
             f"age topcoded at {spec.age_topcode:g}; {mec} is read from here for the "
             f"MEC-examined analytes. {spec.evidence}",
