@@ -106,8 +106,12 @@ the population SD is the correct denominator.
 at the scale of, say, total cholesterol (mean ~200, SD ~40) and can return a negative
 variance. Verified stable at 1e8 scale.
 
-**Design-based standard errors.** The naive SE ignores clustering (which inflates
-variance) and stratification (which deflates it). The Taylor linearization of the ratio
+**Design-based standard errors.** This reverses an earlier decision in this same work,
+and the reversal is worth stating rather than leaving for a reader to notice. The first
+pass deliberately emitted *no* standard error, on the grounds that a correct NHANES SE
+needs design-based linearization and that shipping a naive one would be worse than
+shipping none. That reasoning was right; the premise was wrong. The naive SE ignores
+clustering (which inflates variance) and stratification (which deflates it). The Taylor linearization of the ratio
 estimator under the ultimate-cluster approximation needs only the masked variance stratum
 and PSU columns, which live in the same demographics file the ETL already reads — so a
 correct SE costs nothing and there is no excuse for a wrong one. Verified to reduce
