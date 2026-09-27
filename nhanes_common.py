@@ -379,6 +379,61 @@ SCALE_LOG10 = "Log10"
 MARKER_SCALES = (SCALE_IDENTITY, SCALE_LOG10)
 
 
+# ---------------------------------------------------------------------------
+# Marker orientation — which direction is the abnormal one
+# ---------------------------------------------------------------------------
+#
+# `patient_profile.metta` turns z > 1 into `Elevated`, and `elevated-marker` then treats
+# every `Elevated` marker as a FINDING: it enters the observation set `diagnose` explains,
+# and `patient-relevance` SUMS over it to score an intervention.
+#
+# That is only correct for a marker where high is bad. For a PROTECTIVE analyte — HDL
+# cholesterol, eGFR — a z of +2 is a good result, and reporting it as an elevated finding
+# would both invite `diagnose` to explain a healthy value and inflate the intervention
+# score computed from it. The existing KB already depends on direction mattering: it ships
+# `(MeasuredZ Patient001 DNAmLeptin -1.5)` specifically to exercise the `Low` branch.
+#
+# The grounding layer has no notion of direction, so v1 does the conservative thing: a
+# marker declares its orientation, the orientation is recorded, and a protective marker is
+# NOT emitted by default. Emitting one would silently mis-ground it; suppressing it costs
+# nothing today, since no protective analyte has a declared symbol in the KB. Lifting this
+# needs an orientation-aware status rule, which changes the grounding layer's semantics
+# and belongs in its own increment.
+
+ORIENTATION_RISK = "HigherIsWorse"
+ORIENTATION_PROTECTIVE = "HigherIsBetter"
+MARKER_ORIENTATIONS = (ORIENTATION_RISK, ORIENTATION_PROTECTIVE)
+
+
+class ProtectiveMarkerNotSupported(RuntimeError):
+    """A higher-is-better marker cannot be grounded correctly by the current rules."""
+
+
+def check_orientation(
+    orientation: str, marker: str, *, allow_protective: bool = False
+) -> str:
+    """Validate a marker's orientation, refusing a protective one unless forced.
+
+    The refusal is the point: `z->status` has no direction, so a protective marker's good
+    result would be published as an `Elevated` finding and summed into an intervention
+    score. See the note above.
+    """
+    if orientation not in MARKER_ORIENTATIONS:
+        raise ValueError(
+            f"unknown orientation {orientation!r} for {marker}; "
+            f"known: {MARKER_ORIENTATIONS}"
+        )
+    if orientation == ORIENTATION_PROTECTIVE and not allow_protective:
+        raise ProtectiveMarkerNotSupported(
+            f"{marker} is {ORIENTATION_PROTECTIVE}, and the grounding layer's z->status has "
+            f"no notion of direction: a healthy high value would be published as an "
+            f"'Elevated' finding, entering the observation set diagnose explains and the "
+            f"sum patient-relevance scores. Refusing to emit it. Pass --allow-protective "
+            f"only once an orientation-aware status rule exists."
+        )
+    return orientation
+
+
 def apply_scale(values, scale: str):
     """Transform values onto a marker's declared scale, dropping what cannot be mapped.
 

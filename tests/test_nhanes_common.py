@@ -772,3 +772,28 @@ def test_log_math_fails_silently_so_the_guard_must_be_on_the_input():
     assert metta.run("!(guarded-z 0.0)")[0] == []
     assert metta.run("!(guarded-z -5.0)")[0] == []
     assert float(str(metta.run("!(guarded-z 100.0)")[0][0])) == pytest.approx(2.0)
+
+
+# ════════════════════════════ marker orientation ═══════════════════════════
+def test_risk_oriented_markers_pass():
+    from nhanes_common import ORIENTATION_RISK, check_orientation as check
+    assert check(ORIENTATION_RISK, "CRP") == ORIENTATION_RISK
+
+
+def test_protective_markers_are_refused_by_default():
+    """z->status has no direction, so a healthy high HDL would publish as an Elevated
+    FINDING -- entering diagnose's observation set and patient-relevance's sum."""
+    from nhanes_common import ORIENTATION_PROTECTIVE, ProtectiveMarkerNotSupported
+    from nhanes_common import check_orientation as check
+
+    with pytest.raises(ProtectiveMarkerNotSupported) as excinfo:
+        check(ORIENTATION_PROTECTIVE, "HDLCholesterol")
+    assert "HDLCholesterol" in str(excinfo.value)
+    # and can be forced once an orientation-aware rule exists
+    assert check(ORIENTATION_PROTECTIVE, "HDLCholesterol", allow_protective=True)
+
+
+def test_unknown_orientation_is_rejected():
+    from nhanes_common import check_orientation as check
+    with pytest.raises(ValueError):
+        check("Whatever", "CRP")

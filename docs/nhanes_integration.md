@@ -209,9 +209,35 @@ estimate of anything.
   their own honest names: `AllCauseMortality`, and the new symbol
   **`HeartDiseaseMortality`** whose declaration records precisely what it means.
 - The baseline lookup is **outcome-parameterized**, and the same `$outcome` threads through
-  both the baseline and the hazard lookup, so a mismatch **yields nothing**. There is no
-  code path on which a fatal-heart-disease number can be served as a CHD-incidence
-  baseline — that is enforced structurally, not by a comment.
+  both the baseline and the hazard lookup, so a mismatch **yields nothing** rather than
+  multiplying incompatible factors.
+
+That last point is a requirement on the wiring, and it is worth being precise about *how*
+it holds, because MeTTa makes the obvious version of it wrong. A rule keyed on the outcome
+in its head — `(= (baseline-prior CoronaryHeartDisease $age $sex) …)` — does **not** yield
+nothing when asked for a different outcome: hyperon returns the *unreduced expression*
+`(baseline-prior AllCauseMortality 61 Male)`, which then propagates into the arithmetic
+downstream as a non-numeric atom. Declining has to go through a `match` (which genuinely
+yields nothing when no record matches) or an explicit `(superpose ())`. Both are verified
+in `tests/test_nhanes_common.py`.
+
+### What is actually usable
+
+Pinning the outcomes down exposes the real state of play, which is narrower than either
+open question assumed:
+
+| outcome | data-backed baseline | hazard ratio in the KB |
+|---|---|---|
+| `AllCauseMortality` | ✅ from NHANES + linkage | ✅ Lu 2019, HR 1.10/yr |
+| `HeartDiseaseMortality` | ✅ from NHANES + linkage | ❌ none — no evidence record has this outcome |
+| `CoronaryHeartDisease` | ❌ not identifiable in NHANES (§5) | ✅ Lu 2019, HR 1.07/yr |
+
+So **`AllCauseMortality` is the only outcome with both halves**, and it is therefore the
+only one on which a fully data-backed absolute risk can currently be computed. That is the
+honest headline of step 2. `HeartDiseaseMortality` gets a baseline and waits for a hazard
+ratio fit to the same outcome; `CoronaryHeartDisease` keeps its curated baseline and its
+incident-CHD hazard ratio, correctly paired with each other. The outcome guard is what
+keeps the three rows from being mixed.
 
 This is a better outcome than the open question asked for. It also serves
 `docs/risk_prediction.md` §6 open-Q #5 (multi-outcome risk) directly: the repo now has two
