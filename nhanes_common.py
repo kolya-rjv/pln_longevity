@@ -331,6 +331,117 @@ def weighted_kaplan_meier(
     )
 
 
+@dataclass
+class CIFEstimate:
+    """A weighted Aalen-Johansen cause-specific cumulative-incidence estimate."""
+
+    cumulative_incidence: float       # CIF for the cause of interest at the horizon
+    overall_survival: float           # S(horizon), all event types pooled
+    competing_incidence: float        # CIF for everything else at the horizon
+    naive_km_incidence: float         # 1 - KM treating competing events as censoring
+    horizon: float
+    n: int
+    events: int                       # unweighted cause-of-interest events before horizon
+    competing_events: int
+    sum_w: float
+    censored_before_horizon: int
+
+
+def weighted_aalen_johansen(
+    times: Iterable[float],
+    causes: Iterable,
+    weights: Iterable[float],
+    *,
+    horizon: float,
+    cause,
+) -> Optional[CIFEstimate]:
+    """Weighted cause-specific cumulative incidence (Aalen-Johansen) at ``horizon``.
+
+    ``causes`` holds one label per person: the cause of the event, or a falsy value
+    (None / 0 / "" / NaN) for someone censored. ``cause`` selects the cause of interest.
+
+    WHY NOT 1 - KAPLAN-MEIER: for a cause-specific risk the other causes of death are
+    COMPETING EVENTS, not censoring. Censoring means "this person is still at risk, we
+    just stopped watching"; a person who died of cancer is not still at risk of dying of
+    heart disease. Treating competing deaths as censoring assumes they would have gone on
+    to experience the cause of interest at the same rate as survivors, which OVERSTATES
+    the cause-specific incidence — materially so in an older cohort where competing
+    mortality is common. ``naive_km_incidence`` is reported alongside precisely so the
+    size of that bias is visible rather than assumed away.
+
+    Estimator, over distinct event times t_j <= horizon (any cause):
+        W_j   = sum of w over { i : t_i >= t_j }              (weighted at-risk)
+        D_j   = sum of w over events of ANY cause at t_j
+        Dk_j  = sum of w over events of `cause` at t_j
+        S(t_j-) = product over t_l < t_j of ( 1 - D_l / W_l ) (overall survival, lagged)
+        CIF_k(horizon) = sum_j  S(t_j-) * ( Dk_j / W_j )
+
+    The lagged survival factor is the whole point: a cause-k event at t_j can only happen
+    to someone who survived everything up to t_j.
+
+    Returns None if nothing is at risk (never a fabricated cell).
+    """
+    t = np.asarray(list(times), dtype="float64")
+    raw_causes = list(causes)
+    w = np.asarray(list(weights), dtype="float64")
+    if not (t.size == len(raw_causes) == w.size):
+        raise ValueError(
+            f"times/causes/weights length mismatch: {t.size} {len(raw_causes)} {w.size}"
+        )
+
+    def _is_event(value) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, float) and math.isnan(value):
+            return False
+        return bool(value) or value == 0     # 0 is a legitimate label, "" / None are not
+
+    def _norm(value):
+        return str(value).strip() if value is not None else None
+
+    target = _norm(cause)
+    is_event = np.array([_is_event(c) for c in raw_causes], dtype=bool)
+    is_target = np.array(
+        [e and _norm(c) == target for c, e in zip(raw_causes, is_event)], dtype=bool
+    )
+
+    keep = np.isfinite(t) & np.isfinite(w) & (w > 0.0) & (t >= 0.0)
+    t, w, is_event, is_target = t[keep], w[keep], is_event[keep], is_target[keep]
+    n = int(t.size)
+    if n == 0:
+        return None
+
+    survival = 1.0                       # S(t_j-) carried forward
+    cif_target = 0.0
+    cif_competing = 0.0
+    naive_survival = 1.0                 # KM treating competing events as censoring
+
+    for tj in np.unique(t[is_event & (t <= horizon)]):
+        at_risk = w[t >= tj].sum()
+        if at_risk <= 0.0:
+            continue
+        at_tj = t == tj
+        d_all = w[at_tj & is_event].sum()
+        d_target = w[at_tj & is_target].sum()
+        cif_target += survival * (d_target / at_risk)
+        cif_competing += survival * ((d_all - d_target) / at_risk)
+        naive_survival *= 1.0 - (d_target / at_risk)
+        survival *= 1.0 - (d_all / at_risk)
+
+    return CIFEstimate(
+        cumulative_incidence=min(max(cif_target, 0.0), 1.0),
+        overall_survival=min(max(survival, 0.0), 1.0),
+        competing_incidence=min(max(cif_competing, 0.0), 1.0),
+        naive_km_incidence=min(max(1.0 - naive_survival, 0.0), 1.0),
+        horizon=float(horizon),
+        n=n,
+        events=int((is_target & (t <= horizon)).sum()),
+        competing_events=int((is_event & ~is_target & (t <= horizon)).sum()),
+        sum_w=float(w.sum()),
+        censored_before_horizon=int((~is_event & (t < horizon)).sum()),
+    )
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # 4. Cell suppression
 # ════════════════════════════════════════════════════════════════════════════

@@ -54,6 +54,7 @@ from nhanes_common import (  # noqa: E402
     read_nhanes,
     sex_symbol,
     suppressed_reason,
+    weighted_aalen_johansen,
     weighted_kaplan_meier,
     weighted_moments,
 )
@@ -213,6 +214,102 @@ def test_degenerate_km_returns_none_never_a_number(times, events, weights):
 def test_km_rejects_mismatched_lengths():
     with pytest.raises(ValueError):
         weighted_kaplan_meier([1.0, 2.0], [1], [1.0, 1.0], horizon=10.0)
+
+
+# ════════════════════════ Aalen-Johansen competing risks ═══════════════════
+def test_aalen_johansen_reduces_to_one_minus_km_with_a_single_cause():
+    times, causes = [2, 3, 3, 5, 7], ["001", "001", None, "001", None]
+    weights = [1.0] * 5
+    cif = weighted_aalen_johansen(times, causes, weights, horizon=10.0, cause="001")
+    km = weighted_kaplan_meier(
+        times, [1 if c else 0 for c in causes], weights, horizon=10.0
+    )
+    assert cif.cumulative_incidence == pytest.approx(km.cumulative_incidence, rel=TOL)
+    assert cif.competing_incidence == pytest.approx(0.0, abs=1e-15)
+
+
+def test_aalen_johansen_matches_hand_worked_competing_risks_example():
+    # t=1 cause A, at risk 4 -> CIF_A += 1.00 * 1/4 = 0.25 ; S = 0.75
+    # t=2 cause B, at risk 3 -> CIF_B += 0.75 * 1/3 = 0.25 ; S = 0.50
+    # t=3 cause A, at risk 2 -> CIF_A += 0.50 * 1/2 = 0.25 ; S = 0.25
+    got = weighted_aalen_johansen(
+        [1, 2, 3, 4], ["A", "B", "A", None], [1.0] * 4, horizon=10.0, cause="A"
+    )
+    assert got.cumulative_incidence == pytest.approx(0.5, rel=TOL)
+    assert got.competing_incidence == pytest.approx(0.25, rel=TOL)
+    assert got.overall_survival == pytest.approx(0.25, rel=TOL)
+    assert got.events == 2 and got.competing_events == 1
+
+
+def test_aalen_johansen_identity_holds_under_random_survey_weights():
+    """CIF_cause + CIF_competing + S(horizon) == 1 is the estimator's defining identity."""
+    rng = np.random.default_rng(3)
+    for _trial in range(50):
+        n = 150
+        times = rng.integers(1, 200, n).astype(float)
+        draw = rng.random(n)
+        causes = ["001" if u < 0.12 else "002" if u < 0.30 else None for u in draw]
+        weights = rng.uniform(0.5, 5000.0, n)          # NHANES-like weight spread
+        got = weighted_aalen_johansen(times, causes, weights, horizon=120.0, cause="001")
+        total = got.cumulative_incidence + got.competing_incidence + got.overall_survival
+        assert total == pytest.approx(1.0, abs=1e-12)
+
+
+def test_treating_competing_deaths_as_censoring_overstates_the_risk():
+    """The bias this estimator exists to avoid, asserted in direction and reported."""
+    rng = np.random.default_rng(11)
+    n = 300
+    times = rng.integers(1, 200, n).astype(float)
+    draw = rng.random(n)
+    causes = ["001" if u < 0.15 else "002" if u < 0.45 else None for u in draw]
+    got = weighted_aalen_johansen(times, causes, np.ones(n), horizon=120.0, cause="001")
+    assert got.naive_km_incidence > got.cumulative_incidence
+    assert got.competing_events > 0
+
+
+def test_aalen_johansen_is_invariant_between_frequency_weights_and_expanded_rows():
+    rng = np.random.default_rng(5)
+    n = 120
+    times = rng.integers(1, 150, n).astype(float)
+    draw = rng.random(n)
+    causes = ["001" if u < 0.2 else "002" if u < 0.35 else None for u in draw]
+    weights = rng.integers(1, 4, n).astype(float)
+
+    weighted = weighted_aalen_johansen(times, causes, weights, horizon=100.0, cause="001")
+    index = np.repeat(np.arange(n), weights.astype(int))
+    expanded = weighted_aalen_johansen(
+        times[index], [causes[i] for i in index], np.ones(index.size),
+        horizon=100.0, cause="001",
+    )
+    assert weighted.cumulative_incidence == pytest.approx(
+        expanded.cumulative_incidence, rel=1e-12
+    )
+
+
+def test_absent_cause_gives_zero_incidence_not_none():
+    got = weighted_aalen_johansen([5.0], ["002"], [1.0], horizon=120.0, cause="001")
+    assert got.cumulative_incidence == 0.0
+    assert got.events == 0 and got.competing_events == 1
+
+
+def test_degenerate_aalen_johansen_returns_none():
+    assert weighted_aalen_johansen([], [], [], horizon=120.0, cause="001") is None
+    assert weighted_aalen_johansen([5.0], ["001"], [0.0], horizon=120.0, cause="001") is None
+
+
+def test_aalen_johansen_rejects_mismatched_lengths():
+    with pytest.raises(ValueError):
+        weighted_aalen_johansen([1.0, 2.0], ["001"], [1.0, 1.0], horizon=10.0, cause="001")
+
+
+def test_blank_and_nan_cause_codes_count_as_censored_not_as_events():
+    got = weighted_aalen_johansen(
+        [1, 2, 3, 4], ["001", "", None, float("nan")], [1.0] * 4,
+        horizon=10.0, cause="001",
+    )
+    assert got.events == 1
+    assert got.competing_events == 0
+    assert got.censored_before_horizon == 3      # t=2, 3 and 4 all precede the horizon
 
 
 # ════════════════════════════ bands and codes ══════════════════════════════
