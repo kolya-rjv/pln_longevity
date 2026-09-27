@@ -17,7 +17,17 @@
 ;;
 ;; THE MODEL (v1 — coarse and honest; a multiplicative proportional-hazards step):
 ;;
-;;     risk = baseline(age,sex) × HR_clock ^ (z_clock × sd->years)
+;;     risk = baseline(outcome,age,sex) × HR_clock ^ (z_clock × sd->years)
+;;
+;;   * BOTH FACTORS ARE OUTCOME-SPECIFIC, and the OUTCOME IS PART OF THE BASELINE KEY.
+;;     The optional nhanes_baseline.metta layer lets a survey-weighted, mortality-
+;;     linked NHANES baseline serve the outcomes NHANES can identify (all-cause
+;;     mortality, heart-disease MORTALITY); incident CHD keeps the curated prior of
+;;     §0(a), because NHANES has no incident-CHD ascertainment to calibrate against.
+;;     Threading ONE $outcome through the baseline lookup and the hazard lookup is
+;;     what makes a cross-outcome product — a fatal-heart-disease baseline × the
+;;     incident-CHD HR — unreachable rather than merely discouraged (§1, §2).
+;;     With no generated baseline loaded this file behaves exactly as it did before.
 ;;
 ;;   * The predictor is the COMPOSITE clock AgeAccelGrim -> CHD (Lu et al. 2019,
 ;;     HR 1.07 per year of acceleration — the record already in
@@ -51,6 +61,13 @@
 ;;   pln_abductive_diagnosis patient_profile pln_counterfactual
 ;;   pln_risk_prediction                 (this file)
 ;;
+;; OPTIONAL, loaded AFTER this file when a data-backed baseline is wanted:
+;;   nhanes_baseline                     (Schema B/C types + the outcome-keyed lookup)
+;;   build/nhanes_baseline.metta         (the generated numeric records)
+;; Both absent is the default, and the default path through this file is unchanged:
+;; §1's `patient-baseline` tests for a BaselineRiskRecord atom before it ever names a
+;; rule from that layer, so the missing symbol is never evaluated.
+;;
 ;; STATUS: v1, verified against hyperon 0.2.10; regression-guarded in
 ;; tests/test_risk_prediction.py. Uses only core MeTTa builtins plus the grounded
 ;; math ops (+,-,*,/,>,<,==,car-atom/cdr-atom, pow-math). As in every layer the
@@ -75,6 +92,16 @@
 ;;     calibrated baseline table (Framingham / PCE) is the honest upgrade.
 ;;     Single-rule + nested if -> deterministic ("identical inputs -> identical
 ;;     output", pipeline.md Table 2).
+;;
+;;     STILL CURATED, DELIBERATELY — and it is not the table NHANES could replace.
+;;     nhanes_baseline.metta adds a survey-weighted, mortality-linked baseline for the
+;;     outcomes NHANES can actually identify, and incident CHD is not one of them: the
+;;     Linked Mortality File ascertains DEATH, and NHANES's own CHD items are lifetime
+;;     "ever told" PREVALENCE at baseline, so there is no incident-CHD ascertainment
+;;     to calibrate against. This therefore remains a curated prior, labelled as one,
+;;     and it is the fallback for CoronaryHeartDisease ONLY (see §1's resolution
+;;     order, and nhanes_baseline.metta §1 for why substituting a heart-disease-
+;;     MORTALITY number here would be an estimate of nothing).
 (= (baseline-risk-chd $age $sex)
    (if (< $age 50) (if (== $sex Male) 0.04 0.02)
        (if (< $age 60) (if (== $sex Male) 0.08 0.05)
@@ -88,6 +115,47 @@
 ;;     This is exactly the EffectScale normalization evidence_calibration.metta §2
 ;;     flags as the v1 todo, done here as one documented knob.
 (= (grimaccel-sd-to-years) 4.2)
+
+;;     A MEASURED spread, placed NEXT TO the knob rather than over it. A
+;;     ClockAccelSpread record (Schema C, declared in nhanes_baseline.metta, emitted
+;;     by nhanes_dnam_etl.py from the NHANES DNMEPI subsample) carries the weighted SD
+;;     of GrimAge acceleration IN YEARS — exactly the quantity this knob guesses at.
+;;     `grimaccel-sd-to-years-measured` returns it, and NOTHING when no such record is
+;;     loaded; `grimaccel-sd-to-years-check` returns the two side by side so the
+;;     comparison is one query.
+;;
+;;     WHY THIS DOES NOT OVERRIDE THE KNOB. Swapping a curated constant for a sourced
+;;     one the moment a record appears would move every number this file produces —
+;;     the point estimate, the CI, the decomposition shares, the projections, and the
+;;     §7 values the regression tests pin — with nothing in the output saying that it
+;;     happened or which value was used. A calibration that changes silently is not a
+;;     calibration, it is a drift. So the sourced number is made VISIBLE and the swap
+;;     stays a deliberate, reviewable edit to the knob above (whose effect on the §7
+;;     values is then a diff, not a surprise).
+;;
+;;     The lookup requires (SpreadDefinition … Residual). The SD of the age-adjusted
+;;     RESIDUAL and the SD of the raw DIFFERENCE (clock age − age) are different
+;;     numbers, and only the residual is the scale AgeAccelGrim is defined on
+;;     ((ResidualOf AgeAccelGrim GrimAge), grim_age_core.metta) and the scale Lu 2019
+;;     fit the hazard ratio on. A Difference record therefore answers NOTHING here
+;;     rather than answering approximately.
+;;
+;;     These are `match`es over record atoms, not calls into nhanes_baseline.metta, so
+;;     with that layer absent they yield nothing instead of an unreduced expression.
+(= (grimaccel-sd-to-years-measured $space)
+   (let $sid (match $space
+                (, (SpreadMarker     $s AgeAccelGrim)
+                   (SpreadDefinition $s Residual))
+                $s)
+      (match $space (SpreadSDYears $sid $v) $v)))
+
+;;   (SDToYears (curated 4.2) (measured <v>))  |  (SDToYears (curated 4.2) (measured none))
+(= (grimaccel-sd-to-years-check $space)
+   (let $m (collapse (grimaccel-sd-to-years-measured $space))
+      (if (== $m ())
+          (SDToYears (curated (grimaccel-sd-to-years)) (measured none))
+          (let $v (car-atom $m)
+             (SDToYears (curated (grimaccel-sd-to-years)) (measured $v))))))
 
 ;; (c) One modeling-step confidence discount below the source evidence confidence:
 ;;     the estimate inherits the clock->CHD evidence confidence, then pays a single
@@ -107,16 +175,90 @@
 (= (patient-sex $space $patient) (match $space (PatientSex $patient $s) $s))
 
 ;; The patient's measured GrimAge acceleration (in SDs). Continuous — risk rises
-;; smoothly with the clock, so we read the raw MeasuredZ (a z of 0 -> multiplier 1
+;; smoothly with the clock, so we read the z directly (a z of 0 -> multiplier 1
 ;; -> risk == baseline). Nothing if the clock was not measured (no invented value).
+;;
+;; Reads through `patient-z` (patient_profile.metta) rather than matching `MeasuredZ`
+;; directly, so a patient whose clock arrives as a RAW value reaches this layer too.
+;; Before this, `clock-z` was the last read site still bypassing the derived path, and
+;; the inconsistency showed: a patient carrying only `MeasuredRaw` atoms got a full
+;; `decompose-grimage` and a working `counterfactual-patient`, but `predict-risk`
+;; silently returned nothing — because those layers had been converted and this one
+;; had not.
+;;
+;; `patient-z` preserves both guarantees this site depends on. It is single-valued, with
+;; an explicitly stored `MeasuredZ` winning over a derived one, so the hand-typed example
+;; patients are unaffected; and it yields NOTHING when the clock was neither measured nor
+;; derivable, so an ungrounded clock still produces no risk estimate rather than a default.
 (= (clock-z $space $patient)
-   (match $space (MeasuredZ $patient AgeAccelGrim $z) $z))
+   (patient-z $space $patient AgeAccelGrim))
 
-;; The patient's baseline absolute risk, age/sex forced to concrete values first
-;; (baseline-risk-chd's comparisons do not evaluate their arguments).
-(= (patient-baseline $space $patient)
-   (let* (($a (patient-age $space $patient)) ($s (patient-sex $space $patient)))
-      (baseline-risk-chd $a $s)))
+;; ---------------------------------------------------------------------------
+;; The patient's baseline absolute risk FOR THE OUTCOME BEING PREDICTED.
+;; ---------------------------------------------------------------------------
+;; The baseline now carries the outcome, because a baseline without one is the D21
+;; trap: the model's product is baseline × HR, both factors are outcome-specific, and
+;; pairing them across outcomes yields an estimate of nothing (a fatal-heart-disease
+;; baseline is far too small to be an incidence risk, and the HR beside it was fit to
+;; a different event process). One $outcome enters here and the SAME one enters
+;; `risk-multiplier-at` from `absolute-risk-at` (§2), so the pairing is fixed by the
+;; call rather than by a convention a caller could forget. There is deliberately no
+;; outcome-free way to obtain a baseline.
+;;
+;; RESOLUTION ORDER — explicit, and SINGLE-VALUED:
+;;   1. a data-backed NHANES BaselineRiskRecord for the REQUESTED OUTCOME, when the
+;;      nhanes_baseline.metta layer and a generated record are loaded;
+;;   2. otherwise the curated prior of §0(a), WHICH EXISTS FOR CoronaryHeartDisease
+;;      ONLY — so an outcome with neither a record nor a curated table yields NOTHING,
+;;      never a borrowed number.
+;;
+;; THE ONE DELIBERATE BEHAVIOR CHANGE, stated plainly. Before the outcome was part of
+;; the key, `patient-baseline` returned the CHD-incidence table for WHATEVER outcome
+;; was being predicted, so `(predict-risk … CongestiveHeartFailure)` priced CHF off a
+;; ten-year CHD-INCIDENCE baseline of 0.08 and multiplied it by the CHF hazard ratio.
+;; That product was not a CHF risk; it was the D3 conflation with a different label on
+;; it. It now yields NOTHING until a CHF baseline exists. CoronaryHeartDisease — the
+;; outcome every driver in §6 defaults to and every §7 value is quoted for — is
+;; bit-for-bit unchanged.
+;;
+;; MeTTa has no cut, so the two candidates are not left to both survive: the
+;; data-backed candidates are COLLAPSED and the tuple is tested, exactly the
+;; collapse-then-test idiom patient_profile.metta's `patient-z` uses to let an explicit
+;; MeasuredZ beat a derived one. Downstream consumers here count on one value — a
+;; second baseline would double every risk report, CI and decomposition it appears in.
+;;
+;; THE PRESENCE TEST IS NOT REDUNDANT. `baseline-risk-data` is defined in the OPTIONAL
+;; nhanes_baseline.metta layer, and in MeTTa a call with no matching rule head does not
+;; yield nothing — it yields the unreduced expression, which then propagates into the
+;; arithmetic (tests/test_nhanes_common.py::
+;; test_a_mismatched_rule_head_returns_the_unreduced_expression_not_empty). Testing
+;; for a BaselineRiskRecord atom FIRST means that with no generated baseline loaded the
+;; symbol is never evaluated, and this file behaves exactly as it did before: () from
+;; the match, straight to the curated prior. (The match cannot be satisfied by
+;; nhanes_baseline.metta's own (: BaselineRiskRecord Type) declaration — that atom's
+;; type is Type, not BaselineRiskRecord.)
+(= (curated-baseline $space $patient $outcome)
+   (if (== $outcome CoronaryHeartDisease)
+       (let* (($a (patient-age $space $patient)) ($s (patient-sex $space $patient)))
+          (baseline-risk-chd $a $s))
+       (superpose ())))                        ; no curated table for this outcome
+
+(= (data-baseline-candidates $space $patient $outcome)
+   (let $recs (collapse (match $space (: $bid BaselineRiskRecord) $bid))
+      (if (== $recs ())
+          ()                                   ; no data layer -> never names its rules
+          (let* (($a (patient-age $space $patient))
+                 ($s (patient-sex $space $patient)))
+             (collapse (baseline-risk-data $space $outcome $a $s))))))
+
+;; Age and sex are let*-forced above before either table sees them: `<` and `==` do
+;; not evaluate their arguments, so an unforced (patient-age …) would be compared as
+;; an expression.
+(= (patient-baseline $space $patient $outcome)
+   (let $data (data-baseline-candidates $space $patient $outcome)
+      (if (== $data ())
+          (curated-baseline $space $patient $outcome)
+          (car-atom $data))))
 
 ;; The hazard ratio for the composite clock -> outcome, read straight off the
 ;; empirical evidence record (never hand-typed): HR 1.07 for AgeAccelGrim -> CHD.
@@ -143,7 +285,7 @@
 
 ;; Absolute 10-year risk at a given clock z, and at the patient's measured z.
 (= (absolute-risk-at $space $patient $outcome $z)
-   (let* (($p0 (patient-baseline $space $patient))
+   (let* (($p0 (patient-baseline $space $patient $outcome))
           ($m  (risk-multiplier-at $space $outcome $z)))
       (* $p0 $m)))
 (= (absolute-risk $space $patient $outcome)
@@ -172,7 +314,7 @@
 ;;   (RiskPrediction <patient> <outcome> (point p) (ci lo hi)
 ;;       (confidence c) (baseline p0) (multiplier m))
 (= (predict-risk $space $patient $outcome)
-   (let* (($p0 (patient-baseline $space $patient))
+   (let* (($p0 (patient-baseline $space $patient $outcome))
           ($m  (risk-multiplier-at $space $outcome (clock-z $space $patient)))
           ($p  (absolute-risk $space $patient $outcome))
           ($c  (risk-confidence $space $patient $outcome))
@@ -209,7 +351,7 @@
 ;;   (RiskDecomposition <patient> <outcome> (baseline p0) (total p) (excess e)
 ;;       (Factors (...)) (attributed-excess a) (residual-excess r))
 (= (risk-decomposition $space $patient $outcome)
-   (let* (($p0     (patient-baseline $space $patient))
+   (let* (($p0     (patient-baseline $space $patient $outcome))
           ($p      (absolute-risk $space $patient $outcome))
           ($excess (- $p $p0))
           ($grimz  (clock-z $space $patient)))
@@ -304,3 +446,29 @@
 ;;
 ;; An edge-less lever is omitted, not placed:
 ;; !(project-risk-patient &self Patient001 Elamipretide)     ; => (empty)
+
+;; ----------------------------------------------------------------
+;; 7b. The outcome-keyed baseline (§1), by query
+;; ----------------------------------------------------------------
+;; Every value above is UNCHANGED by the baseline work: with no BaselineRiskRecord in
+;; the space, `patient-baseline` resolves to the §0(a) curated prior for
+;; CoronaryHeartDisease, exactly as it did when it took no outcome.
+;;
+;; !(patient-baseline &self Patient001 CoronaryHeartDisease)   ; => 0.08  (curated)
+;; !(patient-baseline &self Patient001 AllCauseMortality)      ; => (empty)
+;;     — no curated all-cause table exists, and inventing one is the D3 conflation.
+;;       Load nhanes_baseline.metta + a generated record and this returns the
+;;       survey-weighted NHANES value for the patient's band and sex instead.
+;;
+;; The one changed behavior (see §1): a non-CHD outcome no longer borrows the CHD
+;; table. This used to return 0.08 x 1.10^6.72 = 0.1518, a CHD-INCIDENCE baseline
+;; priced with the heart-failure hazard ratio:
+;; !(predict-risk &self Patient001 CongestiveHeartFailure)     ; => (empty)
+;;
+;; Exactly one baseline is ever returned, even with several records in the space:
+;; !(collapse (patient-baseline &self Patient001 CoronaryHeartDisease))  ; => (0.08)
+;;
+;; The curated knob and a measured spread, side by side (§0(b)):
+;; !(grimaccel-sd-to-years-measured &self)   ; => (empty) with no Schema C record
+;; !(grimaccel-sd-to-years-check &self)      ; => (SDToYears (curated 4.2)
+;;                                           ;       (measured none))

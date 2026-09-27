@@ -114,6 +114,13 @@ _INFERENCE_STACK: list[str] = [
     "drugage_calibration.metta",
 
     "patient_profile.metta",
+    # NHANES grounding + baseline layers. Types and rules only: they carry no NHANES
+    # numbers, so with no generated file loaded they change nothing. nhanes_reference
+    # must follow patient_profile (it holds the record types and standardize-z that
+    # patient_profile's derived-z calls); nhanes_baseline must precede
+    # pln_risk_prediction, whose patient-baseline consults it.
+    "nhanes_reference.metta",
+    "nhanes_baseline.metta",
     "pln_counterfactual.metta",
     "pln_risk_prediction.metta",
 

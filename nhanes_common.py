@@ -107,11 +107,21 @@ def read_nhanes(path: Path | str, *, require: Sequence[str] = ()) -> pd.DataFram
     if suffix in (".xpt", ".xport"):
         frame = pd.read_sas(path, format="xport")
         frame = fix_ibm_zero(frame)
+    elif suffix == ".sas7bdat":
+        # The DNA-methylation release ships primarily as .sas7bdat, and it is the safer
+        # form of the two: its clock column names exceed the 8-character limit XPORT v5
+        # imposes, so the .xpt variant must abbreviate them. The IBM-zero repair is NOT
+        # applied here — that bug is specific to pandas' XPORT float decoder, and
+        # sas7bdat stores IEEE doubles directly.
+        frame = pd.read_sas(path, format="sas7bdat")
     elif suffix in (".csv", ".txt", ".tsv"):
         sep = "\t" if suffix == ".tsv" else ","
         frame = pd.read_csv(path, sep=sep)
     else:
-        raise ValueError(f"unsupported NHANES input format: {path.suffix} ({path})")
+        raise ValueError(
+            f"unsupported NHANES input format: {path.suffix} ({path}). "
+            f"Supported: .XPT/.xport (SAS transport), .sas7bdat, .csv/.tsv/.txt."
+        )
 
     frame.columns = [str(c).upper().strip() for c in frame.columns]
     frame = _decode_bytes(frame)

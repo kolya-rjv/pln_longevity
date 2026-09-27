@@ -115,9 +115,10 @@ if [[ -d "$NHANES_DIR" ]] && [[ -n "$(nhanes_files)" ]]; then
   fi
 
   if [[ -f "$NHANES_DIR/DNMEPI.xpt" || -f "$NHANES_DIR/dnmepi.sas7bdat" ]]; then
-    log "NHANES DNA methylation clocks → nhanes_dnam_reference.metta"
+    log "NHANES DNA methylation clocks → nhanes_dnam_clocks.metta"
     "$PYTHON" nhanes_dnam_etl.py \
-      --output "$OUT_DIR/nhanes_dnam_reference.metta" \
+      --data-dir "$NHANES_DIR" \
+      --output   "$OUT_DIR/nhanes_dnam_clocks.metta" \
       || echo "WARNING: NHANES DNAm ETL failed — see the message above" >&2
   fi
 else
