@@ -827,11 +827,25 @@ def suppressed_reason(
 
 DEFAULT_ATOM_BUDGET = 3000
 
+# BYTE BUDGET — the constraint that actually binds for a file at the repo ROOT, and the
+# nastier of the two because it fails SILENTLY. pln_chat/config.py sets
+# PLN_MAX_KB_FILE_BYTES = 60000, and pln_chat/app.py drops any discovered .metta file over
+# that size from the execution set with nothing but a print(). The chat app then answers
+# "empty" for every query against that data and nothing raises. At roughly 52 bytes per
+# atom that caps a root-level file near 1,150 atoms — well BELOW the atom budget above, so
+# the atom count alone is not protection. Generated files default to build/ (which the app
+# does not auto-load), but a user who moves one to the root needs the warning.
+DEFAULT_BYTE_BUDGET = 60000
+
 _SYMBOL_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_\-]*$")
 
 
 class AtomBudgetExceeded(RuntimeError):
     """Emission would produce more atoms than hyperon can query without aborting."""
+
+
+class ByteBudgetExceeded(RuntimeError):
+    """Emission would exceed the size at which the chat app silently drops the file."""
 
 
 def check_symbol(sym: str, *, what: str = "symbol") -> str:
@@ -869,8 +883,12 @@ def mstr(text: str) -> str:
 class MettaWriter:
     """Accumulates atoms with a header, counts them, and enforces the atom budget."""
 
-    def __init__(self, *, budget: int = DEFAULT_ATOM_BUDGET) -> None:
+    def __init__(
+        self, *, budget: int = DEFAULT_ATOM_BUDGET,
+        byte_budget: int = DEFAULT_BYTE_BUDGET,
+    ) -> None:
         self.budget = int(budget)
+        self.byte_budget = int(byte_budget)
         self._lines: list[str] = []
         self._atoms = 0
 
@@ -911,10 +929,26 @@ class MettaWriter:
     def text(self) -> str:
         return "\n".join(self._lines).rstrip() + "\n"
 
+    @property
+    def byte_size(self) -> int:
+        return len(self.text().encode("utf-8"))
+
     def write(self, path: Path | str) -> int:
+        """Write the file, refusing a size the chat app would silently skip."""
         path = Path(path)
+        text = self.text()
+        size = len(text.encode("utf-8"))
+        if size > self.byte_budget:
+            raise ByteBudgetExceeded(
+                f"emission is {size:,} bytes, over the budget of {self.byte_budget:,}. "
+                f"pln_chat drops a .metta file above PLN_MAX_KB_FILE_BYTES from execution "
+                f"with only a print() — the app would answer 'empty' for every query "
+                f"against this data and nothing would raise. Narrow the marker/outcome "
+                f"set, or keep this file out of the repo root and raise --byte-budget "
+                f"knowingly."
+            )
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(self.text(), encoding="utf-8")
+        path.write_text(text, encoding="utf-8")
         return self._atoms
 
 
@@ -974,6 +1008,11 @@ def add_common_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument(
         "--atom-budget", type=int, default=DEFAULT_ATOM_BUDGET,
         help=f"maximum atoms to emit (default {DEFAULT_ATOM_BUDGET}; hyperon aborts past ~4000)",
+    )
+    parser.add_argument(
+        "--byte-budget", type=int, default=DEFAULT_BYTE_BUDGET,
+        help=f"maximum emitted file size in bytes (default {DEFAULT_BYTE_BUDGET}; pln_chat "
+             f"silently skips a .metta file larger than PLN_MAX_KB_FILE_BYTES)",
     )
     parser.add_argument(
         "--min-cell-n", type=int, default=DEFAULT_MIN_CELL_N,

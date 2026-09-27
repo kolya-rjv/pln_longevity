@@ -47,6 +47,7 @@ from nhanes_common import (  # noqa: E402
     UCOD_HEART_DISEASE,
     UCOD_LEADING_LABELS,
     AtomBudgetExceeded,
+    ByteBudgetExceeded,
     LinkageLayoutError,
     IBM_ZERO_ARTIFACT,
     MettaWriter,
@@ -704,3 +705,70 @@ def test_writer_emits_a_trailing_newline_and_counts_atoms(tmp_path):
     text = (tmp_path / "out.metta").read_text(encoding="utf-8")
     assert text.endswith("\n")
     assert ";; header" in text and "(A b)" in text
+
+
+def test_byte_budget_matches_the_chat_apps_silent_skip_threshold():
+    """pln_chat drops an oversized .metta file from execution with only a print(), so the
+    app answers 'empty' and nothing raises. The writer must refuse first."""
+    from nhanes_common import DEFAULT_BYTE_BUDGET
+
+    config = (REPO / "pln_chat" / "config.py").read_text(encoding="utf-8")
+    assert f'"{DEFAULT_BYTE_BUDGET}"' in config, (
+        "DEFAULT_BYTE_BUDGET must track PLN_MAX_KB_FILE_BYTES in pln_chat/config.py"
+    )
+
+
+def test_oversized_emission_is_refused_before_it_is_written(tmp_path):
+    writer = MettaWriter(byte_budget=200)
+    for i in range(30):
+        writer.atom(f"(RefMarker NHANESRef_CRP_Male_50_59_9902_{i} CRP)")
+    assert writer.byte_size > 200
+    target = tmp_path / "out.metta"
+    with pytest.raises(ByteBudgetExceeded):
+        writer.write(target)
+    assert not target.exists()          # nothing half-written
+
+
+def test_a_mismatched_rule_head_returns_the_unreduced_expression_not_empty():
+    """MeTTa semantics that the baseline lookup design depends on: relying on a rule head
+    failing to match as a way of 'yielding nothing' is wrong -- the unreduced expression
+    propagates into arithmetic. Only `match` or an explicit (superpose ()) yield nothing."""
+    hyperon = pytest.importorskip("hyperon")
+    from hyperon import MeTTa
+
+    metta = MeTTa()
+    metta.run("""
+        (= (only-chd CoronaryHeartDisease $age) 0.08)
+        (BaseRec R1 AllCauseMortality 0.11)
+        (= (via-match $o) (match &self (BaseRec $r $o $v) $v))
+        (= (guarded $o) (if (== $o AllCauseMortality) 0.11 (superpose ())))
+    """)
+
+    mismatched = str(metta.run("!(only-chd AllCauseMortality 61)")[0][0])
+    assert mismatched == "(only-chd AllCauseMortality 61)"        # not empty
+    propagated = str(metta.run("!(* 2 (only-chd AllCauseMortality 61))")[0][0])
+    assert "only-chd" in propagated                              # and it spreads
+
+    assert metta.run("!(via-match CoronaryHeartDisease)")[0] == []
+    assert metta.run("!(guarded CoronaryHeartDisease)")[0] == []
+    assert float(str(metta.run("!(guarded AllCauseMortality)")[0][0])) == pytest.approx(0.11)
+
+
+def test_log_math_fails_silently_so_the_guard_must_be_on_the_input():
+    """A raw 0.0 on a log-scaled marker becomes -inf, which z->status reads as Low -- a
+    fabricated finding. See docs/nhanes_integration.md section 4."""
+    hyperon = pytest.importorskip("hyperon")
+    from hyperon import MeTTa
+
+    metta = MeTTa()
+    metta.run((REPO / "patient_profile.metta").read_text(encoding="utf-8"))
+
+    assert str(metta.run("!(log-math 10 0)")[0][0]) == "-inf"
+    assert str(metta.run("!(log-math 10 -5)")[0][0]) == "NaN"
+    # -inf is ordered, so it passes the Low comparison and invents a finding
+    assert str(metta.run("!(z->status (log-math 10 0))")[0][0]) == "Low"
+    # a correct guard on the raw value yields nothing instead
+    metta.run("(= (guarded-z $raw) (if (> $raw 0.0) (log-math 10 $raw) (superpose ())))")
+    assert metta.run("!(guarded-z 0.0)")[0] == []
+    assert metta.run("!(guarded-z -5.0)")[0] == []
+    assert float(str(metta.run("!(guarded-z 100.0)")[0][0])) == pytest.approx(2.0)
