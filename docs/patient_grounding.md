@@ -138,10 +138,26 @@ This is what makes the *same* pool recommend `Berberine` for the metabolic
 
 ## 6. Open questions / next increments
 
-1. **NHANES import.** `MeasuredZ` is the exact shape a NHANES age-acceleration /
-   standardized-blood-panel row provides. The next step is an ETL that emits
-   `MeasuredZ` atoms per participant, so patients come from data, not a curated
-   example. (Ties into roadmap next-step #2/#3 — ETL→inference wiring.)
+1. ~~**NHANES import.**~~ 🔶 **Addressed — see `docs/nhanes_integration.md`.** The
+   machinery exists: `MeasuredRaw` holds a patient's raw lab value, a
+   `ReferenceDistribution` record supplies the age-band × sex survey-weighted mean/SD, and
+   the derived-z path produces the `MeasuredZ` this layer consumes — so a real lab report
+   can be entered in its own units instead of hand-typed as a z. An explicitly stored
+   `MeasuredZ` still wins, and the accessor is single-valued, so nothing downstream
+   double-counts.
+   Two things to know before relying on it:
+   - **No NHANES numbers are committed.** The CDC hosts were unreachable from the
+     environment this was built in, so the reference records are ETL output staged under
+     `build/`, and the layer correctly yields *nothing* until they are generated. Run
+     `nhanes_reference_etl.py` where CDC is reachable.
+   - **A marker now carries a measurement scale.** The ±1 SD rule in §2 is a symmetric
+     cutoff, and on the raw scale of a log-normal analyte like CRP the `Low` branch turns
+     out to be *unreachable* — measured at 0.00% of the population, and no threshold fixes
+     it. Log-scaled markers are standardized on their own scale (`nhanes_integration.md`
+     §4).
+   Remaining: run it against real data and verify each registry entry; and note §7's
+   caveat that a band-derived z adjusts for age *piecewise-constantly*, not smoothly,
+   worth about ±0.25 SD near a band edge — a quarter of this layer's threshold.
 2. **Multiplicative `f(patient factors)`.** `pipeline.md` §4.2 writes the patient
    factor as a *product*. v1 is additive (transparent, monotone — it can only
    promote an intervention that also helps this patient, never demote a

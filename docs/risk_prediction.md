@@ -142,10 +142,26 @@ no clock surrogate, so it honestly projects **~0** change; an edge-less lever
 
 ## 6. Open questions / next increments
 
-1. **Calibrate the constants.** `sd→years`, the baseline table, the confidence
-   discount, and `risk-ci-k` are curated v1 priors; fit them against a real cohort
-   (NHANES linked mortality/CHD) and check interval calibration. v1 locks the
-   architecture, not the numbers.
+1. **Calibrate the constants.** 🔶 **Partly addressed, and the premise needed
+   correcting — see `docs/nhanes_integration.md` §5.** NHANES + the linked mortality file
+   turns out **not** to be able to calibrate *this* baseline. It identifies death, not
+   incidence: NHANES has no incident-CHD ascertainment at all (its `MCQ` items are
+   lifetime prevalence measured *at* baseline, usable only to exclude prevalent cases),
+   and the linkage's finest cardiac resolution is "Diseases of heart", which is fatal-only
+   and broad enough to include heart failure — an outcome this repo already models
+   separately as `CongestiveHeartFailure` with its own hazard ratio. Multiplying such a
+   baseline by Lu 2019's *incident*-CHD `HR 1.07` is a category error in both factors.
+   So `baseline-risk-chd` stays curated, clearly labelled, and the baseline lookup is now
+   outcome-parameterized: data-backed records serve the outcomes NHANES *can* identify
+   (`AllCauseMortality`, `HeartDiseaseMortality`), and the same `$outcome` threads through
+   both the baseline and hazard lookups so a mismatch yields nothing rather than a number.
+   Calibrating incident CHD needs Framingham/ARIC/MESA or the Pooled Cohort Equations.
+   What NHANES *does* deliver for this layer: the methylation subsample yields the measured
+   weighted SD of GrimAge acceleration in years, which either validates or replaces the
+   curated `(= (grimaccel-sd-to-years) 4.2)` knob. It is emitted as its own record and
+   deliberately does **not** override the knob silently — the point is that a sourced
+   number becomes visible next to the curated one.
+   Still open: the confidence discount, `risk-ci-k`, and interval calibration.
 2. **Log-hazard decomposition.** The excess is apportioned *linearly* by clock share;
    the hazard is multiplicative, so a log-hazard (or Shapley) attribution is the
    principled refinement. The linear split is a defensible v1 "attributable share".
