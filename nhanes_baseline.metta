@@ -71,6 +71,11 @@
 ;;   nhanes_baseline                     (this file)
 ;;   [build/nhanes_baseline.metta]       (the generated numeric records, if present)
 ;;
+;; The chat app's _INFERENCE_STACK lists this file EARLIER, beside nhanes_reference and
+;; before pln_risk_prediction. That is not a contradiction: for the reason above, the
+;; position of a file carrying only `=` rules and type declarations does not affect the
+;; result. The listing here is dependency order for a reader; the app's is readability.
+;;
 ;; With this file ABSENT, pln_risk_prediction.metta is byte-identical to its previous
 ;; behavior: its `patient-baseline` tests for the presence of a BaselineRiskRecord
 ;; atom BEFORE it ever names `baseline-risk-data`, precisely so that the missing

@@ -116,6 +116,7 @@ import numpy as np
 import pandas as pd
 
 from nhanes_common import (
+    declared_biomarker_symbols,
     short_sex,
     short_cycles,
     short_band,
@@ -435,50 +436,6 @@ REGISTRY: list[ClockSpec] = [
 # ---------------------------------------------------------------------------
 # Declaration check (D22) — walked against the repo at run time, not trusted
 # ---------------------------------------------------------------------------
-_INHERITANCE_RE = re.compile(
-    r"\(\s*Inheritance\s+([A-Za-z][A-Za-z0-9_\-]*)\s+([A-Za-z][A-Za-z0-9_\-]*)\s*\)"
-)
-_BIOMARKER_ROOT = "Biomarker"
-
-
-def declared_biomarker_symbols(repo_root: Path) -> dict[str, str]:
-    """Symbols that reach ``Biomarker`` through a chain of ``Inheritance`` atoms.
-
-    The chain matters here and a one-hop check is NOT enough: the repo declares
-    ``(Inheritance AgeAccelGrim EpigeneticAgeAcceleration)`` and, separately in
-    system_types.metta, ``(Inheritance EpigeneticAgeAcceleration Biomarker)``. A
-    scanner that only accepted a direct parent named ``*Biomarker`` would conclude
-    that AgeAccelGrim — the symbol this entire ETL exists to serve — is undeclared,
-    and silently emit nothing.
-
-    Returns ``symbol -> "file:line (Inheritance symbol parent)"`` for the edge that
-    put the symbol in, so ``--show-registry`` can print where the claim was checked.
-    """
-    edges: dict[str, list[tuple[str, str]]] = {}        # parent -> [(child, where)]
-    for path in sorted(repo_root.glob("*.metta")):
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        for lineno, line in enumerate(text.splitlines(), start=1):
-            code = line.split(";;", 1)[0]
-            for child, parent in _INHERITANCE_RE.findall(code):
-                where = f"{path.name}:{lineno} (Inheritance {child} {parent})"
-                edges.setdefault(parent, []).append((child, where))
-
-    found: dict[str, str] = {}
-    frontier = [_BIOMARKER_ROOT]
-    seen = {_BIOMARKER_ROOT}
-    while frontier:
-        parent = frontier.pop()
-        for child, where in edges.get(parent, ()):
-            found.setdefault(child, where)
-            if child not in seen:
-                seen.add(child)
-                frontier.append(child)
-    return found
-
-
 # ---------------------------------------------------------------------------
 # Registry overrides (--registry): the escape hatch for a wrong column name
 # ---------------------------------------------------------------------------

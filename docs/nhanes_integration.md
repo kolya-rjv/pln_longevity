@@ -184,8 +184,12 @@ against a reference on the same scale.
 A raw value of exactly `0.0` on a log-scaled marker becomes `−inf`, which genuinely *is*
 less than `−1`, so `z->status` returns **`Low`**: "low inflammation" invented from an
 impossible measurement. And a true `0.0` is not hypothetical — NHANES lab files contain
-real zeros. So `derived-z` tests the **raw value** before taking the log and yields
-nothing when it is non-positive. Nothing downstream is trusted to catch `−inf` (it is
+real zeros. So the raw value is tested **before** the logarithm, and yields nothing when it is
+non-positive. The guard sits in `standardize-z` rather than in `derived-z`, which is the
+right place and not merely the convenient one: `derived-z` does not know the marker's
+scale without a second record lookup, whereas `standardize-z` already holds the scale,
+mean and SD from the same record — so putting it there makes it true that **no path
+reaches `log-math` unguarded**, which is the property that matters. Nothing downstream is trusted to catch `−inf` (it is
 ordered, and passes comparisons) or `NaN` (it makes every comparison False, which
 `z->status` reads as `Normal`).
 

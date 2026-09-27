@@ -115,10 +115,10 @@ _INFERENCE_STACK: list[str] = [
 
     "patient_profile.metta",
     # NHANES grounding + baseline layers. Types and rules only: they carry no NHANES
-    # numbers, so with no generated file loaded they change nothing. nhanes_reference
-    # must follow patient_profile (it holds the record types and standardize-z that
-    # patient_profile's derived-z calls); nhanes_baseline must precede
-    # pln_risk_prediction, whose patient-baseline consults it.
+    # numbers, so with no generated file loaded they change nothing. Listed next to the
+    # layers they extend for readability; the position is not a constraint, since every
+    # file lands in one space and `=` rules do not care about load order. Verified by
+    # loading both orders: all lookups stayed single-valued and identical.
     "nhanes_reference.metta",
     "nhanes_baseline.metta",
     "pln_counterfactual.metta",

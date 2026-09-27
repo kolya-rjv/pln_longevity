@@ -84,6 +84,7 @@ from typing import Iterable, Optional, Sequence
 import numpy as np
 
 from nhanes_common import (
+    declared_biomarker_symbols,
     short_band,
     short_sex,
     short_cycles,
@@ -460,36 +461,8 @@ REGISTRY: list[MarkerSpec] = [
 # ---------------------------------------------------------------------------
 # Declaration check (D22) — enforced against the repo at run time, not trusted
 # ---------------------------------------------------------------------------
-_DECLARATION_RE = re.compile(
-    r"\(\s*Inheritance\s+([A-Za-z][A-Za-z0-9_\-]*)\s+([A-Za-z][A-Za-z0-9_\-]*)\s*\)"
-)
 
 
-def declared_biomarkers(repo_root: Path) -> dict[str, str]:
-    """Scan the repo's .metta files for declared Biomarker symbols.
-
-    The registry's ``declared_in`` field is a claim like any other, so it is checked
-    rather than believed: this scan is what actually decides whether a marker may be
-    emitted. A symbol whose declaration was removed from the KB stops producing atoms
-    at the next ETL run instead of leaving a dangling reference behind.
-    """
-    found: dict[str, str] = {}
-    for path in sorted(repo_root.glob("*.metta")):
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        for lineno, line in enumerate(text.splitlines(), start=1):
-            code = line.split(";;", 1)[0]
-            for symbol, parent in _DECLARATION_RE.findall(code):
-                # Accept `Biomarker` itself and any of its named subtypes
-                # (PlasmaProteinBiomarker, DNAmSurrogateBiomarker, ...). The suffix
-                # convention is how grim_age_core.metta names them, so matching on it
-                # avoids having to walk the Inheritance chain in Python.
-                if parent != "Biomarker" and not parent.endswith("Biomarker"):
-                    continue
-                found.setdefault(symbol, f"{path.name}:{lineno} (Inheritance {symbol} {parent})")
-    return found
 
 
 # ---------------------------------------------------------------------------
@@ -1082,7 +1055,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(message, file=sys.stderr)
 
     registry = apply_overrides(REGISTRY, load_registry_override(args.registry))
-    declared = declared_biomarkers(args.repo_root)
+    declared = declared_biomarker_symbols(args.repo_root)
 
     if args.manifest:
         sys.stdout.write(render_manifest(registry))

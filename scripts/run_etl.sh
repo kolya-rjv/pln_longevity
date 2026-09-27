@@ -121,7 +121,10 @@ if [[ -d "$NHANES_DIR" ]] && [[ -n "$(nhanes_files)" ]]; then
     log "NHANES linked mortality: skipped (need DEMO*.XPT and *MORT*.dat in $NHANES_DIR)"
   fi
 
-  if [[ -f "$NHANES_DIR/DNMEPI.xpt" || -f "$NHANES_DIR/dnmepi.sas7bdat" ]]; then
+  # Case-insensitive, and covering every form the ETL can actually read. A test for two
+  # exact spellings missed DNMEPI.XPT — the spelling MANIFEST.tsv itself lists — and
+  # skipped the step silently.
+  if [[ -n "$(find "$NHANES_DIR" -maxdepth 1 -type f \( -iname 'dnmepi.xpt' -o -iname 'dnmepi.sas7bdat' -o -iname 'dnmepi.csv' \) 2>/dev/null)" ]]; then
     log "NHANES DNA methylation clocks → nhanes_dnam_clocks.metta"
     "$PYTHON" nhanes_dnam_etl.py \
       --data-dir "$NHANES_DIR" \
