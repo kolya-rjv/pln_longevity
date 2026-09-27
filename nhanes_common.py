@@ -483,6 +483,104 @@ def weighted_moments(
     )
 
 
+# ---------------------------------------------------------------------------
+# Design-based standard error for the weighted mean
+# ---------------------------------------------------------------------------
+#
+# NHANES is a stratified multistage sample, so the naive SE of a weighted mean is wrong:
+# it ignores clustering (which inflates variance) and stratification (which deflates it).
+# The correct estimator is a Taylor-series linearization of the ratio estimator under the
+# ultimate-cluster approximation, and it needs exactly two extra columns — the masked
+# variance stratum and PSU — which live in the same demographics file the ETLs already
+# read. So a design-correct SE is in scope at near-zero cost, and there is no reason to
+# ship either a wrong SE or no SE at all.
+#
+#   R           = sum(w x) / sum(w)                        (the Hajek ratio estimator)
+#   u_i         = w_i (x_i - R) / sum(w)                   (linearized variable)
+#   U_hi        = sum of u over the units in PSU i of stratum h
+#   Var(R)      = sum_h  n_h/(n_h - 1)  sum_i (U_hi - Ubar_h)^2
+#
+# A stratum containing a single PSU has no within-stratum degrees of freedom. This
+# implementation gives it zero variance contribution (the "certainty PSU" convention) and
+# COUNTS it, so the caller can see how much of the sample was treated that way instead of
+# discovering it in a suspiciously small SE.
+
+
+@dataclass
+class DesignSE:
+    """A design-based standard error, with the diagnostics needed to trust it."""
+
+    se: float
+    variance: float
+    n_strata: int
+    n_psu: int
+    singleton_strata: int             # strata with one PSU: zero variance contribution
+    degrees_of_freedom: int           # n_psu - n_strata, the usual survey approximation
+
+
+def design_se_of_weighted_mean(
+    values: Iterable[float],
+    weights: Iterable[float],
+    strata: Iterable,
+    psu: Iterable,
+) -> Optional[DesignSE]:
+    """Taylor-linearized SE of a survey-weighted mean under a stratified cluster design.
+
+    Verified to reduce EXACTLY to ``s / sqrt(n)`` (with ``s`` the ddof=1 sample SD) in the
+    degenerate case of equal weights, one stratum and one PSU per observation, which is
+    the analytic identity this estimator must satisfy.
+
+    Returns None when the estimate is not defined (nothing left after dropping missing
+    rows, or a zero total weight).
+    """
+    v = np.asarray(list(values), dtype="float64")
+    w = np.asarray(list(weights), dtype="float64")
+    st = np.asarray([str(s) for s in strata], dtype=object)
+    ps = np.asarray([str(p) for p in psu], dtype=object)
+    if not (v.size == w.size == st.size == ps.size):
+        raise ValueError(
+            f"values/weights/strata/psu length mismatch: "
+            f"{v.size} {w.size} {st.size} {ps.size}"
+        )
+
+    keep = np.isfinite(v) & np.isfinite(w) & (w > 0.0)
+    v, w, st, ps = v[keep], w[keep], st[keep], ps[keep]
+    if v.size == 0:
+        return None
+    total_w = float(w.sum())
+    if not (total_w > 0.0):
+        return None
+
+    ratio = float((w * v).sum() / total_w)
+    u = w * (v - ratio) / total_w
+
+    variance = 0.0
+    n_psu_total = 0
+    singletons = 0
+    unique_strata = np.unique(st)
+    for stratum in unique_strata:
+        in_stratum = st == stratum
+        psu_ids = np.unique(ps[in_stratum])
+        n_h = psu_ids.size
+        n_psu_total += n_h
+        if n_h < 2:
+            singletons += 1
+            continue
+        totals = np.array([u[in_stratum & (ps == pid)].sum() for pid in psu_ids])
+        centred = totals - totals.mean()
+        variance += (n_h / (n_h - 1)) * float((centred ** 2).sum())
+
+    variance = max(variance, 0.0)
+    return DesignSE(
+        se=math.sqrt(variance),
+        variance=variance,
+        n_strata=int(unique_strata.size),
+        n_psu=int(n_psu_total),
+        singleton_strata=int(singletons),
+        degrees_of_freedom=int(n_psu_total - unique_strata.size),
+    )
+
+
 @dataclass
 class KMEstimate:
     """A weighted product-limit cumulative-incidence estimate at a fixed horizon."""
@@ -494,6 +592,7 @@ class KMEstimate:
     events: int         # unweighted event count before the horizon
     sum_w: float
     censored_before_horizon: int
+    followup_reaches_horizon: bool    # False => S(horizon) is an extrapolation, not an estimate
 
 
 def weighted_kaplan_meier(
@@ -517,6 +616,11 @@ def weighted_kaplan_meier(
         D_j = sum of w_i over { i : t_i == t_j, d_i=1 } (weighted events, ties summed)
         S(horizon) = product_j ( 1 - D_j / W_j )
         cumulative incidence = 1 - S(horizon)
+
+    A product-limit curve is FLAT and undefined past the last observed time, so if no one
+    is followed as far as ``horizon`` this returns S(last observed time) — a plausible
+    number that is not an estimate of S(horizon). ``followup_reaches_horizon`` says whether
+    that happened; a caller emitting a risk must refuse the cell when it is False.
 
     Returns None if nothing is at risk (never a fabricated cell).
     """
@@ -550,6 +654,7 @@ def weighted_kaplan_meier(
         events=int(((d == 1) & (t <= horizon)).sum()),
         sum_w=float(w.sum()),
         censored_before_horizon=int(((d == 0) & (t < horizon)).sum()),
+        followup_reaches_horizon=bool((t >= horizon).any()),
     )
 
 
@@ -567,6 +672,7 @@ class CIFEstimate:
     competing_events: int
     sum_w: float
     censored_before_horizon: int
+    followup_reaches_horizon: bool    # False => the CIF at the horizon is an extrapolation
 
 
 def weighted_aalen_johansen(
@@ -661,6 +767,7 @@ def weighted_aalen_johansen(
         competing_events=int((is_event & ~is_target & (t <= horizon)).sum()),
         sum_w=float(w.sum()),
         censored_before_horizon=int((~is_event & (t < horizon)).sum()),
+        followup_reaches_horizon=bool((t >= horizon).any()),
     )
 
 
@@ -682,8 +789,17 @@ DEFAULT_MIN_EVENTS = 5          # for a risk/incidence cell
 def suppressed_reason(
     *, n: int, min_n: int = DEFAULT_MIN_CELL_N,
     events: Optional[int] = None, min_events: int = DEFAULT_MIN_EVENTS,
+    followup_reaches_horizon: Optional[bool] = None,
 ) -> Optional[str]:
-    """Return a suppression reason, or None if the cell may be emitted."""
+    """Return a suppression reason, or None if the cell may be emitted.
+
+    ``followup_reaches_horizon=False`` suppresses on its own regardless of cell size: a
+    product-limit curve is flat past the last observed time, so a cell whose follow-up
+    stops short of the horizon yields a plausible number that estimates the risk at the
+    last observed time, not at the horizon. That is a wrong answer, not a noisy one.
+    """
+    if followup_reaches_horizon is False:
+        return "no observation is followed as far as the horizon (would extrapolate)"
     if n < min_n:
         return f"n={n} below minimum cell size {min_n}"
     if events is not None and events < min_events:

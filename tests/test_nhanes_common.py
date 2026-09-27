@@ -54,6 +54,7 @@ from nhanes_common import (  # noqa: E402
     age_band,
     apply_scale,
     check_symbol,
+    design_se_of_weighted_mean,
     fix_ibm_zero,
     mstr,
     num,
@@ -223,6 +224,82 @@ def test_degenerate_km_returns_none_never_a_number(times, events, weights):
 def test_km_rejects_mismatched_lengths():
     with pytest.raises(ValueError):
         weighted_kaplan_meier([1.0, 2.0], [1], [1.0, 1.0], horizon=10.0)
+
+
+# ══════════════════════════ design-based standard error ════════════════════
+def test_design_se_reduces_exactly_to_the_srs_formula():
+    """The analytic identity the linearization must satisfy: equal weights, one stratum,
+    one PSU per observation => s/sqrt(n) with s the ddof=1 sample SD."""
+    values = [200.0, 180.0, 240.0, 150.0, 310.0, 275.0, 190.0]
+    n = len(values)
+    got = design_se_of_weighted_mean(
+        values, [1.0] * n, ["1"] * n, [str(i) for i in range(n)]
+    )
+    expected = float(np.std(values, ddof=1)) / math.sqrt(n)
+    assert got.se == pytest.approx(expected, rel=1e-13)
+    assert got.n_strata == 1 and got.n_psu == n and got.singleton_strata == 0
+    assert got.degrees_of_freedom == n - 1
+
+
+def test_clustering_inflates_the_se_above_the_naive_srs_value():
+    """A design effect above 1 is the whole reason this estimator exists."""
+    rng = np.random.default_rng(1)
+    n = 600
+    strata = np.repeat([f"s{i}" for i in range(15)], n // 15)
+    psu = np.array([f"{s}_p{i % 4}" for i, s in enumerate(strata)])
+    cluster_effect = {p: rng.normal(0, 8) for p in np.unique(psu)}
+    values = np.array([100 + cluster_effect[p] + rng.normal(0, 3) for p in psu])
+    weights = rng.uniform(1000, 9000, n)
+
+    design = design_se_of_weighted_mean(values, weights, strata, psu)
+    naive = float(np.std(values, ddof=1)) / math.sqrt(n)
+    assert design.se > naive
+    assert design.n_strata == 15
+
+
+def test_singleton_strata_are_counted_not_silently_dropped():
+    got = design_se_of_weighted_mean(
+        [1.0, 2.0, 3.0], [1.0, 1.0, 1.0], ["a", "b", "b"], ["p1", "p2", "p3"]
+    )
+    assert got.singleton_strata == 1
+    assert got.n_strata == 2
+
+
+def test_design_se_guards():
+    assert design_se_of_weighted_mean([], [], [], []) is None
+    assert design_se_of_weighted_mean([1.0], [0.0], ["a"], ["p"]) is None
+    with pytest.raises(ValueError):
+        design_se_of_weighted_mean([1.0], [1.0], ["a", "b"], ["p"])
+
+
+# ═════════════════════ horizon feasibility (flat-curve trap) ═══════════════
+def test_short_followup_is_flagged_because_the_curve_is_flat_past_it():
+    """A product-limit curve is undefined past the last observed time, so it returns
+    S(last observed) — a plausible number that is not the risk at the horizon."""
+    short = weighted_kaplan_meier([10, 20, 30], [1, 0, 0], [1.0] * 3, horizon=120.0)
+    assert short.followup_reaches_horizon is False
+    assert short.cumulative_incidence > 0.0          # it DID return a plausible number
+    assert suppressed_reason(n=100, followup_reaches_horizon=False) is not None
+
+    adequate = weighted_kaplan_meier([10, 200, 300], [1, 0, 0], [1.0] * 3, horizon=120.0)
+    assert adequate.followup_reaches_horizon is True
+    assert suppressed_reason(n=100, followup_reaches_horizon=True) is None
+
+
+def test_short_followup_suppresses_regardless_of_cell_size():
+    """Wrong is not the same as noisy: a huge cell with short follow-up is still wrong."""
+    assert suppressed_reason(n=100_000, events=9_999, followup_reaches_horizon=False)
+
+
+def test_aalen_johansen_also_reports_horizon_feasibility():
+    short = weighted_aalen_johansen(
+        [10, 20], ["001", "002"], [1.0, 1.0], horizon=120.0, cause="001"
+    )
+    assert short.followup_reaches_horizon is False
+    adequate = weighted_aalen_johansen(
+        [10, 200], ["001", "002"], [1.0, 1.0], horizon=120.0, cause="001"
+    )
+    assert adequate.followup_reaches_horizon is True
 
 
 # ════════════════════════════ measurement scale ════════════════════════════
