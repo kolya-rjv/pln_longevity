@@ -68,6 +68,24 @@ The response was not to approximate. It was:
 To produce actual numbers, run the ETLs on a machine that can reach CDC. `data/nhanes/`
 carries the manifest and the download instructions; nothing under it is bundled.
 
+## 2b. What ships
+
+| file | what it is |
+|---|---|
+| `nhanes_common.py` | the correctness core — weighted statistics, the file readers, budgets, scales |
+| `nhanes_reference_etl.py` | step 1: blood analytes → `ReferenceDistribution` records |
+| `nhanes_mortality_etl.py` | step 2: demographics + linkage → `BaselineRiskRecord` records |
+| `nhanes_dnam_etl.py` | methylation clocks → clock references + the `ClockAccelSpread` record |
+| `nhanes_reference.metta` | types and rules: `MeasuredRaw`, the reference lookup, `standardize-z` |
+| `nhanes_baseline.metta` | types and rules: the baseline lookup, `HeartDiseaseMortality`, the outcome guard |
+| `data/nhanes/` | `MANIFEST.tsv` and a README — which files to fetch, and from where |
+| `tests/nhanes_xport_writer.py` | a SAS XPORT v5 writer, so the `.XPT` path is genuinely tested |
+| `tests/test_nhanes_common.py`, `tests/test_nhanes_integration.py` | the statistics, and the whole chain end to end |
+
+The three ETLs write to `build/` by default, which is gitignored, and
+`scripts/run_etl.sh` runs them when data is present and explains what to fetch when it is
+not. Both hand-written `.metta` layers are registered in the chat app's inference stack.
+
 ## 3. What the statistics had to get right
 
 These are in `nhanes_common.py`, each verified against an independent reference rather
@@ -212,8 +230,8 @@ estimate of anything.
   both the baseline and the hazard lookup, so a mismatch **yields nothing** rather than
   multiplying incompatible factors.
 
-That last point is a requirement on the wiring, and it is worth being precise about *how*
-it holds, because MeTTa makes the obvious version of it wrong. A rule keyed on the outcome
+That last point is implemented and checked, and it is worth being precise about *how* it
+holds, because MeTTa makes the obvious version of it wrong. A rule keyed on the outcome
 in its head — `(= (baseline-prior CoronaryHeartDisease $age $sex) …)` — does **not** yield
 nothing when asked for a different outcome: hyperon returns the *unreduced expression*
 `(baseline-prior AllCauseMortality 61 Male)`, which then propagates into the arithmetic
@@ -238,6 +256,19 @@ honest headline of step 2. `HeartDiseaseMortality` gets a baseline and waits for
 ratio fit to the same outcome; `CoronaryHeartDisease` keeps its curated baseline and its
 incident-CHD hazard ratio, correctly paired with each other. The outcome guard is what
 keeps the three rows from being mixed.
+
+Measured, with a fatal-heart-disease baseline record loaded alongside the curated prior:
+
+| query | result |
+|---|---|
+| `(patient-baseline … CoronaryHeartDisease)` | `0.08` — the curated prior, never the fatal `0.031` |
+| `(patient-baseline … HeartDiseaseMortality)` | `0.031` — the data-backed record |
+| baselines returned per outcome | exactly one, never two candidates |
+| `(predict-risk … HeartDiseaseMortality)` | **nothing** — it has a baseline but no hazard ratio, so the guard declines rather than borrowing CHD's |
+| `(predict-risk … CoronaryHeartDisease)` | unchanged at the documented `0.12605…` |
+
+The fourth row is the guard doing its job: an outcome with half the inputs produces no
+estimate, instead of an estimate assembled from mismatched halves.
 
 This is a better outcome than the open question asked for. It also serves
 `docs/risk_prediction.md` §6 open-Q #5 (multi-outcome risk) directly: the repo now has two
