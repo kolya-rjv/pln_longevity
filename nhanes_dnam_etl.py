@@ -116,6 +116,9 @@ import numpy as np
 import pandas as pd
 
 from nhanes_common import (
+    short_sex,
+    short_cycles,
+    short_band,
     AGE_BANDS,
     AtomBudgetExceeded,
     ByteBudgetExceeded,
@@ -975,15 +978,23 @@ def record_id(spec: ClockSpec, sex: str, band: str, definition: str) -> str:
     the cycle-tag component, so the ids stay distinct and the definition is visible
     in the identifier itself rather than only in a field.
     """
+    # Terse on purpose: the identifier is repeated on every one of a record's ~17 field
+    # atoms, so its length dominates the emitted file size — and the file size is what
+    # silently binds (pln_chat drops an oversized .metta from execution with only a
+    # print()). A 2-clock x 2-convention run measured 55,047 bytes against the
+    # 60,000-byte limit with the long form, so one more declared clock would have
+    # overflowed it. Nothing is lost: the record carries its marker, sex, band, cycles
+    # and acceleration definition as field atoms, and a readable comment sits above it.
     return check_symbol(
-        f"NHANESRef_{spec.symbol}_{sex}_{band}_{DNMEPI_CYCLE_TAG}_{definition}",
+        f"NR_{spec.symbol}_{short_sex(sex)}_{short_band(band)}"
+        f"_{short_cycles(DNMEPI_CYCLE_TAG)}_{definition[:3]}",
         what="record id",
     )
 
 
 def spread_id(spec: ClockSpec, definition: str) -> str:
     return check_symbol(
-        f"NHANESClockSpread_{spec.symbol}_{DNMEPI_CYCLE_TAG}_{definition}",
+        f"NCS_{spec.symbol}_{short_cycles(DNMEPI_CYCLE_TAG)}_{definition[:3]}",
         what="record id",
     )
 
