@@ -130,18 +130,177 @@ def read_nhanes(path: Path | str, *, require: Sequence[str] = ()) -> pd.DataFram
 def read_fixed_width(path: Path | str, layout: Sequence[tuple]) -> pd.DataFrame:
     """Read a fixed-width ASCII file (the NHANES linked-mortality file format).
 
-    ``layout`` is a sequence of ``(name, start, width)`` with **1-based inclusive**
-    start columns, matching how record layouts are published. Values that are blank
-    or all-dots become NaN.
+    ``layout`` is a sequence of ``(name, start, width)`` or ``(name, start, width, kind)``
+    with **1-based inclusive** start columns, matching how record layouts are published.
+    ``kind`` is ``"num"`` (default) or ``"str"``. Blank and all-dot values become NA.
+
+    The ``kind`` distinction is not cosmetic. ``UCOD_LEADING`` is a CHARACTER field of
+    zero-padded codes (``"001"`` … ``"010"``); coercing it to a number turns ``"001"``
+    into ``1`` and silently breaks every comparison written against CDC's codebook.
     """
-    names = [str(n).upper() for n, _s, _w in layout]
-    colspecs = [(int(s) - 1, int(s) - 1 + int(w)) for _n, s, w in layout]
+    names, colspecs, kinds = [], [], {}
+    for entry in layout:
+        name, start, width = entry[0], entry[1], entry[2]
+        kind = entry[3] if len(entry) > 3 else "num"
+        name = str(name).upper()
+        names.append(name)
+        colspecs.append((int(start) - 1, int(start) - 1 + int(width)))
+        kinds[name] = kind
+
     frame = pd.read_fwf(path, colspecs=colspecs, names=names, dtype=str, header=None)
     for col in frame.columns:
         stripped = frame[col].astype(str).str.strip()
-        stripped = stripped.replace({"": None, ".": None, "..": None, "...": None})
-        frame[col] = pd.to_numeric(stripped, errors="coerce")
+        stripped = stripped.replace({"": None, "nan": None, ".": None, "..": None, "...": None})
+        if kinds.get(col, "num") == "str":
+            frame[col] = stripped
+        else:
+            frame[col] = pd.to_numeric(stripped, errors="coerce")
     return frame
+
+
+# ---------------------------------------------------------------------------
+# The NHANES public-use Linked Mortality File
+# ---------------------------------------------------------------------------
+#
+# The layout below is transcribed from CDC's own read-in program
+# (``SAS_ReadInProgramAllSurveys.sas``, header "PUBLIC-USE LINKED MORTALITY FOLLOW-UP
+# THROUGH DECEMBER 31, 2019"), so unlike the analyte registries it is not recall.
+#
+# Two traps it encodes:
+#
+#   * VINTAGE. The 2011-vintage file inserts ``CAUSEAVL`` at column 17 and shifts every
+#     later field by one. Reading a 2019 file with the 2011 layout does not fail — it
+#     reads the last two digits of the cause code plus the diabetes flag as the cause,
+#     and three wrong bytes as the follow-up time, yielding plausible small integers.
+#     So the vintage is a required, explicit argument and unknown vintages are refused.
+#
+#   * NHANES vs NHIS. Columns 22-42 hold NHIS-only fields and are blank in the NHANES
+#     file, which means NHANES carries NO date of death (only person-months) and no
+#     linkage-adjusted weight. ``read_linked_mortality`` asserts that blankness as a
+#     vintage/­survey sanity check rather than assuming it.
+
+LMF_LAYOUTS: dict[str, tuple[tuple, ...]] = {
+    "2019": (
+        ("SEQN", 1, 6),
+        ("ELIGSTAT", 15, 1),
+        ("MORTSTAT", 16, 1),
+        ("UCOD_LEADING", 17, 3, "str"),
+        ("DIABETES", 20, 1),
+        ("HYPERTEN", 21, 1),
+        ("PERMTH_INT", 43, 3),
+        ("PERMTH_EXM", 46, 3),
+    ),
+    "2011": (
+        ("SEQN", 1, 6),
+        ("ELIGSTAT", 15, 1),
+        ("MORTSTAT", 16, 1),
+        ("CAUSEAVL", 17, 1),
+        ("UCOD_LEADING", 18, 3, "str"),
+        ("DIABETES", 21, 1),
+        ("HYPERTEN", 22, 1),
+        ("PERMTH_INT", 44, 3),
+        ("PERMTH_EXM", 47, 3),
+    ),
+}
+
+# UCOD_LEADING — CDC's leading-cause recode, verbatim from the read-in program's
+# value labels. Note what "001" is and is NOT: it is all Diseases of heart, which
+# includes hypertensive and rheumatic heart disease, cardiomyopathy, arrhythmias and
+# heart failure. No public-use value isolates ischemic/coronary disease.
+UCOD_LEADING_LABELS: dict[str, str] = {
+    "001": "Diseases of heart (I00-I09, I11, I13, I20-I51)",
+    "002": "Malignant neoplasms (C00-C97)",
+    "003": "Chronic lower respiratory diseases (J40-J47)",
+    "004": "Accidents / unintentional injuries (V01-X59, Y85-Y86)",
+    "005": "Cerebrovascular diseases (I60-I69)",
+    "006": "Alzheimer's disease (G30)",
+    "007": "Diabetes mellitus (E10-E14)",
+    "008": "Influenza and pneumonia (J09-J18)",
+    "009": "Nephritis, nephrotic syndrome and nephrosis (N00-N07, N17-N19, N25-N27)",
+    "010": "All other causes (residual)",
+}
+
+UCOD_HEART_DISEASE = "001"
+
+
+class LinkageLayoutError(RuntimeError):
+    """The mortality file does not match the declared vintage's record layout."""
+
+
+def read_linked_mortality(path: Path | str, *, vintage: str = "2019") -> pd.DataFrame:
+    """Read an NHANES public-use Linked Mortality File and validate its layout.
+
+    Validations, each of which catches a silent-wrong-numbers failure mode:
+      * the declared vintage is one we have an authoritative layout for;
+      * the NHIS-only columns are blank, confirming this is the NHANES file at the
+        declared vintage rather than a differently shifted one;
+      * ``MORTSTAT`` is present exactly when ``ELIGSTAT == 1``. A parser that fills
+        blanks with 0 would turn every linkage-ineligible participant into a censored
+        survivor, deflating the event rate and inflating the denominator;
+      * every observed ``UCOD_LEADING`` code is in CDC's documented value set.
+    """
+    if vintage not in LMF_LAYOUTS:
+        raise LinkageLayoutError(
+            f"unknown linked-mortality vintage {vintage!r}; known: "
+            f"{sorted(LMF_LAYOUTS)}. Field positions changed between vintages, and "
+            f"parsing with the wrong one yields plausible but wrong numbers rather than "
+            f"an error — so an unrecognized vintage is refused rather than guessed."
+        )
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path} not found. The NHANES linked mortality file is public but is not "
+            f"bundled with this repo; see docs/nhanes_integration.md."
+        )
+
+    frame = read_fixed_width(path, LMF_LAYOUTS[vintage])
+
+    # NHIS-only block must be blank in the NHANES file.
+    nhis_probe = read_fixed_width(path, (("NHIS_BLOCK", 22, 21, "str"),))
+    non_blank = int(nhis_probe["NHIS_BLOCK"].notna().sum())
+    if non_blank:
+        raise LinkageLayoutError(
+            f"{path.name}: columns 22-42 should be blank for an NHANES file at vintage "
+            f"{vintage}, but {non_blank} of {len(nhis_probe)} records have content there. "
+            f"This is either an NHIS file or a different vintage — refusing to parse "
+            f"rather than silently misreading the cause and follow-up fields."
+        )
+
+    eligible = frame["ELIGSTAT"] == 1
+    if not frame.loc[eligible, "MORTSTAT"].notna().all():
+        raise LinkageLayoutError(
+            f"{path.name}: some ELIGSTAT==1 records have a missing MORTSTAT, which the "
+            f"layout does not allow. Suspect a vintage mismatch."
+        )
+    if frame.loc[~eligible, "MORTSTAT"].notna().any():
+        raise LinkageLayoutError(
+            f"{path.name}: some ELIGSTAT!=1 records carry a MORTSTAT. Suspect a vintage "
+            f"mismatch. Ineligible records must be excluded as a domain, never read as "
+            f"censored survivors."
+        )
+
+    codes = set(frame["UCOD_LEADING"].dropna().unique())
+    unknown = sorted(c for c in codes if c not in UCOD_LEADING_LABELS)
+    if unknown:
+        raise LinkageLayoutError(
+            f"{path.name}: UCOD_LEADING contains undocumented code(s) {unknown}; "
+            f"documented values are {sorted(UCOD_LEADING_LABELS)}. Suspect a vintage "
+            f"mismatch (the 2011 layout shifts this field by one column)."
+        )
+    return frame
+
+
+def max_observed_followup_months(frame: pd.DataFrame, *, time_col: str = "PERMTH_EXM") -> float:
+    """Longest follow-up among CENSORED records — the horizon a file can actually support.
+
+    Per-cycle maximum follow-up must be DERIVED, not assumed: with linkage ending
+    2019-12-31, the later cycles have less than ten years of follow-up, and estimating a
+    120-month risk there produces a number driven by extrapolation. Censored records are
+    the right ones to read, since a decedent's follow-up ends at death, not at the
+    linkage cut-off.
+    """
+    censored = frame.loc[frame["MORTSTAT"] == 0, time_col].dropna()
+    return float(censored.max()) if len(censored) else float("nan")
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -188,6 +347,69 @@ def sex_symbol(code) -> Optional[str]:
 # ════════════════════════════════════════════════════════════════════════════
 # 3. Survey-weighted statistics
 # ════════════════════════════════════════════════════════════════════════════
+
+
+# ---------------------------------------------------------------------------
+# Measurement scale — why a marker needs one
+# ---------------------------------------------------------------------------
+#
+# `patient_profile.metta`'s grounding rule is symmetric: z > 1 is Elevated, z < -1 is
+# Low. That is a Gaussian-flavoured cutoff, and applying it to a z computed on the RAW
+# scale of a log-normal analyte does not merely blur the categories, it removes one.
+#
+# Measured on a realistic simulated CRP distribution (geometric mean 0.2 mg/dL,
+# geometric SD 3, n = 200,000):
+#
+#     scale     P(z > +1)    P(z < -1)    max z
+#     raw          7.56%        0.00%      80.4
+#     log10       15.83%       15.86%       5.0
+#     normal      15.87%       15.87%        --
+#
+# On the raw scale the `Low` branch is UNREACHABLE, and raising the threshold does not
+# fix it (P(z < -t) stays 0.00% at t = 1.0, 1.5 and 2.0). Worse, "Elevated" would then
+# mean a different population percentile for CRP than for a symmetric marker like HbA1c,
+# so `diagnose-patient`'s coverage counts would silently weight the two differently.
+#
+# So a marker's scale is part of its definition, the reference moments are computed on
+# that scale, and the z must be computed on the same scale as the reference it is
+# measured against. The emitted record carries the scale so the pairing is auditable.
+
+SCALE_IDENTITY = "Identity"
+SCALE_LOG10 = "Log10"
+MARKER_SCALES = (SCALE_IDENTITY, SCALE_LOG10)
+
+
+def apply_scale(values, scale: str):
+    """Transform values onto a marker's declared scale, dropping what cannot be mapped.
+
+    Returns ``(transformed, kept_mask)``. For ``Log10`` a non-positive value has no
+    logarithm, so it is DROPPED rather than clamped or floored: clamping would invent a
+    value at the detection limit and quietly pile probability mass onto one point.
+    Callers must apply ``kept_mask`` to the weights so the pairing stays aligned.
+    """
+    array = np.asarray(list(values), dtype="float64")
+    if scale == SCALE_IDENTITY:
+        return array, np.isfinite(array)
+    if scale == SCALE_LOG10:
+        keep = np.isfinite(array) & (array > 0.0)
+        out = np.full(array.shape, np.nan)
+        out[keep] = np.log10(array[keep])
+        return out, keep
+    raise ValueError(f"unknown marker scale {scale!r}; known: {MARKER_SCALES}")
+
+
+def standardize(value: float, mean: float, sd: float, scale: str) -> Optional[float]:
+    """z for one raw observation against a reference computed on the SAME scale.
+
+    Returns None when the value cannot be placed (non-positive on a log scale, or a
+    degenerate reference SD) — never a fabricated z.
+    """
+    if sd is None or not math.isfinite(sd) or sd <= 0.0:
+        return None
+    transformed, keep = apply_scale([value], scale)
+    if not bool(keep[0]):
+        return None
+    return float((transformed[0] - mean) / sd)
 
 
 @dataclass

@@ -42,17 +42,26 @@ sys.path.insert(0, str(REPO / "tests"))
 pd = pytest.importorskip("pandas")
 
 from nhanes_common import (  # noqa: E402
+    SCALE_IDENTITY,
+    SCALE_LOG10,
+    UCOD_HEART_DISEASE,
+    UCOD_LEADING_LABELS,
     AtomBudgetExceeded,
+    LinkageLayoutError,
     IBM_ZERO_ARTIFACT,
     MettaWriter,
     MissingColumns,
     age_band,
+    apply_scale,
     check_symbol,
     fix_ibm_zero,
     mstr,
     num,
+    max_observed_followup_months,
+    read_linked_mortality,
     read_nhanes,
     sex_symbol,
+    standardize,
     suppressed_reason,
     weighted_aalen_johansen,
     weighted_kaplan_meier,
@@ -214,6 +223,141 @@ def test_degenerate_km_returns_none_never_a_number(times, events, weights):
 def test_km_rejects_mismatched_lengths():
     with pytest.raises(ValueError):
         weighted_kaplan_meier([1.0, 2.0], [1], [1.0, 1.0], horizon=10.0)
+
+
+# ════════════════════════════ measurement scale ════════════════════════════
+def test_identity_scale_passes_values_through():
+    values, keep = apply_scale([1.0, 2.0, float("nan")], SCALE_IDENTITY)
+    assert values[0] == 1.0 and values[1] == 2.0
+    assert list(keep) == [True, True, False]
+
+
+def test_log10_scale_drops_non_positive_rather_than_clamping():
+    values, keep = apply_scale([100.0, 1.0, 0.0, -3.0], SCALE_LOG10)
+    assert values[0] == pytest.approx(2.0)
+    assert values[1] == pytest.approx(0.0)
+    assert list(keep) == [True, True, False, False]      # not floored at a detection limit
+
+
+def test_unknown_scale_is_rejected():
+    with pytest.raises(ValueError):
+        apply_scale([1.0], "Ln")
+
+
+def test_raw_scale_makes_the_low_branch_unreachable_for_a_lognormal_marker():
+    """The measurement this repo's symmetric z threshold depends on. See D17 / the
+    MARKER_SCALES note in nhanes_common.py."""
+    rng = np.random.default_rng(42)
+    values = rng.lognormal(mean=np.log(0.2), sigma=np.log(3.0), size=100_000)
+    weights = np.ones_like(values)
+
+    raw = weighted_moments(values, weights)
+    raw_z = (values - raw.mean) / raw.sd
+    assert (raw_z < -1.0).mean() == 0.0                  # Low is literally unreachable
+    assert (raw_z > 1.0).mean() < 0.10                   # and Elevated is far off 15.87%
+
+    transformed, keep = apply_scale(values, SCALE_LOG10)
+    logged = weighted_moments(transformed[keep], weights[keep])
+    log_z = (transformed[keep] - logged.mean) / logged.sd
+    assert (log_z < -1.0).mean() == pytest.approx(0.1587, abs=0.01)
+    assert (log_z > 1.0).mean() == pytest.approx(0.1587, abs=0.01)
+
+
+def test_standardize_refuses_rather_than_inventing_a_z():
+    assert standardize(0.0, -0.7, 0.48, SCALE_LOG10) is None      # no log of zero
+    assert standardize(1.0, 0.0, 0.0, SCALE_IDENTITY) is None     # degenerate reference
+    assert standardize(1.0, 0.0, float("nan"), SCALE_IDENTITY) is None
+    assert standardize(7.0, 5.0, 2.0, SCALE_IDENTITY) == pytest.approx(1.0)
+
+
+# ═══════════════════════ linked mortality file reader ══════════════════════
+def _lmf_record(seqn, elig, mort, ucod, diabetes, hyperten, pm_int, pm_exm,
+                nhis=" " * 21):
+    """One 2019-vintage NHANES LMF record, per CDC's published field positions."""
+    text = (f"{seqn:<6}" + " " * 8 + f"{elig}" + f"{mort}" + f"{ucod:<3}"
+            + f"{diabetes}" + f"{hyperten}" + nhis + f"{pm_int:>3}" + f"{pm_exm:>3}")
+    return text.ljust(61)
+
+
+GOOD_LMF = "\n".join([
+    _lmf_record(1, 1, 1, "001", 0, 1, 120, 118),        # heart-disease death
+    _lmf_record(2, 1, 0, "   ", " ", " ", 240, 238),    # censored survivor
+    _lmf_record(3, 1, 1, "002", 0, 0, 60, 58),          # cancer death (competing)
+    _lmf_record(4, 2, " ", "   ", " ", " ", "  ", "  "),  # linkage-ineligible
+]) + "\n"
+
+
+def _write_lmf(tmp_path, text, name="NHANES_2001_2002_MORT_2019_PUBLIC.dat"):
+    path = tmp_path / name
+    path.write_text(text, encoding="ascii")
+    return path
+
+
+def test_linked_mortality_parses_the_documented_2019_layout(tmp_path):
+    frame = read_linked_mortality(_write_lmf(tmp_path, GOOD_LMF))
+    assert list(frame["SEQN"]) == [1, 2, 3, 4]
+    assert list(frame["ELIGSTAT"]) == [1, 1, 1, 2]
+    assert frame["PERMTH_EXM"][0] == 118
+    assert pd.isna(frame["MORTSTAT"][3])                 # ineligible stays missing
+
+
+def test_ucod_leading_stays_a_zero_padded_string(tmp_path):
+    frame = read_linked_mortality(_write_lmf(tmp_path, GOOD_LMF))
+    assert frame["UCOD_LEADING"][0] == "001"             # not the integer 1
+    assert frame["UCOD_LEADING"][0] in UCOD_LEADING_LABELS
+    assert pd.isna(frame["UCOD_LEADING"][1])
+
+
+def test_heart_disease_code_is_documented_as_broader_than_chd():
+    label = UCOD_LEADING_LABELS[UCOD_HEART_DISEASE]
+    assert "Diseases of heart" in label
+    assert "I50" in label or "I51" in label              # the range that swallows failure
+
+
+def test_unknown_vintage_is_refused_not_guessed(tmp_path):
+    path = _write_lmf(tmp_path, GOOD_LMF)
+    with pytest.raises(LinkageLayoutError) as excinfo:
+        read_linked_mortality(path, vintage="2022")
+    assert "2019" in str(excinfo.value)                  # names what it does know
+
+
+def test_reading_a_2019_file_with_the_2011_layout_is_caught(tmp_path):
+    """The off-by-one vintage trap: it yields plausible integers, so it must be caught."""
+    path = _write_lmf(tmp_path, GOOD_LMF)
+    with pytest.raises(LinkageLayoutError):
+        read_linked_mortality(path, vintage="2011")
+
+
+def test_non_blank_nhis_block_is_refused(tmp_path):
+    text = _lmf_record(1, 1, 1, "001", 0, 1, 120, 118, nhis="X" * 21) + "\n"
+    with pytest.raises(LinkageLayoutError) as excinfo:
+        read_linked_mortality(_write_lmf(tmp_path, text))
+    assert "22-42" in str(excinfo.value)
+
+
+def test_mortstat_on_an_ineligible_record_is_refused(tmp_path):
+    text = _lmf_record(1, 2, 1, "001", 0, 1, 120, 118) + "\n"
+    with pytest.raises(LinkageLayoutError):
+        read_linked_mortality(_write_lmf(tmp_path, text))
+
+
+def test_undocumented_cause_code_is_refused(tmp_path):
+    text = _lmf_record(1, 1, 1, "099", 0, 1, 120, 118) + "\n"
+    with pytest.raises(LinkageLayoutError) as excinfo:
+        read_linked_mortality(_write_lmf(tmp_path, text))
+    assert "099" in str(excinfo.value)
+
+
+def test_feasible_horizon_is_derived_from_censored_records(tmp_path):
+    frame = read_linked_mortality(_write_lmf(tmp_path, GOOD_LMF))
+    # Only SEQN 2 is censored, with 238 months of follow-up.
+    assert max_observed_followup_months(frame) == pytest.approx(238.0)
+
+
+def test_absent_mortality_file_explains_it_is_not_bundled(tmp_path):
+    with pytest.raises(FileNotFoundError) as excinfo:
+        read_linked_mortality(tmp_path / "nope.dat")
+    assert "not bundled" in str(excinfo.value)
 
 
 # ════════════════════════ Aalen-Johansen competing risks ═══════════════════
