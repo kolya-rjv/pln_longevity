@@ -41,6 +41,11 @@
 ;;   mechanistic_bridges pln_deduction pln_intervention_ranking
 ;;   pln_abductive_diagnosis patient_profile
 ;;   pln_counterfactual                  (this file)
+;; It now reads a patient's z through patient_profile.metta's `patient-z` (§2a), so
+;; a raw lab value standardized against the NHANES reference layer is visible here.
+;; nhanes_reference.metta remains OPTIONAL and loads after patient_profile.metta;
+;; without it, patient-z's explicit-MeasuredZ branch is the only reachable one and
+;; this layer behaves exactly as before.
 ;;
 ;; STATUS: v1, verified against hyperon 0.2.10; regression-guarded in
 ;; tests/test_counterfactual.py. Uses only core MeTTa builtins (match, superpose,
@@ -82,8 +87,14 @@
 ;; otherwise nothing. So a Low/Normal or unmeasured component contributes zero and
 ;; drops out — we never invent an elevation. `elevated-z-threshold` is reused, not
 ;; forked, so the two layers stay in lockstep.
+;; NHANES integration: reads `patient-z` (patient_profile.metta §2a) instead of
+;; matching MeasuredZ directly, so a component supplied only as a raw lab value is
+;; seen here too. patient-z is single-valued — explicit MeasuredZ wins over a
+;; derived one — which matters because this function feeds SUMS (decompose-grimage's
+;; attributed total, cf-sum-dm); two z values for one component would double its
+;; contribution. For a patient carrying only MeasuredZ atoms this is unchanged.
 (= (patient-elevated-z $space $patient $m)
-   (let $z (match $space (MeasuredZ $patient $m $zv) $zv)
+   (let $z (patient-z $space $patient $m)
       (if (> $z (elevated-z-threshold)) $z (superpose ()))))
 
 ;; The (stv s c) of the strongest / first POSITIVE transmission $a -> $b, or
@@ -141,8 +152,12 @@
         (collapse
            (let $m (match $space (PartOf $mm GrimAge) $mm)
               (decompose-one $space $patient $m)))
+      ;; NHANES integration: the clock's own z comes through `patient-z`
+      ;; (patient_profile.metta §2a) rather than a direct MeasuredZ match, so a
+      ;; GrimAge acceleration entered as a raw clock value is read too. Still
+      ;; exactly one value per patient, so the residual stays a single number.
       (let* (($attributed (sum-contribs $comps))
-             ($grimz (match $space (MeasuredZ $patient AgeAccelGrim $z) $z))
+             ($grimz (patient-z $space $patient AgeAccelGrim))
              ($residual (- $grimz $attributed)))
          (Decomposition $patient
             (Components $comps)

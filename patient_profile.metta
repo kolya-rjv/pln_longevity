@@ -31,9 +31,17 @@
 ;;   pln_abductive_diagnosis
 ;;   patient_profile                     (this file)
 ;;
+;; OPTIONAL, AFTER THIS FILE: nhanes_reference.metta (+ a generated
+;; build/nhanes_reference.metta) adds the NHANES reference distributions and lets
+;; §2a standardize a patient's RAW lab values. This file does NOT require it: with
+;; it absent, `derived-z`'s leading (MeasuredRaw …) match is empty, the reference
+;; functions are never reached, and every rule here behaves exactly as it did
+;; before that layer existed. That is why every pre-existing KB_FILES list is still
+;; correct and unchanged — see §2a and nhanes_reference.metta's header.
+;;
 ;; STATUS: v1, verified against hyperon 0.2.10; regression-guarded in
 ;; tests/test_patient_grounding.py. Uses only core MeTTa builtins (match,
-;; superpose, collapse, let/let*, car-atom/cdr-atom, +/*/>/<). As in every layer
+;; superpose, collapse, let/let*, car-atom/cdr-atom/cons-atom, +/*/>/<). As in every layer
 ;; the space $space is threaded explicitly (never hard-coded &self) because a
 ;; (match &self ...) inside an imported module reads only that module's own space
 ;; — the cross-module gotcha docs/calibration_layer.md §10.1 documents.
@@ -60,6 +68,22 @@
 ;; one convention that makes clocks and blood panels commensurable, and the value
 ;; NHANES / a blood panel actually yields. Positive z = above the norm.
 (: MeasuredZ (-> PatientProfile Biomarker Number Atom))
+
+;; Raw measurement: the value a lab report actually prints, in its own unit — CRP
+;; 0.82 mg/dL, HbA1c 6.2 %. MeasuredZ above is what inference consumes, but it is
+;; not what a patient arrives with: a z presupposes a population mean and SD, and
+;; until the NHANES reference layer existed those had to be worked out by hand
+;; before a real person could be entered at all. MeasuredRaw closes that gap — §2a
+;; standardizes it against the (ReferenceDistribution …) record for this patient's
+;; age band and sex. An explicit MeasuredZ still wins where both are present.
+;; (Schema D of the NHANES design contract; docs/nhanes_integration.md §1.)
+(: MeasuredRaw (-> PatientProfile Biomarker Number Atom))
+
+;; The unit the raw value was reported in. Optional and purely for audit: the z is
+;; taken against a reference record carrying its OWN (RefUnit …), and the two
+;; agreeing is the data-entry's responsibility — this layer never silently converts
+;; units. Recorded so a mismatch is discoverable after the fact.
+(: MeasuredUnit (-> PatientProfile Biomarker String Atom))
 
 ;; Demographics — kept raw. Not yet used in scoring; they are the hooks the
 ;; sex/age-specific modifiers (pipeline.md App. A.7) will read in the next
@@ -136,23 +160,126 @@
       (if (> $z $t) Elevated
           (if (< $z $nt) Low Normal))))
 
+;; ================================================================
+;; 2a. Raw measurement -> derived z  (the NHANES reference path)
+;; ================================================================
+;; A patient may now carry a value in EITHER form: an explicit (MeasuredZ …), as
+;; the two example patients above do, or a raw lab value (MeasuredRaw …) that is
+;; standardized on demand against the survey-weighted reference distribution for
+;; the patient's age band and sex. Everything below §2a reads `patient-z` and is
+;; indifferent to which one a marker came from.
+;;
+;; WHERE THE OTHER HALF LIVES, AND WHY THE SPLIT IS HERE.
+;; The reference half — the (ReferenceDistribution …) record type, the Ref* field
+;; signatures, the AgeBand / MarkerScale symbols, `age-band`, `reference-cell` and
+;; `standardize-z` — lives in nhanes_reference.metta, which conceptually sits ON
+;; TOP of this layer. These accessors stay HERE, so that this file has no load-time
+;; dependency on a file that loads after it. What makes that safe is not a
+;; convention but the shape of `derived-z`: it matches (MeasuredRaw …) FIRST, so
+;; with nhanes_reference.metta absent — which is exactly the situation in every
+;; pre-existing KB_FILES list — the match is empty, the reference functions are
+;; never reached, and a patient carrying only MeasuredZ atoms behaves EXACTLY as
+;; before this change. That is a load-order guarantee, not an assumption; see
+;; nhanes_reference.metta's header for the full rationale, and
+;; docs/nhanes_integration.md for the design.
+
+;; --- tuple helpers -------------------------------------------------------------
+;; Deduping union of two collapsed tuples. `sum-tuple` (§5) is the only other tuple
+;; helper this file defines and the three names below are unique across the repo
+;; (checked), so nothing is shadowed. All three are let*-forced: car-atom/cdr-atom/
+;; cons-atom do not evaluate their arguments.
+(= (tuple-has $xs $y)
+   (if (== $xs ()) False
+       (let* (($h (car-atom $xs)) ($r (cdr-atom $xs)))
+          (if (== $h $y) True (tuple-has $r $y)))))
+(= (unique-tuple $xs)
+   (if (== $xs ()) ()
+       (let* (($h (car-atom $xs)) ($r (unique-tuple (cdr-atom $xs))))
+          (if (tuple-has $r $h) $r (cons-atom $h $r)))))
+(= (append-tuple $xs $ys)
+   (if (== $xs ()) $ys
+       (let* (($h (car-atom $xs)) ($r (append-tuple (cdr-atom $xs) $ys)))
+          (cons-atom $h $r))))
+
+;; --- the patient's marker set --------------------------------------------------
+;; Every marker this patient has a value for, from EITHER source, each appearing
+;; exactly once. The dedupe is the point: a marker recorded both as a MeasuredZ and
+;; as a MeasuredRaw is ONE marker, and enumerating it twice would double-count it in
+;; `patient-observations` -> `diagnose` coverage and in `patient-relevance`.
+(= (patient-markers $space $patient)
+   (let* (($zs (collapse (match $space (MeasuredZ   $patient $m $v) $m)))
+          ($rs (collapse (match $space (MeasuredRaw $patient $m $v) $m))))
+      (unique-tuple (append-tuple $zs $rs))))
+
+;; --- the derived z -------------------------------------------------------------
+;; Standardize the patient's raw value for $marker against the reference cell for
+;; their age band and sex. Yields NOTHING — never a defaulted mean, never `Normal` —
+;; when any link in the chain is missing: no raw value, no recorded age or sex, no
+;; reference cell for that marker/band/sex, a degenerate reference SD, or a
+;; non-positive value on a Log10-scaled marker (the D27 input guard, implemented in
+;; `standardize-z` because that is the one place that holds both the raw value and
+;; the scale its reference was computed on).
+;;
+;; The (MeasuredRaw …) match is deliberately the FIRST binding: it is what makes
+;; this rule inert, rather than an unresolved call into nhanes_reference.metta, when
+;; the reference layer is not loaded.
+(= (derived-z $space $patient $marker)
+   (let* (($raw  (match $space (MeasuredRaw $patient $marker $rv) $rv))
+          ($age  (match $space (PatientAge  $patient $a) $a))
+          ($sex  (match $space (PatientSex  $patient $s) $s))
+          ($band (age-band $age)))
+      (standardize-z $space $marker $band $sex $raw)))
+
+;; --- the single-valued z -------------------------------------------------------
+;; PRECEDENCE: an explicit (MeasuredZ …) beats a derived one. A clinician who has
+;; typed a z has asserted it; the reference path is the convenience, not the
+;; authority.
+;;
+;; SINGLE-VALUEDNESS IS A CORRECTNESS REQUIREMENT, not tidiness. Downstream
+;; consumers COUNT derivations — `diagnose` scores hypotheses by how many
+;; observations they cover, `patient-relevance` sums over the observation set,
+;; `decompose-grimage` sums per-component contributions — so a marker yielding two
+;; z values would silently double its own weight. MeTTa has no cut, so the two
+;; branches cannot simply be two rules: `collapse` the explicit match to a concrete
+;; tuple FIRST, test it, and only then choose. Collapse-then-test, in that order, is
+;; what makes the choice exclusive.
+(= (patient-z $space $patient $marker)
+   (let $explicit (collapse (match $space (MeasuredZ $patient $marker $z) $z))
+      (if (== $explicit ())
+          (derived-z $space $patient $marker)
+          (car-atom $explicit))))
+
 ;; Status of ONE marker for a patient. Space threaded explicitly. Yields nothing
 ;; if the marker was not measured for this patient (no invented Normal).
+;; NHANES integration: reads `patient-z` rather than matching MeasuredZ directly,
+;; so a marker supplied only as a raw lab value is grounded too. For a patient
+;; carrying only MeasuredZ atoms this is byte-identical to the previous rule —
+;; patient-z's explicit branch returns that same value.
 (= (patient-status $space $patient $marker)
-   (let $z (match $space (MeasuredZ $patient $marker $zv) $zv)
+   (let $z (patient-z $space $patient $marker)
         (z->status $z)))
 
 ;; ================================================================
 ;; 3. Observation set: the markers a patient presents ELEVATED
 ;; ================================================================
-;; A non-deterministic stream of the patient's elevated marker NAMES. Each
-;; MeasuredZ atom for the patient is destructured; only Elevated ones pass, the
-;; rest drop via (superpose ()). This is the set the abductive-diagnosis demo
-;; (pln_abductive_diagnosis.metta) consumes.
+;; A non-deterministic stream of the patient's elevated marker NAMES. Only Elevated
+;; ones pass, the rest drop via (superpose ()). This is the set the
+;; abductive-diagnosis demo (pln_abductive_diagnosis.metta) consumes.
+;;
+;; NHANES integration: this used to destructure the (MeasuredZ …) atoms directly,
+;; which would now miss a marker supplied only as a raw lab value. It enumerates the
+;; deduped UNION instead (§2a `patient-markers`) and reads each marker's single z
+;; through `patient-z`. $ms is let-forced to the concrete tuple before `superpose`
+;; fans it — superpose does not reduce its argument, so superposing the bare call
+;; would branch over the unevaluated expression (the same discipline §5 documents).
+;; For a patient carrying only MeasuredZ atoms the union is that same marker list in
+;; that same order, so the behavior is unchanged.
 (= (elevated-marker $space $patient)
-   (let ($m $z) (match $space (MeasuredZ $patient $mm $zz) ($mm $zz))
-      (let $t (elevated-z-threshold)
-         (if (> $z $t) $m (superpose ())))))
+   (let $ms (patient-markers $space $patient)
+      (let $m (superpose $ms)
+         (let* (($z (patient-z $space $patient $m))
+                ($t (elevated-z-threshold)))
+            (if (> $z $t) $m (superpose ()))))))
 
 ;; Collapsed into one tuple, e.g. (DNAmPAI1 DNAmGDF15 CRP AgeAccelGrim). Tuple
 ;; order is collapse-order (not significant — diagnose ranks by coverage/mass).
