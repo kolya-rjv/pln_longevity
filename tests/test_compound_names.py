@@ -217,3 +217,66 @@ def test_translator_prompt_carries_the_same_alias_table():
     assert "COMPOUND NAME ALIASES" in prompt
     assert "sirolimus -> Rapamycin" in prompt
     assert "nmn -> Nicotinamide_mononucleotide" in prompt
+
+
+# ── A family stem is a question, not a compound ──────────────────────────────
+# The 2026-09-28 re-test: bare "urolithin" resolved to `Urolithin_D` and bare
+# "vitamin" to `Vitamin_E`, both reported as `synonym` at score 1.0 with the
+# note "same active moiety". They are different substances, and the resolver
+# already had an `ambiguous` rung that should have caught it.
+#
+# The cause was in `loose_key`, not in the ladder: `d`, `e`, `l` and `s` are
+# stereo descriptors, so `Urolithin_D` was stripped to `urolithin` while
+# `Urolithin_A` (no stereo letter) stayed `urolithina`. The two never shared a
+# loose bucket, so the collision check saw one candidate and matched it.
+
+def test_a_trailing_series_letter_is_not_a_stereo_descriptor():
+    """`Urolithin D` and `Vitamin E` keep the letter that names them."""
+    assert loose_key("Urolithin_D") != loose_key("urolithin")
+    assert loose_key("Vitamin_E") != loose_key("vitamin")
+    # Both members of a family stay distinguishable from each other.
+    assert loose_key("Urolithin_A") != loose_key("Urolithin_D")
+
+
+def test_a_leading_or_medial_stereo_descriptor_still_strips():
+    """The cases the loose key exists for must keep working."""
+    assert loose_key("n-acetylcysteine") == loose_key("N_acetyl_L_cysteine")
+    assert loose_key("trans-resveratrol") == loose_key("Resveratrol")
+    assert loose_key("glucosamine") == loose_key("D_glucosamine")
+
+
+def test_a_family_stem_resolves_to_ambiguous_with_its_members():
+    resolver = CompoundResolver(
+        ["Urolithin_A", "Urolithin_D", "Vitamin_C", "Vitamin_E", "Rapamycin"]
+    )
+
+    urolithin = resolver.resolve("urolithin")
+    assert urolithin.method == "ambiguous"
+    assert urolithin.matched is None
+    assert urolithin.suggestions == ["Urolithin_A", "Urolithin_D"]
+
+    vitamin = resolver.resolve("vitamin")
+    assert vitamin.method == "ambiguous"
+    assert vitamin.suggestions == ["Vitamin_C", "Vitamin_E"]
+
+
+def test_naming_a_family_member_still_resolves_exactly():
+    """Declining the stem must not cost the names that are not ambiguous."""
+    resolver = CompoundResolver(
+        ["Urolithin_A", "Urolithin_D", "Vitamin_C", "Vitamin_E", "Rapamycin"]
+    )
+    for query, expected in [
+        ("urolithin a", "Urolithin_A"),
+        ("Urolithin_D", "Urolithin_D"),
+        ("vitamin e", "Vitamin_E"),
+        ("rapamycin", "Rapamycin"),
+    ]:
+        resolution = resolver.resolve(query)
+        assert resolution.matched == expected, query
+        assert resolution.method in {"exact", "normalized"}, query
+
+    # And a typo is still corrected, at a score that says it was a correction.
+    typo = resolver.resolve("rapamicin")
+    assert typo.matched == "Rapamycin"
+    assert typo.method == "fuzzy"
+    assert typo.score < 1.0

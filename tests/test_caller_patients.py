@@ -376,3 +376,104 @@ def test_the_published_z_convention_says_which_z_it_describes():
     assert "AGE- AND SEX-ADJUSTED" in convention
     # …and, since the server also PRODUCES z-scores, which of the two it means.
     assert "DERIVES" in convention and "NOT" in convention
+
+
+# ── Units on raw marker values ───────────────────────────────────────────────
+# The 2026-09-28 re-test, finding 1: `CRP {value: 0.4, unit: "mg/dL"}` — 4 mg/L,
+# an ordinary result — came back z = -1.61 "Low" instead of z = +0.69. The unit
+# was read off the payload and then never used: `to_z` got the raw number
+# whatever the caller said it was measured in. A caller who follows the schema
+# got a silently wrong patient, and every downstream number inherited it.
+
+def test_the_same_concentration_standardises_the_same_in_any_accepted_unit():
+    """4 mg/L and 0.4 mg/dL are one measurement and must give one z."""
+    reference = build_patient(
+        {"age": 45, "sex": "Female", "markers": {"CRP": {"value": 4, "unit": "mg/L"}}}
+    ).markers[0]
+
+    for value, unit in [(0.4, "mg/dL"), (4, "ug/mL"), (4, "µg/mL"), (4, "MG / L")]:
+        converted = build_patient({
+            "age": 45, "sex": "Female",
+            "markers": {"CRP": {"value": value, "unit": unit}},
+        }).markers[0]
+        assert converted.z == pytest.approx(reference.z), f"{value} {unit}"
+        assert converted.status == reference.status
+
+
+def test_the_conversion_is_shown_in_the_formula():
+    """A derived z says how it was derived, conversion included."""
+    marker = build_patient({
+        "age": 45, "sex": "Female",
+        "markers": {"CRP": {"value": 0.4, "unit": "mg/dL"}},
+    }).markers[0]
+    assert "mg/dL" in marker.formula and "mg/L" in marker.formula
+    assert marker.derived is True
+    # The caller's own numbers are echoed back unchanged, not overwritten.
+    assert marker.raw_value == 0.4
+    assert marker.unit == "mg/dL"
+
+
+def test_molar_units_use_the_published_conversion():
+    """mmol/L glucose and IFCC HbA1c are the units a non-US lab reports."""
+    glucose = build_patient({
+        "age": 45, "sex": "Female",
+        "markers": {"FastingGlucose": {"value": 5.3, "unit": "mmol/L"}},
+    }).markers[0]
+    as_mgdl = build_patient({
+        "age": 45, "sex": "Female",
+        "markers": {"FastingGlucose": {"value": 5.3 * 18.0182, "unit": "mg/dL"}},
+    }).markers[0]
+    assert glucose.z == pytest.approx(as_mgdl.z)
+
+    # NGSP % = 0.09148 x IFCC + 2.152; 43 mmol/mol is ~6.09%.
+    hba1c = build_patient({
+        "age": 45, "sex": "Female",
+        "markers": {"HbA1c": {"value": 43, "unit": "mmol/mol"}},
+    }).markers[0]
+    as_percent = build_patient({
+        "age": 45, "sex": "Female",
+        "markers": {"HbA1c": {"value": 0.09148 * 43 + 2.152, "unit": "%"}},
+    }).markers[0]
+    assert hba1c.z == pytest.approx(as_percent.z)
+
+
+def test_an_unconvertible_unit_is_refused_rather_than_ignored():
+    """A 422 naming the accepted units beats a confidently wrong patient."""
+    with pytest.raises(PatientSpecError) as excinfo:
+        build_patient({
+            "age": 45, "sex": "Female",
+            "markers": {"CRP": {"value": 4, "unit": "nmol/L"}},
+        })
+    assert excinfo.value.code == "unsupported_unit"
+    assert "mg/L" in excinfo.value.extra["accepted_units"]
+
+    # An age ACCELERATION is read as years; months are not years.
+    with pytest.raises(PatientSpecError) as excinfo:
+        build_patient({
+            "age": 45, "sex": "Female",
+            "markers": {"AgeAccelGrim": {"value": 6, "unit": "months"}},
+        })
+    assert excinfo.value.code == "unsupported_unit"
+
+
+def test_omitting_the_unit_still_means_the_reference_unit():
+    """The documented default, unchanged: no unit is not an error."""
+    stated = build_patient({
+        "age": 45, "sex": "Female",
+        "markers": {"CRP": {"value": 4, "unit": "mg/L"}},
+    }).markers[0]
+    omitted = build_patient({
+        "age": 45, "sex": "Female", "markers": {"CRP": {"value": 4}},
+    }).markers[0]
+    assert omitted.z == pytest.approx(stated.z)
+
+
+def test_the_marker_catalogue_publishes_what_it_accepts():
+    """A caller should not need a 422 to learn which units work."""
+    from core.patient_builder import marker_catalog
+
+    catalogue = {entry["marker"]: entry for entry in marker_catalog()}
+    assert "mg/dL" in catalogue["CRP"]["accepted_units"]
+    assert catalogue["CRP"]["raw_unit"] == "mg/L"
+    assert "mmol/mol" in catalogue["HbA1c"]["accepted_units"]
+    assert "years" in catalogue["AgeAccelGrim"]["accepted_units"]

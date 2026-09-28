@@ -1848,6 +1848,13 @@ class HumanCrossReferenceOut(BaseModel):
 
 class HumanEvidenceResponse(BaseModel):
     intervention: Optional[str] = None
+    resolution: Optional["CompoundResolutionOut"] = Field(
+        default=None,
+        description="How the requested name was matched onto a curated "
+                    "intervention. Absent when no intervention was requested. "
+                    "`method` other than exact/normalized means this endpoint "
+                    "made a judgement worth reading.",
+    )
     studies: list[HumanStudyOut]
     cross_references: list[HumanCrossReferenceOut] = Field(
         default_factory=list,
@@ -1886,7 +1893,8 @@ def drugage_top_endpoint(
     is "gold-standard replicated mouse evidence only". `clade` takes
     Vertebrate / Invertebrate / Fungi / Protozoa. `direction=harmful` ranks the
     other end — compounds that SHORTENED lifespan — most harmful first, and
-    `direction=none` returns the measured NULLS (0.0% change), which used to be
+    `direction=none` returns the measured NULLS — a 0.0% change, or a row the
+    study itself reports as NotSignificant — which used to be
     counted as protective because the MeTTa sign convention has no zero.
 
     Scoring is done in Python because it cannot be done in the engine: 1,043
@@ -2069,15 +2077,29 @@ def human_evidence(intervention: Optional[str] = None) -> HumanEvidenceResponse:
     Pass `intervention=Metformin`, or nothing to list the whole table.
     """
     index = human_evidence_index(_runtime_kb_paths())
+    resolution = None
+    looked_up = intervention
     if intervention:
-        studies = index.for_intervention(intervention)
-        crossrefs = index.cross_references_for(intervention)
+        # The same resolver /drugage/rank uses. `omega-3` and
+        # `dasatinib+quercetin` used to miss `Omega3` and
+        # `DasatinibPlusQuercetin` on a case-insensitive string equality.
+        resolved = index.resolve_intervention(intervention)
+        resolution = CompoundResolutionOut(**resolved.as_dict())
+        looked_up = resolved.matched or intervention
+        studies = index.for_intervention(looked_up)
+        crossrefs = index.cross_references_for(looked_up)
     else:
         studies = index.records()
         crossrefs = list(index.cross_references)
 
     note = None
-    if intervention and not studies and not crossrefs:
+    if resolution is not None and resolution.method == "ambiguous":
+        note = (
+            f"'{intervention}' matches more than one curated intervention, so "
+            f"nothing was looked up. Ask for one of: "
+            f"{', '.join(resolution.suggestions)}."
+        )
+    elif intervention and not studies and not crossrefs:
         note = (
             f"No curated human study names '{intervention}'. This layer is a "
             f"small hand-built table, so that is an absence of a RECORD, not "
@@ -2100,6 +2122,7 @@ def human_evidence(intervention: Optional[str] = None) -> HumanEvidenceResponse:
 
     return HumanEvidenceResponse(
         intervention=intervention,
+        resolution=resolution,
         studies=[HumanStudyOut(**s.as_dict()) for s in studies],
         cross_references=[HumanCrossReferenceOut(**x.as_dict()) for x in crossrefs],
         covered_interventions=index.interventions(),

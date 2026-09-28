@@ -286,16 +286,58 @@ def test_a_reported_null_is_not_labelled_protective():
     """
     from ontology.drugage_selector import DrugAgeRow
 
-    def scored(pct: float):
+    def scored(pct: float, significance: str = "Significant"):
         return score_row(DrugAgeRow(
             row_id="E", compound="X", species="Mus_musculus",
-            significance="NotSignificant", avg_change=pct, is_itp=True, block="",
+            significance=significance, avg_change=pct, is_itp=True, block="",
         ), load_knobs())
 
     assert scored(0.0).direction == "no_effect"
     assert scored(0.0).score == 0.0
     assert scored(3.0).direction == "protective"
     assert scored(-3.0).direction == "harmful"
+
+
+def test_a_non_significant_row_reports_no_direction():
+    """A direction the experiment declined to claim is not ours to report.
+
+    The 2026-09-28 re-test: fisetin came back `harmful` at confidence 0.81 off a
+    NON-significant -1% ITP row. Significance was priced into `confidence` and
+    then ignored by the label, so the strongest-sounding field in the response
+    asserted a direction the study explicitly did not find.
+
+    `Unreported` is deliberately NOT swept in with it: a study that never stated
+    significance is an unknown, not a null, and the 0.6 gate already prices that.
+    """
+    from ontology.drugage_selector import DrugAgeRow
+
+    def scored(pct: float, significance: str, itp: bool = True):
+        return score_row(DrugAgeRow(
+            row_id="E", compound="X", species="Mus_musculus",
+            significance=significance, avg_change=pct, is_itp=itp, block="",
+        ), load_knobs())
+
+    # The reported case, both signs, ITP and ordinary rows alike.
+    assert scored(-1.0, "NotSignificant").direction == "no_effect"
+    assert scored(3.0, "NotSignificant").direction == "no_effect"
+    assert scored(3.0, "NotSignificant", itp=False).direction == "no_effect"
+
+    # The magnitude survives: only the LABEL changed, not the arithmetic.
+    assert scored(-1.0, "NotSignificant").strength > 0.0
+
+    # And this is why the label is the whole story for an ITP row: the
+    # calibration layer scores a well-run NULL at the same confidence as a
+    # well-run positive, on purpose (drugage_calibration.metta: "both 0.90: we
+    # trust a well-run NULL too"). So `direction` was the ONLY field in which
+    # an ITP null differed from an ITP hit, and it differed by reporting the
+    # sign of the noise.
+    assert scored(-1.0, "NotSignificant").confidence == pytest.approx(
+        scored(-1.0, "Significant").confidence
+    )
+
+    # An unreported significance keeps its direction.
+    assert scored(3.0, "Unreported").direction == "protective"
+    assert scored(-3.0, "Unreported").direction == "harmful"
 
 
 def test_the_ranking_reports_how_many_compounds_it_could_not_score():

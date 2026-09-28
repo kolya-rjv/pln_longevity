@@ -359,7 +359,19 @@ curl -X POST localhost:7860/query -H 'Content-Type: application/json' -d '{
 A bare number is a **z-score** — standard deviations from the age- and
 sex-adjusted mean, which is what the KB reasons in. A `value` is standardised
 server-side and the response says exactly how (`derived: true` plus the
-formula). `GET /patients/markers` lists what is supported; `POST
+formula).
+
+**`unit` is honoured, or the marker is refused.** It used to be read off the
+payload and then ignored, so `CRP {value: 0.4, unit: "mg/dL"}` — 4 mg/L, an
+ordinary result — was standardised as 0.4 mg/L and came back z = -1.61 "Low"
+instead of z = +0.69, and every number downstream inherited it. A unit the
+marker has an exact conversion for is converted, and the conversion appears in
+`formula`; any other unit is a **422 `unsupported_unit`** naming what is
+accepted. Omitting `unit` still means the reference unit. `GET
+/patients/markers` publishes `accepted_units` per marker, so a caller never
+needs a 422 to find out: CRP takes mg/L, mg/dL and µg/mL; FastingGlucose mg/dL
+and mmol/L; HbA1c % (NGSP) and mmol/mol (IFCC, via the published master
+equation); the age-acceleration markers take years. `GET /patients/markers` lists what is supported; `POST
 /patients/preview` shows the atoms and each marker's Elevated/Normal/Low status
 without running anything.
 
@@ -513,8 +525,21 @@ is the record set, and `GET /evidence/human` reads it:
 ```bash
 curl 'localhost:7860/evidence/human?intervention=Metformin'
 curl 'localhost:7860/evidence/human?intervention=DasatinibPlusQuercetin'
+curl 'localhost:7860/evidence/human?intervention=dasatinib+quercetin'   # same thing
 curl localhost:7860/evidence/human           # the whole table
 ```
+
+**The name is resolved, not string-matched.** This endpoint used the same
+`CompoundResolver` as `/drugage/rank` only from the 2026-09-28 fixes onward;
+before that the lookup was a case-insensitive equality, so `omega-3` and
+`dasatinib+quercetin` returned "no curated human study" while `Omega3` and
+`DasatinibPlusQuercetin` were both covered — the endpoint denying evidence it
+holds, which is the one mistake a layer built to separate "no record" from "no
+effect" cannot afford. `+`, `&` and `and` between two compounds all name the
+combination. The response carries a `resolution` block (`query`, `matched`,
+`method`, `score`) so a caller can see which name was actually read; a `method`
+of `ambiguous` means nothing was looked up and the suggestions name the
+candidates.
 
 ```
 Metformin
@@ -842,20 +867,37 @@ under `excluded_from_runtime`. It's still queryable in stub mode (no
 `hyperon` installed / `PLN_RUNTIME_AVAILABLE=false`).
 
 There is a second, sharper limit on the same space, and it is not about file
-size: **the number of top-level expressions the runtime KB loads in total.**
-Adding `lifestyle_evidence.metta` and a first draft of `human_evidence.metta`
-took it from ~940 to ~1050 expressions, and `POST /query` for a caller-supplied
-patient started aborting the interpreter outright — the non-unwinding panic in
-`hyperon-space/src/index/trie.rs`, which no `except` can catch. In the API that
-surfaces as a 500 and a replaced worker (`core/executor.py` exists for exactly
-this); in the test suite it killed the run with "Fatal Python error: Aborted"
-and no failing test to point at.
+size — nor, as this document said until the 2026-09-28 re-test, about how many
+expressions or rows the KB holds. **It is the number of DISTINCT HEAD SYMBOLS
+in the space.** Measured against the shipped KB and asserted by
+`tests/test_kb_head_symbol_budget.py`:
 
-The human-evidence records were reshaped to one atom per study rather than one
-atom per field, which cost ~49 expressions instead of ~113, and
-`tests/test_human_evidence.py` now carries two guards: a cheap budget assertion
-on the expression count, and the query that died, re-run in a **subprocess**, so
-the next regression is a red test rather than a dead process.
+| Added to the runtime space | Result |
+| --- | --- |
+| 400 atoms under ONE new head symbol | loads and queries fine |
+| 4 atoms under FOUR new head symbols | non-unwinding panic, process dies |
+
+The panic is in `hyperon-space/src/index/trie.rs` and no `except` can catch it.
+In the API it surfaces as a 500 and a replaced worker (`core/executor.py`
+exists for exactly this); in the test suite it killed the run with "Fatal
+Python error: Aborted" and no failing test to point at.
+
+**Why this matters more than the atom count.** Trimming rows buys nothing:
+reshaping the human-evidence records to one atom per study rather than one per
+field helped because it removed *predicates*, not because it removed
+expressions. And the margin is small — on the order of a handful of new head
+symbols — so the realistic way to cross it is not curation but a **generated
+ETL file left in the repository root**, which `_runtime_kb_paths()` auto-loads
+and which introduces a head symbol per field predicate. That takes every
+inference query to a 500 at once, while the endpoints that do not go through
+the shared space (`/drugage/*`, `/genes*`, `/evidence/human`, `/hallmarks`)
+keep working — which is exactly the shape the 2026-09-28 re-test observed.
+`scripts/run_etl.sh` now refuses to write to the repo root, and
+`tests/test_kb_head_symbol_budget.py` fails if an untracked `.metta` appears
+there.
+
+`tests/test_human_evidence.py` also carries the query that died, re-run in a
+**subprocess**, so the next regression is a red test rather than a dead process.
 
 The same size question applies to the **prompt**, and used to be fatal there.
 The LLM context pasted every selected file verbatim; selecting a CellAge or
@@ -1007,7 +1049,18 @@ negatives at confidence 0.81), never a missing value — and it now reads
 zero, so a 0.0 % row is `Neg` because it is not negative; rendering that as
 `"protective"` put `direction: "protective"` next to `score: 0.0` and a
 `semantics.zero_score` note calling it a measured null, in one response.
-`GET /drugage/top?direction=none` lists them.
+
+A row the study itself reports as **NotSignificant** reads `no_effect` too,
+whatever the sign of its point estimate. Fisetin used to come back `harmful` at
+confidence 0.81 off a non-significant -1 % ITP row — a direction the experiment
+declined to claim. For an ITP row the label is the whole story: the calibration
+layer scores a well-run null at the *same* confidence as a well-run positive, on
+purpose, so `direction` was the only field in which the two differed, and it
+differed by reporting the sign of the noise. `Unreported` is deliberately left
+alone — a study that never stated significance is an unknown, not a null, and
+the 0.6 gate already prices that.
+
+`GET /drugage/top?direction=none` lists all of them.
 
 **One row per compound, and which one.** A compound usually has several rows —
 rapamycin has 37, astaxanthin 6. The score uses one representative: the

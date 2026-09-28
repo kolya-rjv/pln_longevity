@@ -28,8 +28,11 @@ Three things follow, and all three need a separate PROCESS:
    impossible.
 3. **Crash containment.** hyperon 0.2.10 aborts the whole interpreter with a
    NON-UNWINDING Rust panic ("called `Option::unwrap()` on a `None` value" in
-   hyperon-space's trie) once a space passes a few hundred rows in certain query
-   shapes. `except Exception` cannot catch that — in-process it kills the uvicorn
+   hyperon-space's trie) once a space holds too many DISTINCT HEAD SYMBOLS.
+   Measured, and asserted by `tests/test_kb_head_symbol_budget.py`: 400 atoms
+   under ONE new head symbol load and query fine, while 4 atoms under 4 NEW head
+   symbols abort. Atom count is not the axis; the number of distinct predicates
+   is. `except Exception` cannot catch that — in-process it kills the uvicorn
    worker. In a child process it surfaces as `BrokenProcessPool`, which is an
    ordinary exception the API can answer with a 500.
 
@@ -76,9 +79,13 @@ class PLNWorkerCrashed(Exception):
     def __init__(self, detail: str = "") -> None:
         super().__init__(
             "The PLN worker process terminated while running this query. hyperon "
-            "0.2.10 aborts the interpreter (a non-unwinding Rust panic) on some "
-            "query shapes once a space grows past a few hundred rows; the worker "
-            "has been replaced and the service is still up. "
+            "0.2.10 aborts the interpreter (a non-unwinding Rust panic) once the "
+            "loaded space holds too many DISTINCT HEAD SYMBOLS -- NOT too many "
+            "rows: 400 atoms under one new head symbol are fine, 4 atoms under 4 "
+            "new head symbols are not. The usual cause is a generated ETL file "
+            "left in the repository root, which the runtime auto-loads; check "
+            "GET /ontology/files against what the build should contain. The "
+            "worker has been replaced and the service is still up. "
             + detail
         )
 

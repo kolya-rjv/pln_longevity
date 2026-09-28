@@ -144,8 +144,25 @@ class RowScore:
         `semantics.zero_score` note saying that a 0.0 is a REPORTED NULL. The
         most consequential rows in the build are exactly these: the ITP nulls
         for metformin and resveratrol, at the highest confidence the KB gives.
+
+        A row the study itself calls NOT significant reports no effect either,
+        whatever the sign of its point estimate. Reading the sign alone made
+        fisetin `harmful` at confidence 0.81 off a non-significant -1% ITP row —
+        a direction the experiment explicitly declined to claim. For an ITP row
+        the label is the whole story: the calibration layer scores a well-run
+        NULL at the same confidence as a well-run positive, deliberately
+        (drugage_calibration.metta §5), so `direction` was the only field in
+        which the two differed — and it differed by reporting the sign of the
+        noise. Outside the ITP the `sig-gate` still discounts the confidence;
+        either way this changes the LABEL, never the arithmetic.
+
+        `Unreported` is left alone on purpose: a study that never stated
+        significance is an unknown, not a null, and the 0.6 gate already prices
+        that in.
         """
         if self.strength == 0.0:
+            return "no_effect"
+        if (self.row.significance or "") == "NotSignificant":
             return "no_effect"
         return "protective" if self.protective else "harmful"
 
