@@ -395,5 +395,41 @@
     "requires_pln_inference": true,
     "confidence_filter": 0.0,
     "warnings": []
+  },
+  {
+    "nl": "Which of my labs make me biologically older according to LinAge2?",
+    "metta_query": "(linage-decomposition-patient &self Caller_W58)",
+    "explanation": "Runs the LinAge2 decomposition for the caller's patient: every model input with its years-contribution, measured and imputed kept apart, the totals, and the explicit age-term residual. An input that reads out a KB biomarker (CRP, HbA1c, glucose, cotinine) carries the hallmark causes credited to it — only when the patient's own z for that biomarker is Elevated, or for cotinine when the patient is a current smoker; the other inputs are reported as years and left unexplained rather than guessed at.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "How much does my LinAge2 result raise my risk of dying?",
+    "metta_query": "(linage-hazard-patient &self Caller_W58)",
+    "explanation": "Returns the relative all-cause-mortality hazard for the caller's LinAge2 delta: HR^delta with the hazard ratio per year read off the Fong 2025 record (1.093, from the reported ~7.8-year mortality rate doubling time), and the calibrated confidence of that single-cohort evidence. It is a multiplier against a same-age, same-sex person with a delta of 0; an absolute risk (linage-risk-patient) additionally needs the generated NHANES all-cause baseline and yields nothing without it.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "If I quit smoking, how many of my LinAge2 years would that remove?",
+    "metta_query": "(linage-counterfactual-patient &self Caller_W58 SmokingCessation)",
+    "explanation": "The LinAge2 counterfactual for the SmokingCessation lever: it resolves the lever to the exposures it reduces (SmokingPackYears, CurrentTobaccoExposure), finds the measured LinAge2 inputs that read those out (the cotinine input), and — only if the patient is recorded as a CurrentSmoker and the input adds years — returns the expected reduction in years with the propagated confidence, naming the inputs credited under Via. For a never smoker it honestly returns 0 with an empty Via.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "What could I do about my LinAge2 biological age?",
+    "metta_query": "(linage-scenarios-patient &self Caller_W58)",
+    "explanation": "Runs the four standing LinAge2 counterfactuals — reduce chronic inflammation, clear senescent cells, address insulin resistance, quit smoking — and returns the expected years removed by each, with confidence and the inputs credited. A lever that reaches no input whose direction the patient's own values witness returns 0 rather than a fabricated benefit.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": []
   }
 ]

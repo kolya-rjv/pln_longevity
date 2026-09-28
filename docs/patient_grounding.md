@@ -185,6 +185,13 @@ This is what makes the *same* pool recommend `Berberine` for the metabolic
 6. **Per-marker reference policy.** v1 uses one global z-threshold; some markers
    may warrant marker-specific cutoffs (e.g. `DunedinPACE > 1.0`), which fits as a
    per-marker override of `elevated-z-threshold`.
+7. **A clinical clock, not just DNAm.** ✅ **Done — see `docs/linage2_integration.md`.**
+   A caller's LinAge2 result (Fong et al. 2025; blood-panel mortality clock) enters as a
+   request-scoped patient: the `LinAgeAccel` clock marker plus one years-contribution
+   atom per lab. The layer credits a contribution to a cause only when this layer's own
+   `patient-z` witnesses the biomarker's direction — a LinAge2 weight's sign is not a
+   lab's direction — and runs in its own query-scoped space for the head-symbol reason
+   `docs/nhanes_integration.md` §8 measured.
 
 ## 7. Non-goals
 

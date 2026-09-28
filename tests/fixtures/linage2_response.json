@@ -1,0 +1,337 @@
+{
+ "code": 200,
+ "biological_age": 66.28471074088066,
+ "message": "Prediction successful",
+ "metadata": {
+  "chronological_age": 58.0,
+  "delta_ba_ca": 8.284710740880657,
+  "features_used": 59,
+  "total_features": 59,
+  "warnings": null,
+  "feature_contributions": [
+   {
+    "feature": "LBXCOT",
+    "contribution_years": 2.934100199976649,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBDSALSI",
+    "contribution_years": 2.2642984565989597,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBXGH",
+    "contribution_years": 0.8646268462477731,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBXRDW",
+    "contribution_years": 0.8615603294632866,
+    "is_imputed": false
+   },
+   {
+    "feature": "BPXSAR",
+    "contribution_years": 0.8191911990202793,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBDSUASI",
+    "contribution_years": 0.3985248841146052,
+    "is_imputed": false
+   },
+   {
+    "feature": "BPXPLS",
+    "contribution_years": 0.30731741712963323,
+    "is_imputed": false
+   },
+   {
+    "feature": "fs2Score",
+    "contribution_years": 0.26417816042847925,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBDSGBSI",
+    "contribution_years": 0.18285961598981693,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBXWBCSI",
+    "contribution_years": 0.14797812740932478,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBXSNASI",
+    "contribution_years": 0.09851480416726481,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBXMC",
+    "contribution_years": 0.09761561224275346,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBDSTPSI",
+    "contribution_years": 0.09523224133872771,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBXRBCSI",
+    "contribution_years": 0.08507987625850316,
+    "is_imputed": true
+   },
+   {
+    "feature": "LDLV",
+    "contribution_years": 0.0825353623302807,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBDSTBSI",
+    "contribution_years": 0.07541867966245948,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBDNENO",
+    "contribution_years": 0.07416145062469946,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXPLTSI",
+    "contribution_years": 0.056668325527535084,
+    "is_imputed": false
+   },
+   {
+    "feature": "fs1Score",
+    "contribution_years": 0.04692174128623777,
+    "is_imputed": false
+   },
+   {
+    "feature": "SSBNP",
+    "contribution_years": 0.04586186282032296,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBDFERSI",
+    "contribution_years": 0.028496998049873084,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXHGB",
+    "contribution_years": 0.028440632299742922,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBDSCRSI",
+    "contribution_years": 0.02698286536772934,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBDEONO",
+    "contribution_years": 0.023739840941850957,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXPCT",
+    "contribution_years": 0.023672981760463414,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXMOPCT",
+    "contribution_years": 0.02297304419469764,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXSASSI",
+    "contribution_years": 0.019848756401250296,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBXNEPCT",
+    "contribution_years": 0.016334969015153824,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXBAPCT",
+    "contribution_years": 0.013307260355133079,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXLYPCT",
+    "contribution_years": 0.012397130296483212,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXMPSI",
+    "contribution_years": 0.006729584661044167,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBDSPHSI",
+    "contribution_years": 0.005501485397233572,
+    "is_imputed": false
+   },
+   {
+    "feature": "URXUCRSI",
+    "contribution_years": 0.004476982363866868,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBDFOLSI",
+    "contribution_years": 0.004408456014487492,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBDSBUSI",
+    "contribution_years": 0.001124586416545951,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBDMONO",
+    "contribution_years": 0.0010384880375933563,
+    "is_imputed": true
+   },
+   {
+    "feature": "URXUMASI",
+    "contribution_years": 0.0001285572948526738,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBDSCASI",
+    "contribution_years": 0.0,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBXSKSI",
+    "contribution_years": -0.0,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBDBANO",
+    "contribution_years": -0.0038747409987648696,
+    "is_imputed": true
+   },
+   {
+    "feature": "crAlbRat",
+    "contribution_years": -0.004666595703328198,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBDLYMNO",
+    "contribution_years": -0.005147428905311149,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXEOPCT",
+    "contribution_years": -0.005323673764836429,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBDIRNSI",
+    "contribution_years": -0.0064636719426028055,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXHCT",
+    "contribution_years": -0.0084808967942632,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXMCHSI",
+    "contribution_years": -0.008893255774052188,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXSC3SI",
+    "contribution_years": -0.018895439547108258,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBDB12SI",
+    "contribution_years": -0.026739290659647988,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXCRP",
+    "contribution_years": -0.02698449404382769,
+    "is_imputed": false
+   },
+   {
+    "feature": "fs3Score",
+    "contribution_years": -0.04674718410473406,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBXSATSI",
+    "contribution_years": -0.0912049604013395,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBXSCLSI",
+    "contribution_years": -0.09613615912133311,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBDTIBSI",
+    "contribution_years": -0.1185959812550272,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXSLDSI",
+    "contribution_years": -0.15009889064851953,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBXMCVSI",
+    "contribution_years": -0.15396548263011478,
+    "is_imputed": true
+   },
+   {
+    "feature": "LBXSAPSI",
+    "contribution_years": -0.15839429548244316,
+    "is_imputed": false
+   },
+   {
+    "feature": "LBDSGLSI",
+    "contribution_years": -0.33663580702681467,
+    "is_imputed": false
+   },
+   {
+    "feature": "BPXDAR",
+    "contribution_years": -0.3877093946022722,
+    "is_imputed": false
+   },
+   {
+    "feature": "BMXBMI",
+    "contribution_years": -0.5984024474343695,
+    "is_imputed": false
+   }
+  ],
+  "imputed_features": [
+   "URXUMASI",
+   "URXUCRSI",
+   "LBDIRNSI",
+   "LBDTIBSI",
+   "LBXPCT",
+   "LBDFERSI",
+   "LBDFOLSI",
+   "LBDB12SI",
+   "LBXLYPCT",
+   "LBXMOPCT",
+   "LBXNEPCT",
+   "LBXEOPCT",
+   "LBXBAPCT",
+   "LBDLYMNO",
+   "LBDMONO",
+   "LBDNENO",
+   "LBDEONO",
+   "LBDBANO",
+   "LBXRBCSI",
+   "LBXHCT",
+   "LBXMCVSI",
+   "LBXMCHSI",
+   "LBXMC",
+   "LBXMPSI",
+   "SSBNP",
+   "crAlbRat"
+  ]
+ }
+}

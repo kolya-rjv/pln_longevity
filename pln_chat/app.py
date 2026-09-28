@@ -4,6 +4,7 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 # Ensure the pln_chat package root is on sys.path so submodule imports work
 # whether the file is run directly or via `python -m`.
@@ -48,7 +49,8 @@ from core.executor import (
 )
 from core.llm_translator import translate
 from core.metta_validator import ValidationResult, validate
-from core.pln_runner import PLNRunResult, run_query
+from core.linage2_router import linage2_form_warnings, parse_linage2_query
+from core.pln_runner import PLNRunResult, linage2_patient_kb, run_query
 from utils.formatting import format_bot_response
 from utils.logging import log_query, log_turn
 from utils.metta_highlight import highlight_metta
@@ -194,6 +196,25 @@ def _runtime_kb_paths() -> list[Path]:
 _ALL_KB_PATHS: list[Path] = _runtime_kb_paths()
 
 
+_LINAGE2_CONTEXT: Optional[tuple] = None
+
+
+def _linage2_context() -> tuple:
+    """Registry + inventory over the LinAge2 scoped stack, built once.
+
+    The chat UI has no caller-supplied patient yet, so a LinAge2 form typed here
+    can only name a curated patient — none of whom carries a LinAge2 result — and
+    the honest answer is empty. The route exists so the UI and the API validate
+    and execute the same form the same way; the patient surface is the API's.
+    """
+    global _LINAGE2_CONTEXT
+    if _LINAGE2_CONTEXT is None:
+        paths = linage2_patient_kb()
+        registry, _ = load_specific_files(paths)
+        _LINAGE2_CONTEXT = (registry, inventory_for(paths))
+    return _LINAGE2_CONTEXT
+
+
 def _build_context(selected_files: list[str]) -> tuple[OntologyRegistry, dict[str, str]]:
     """Load selected .metta files for the LLM system prompt context.
 
@@ -286,6 +307,25 @@ def chat(
                     confidence_threshold=confidence_threshold,
                 ),
             )
+        elif parse_linage2_query(translation.metta_query) is not None:
+            # A LinAge2 form (pln_linage2.metta). Its layer cannot join the shared
+            # space — hyperon's head-symbol budget, linage2_core.metta header — so
+            # it runs in core.pln_runner.LINAGE2_PATIENT_STACK, validated against
+            # that space, exactly as the HTTP API does (tests/test_ui_api_parity).
+            linage_registry, linage_inventory = _linage2_context()
+            validation = validate(translation.metta_query, linage_registry, linage_inventory)
+            linage_kb = linage2_patient_kb()
+            pln_result = run_offloaded(
+                "run_query",
+                {"metta_query": translation.metta_query,
+                 "confidence_threshold": confidence_threshold,
+                 "kb_files": linage_kb},
+                lambda: run_query(
+                    metta_query=translation.metta_query,
+                    confidence_threshold=confidence_threshold,
+                    kb_files=linage_kb,
+                ),
+            )
         else:
             # The inventory is what tells a real symbol (MTORC1, Mouse) from an
             # invented one, and a populated predicate from a declared-but-empty
@@ -332,6 +372,7 @@ def chat(
     for warning in (
         lever_warnings(translation.metta_query)
         + scoped_form_warnings(translation.metta_query, _ALL_KB_PATHS, inventory)
+        + linage2_form_warnings(translation.metta_query)
     ):
         bot_response += f"\n\n> **Note.** {warning}"
 

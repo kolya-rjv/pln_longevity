@@ -103,6 +103,14 @@ MARKERS: dict[str, MarkerSpec] = {
         "HorvathAgeAccel", "clock",
         "first-generation clock; carried for the discordance story, no downstream edge",
     ),
+    "LinAgeAccel": MarkerSpec(
+        "LinAgeAccel", "clock",
+        "the LinAge2 CLINICAL clock's biological-age delta (BA - CA, years) — the "
+        "predictor of the all-cause-mortality hazard (linage-hazard-patient). Send "
+        "the whole LinAge2 /predict response under `linage2` instead of this bare "
+        "marker to also get the per-lab decomposition and the counterfactuals; the "
+        "two are mutually exclusive.",
+    ),
     "DNAmPAI1": MarkerSpec(
         "DNAmPAI1", "grimage_component",
         "senescence readout (SASP -> PAI-1); drives the abductive diagnosis and "
@@ -162,6 +170,10 @@ MARKERS: dict[str, MarkerSpec] = {
 #: Converted with the risk layer's own `grimaccel-sd-to-years` knob so the two
 #: never drift apart.
 YEARS_PER_SD_MARKERS = {"AgeAccelGrim", "HorvathAgeAccel"}
+#: The LinAge2 delta is also years, but on the clinical clock's own spread —
+#: `linage-sd-to-years` in pln_linage2.metta (8.66 y/SD, derived from the model's
+#: training cohort), not GrimAge's 4.2. Same rule, different knob.
+LINAGE_YEARS_MARKERS = {"LinAgeAccel"}
 
 SEXES = {"Male", "Female"}
 SMOKING = {"NeverSmoker", "FormerSmoker", "CurrentSmoker"}
@@ -221,10 +233,19 @@ class BuiltPatient:
     sex: Optional[str] = None
     smoking: Optional[str] = None
 
+    #: Set when the caller sent a LinAge2 response under `linage2`.
+    linage2: Optional["BuiltLinAge2"] = None
+
     @property
     def can_predict_risk(self) -> bool:
         has_clock = any(m.name == "AgeAccelGrim" for m in self.markers)
         return has_clock and self.age is not None and self.sex is not None
+
+    @property
+    def has_linage2(self) -> bool:
+        """A LinAge2 delta is present (as a block or a bare LinAgeAccel marker), so
+        the LinAge2 forms — hazard, decomposition, counterfactuals — have input."""
+        return self.linage2 is not None or any(m.name == "LinAgeAccel" for m in self.markers)
 
 
 def _validate_id(raw_id: Optional[str], existing: Iterable[str]) -> str:
@@ -296,6 +317,7 @@ def _resolve_marker(
     *,
     sd_to_years: float,
     elevated_threshold: float,
+    linage_sd_to_years: float = 8.66,
 ) -> ResolvedMarker:
     spec = MARKERS.get(name)
     if spec is None:
@@ -330,6 +352,14 @@ def _resolve_marker(
             derived = True
             unit = unit or "years"
             formula = f"z = years / {sd_to_years:g}   [grimaccel-sd-to-years]"
+        elif name in LINAGE_YEARS_MARKERS:
+            z = _as_number(
+                value, code="invalid_marker_value",
+                what=f"Marker '{name}' value", marker=name,
+            ) / linage_sd_to_years
+            derived = True
+            unit = unit or "years"
+            formula = f"z = years / {linage_sd_to_years:g}   [linage-sd-to-years]"
         elif spec.reference is not None:
             # Coerced OUTSIDE the try: PatientSpecError is a ValueError, so a
             # coercion refusal caught here would be re-wrapped into itself.
@@ -376,6 +406,12 @@ def _resolve_marker(
         )
     elif spec.role == "clock" and name == "HorvathAgeAccel":
         note = "Recorded for the clock-discordance picture; no downstream edge."
+    elif name == "LinAgeAccel":
+        note = (
+            "Read by the LinAge2 forms only (linage-hazard-patient and friends), "
+            "which run in their own query-scoped space. The CHD risk model reads "
+            "AgeAccelGrim, not this."
+        )
     return ResolvedMarker(
         name=name, z=z, derived=derived,
         raw_value=(
@@ -395,12 +431,25 @@ def build_patient(
     existing_ids: Iterable[str] = (),
     sd_to_years: float = 4.2,
     elevated_threshold: float = 1.0,
+    linage_sd_to_years: Optional[float] = None,
 ) -> BuiltPatient:
     """Validate a caller's patient and render it as MeTTa atoms.
 
     Every atom is assembled from a validated field. Nothing the caller sends is
     ever interpolated into the text unchecked.
+
+    `linage2`, when present, is a LinAge2 /predict response for THIS patient; it is
+    validated and rendered by core.linage2_builder and its atoms are appended. It
+    is request-scoped like everything else here.
     """
+    # Imported here rather than at module top: linage2_builder imports this module
+    # for PatientSpecError / _as_number, and a top-level import in both directions
+    # would be a cycle.
+    from core.linage2_builder import build_linage2, linage_sd_to_years as _linage_knob
+
+    if linage_sd_to_years is None:
+        linage_sd_to_years = _linage_knob()
+
     patient_id = _validate_id(payload.get("id"), existing_ids)
 
     age = payload.get("age")
@@ -457,9 +506,70 @@ def build_patient(
         resolved.append(_resolve_marker(
             name, entry, sd_to_years=sd_to_years,
             elevated_threshold=elevated_threshold,
+            linage_sd_to_years=linage_sd_to_years,
         ))
 
     warnings: list[str] = []
+
+    # ── the LinAge2 block ──────────────────────────────────────────────────
+    # A whole /predict response, validated and rendered by core.linage2_builder.
+    # It becomes the LinAgeAccel clock marker (so it appears in `markers` and is
+    # rendered by the same loop as every other z, exactly once) plus the
+    # LinAgeDelta / LinAgeContribution atoms the LinAge2 forms read.
+    linage2_payload = payload.get("linage2")
+    built_linage2 = None
+    if linage2_payload is not None:
+        if any(m.name == "LinAgeAccel" for m in resolved):
+            raise PatientSpecError(
+                "duplicate_clock",
+                "Send EITHER `markers.LinAgeAccel` OR a `linage2` block, not both: "
+                "two z values for one clock double-count in every sum that reads it.",
+            )
+        built_linage2 = build_linage2(
+            linage2_payload, patient_id, age=age,
+            elevated_threshold=elevated_threshold, sd_to_years=linage_sd_to_years,
+        )
+        if age is None:
+            age = float(built_linage2.chronological_age)
+            warnings.append(
+                f"`age` was not sent; taken from the LinAge2 response's "
+                f"chronological_age ({age:g})."
+            )
+        resolved.append(ResolvedMarker(
+            name="LinAgeAccel", z=built_linage2.z, derived=True,
+            raw_value=built_linage2.delta_years, unit="years",
+            formula=f"z = years / {linage_sd_to_years:g}   [linage-sd-to-years]",
+            status=built_linage2.status,
+            note=(
+                "From the `linage2` block. Read by the LinAge2 forms "
+                "(linage-hazard-patient, linage-decomposition-patient, "
+                "linage-counterfactual-patient), which run in their own query-scoped "
+                "space; the CHD risk model reads AgeAccelGrim, not this."
+            ),
+        ))
+        warnings.extend(built_linage2.warnings)
+        # The join that makes a cause creditable needs a witness the CALLER sends:
+        # the patient's own z for CRP / HbA1c / FastingGlucose, or a current-smoker
+        # status. Say so up front, or the decomposition comes back with every
+        # DrivenBy empty and reads as "the KB knows no causes".
+        witnesses = {"CRP", "HbA1c", "FastingGlucose"}
+        if not (witnesses & {m.name for m in resolved}) and smoking != "CurrentSmoker":
+            warnings.append(
+                "The LinAge2 block was sent without any of the markers the knowledge "
+                "base can join it to (CRP, HbA1c, FastingGlucose as z or value) and "
+                "without smoking = CurrentSmoker — the witnesses a cause needs. The "
+                "per-lab years will be reported, "
+                "but no contribution can be credited to a cause and every "
+                "counterfactual will return 0: a contribution's sign is not a lab's "
+                "direction (LinAge2's weights are sex-specific projections), so the "
+                "engine needs the patient's own value to say a lab is high."
+            )
+    elif any(m.name == "LinAgeAccel" for m in resolved):
+        warnings.append(
+            "LinAgeAccel was sent as a bare marker: the LinAge2 hazard is computable, "
+            "but the per-lab decomposition and the counterfactuals need the whole "
+            "/predict response under `linage2`."
+        )
     if not any(m.name == "AgeAccelGrim" for m in resolved):
         warnings.append(
             "No AgeAccelGrim measurement: the 10-year CHD risk model reads that "
@@ -513,7 +623,10 @@ def build_patient(
     # The provenance is in `derived`/`formula` on the response and in this
     # warning; it deliberately is NOT invented into the KB as an adjustment
     # that was never made.
-    derived = [m.name for m in resolved if m.derived and m.name not in YEARS_PER_SD_MARKERS]
+    derived = [
+        m.name for m in resolved
+        if m.derived and m.name not in YEARS_PER_SD_MARKERS and m.name not in LINAGE_YEARS_MARKERS
+    ]
     if derived:
         warnings.append(
             "Standardised server-side from a raw value: " + ", ".join(derived) +
@@ -540,6 +653,8 @@ def build_patient(
         lines.append(f"(PatientSmoking {patient_id} {smoking})")
     for marker in sorted(resolved, key=lambda m: m.name):
         lines.append(f"(MeasuredZ {patient_id} {marker.name} {marker.z:.6g})")
+    if built_linage2 is not None:
+        lines.append(built_linage2.atoms)
 
     return BuiltPatient(
         patient_id=patient_id,
@@ -549,6 +664,7 @@ def build_patient(
         age=age,
         sex=sex,
         smoking=smoking,
+        linage2=built_linage2,
     )
 
 
@@ -565,6 +681,13 @@ def marker_catalog() -> list[dict]:
         if spec.name in YEARS_PER_SD_MARKERS:
             entry["raw_unit"] = "years of age acceleration"
             entry["conversion"] = "z = years / grimaccel-sd-to-years"
+        elif spec.name in LINAGE_YEARS_MARKERS:
+            entry["raw_unit"] = "years of LinAge2 BA - CA delta"
+            entry["conversion"] = "z = years / linage-sd-to-years"
+            entry["scoped"] = (
+                "read in the LinAge2 query-scoped space only; prefer the `linage2` "
+                "block (the whole /predict response) — see GET /linage2/features"
+            )
         elif spec.reference is not None:
             entry["raw_unit"] = spec.reference.unit
             entry["reference_mean"] = spec.reference.mean

@@ -113,6 +113,96 @@ def nhanes_patient_kb(*generated: Path) -> list[Path]:
     return list(NHANES_PATIENT_STACK) + [p for p in generated if p.exists()]
 
 
+# ── LinAge2 clinical-clock stack ──────────────────────────────────────────────
+#
+# A QUERY-SCOPED space for the LinAge2 forms (pln_linage2.metta), routed to by
+# core/linage2_router.py. Scoped for the same measured reason as NHANES_PATIENT_STACK:
+# the shared space is saturated on distinct head symbols, and the LinAge2 layer adds
+# three (MeasuresBiomarker, and the per-request LinAgeDelta / LinAgeContribution).
+#
+# It is NOT "the NHANES patient stack plus LinAge2". Measured with the whole
+# NHANES_PATIENT_STACK underneath, the LinAge2 layer loaded with ZERO head-symbol
+# margin — two more heads and any query aborted — which also means a generated
+# NHANES baseline file (12 field heads) could never join it, and an absolute risk
+# would have been unreachable forever. Dropping what no LinAge2 form reads
+# (pln_intervention_ranking, pln_abductive_diagnosis, the López-Otín intervention
+# records, nhanes_reference) bought a margin of 32+ heads, enough for the generated
+# all-cause baseline with room to spare (tests/test_linage2.py asserts both the
+# canary queries and the margin). So this list is minimal on purpose; add a file
+# only if a LinAge2 form needs it, and re-run the margin test when you do.
+#
+# What each entry is for:
+#   types / predicates / evidence tiers ............ system_types, logical_predicates,
+#                                                    epistemic_calibration
+#   ExposureBiomarker, SmokingPackYears, Outcomes .. grim_age_core, grim_age_lu2019_evidence
+#   calibrate-tv ................................... evidence_calibration
+#   the hallmark list the causes are drawn from ..... hallmarks_core
+#   the causal graph (CRP / glucose / HbA1c axes) ... mechanistic_bridges
+#   infer, chain-discount .......................... pln_deduction
+#   patient-z, unique-tuple, elevated-z-threshold .. patient_profile
+#   pos-transmission, cf-tv-s / cf-tv-c ............ pln_counterfactual
+#   patient-baseline, risk-conf-discount, risk-ci-k  pln_risk_prediction
+#   the outcome-keyed data baseline lookup ......... nhanes_baseline
+#   SmokingCessation, SmokingPackYears edges ....... lifestyle_evidence
+#   the clock, its inputs, the hazard record, rules  linage2_core, linage2_fong2025_evidence,
+#                                                    pln_linage2
+LINAGE2_PATIENT_STACK: list[Path] = [
+    ONTOLOGY_DIR / f for f in (
+        "system_types.metta",
+        "logical_predicates.metta",
+        "epistemic_calibration.metta",
+        "grim_age_core.metta",
+        "grim_age_lu2019_evidence.metta",
+        "evidence_calibration.metta",
+        "hallmarks_core.metta",
+        "mechanistic_bridges.metta",
+        "pln_deduction.metta",
+        "patient_profile.metta",
+        "pln_counterfactual.metta",
+        "pln_risk_prediction.metta",
+        "nhanes_baseline.metta",
+        "lifestyle_evidence.metta",
+        "linage2_core.metta",
+        "linage2_fong2025_evidence.metta",
+        "pln_linage2.metta",
+    )
+]
+
+#: The three files that ARE the LinAge2 layer. Never in _INFERENCE_STACK (api.py /
+#: app.py) — the shared space cannot take their head symbols — and asserted absent
+#: from it by tests/test_linage2.py.
+LINAGE2_LAYER_FILES: tuple[str, ...] = (
+    "linage2_core.metta", "linage2_fong2025_evidence.metta", "pln_linage2.metta",
+)
+
+#: The one ETL output the LinAge2 stack picks up when present: the survey-weighted
+#: all-cause-mortality baseline (scripts/run_etl.sh -> nhanes_mortality_etl.py). It
+#: is what turns `linage-hazard-patient` (always available) into `linage-risk-patient`
+#: (an absolute ten-year risk). The reference-distribution and DNAm-clock outputs are
+#: deliberately NOT here: no LinAge2 form reads them, nhanes_reference.metta is not in
+#: this stack, and their 12-21 head symbols each would spend the margin for nothing.
+LINAGE2_GENERATED_BASELINE: Path = ONTOLOGY_DIR / "build" / "nhanes_mortality_baseline.metta"
+
+
+def linage2_patient_kb(*generated: Path) -> list[Path]:
+    """LINAGE2_PATIENT_STACK plus the generated all-cause baseline, when it exists.
+
+    Extra `generated` paths are appended if present, the same contract as
+    `nhanes_patient_kb`. With no baseline file the stack is complete and every
+    LinAge2 form except the absolute risk answers; `linage-risk-patient` then
+    yields nothing, which is the honest answer to "what is my risk" without a
+    baseline to multiply.
+    """
+    extras = [LINAGE2_GENERATED_BASELINE, *generated]
+    seen: set[Path] = set()
+    out = list(LINAGE2_PATIENT_STACK)
+    for p in extras:
+        if p.exists() and p not in seen:
+            seen.add(p)
+            out.append(p)
+    return out
+
+
 @dataclass
 class PLNAtomResult:
     atom: str

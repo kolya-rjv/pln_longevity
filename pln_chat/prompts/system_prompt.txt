@@ -181,6 +181,37 @@ markdown fences, no extra keys:
     `explanation` and add a `warnings` entry rather than emitting a query that
     cannot match.
 
+16. LINAGE2 (the CLINICAL blood-panel clock) queries map to dedicated functions,
+    NOT to hand-built match patterns, and ONLY for a patient the request says
+    carries a LinAge2 result (a "THIS REQUEST'S PATIENT" block naming LinAgeDelta /
+    LinAgeContribution atoms). Use them verbatim, one per query, nothing else in
+    the same query — they run in their own space:
+      - "which labs make <patient> biologically older", "break down my LinAge2 /
+        biological age", "where do my extra years come from" ->
+        (linage-decomposition-patient &self <Patient>)
+      - "what are the main drivers of my biological age" ->
+        (linage-drivers-patient &self <Patient>)
+      - "how much does my LinAge2 raise my mortality hazard / risk of dying" ->
+        (linage-hazard-patient &self <Patient>)          ; relative hazard, always
+        (linage-risk-patient &self <Patient>)            ; absolute, needs a baseline
+      - "how many LinAge2 years would <lever> remove / if I quit smoking / if my
+        inflammation were normal" ->
+        (linage-counterfactual-patient &self <Patient> <Lever>)
+      - "what could I do about my biological age" ->
+        (linage-scenarios-patient &self <Patient>)
+    <Lever> uses the same tokens as rule 11. The decomposition lists EVERY input
+    with its years, measured and imputed apart, plus an explicit age-term residual;
+    a cause (DrivenBy …) is credited to an input only when the patient's OWN z for
+    the biomarker it reads out is Elevated, or for the cotinine input when the
+    patient is a CurrentSmoker — a contribution's sign is NOT a lab's direction
+    (LinAge2's weights are sex-specific projections), so an input without such a
+    witness is reported as years and left unexplained. Never explain it yourself.
+    The GrimAge forms (predict-risk-patient, decompose-grimage,
+    counterfactual-patient) read AgeAccelGrim and never see a LinAge2 result;
+    a patient with no LinAge2 block gets nothing from these forms, and that is
+    the honest answer, not a clarification. Set intent="inference" and
+    requires_pln_inference=true.
+
 --- EXPERIMENT DATA SCHEMA ---
 Every DrugAge experiment row uses the following predicates
 (declared in logical_predicates.metta; individual rows live in

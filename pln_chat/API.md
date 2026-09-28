@@ -158,7 +158,7 @@ checkout, `drugage_etl_short.metta` is ~26,900 estimated tokens verbatim and
 ~340 as a card), and anything still too large is refused with **413
 `prompt_too_large`** before a call is billed.
 
-The default selection measures **292,605 characters, about 73,151 estimated
+The default selection measures **297,671 characters, about 74,417 estimated
 tokens** (26 files; `tests/test_prompt_size.py` pins that figure against the
 real `build_system_prompt`, so this sentence cannot drift from the code again).
 It came down from 301,035 when execution was scoped to the curated stack:
@@ -279,6 +279,8 @@ to `pln_chat/logs/session_*.jsonl`. For browser clients, set
 | GET    | `/patients`        | List the built-in patient profiles                            |
 | GET    | `/patients/markers`| Which biomarkers a caller-supplied patient may carry, and in what units |
 | POST   | `/patients/preview`| Validate your own patient and see the atoms it becomes — no inference |
+| GET    | `/linage2/features`| The LinAge2 clinical clock's 59 inputs (NHANES codes, KB symbols, which read out a KB biomarker), the forms, the scoped stack, whether an all-cause baseline is loaded |
+| POST   | `/linage2/analyze` | A patient's LinAge2 result, analysed without an LLM: per-lab years with causes credited under evidence, mortality hazard, absolute risk when a baseline exists, counterfactuals in years |
 | POST   | `/query`           | Ask a natural-language question of the KB (goes through the LLM translator) |
 | POST   | `/metta/run`       | Validate + execute a raw MeTTa query directly (no LLM call)  |
 | POST   | `/drugage/rank`    | Rank real DrugAge compounds by lifespan/mortality effect, no MeTTa needed |
@@ -421,6 +423,64 @@ against the raw `extra_atoms` path:
 * a query naming a patient the KB does not hold is flagged
   `unpersonalized` — `rank-interventions-for-patient` otherwise returns a
   confident population-level ranking for a typo'd id.
+
+### …and your LinAge2 result
+
+GrimAge is a DNA-methylation clock almost no app user has. **LinAge2** (Fong et
+al. 2025, npj Aging) is a mortality clock built from routine labs, and the
+`Rejuve/LinAge2-Python` service already returns, per person, a biological age,
+the BA−CA delta in years and one years-contribution per model input. Forward
+that response under `patient.linage2` and it becomes part of the same
+request-scoped patient:
+
+```bash
+curl -X POST localhost:7860/query -H 'Content-Type: application/json' -d '{
+  "message": "which of my labs make me biologically older, and what could I do about it?",
+  "patient": {
+    "id": "W58", "age": 58, "sex": "Male", "smoking": "CurrentSmoker",
+    "markers": {"HbA1c": 1.6, "CRP": {"value": 1.2, "unit": "mg/L"}},
+    "linage2": { … the LinAge2 /predict response body, as received … }
+  }
+}'
+```
+
+What it becomes: the `LinAgeAccel` clock marker (`z = delta / linage-sd-to-years`,
+8.66 years per SD, the spread of the delta across the model's training cohort) plus
+one `(LinAgeContribution <Patient> <Input> <years> Measured|Imputed)` atom per
+input. What it unlocks — the dedicated forms, which the translator emits for
+matching questions and which run in their own **query-scoped space**
+(`routed: "linage2"`; see "Demo query forms"):
+
+| form | answers |
+|---|---|
+| `(linage-decomposition-patient &self <P>)` | every input's years, measured and imputed apart, the totals, the explicit age-term residual, and for the four inputs that read out a KB biomarker the hallmark causes — credited **only under a witness** |
+| `(linage-hazard-patient &self <P>)` | the relative all-cause-mortality hazard, `1.093^delta`, always |
+| `(linage-risk-patient &self <P>)` | an absolute ten-year risk — only when the generated NHANES all-cause baseline is loaded |
+| `(linage-counterfactual-patient &self <P> <Lever>)` | how many LinAge2 years normalizing the lever's driver would remove, through the causal graph |
+| `(linage-scenarios-patient &self <P>)` | the four standing levers at once |
+
+**Send the witnesses.** A LinAge2 contribution's *sign is not the lab's
+direction*: the per-input weights are sex-specific projections that flip sign
+between the male and female models (CRP is +4.4 months/SD in women and −0.2 in
+men). So the engine credits a cause to an input only when the patient's own z for
+the biomarker it reads out is Elevated — or, for the cotinine input, when the
+patient is a `CurrentSmoker`. Send `CRP`, `HbA1c`, `FastingGlucose` (z or value)
+and `smoking` alongside the block; without them the years come back with no causes
+and every counterfactual is 0, and the builder warns you so.
+
+**No LLM needed.** `POST /linage2/analyze` takes the same patient at the top level
+(the `linage2` block required, plus optional `levers`) and returns the whole
+picture as JSON: decomposition, hazard, risk (or the reason there is none),
+counterfactuals. `GET /linage2/features` publishes the 59 input codes and which
+four can be explained. The refusals, each a 422 with a code:
+`unknown_linage2_feature`, `duplicate_linage2_feature`, `linage2_inconsistent`
+(delta ≠ BA − CA), `linage2_age_mismatch` (a result computed for another age),
+`implausible_linage2_delta`, `implausible_linage2_contribution`,
+`duplicate_clock` (a block and a bare `markers.LinAgeAccel`), `unknown_lever`,
+`linage2_required`. A `linage-*` form naming a patient with no LinAge2 result is
+valid, empty, and **warned** — the built-in patients have none.
+
+Design, measurements and limits: `docs/linage2_integration.md`.
 
 ## Discovery without an LLM
 
@@ -1192,6 +1252,10 @@ a known ID from `GET /patients` (currently `Patient001` / `Patient002` /
 | "what if `<Patient>` had never smoked / had quit"              | `(counterfactual-patient &self <Patient> SmokingCessation)`   |
 | "what does the evidence say about `<Intervention>` in humans" | `(human-evidence &self <Intervention>)` — or just call `GET /evidence/human` |
 | "rank rapamycin, metformin by lifespan benefit"               | `(rank-drugage-lifespan (<Compound1> <Compound2> …))` — or just call `POST /drugage/rank` |
+| "which labs make me biologically older (LinAge2)"              | `(linage-decomposition-patient &self <Patient>)` — needs a `patient.linage2` block |
+| "how much does my LinAge2 raise my mortality hazard"           | `(linage-hazard-patient &self <Patient>)` — absolute risk via `(linage-risk-patient …)` once a NHANES baseline is generated |
+| "how many LinAge2 years would quitting smoking remove"          | `(linage-counterfactual-patient &self <Patient> SmokingCessation)` — 0 with an empty `Via` for a never smoker |
+| "what could I do about my LinAge2 biological age"               | `(linage-scenarios-patient &self <Patient>)` — or just call `POST /linage2/analyze` |
 
 A finding with no mechanistic path is omitted rather than invented; a
 compound with a negative gold-standard trial (e.g. `Resveratrol`, ITP

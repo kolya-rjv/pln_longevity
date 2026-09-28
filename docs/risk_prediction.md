@@ -175,6 +175,13 @@ no clock surrogate, so it honestly projects **~0** change; an edge-less lever
    hazard transform (Monte-Carlo or a delta-method on log-HR).
 5. **Multi-outcome risk.** Extend from CHD to a basket (all-cause mortality, CHF —
    both have Lu 2019 hazard records already in the KB) and aggregate.
+   🔶 **Partly addressed by the LinAge2 layer** (`docs/linage2_integration.md`): a
+   caller's LinAge2 delta is priced as an all-cause-mortality hazard (`1.093^delta`,
+   off the Fong 2025 record) and, when the generated NHANES all-cause baseline is
+   loaded, as an absolute ten-year risk through the survival form
+   `1 − (1 − p0)^HR^delta` — a second clock, a second outcome, deliberately **not**
+   combined with this layer's CHD estimate (§3's double-counting rule applies across
+   clocks too).
 6. **Multi-lever projection.** Project risk under a *combination* of interventions,
    which needs the counterfactual layer's own multi-lever follow-up
    (`docs/counterfactual_analysis.md`).

@@ -29,6 +29,7 @@ be run on its own when an API-only process is useful.
 from __future__ import annotations
 
 import importlib.util
+from functools import lru_cache
 import re
 import secrets
 import sys
@@ -123,7 +124,23 @@ from core.drugage_router import (
 )
 from core.llm_translator import translate
 from core.metta_validator import ValidationResult, validate
-from core.pln_runner import CELLAGE_STACK, run_cellage_effects, run_query
+from core.pln_runner import (
+    CELLAGE_STACK,
+    LINAGE2_GENERATED_BASELINE,
+    linage2_patient_kb,
+    run_cellage_effects,
+    run_query,
+)
+from core.linage2_builder import feature_listing as linage2_feature_listing
+from core.linage2_router import (
+    DEFAULT_LEVERS as LINAGE2_DEFAULT_LEVERS,
+    LINAGE2_FORMS,
+    analysis_program as linage2_analysis_program,
+    collect_analysis as linage2_collect_analysis,
+    linage2_form_warnings,
+    parse_linage2_query,
+)
+from ontology.inventory import inventory_for as _inventory_for_paths
 from utils.formatting import format_bot_response
 from utils.logging import log_http_request, log_turn
 
@@ -1012,6 +1029,55 @@ class HistoryTurn(BaseModel):
     content: str = Field(min_length=1, max_length=50_000)
 
 
+class LinAge2ContributionIn(BaseModel):
+    """One entry of the LinAge2 service's `feature_contributions`."""
+    model_config = ConfigDict(extra="forbid")
+
+    feature: str = Field(description="NHANES variable code, e.g. LBXCRP (GET /linage2/features).")
+    contribution_years: float = Field(description="This input's share of the BA-CA delta, in years.")
+    is_imputed: Optional[bool] = Field(
+        default=None,
+        description="True when the service filled the value in from its reference cohort. "
+                    "Falls back to membership in `imputed_features` when omitted.",
+    )
+
+
+class LinAge2MetadataIn(BaseModel):
+    """The `metadata` object of a LinAge2 `/predict` response."""
+    model_config = ConfigDict(extra="forbid")
+
+    chronological_age: float
+    delta_ba_ca: float
+    feature_contributions: list[LinAge2ContributionIn] = Field(min_length=1, max_length=64)
+    imputed_features: Optional[list[str]] = None
+    features_used: Optional[int] = None
+    total_features: Optional[int] = None
+    warnings: Optional[list[str]] = None
+
+
+class LinAge2In(BaseModel):
+    """A LinAge2 service response, passed through as the client received it.
+
+    Either the `/predict` response body (`biological_age` + `metadata`), or the
+    flattened shape with `chronological_age`, `delta_ba_ca` and
+    `feature_contributions` at the top level. `code` and `message` are accepted so
+    the body can be forwarded verbatim; they are ignored.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    code: Optional[int] = None
+    message: Optional[str] = None
+    biological_age: float
+    metadata: Optional[LinAge2MetadataIn] = None
+    chronological_age: Optional[float] = None
+    delta_ba_ca: Optional[float] = None
+    feature_contributions: Optional[list[LinAge2ContributionIn]] = Field(default=None, max_length=64)
+    imputed_features: Optional[list[str]] = None
+    features_used: Optional[int] = None
+    total_features: Optional[int] = None
+    warnings: Optional[list[str]] = None
+
+
 class PatientIn(BaseModel):
     """A patient the CALLER supplies, scored for this request only.
 
@@ -1054,6 +1120,17 @@ class PatientIn(BaseModel):
                     "`z`, or `value` (+ optional `unit`) to be standardised "
                     "server-side. See GET /patients/markers for what is supported "
                     "and which conversions are curated priors.",
+    )
+    linage2: Optional[LinAge2In] = Field(
+        default=None,
+        description="The LinAge2 service's /predict response for THIS patient, "
+                    "forwarded as received. Becomes the LinAgeAccel clock marker plus "
+                    "one LinAgeContribution atom per model input, for this request "
+                    "only, and unlocks the `linage-*` forms (GET /linage2/features, "
+                    "POST /linage2/analyze). Send the patient's own CRP / HbA1c / "
+                    "FastingGlucose z (or value) and smoking status alongside: the "
+                    "engine credits a cause to a LinAge2 contribution only when the "
+                    "patient's own value witnesses the direction.",
     )
 
 
@@ -1158,7 +1235,9 @@ class QueryResponse(BaseModel):
         default=None,
         description="Set to 'drugage_ranking' when the generated MeTTa was a "
                     "`(rank-drugage-lifespan ...)` form and got dispatched to the scoped "
-                    "DrugAge engine instead of the generic KB (see POST /drugage/rank).",
+                    "DrugAge engine instead of the generic KB (see POST /drugage/rank); "
+                    "'linage2' when it called a `(linage-… &self <Patient> …)` form and "
+                    "ran in the LinAge2 scoped space (see GET /linage2/features).",
     )
     usage: Optional[dict] = None
     patient: Optional["PatientPreviewResponse"] = Field(
@@ -1272,7 +1351,9 @@ class MettaRunResponse(BaseModel):
     routed: Optional[str] = Field(
         default=None,
         description="Set to 'drugage_ranking' when metta_query was a "
-                    "`(rank-drugage-lifespan ...)` form (see POST /drugage/rank).",
+                    "`(rank-drugage-lifespan ...)` form (see POST /drugage/rank); "
+                    "'linage2' when it called a `linage-*` form, which runs in the "
+                    "LinAge2 query-scoped space rather than the generic one.",
     )
 
 
@@ -1349,6 +1430,17 @@ class PatientPreviewResponse(BaseModel):
     age: Optional[float] = None
     sex: Optional[str] = None
     smoking: Optional[str] = None
+    has_linage2: bool = Field(
+        default=False,
+        description="True when a LinAge2 delta is present (a `linage2` block or a bare "
+                    "LinAgeAccel marker), so the `linage-*` forms have input.",
+    )
+    linage2: Optional[dict] = Field(
+        default=None,
+        description="Set when the request carried a `linage2` block: the delta, its z "
+                    "and status, and every contribution (measured first, by |years|) "
+                    "with the KB biomarker it reads out, if any.",
+    )
 
 
 class MarkerCatalogResponse(BaseModel):
@@ -1356,6 +1448,79 @@ class MarkerCatalogResponse(BaseModel):
     z_convention: str
     elevated_threshold: float
     raw_value_note: str
+    linage2: dict = Field(
+        default_factory=dict,
+        description="How to send a LinAge2 clinical-clock result: the `linage2` block, "
+                    "what it unlocks, and where the feature vocabulary is published.",
+    )
+
+
+class LinAge2FeaturesResponse(BaseModel):
+    features: list[dict] = Field(
+        description="Every LinAge2 model input the KB declares: NHANES code, KB symbol, "
+                    "description, the KB biomarker it reads out (4 of 59), and how a "
+                    "cause gets credited to it.",
+    )
+    clock: dict
+    forms: list[str] = Field(description="The MeTTa forms the LinAge2 layer defines.")
+    stack: list[str] = Field(description="The query-scoped files those forms run in.")
+    baseline_available: bool = Field(
+        description="True when the generated NHANES all-cause baseline is present, so "
+                    "linage-risk-patient returns an absolute risk; otherwise only the "
+                    "relative hazard is computable and the risk form yields nothing.",
+    )
+
+
+class LinAge2AnalyzeRequest(PatientIn):
+    """`/patients/preview`'s top-level patient shape, with a `linage2` block REQUIRED,
+    plus the levers to run counterfactuals for."""
+    levers: Optional[list[str]] = Field(
+        default=None, max_length=8,
+        description="Levers for the counterfactuals (a cause, an intervention or a "
+                    "marker the KB knows). Defaults to ChronicInflammation, "
+                    "CellularSenescence, InsulinResistance, SmokingCessation.",
+    )
+
+
+class LinAge2AnalyzeResponse(BaseModel):
+    patient_id: str
+    atoms: str
+    linage2: dict = Field(description="The validated block, as /patients/preview reports it.")
+    decomposition: Optional[dict] = Field(
+        default=None,
+        description="Every input's years, measured and imputed apart, with the KB "
+                    "biomarker it reads out, whether the patient's own value witnesses "
+                    "its direction, and the hallmark causes credited (only under a "
+                    "witness); plus the totals and the explicit age-term residual.",
+    )
+    hazard: Optional[dict] = Field(
+        default=None,
+        description="The relative all-cause-mortality hazard, HR^delta, with confidence. "
+                    "Always computable from a delta.",
+    )
+    risk: Optional[dict] = Field(
+        default=None,
+        description="An ABSOLUTE ten-year all-cause-mortality risk — only when the "
+                    "generated NHANES baseline is loaded (see `risk_note`).",
+    )
+    risk_note: str
+    counterfactuals: list[dict] = Field(
+        description="Per lever: the expected change in the LinAge2 delta, in years, "
+                    "through the causal graph and the lever's own evidence edge; the "
+                    "inputs credited (`via`); 0 with an empty `via` when the lever "
+                    "reaches no witnessed input.",
+    )
+    projected_risks: list[dict] = Field(
+        description="The counterfactuals in absolute-risk terms; empty without a baseline.",
+    )
+    warnings: list[str]
+    metta_query: str
+    pln_status: str
+    pln_query_time_ms: int
+    unparsed: list[str] = Field(
+        default_factory=list,
+        description="Result atoms this endpoint could not read; should be empty.",
+    )
 
 
 class DrugAgeRankRequest(BaseModel):
@@ -2772,6 +2937,7 @@ def patient_markers() -> MarkerCatalogResponse:
             "this repository contains no reference table. Send `z` when you have "
             "a properly standardised measurement."
         ),
+        linage2=_linage2_block_description(),
     )
 
 
@@ -2795,6 +2961,193 @@ def patients_preview(patient: PatientIn) -> PatientPreviewResponse:
         age=built.age,
         sex=built.sex,
         smoking=built.smoking,
+        has_linage2=built.has_linage2,
+        linage2=built.linage2.as_dict() if built.linage2 is not None else None,
+    )
+
+
+# ── LinAge2: the clinical clock ─────────────────────────────────────────────
+# A caller's LinAge2 /predict response arrives under `patient.linage2` and is
+# rendered to request-scoped atoms by core.linage2_builder. The forms that read
+# them live in pln_linage2.metta and run in core.pln_runner.LINAGE2_PATIENT_STACK,
+# a query-scoped space — the shared space cannot take the layer's head symbols
+# (linage2_core.metta header). core/linage2_router.py recognises the forms.
+
+_LINAGE2_BASELINE_NOTE_PRESENT = (
+    "A generated NHANES all-cause-mortality baseline (build/nhanes_mortality_baseline"
+    ".metta) is loaded, so `risk` is an absolute ten-year risk: 1 - (1 - baseline)^"
+    "(HR^delta), with the baseline's own age band, sex and horizon."
+)
+_LINAGE2_BASELINE_NOTE_ABSENT = (
+    "No absolute risk: the knowledge base holds no all-cause-mortality baseline. It "
+    "deliberately ships no curated one (docs/nhanes_integration.md §5), and the "
+    "survey-weighted NHANES baseline is an ETL output — run scripts/run_etl.sh with "
+    "the NHANES mortality linkage present and `risk` becomes available. `hazard` is "
+    "the relative hazard versus a same-age, same-sex person with a delta of 0 and "
+    "needs no baseline."
+)
+
+
+def _linage2_block_description() -> dict:
+    return {
+        "field": "patient.linage2",
+        "what": "the LinAge2 service's POST /predict response body, forwarded as "
+                "received (or its flattened metadata)",
+        "becomes": "the LinAgeAccel clock marker (z = delta / linage-sd-to-years) plus "
+                   "one (LinAgeContribution <Patient> <Input> <years> Measured|Imputed) "
+                   "atom per model input — this request only, nothing stored",
+        "unlocks": [f"({form} &self <Patient> …)" for form in LINAGE2_FORMS[:7]],
+        "features": "GET /linage2/features",
+        "no_llm": "POST /linage2/analyze",
+        "send_alongside": "the patient's own CRP / HbA1c / FastingGlucose (z or value) "
+                          "and smoking status — a LinAge2 contribution is credited to "
+                          "a cause only when the patient's own value witnesses the "
+                          "direction; a contribution's sign is not a lab's direction",
+        "excludes": "markers.LinAgeAccel (one clock, one z)",
+    }
+
+
+def _linage2_prompt_hint(patient: BuiltPatient) -> str:
+    return (
+        "This patient carries a LinAge2 clinical-clock result (LinAgeDelta and one "
+        "LinAgeContribution per lab). Questions about it — biological age, which labs "
+        "add years, mortality hazard or risk, what would remove years — map to the "
+        "dedicated LinAge2 forms, which take this patient id:\n"
+        f"  (linage-decomposition-patient &self {patient.patient_id})\n"
+        f"  (linage-drivers-patient &self {patient.patient_id})\n"
+        f"  (linage-hazard-patient &self {patient.patient_id})\n"
+        f"  (linage-risk-patient &self {patient.patient_id})\n"
+        f"  (linage-counterfactual-patient &self {patient.patient_id} <Lever>)\n"
+        f"  (linage-project-risk-patient &self {patient.patient_id} <Lever>)\n"
+        f"  (linage-scenarios-patient &self {patient.patient_id})\n"
+        "Use exactly one of them per query and nothing else in the same query — they "
+        "run in their own space. The GrimAge forms (predict-risk-patient, "
+        "decompose-grimage) read AgeAccelGrim and do NOT see the LinAge2 result.\n"
+    )
+
+
+@lru_cache(maxsize=1)
+def _linage2_context():
+    """Registry + inventory over the LinAge2 scoped stack (static files; cached)."""
+    paths = linage2_patient_kb()
+    registry, _ = load_specific_files(paths)
+    return registry, _inventory_for_paths(paths)
+
+
+def _validate_linage2_query(metta_query: str, injected: Optional[str]) -> ValidationResult:
+    """Validate a LinAge2 form against the space it will actually run in."""
+    base_registry, base_inventory = _linage2_context()
+    registry = OntologyRegistry()
+    registry.merge(base_registry)
+    inventory = base_inventory
+    if injected:
+        registry.merge(parse_metta_text(injected, source_name="<api-extra-atoms>"))
+        inventory = merged_inventory(inventory, injected)
+    return validate(
+        "\n".join(part for part in (injected, metta_query) if part), registry, inventory
+    )
+
+
+@app.get("/linage2/features", response_model=LinAge2FeaturesResponse)
+def linage2_features() -> LinAge2FeaturesResponse:
+    """What a LinAge2 result may contain, and what the knowledge base does with it.
+
+    Read this before sending `patient.linage2`. Every NHANES code the LinAge2
+    service emits is declared in linage2_core.metta with its KB symbol; four of
+    the 59 inputs read out a biomarker the causal graph reaches (CRP, HbA1c,
+    glucose, cotinine) and can therefore be credited to a cause — the rest are
+    carried as years and left unexplained, never guessed at.
+    """
+    return LinAge2FeaturesResponse(
+        features=linage2_feature_listing(),
+        clock={
+            "symbol": "LinAge2",
+            "acceleration": "LinAgeAccel (BA - CA, years; AccelDefinition Difference)",
+            "outcome": "AllCauseMortality",
+            "hazard_per_year": "read off Fong2025_LinAgeAccel_AllCauseMortality "
+                               "(linage2_fong2025_evidence.metta): 1.093, derived from "
+                               "the reported null-model mortality rate doubling time of "
+                               "~7.8 years",
+            "publication": "Fong et al. 2025, npj Aging 11:29, PMID 40268972",
+        },
+        forms=list(LINAGE2_FORMS[:7]),
+        stack=[p.name for p in linage2_patient_kb()],
+        baseline_available=LINAGE2_GENERATED_BASELINE.exists(),
+    )
+
+
+@app.post("/linage2/analyze", response_model=LinAge2AnalyzeResponse)
+def linage2_analyze(req: LinAge2AnalyzeRequest) -> LinAge2AnalyzeResponse:
+    """The whole LinAge2 analysis for one caller-supplied patient, no LLM.
+
+    Takes the patient at the TOP LEVEL like /patients/preview, with the `linage2`
+    block required. Runs the decomposition, the hazard, the absolute risk (when a
+    baseline is loaded) and one counterfactual per lever in the LinAge2 scoped
+    space, in one MeTTa program, and returns them as JSON rather than atoms.
+    """
+    payload = req.model_dump(exclude={"levers"})
+    if payload.get("linage2") is None:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "linage2_required",
+                    "message": "POST /linage2/analyze needs a `linage2` block (the LinAge2 "
+                               "/predict response). For markers alone use /patients/preview."},
+        )
+    built = _build_caller_patient(payload)
+    assert built is not None and built.linage2 is not None
+
+    levers = tuple(req.levers) if req.levers else LINAGE2_DEFAULT_LEVERS
+    _, inventory = _linage2_context()
+    unknown = [lv for lv in levers if not inventory.knows_symbol(lv)]
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "unknown_lever",
+                    "message": f"Lever(s) {', '.join(unknown)} are not symbols the LinAge2 "
+                               f"space holds. A lever is a cause (ChronicInflammation, "
+                               f"CellularSenescence, InsulinResistance), an intervention "
+                               f"(Metformin, DasatinibPlusQuercetin, SmokingCessation) or a "
+                               f"marker (CRP).",
+                    "levers": unknown},
+        )
+    try:
+        program = linage2_analysis_program(
+            built.patient_id, levers, with_projections=LINAGE2_GENERATED_BASELINE.exists()
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"code": "invalid_lever", "message": str(exc)})
+
+    kb_files = linage2_patient_kb()
+    atoms = built.atoms
+    pln_result = run_offloaded(
+        "run_query",
+        {"metta_query": program, "confidence_threshold": 0.0,
+         "kb_files": kb_files, "extra_atoms": atoms},
+        lambda: run_query(metta_query=program, confidence_threshold=0.0,
+                          kb_files=kb_files, extra_atoms=atoms),
+    )
+    if pln_result.status == "error":
+        _raise_pln_failure(pln_result, stage="pln_execution", extra={"metta_query": program})
+    analysis = linage2_collect_analysis(program, pln_result)
+
+    warnings = list(built.warnings)
+    warnings.extend(lever_warnings(program, extra_atoms=atoms, known_patients={built.patient_id}))
+    return LinAge2AnalyzeResponse(
+        patient_id=built.patient_id,
+        atoms=atoms,
+        linage2=built.linage2.as_dict(),
+        decomposition=analysis.decomposition,
+        hazard=analysis.hazard,
+        risk=analysis.risk,
+        risk_note=(_LINAGE2_BASELINE_NOTE_PRESENT if LINAGE2_GENERATED_BASELINE.exists()
+                   else _LINAGE2_BASELINE_NOTE_ABSENT),
+        counterfactuals=analysis.counterfactuals,
+        projected_risks=analysis.projected_risks,
+        warnings=warnings,
+        metta_query=program,
+        pln_status=pln_result.status,
+        pln_query_time_ms=pln_result.query_time_ms,
+        unparsed=analysis.unparsed,
     )
 
 
@@ -2835,6 +3188,7 @@ def query(req: QueryRequest) -> QueryResponse:
             f"Treat `{patient.patient_id}` as a valid <Patient> for every "
             f"dedicated patient form. When the question says 'me', 'my', 'this "
             f"patient' or gives no id, it means {patient.patient_id}.\n"
+            + (_linage2_prompt_hint(patient) if patient.has_linage2 else "")
         )
 
     history_msgs = [turn.model_dump() for turn in req.history]
@@ -2874,6 +3228,28 @@ def query(req: QueryRequest) -> QueryResponse:
             lambda: route_drugage_ranking(
                 drugage_compounds,
                 confidence_threshold=req.confidence_threshold,
+            ),
+        )
+    elif parse_linage2_query(translation.metta_query) is not None:
+        # A LinAge2 form. Its layer cannot live in the shared space (head-symbol
+        # budget — linage2_core.metta header), so it is validated against and run
+        # in the LinAge2 scoped stack, with the caller's atoms. Same worker pool,
+        # same deadline, same admission limit as everything else.
+        routed = "linage2"
+        extra_atoms = patient.atoms if patient is not None else None
+        validation = _validate_linage2_query(translation.metta_query, extra_atoms)
+        kb_files = linage2_patient_kb()
+        pln_result = run_offloaded(
+            "run_query",
+            {"metta_query": translation.metta_query,
+             "confidence_threshold": req.confidence_threshold,
+             "kb_files": kb_files,
+             "extra_atoms": extra_atoms},
+            lambda: run_query(
+                metta_query=translation.metta_query,
+                confidence_threshold=req.confidence_threshold,
+                kb_files=kb_files,
+                extra_atoms=extra_atoms,
             ),
         )
     else:
@@ -2936,6 +3312,11 @@ def query(req: QueryRequest) -> QueryResponse:
     # a well-formed, validated, structurally empty answer that reads as "no".
     warnings.extend(scoped_form_warnings(
         translation.metta_query, _runtime_kb_paths(), _runtime_inventory()
+    ))
+    # A LinAge2 form for a patient with no LinAge2 result: valid, empty, and
+    # misleading unless it says so.
+    warnings.extend(linage2_form_warnings(
+        translation.metta_query, patient.atoms if patient is not None else None
     ))
 
     log_turn(req.message, translation, pln_result)
@@ -3039,6 +3420,34 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
                 confidence_threshold=req.confidence_threshold,
             ),
         )
+    elif parse_linage2_query(req.metta_query) is not None:
+        # A LinAge2 form runs in its own scoped space (see /query for why).
+        routed = "linage2"
+        validation = _validate_linage2_query(req.metta_query, injected)
+        if not validation.valid:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "invalid_metta_query",
+                    "message": "MeTTa validation failed against the LinAge2 scoped "
+                               "space; the query was not executed.",
+                    "issues": validation.issues,
+                },
+            )
+        kb_files = linage2_patient_kb()
+        pln_result = run_offloaded(
+            "run_query",
+            {"metta_query": req.metta_query,
+             "confidence_threshold": req.confidence_threshold,
+             "kb_files": kb_files,
+             "extra_atoms": injected},
+            lambda: run_query(
+                metta_query=req.metta_query,
+                confidence_threshold=req.confidence_threshold,
+                kb_files=kb_files,
+                extra_atoms=injected,
+            ),
+        )
     else:
         if req.ontology_files is not None:
             _validate_ontology_files(req.ontology_files)
@@ -3106,6 +3515,7 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
         + scoped_form_warnings(
             req.metta_query, _runtime_kb_paths(), _runtime_inventory()
         )
+        + linage2_form_warnings(req.metta_query, injected)
     )
 
     return MettaRunResponse(
