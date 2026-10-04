@@ -258,8 +258,7 @@ _FLAG = re.compile(r"^(?:h|l|hh|ll|high|low|normal|abnormal|elevated|raised|ok|b
                    r"\*+|↑|↓|\(h\)|\(l\)|\(high\)|\(low\)|\(normal\))$")
 _CONTEXT_WORD = re.compile(r"^(?:today|yesterday|on|in|at|last|this|from|taken|measured|done|recently|"
                            r"fasting|non-fasting|nonfasting|random|ref|reference|range|nr|normal)\b")
-_LEAD_FILLER = re.compile(r"^(?:(?:my|the|a|his|her|latest|last|recent|most recent|today'?s|current|"
-                          r"repeat|baseline)\s+)*$")
+_LEAD_FILLER = re.compile(r"^(?:(?:my|the|a|latest|last|recent|most recent|today'?s|current|repeat)\s+)*$")
 _RANGE = re.compile(r"\d+(?:\.\d+)?\s*-\s*\d+(?:\.\d+)?")
 _DATE = re.compile(r"\b\d{4}-\d{1,2}(?:-\d{1,2})?\b|\b\d{1,2}/\d{1,2}/\d{2,4}\b")
 
@@ -274,10 +273,9 @@ _EMPTY_ANSWER = re.compile(r"^\s*[:=]\s*-*\s*$")
 _WORD = re.compile(r"[^\W_]+(?:'[^\W_]+)?")
 #: words any quote may carry without saying anything
 _QUOTE_FILLER = {"my", "the", "a", "an", "is", "are", "i", "im", "i'm", "ive", "i've", "me", "and", "also", "too",
-                 "of", "current", "currently", "latest", "last", "recent", "most", "today", "todays", "today's",
-                 "now", "patient", "pt", "about", "around", "approx", "approximately"}
+                 "of", "patient", "pt"}
 _SEX_AGE_WORDS = {"male", "female", "man", "woman", "gentleman", "lady", "m", "f", "sex", "gender", "age",
-                  "aged", "year", "years", "yr", "yrs", "old", "yo", "y", "o", "am", "was"}
+                  "aged", "year", "years", "yr", "yrs", "old", "yo", "y", "o", "am"}
 _UNIT_WORDS = {"g", "dl", "mg", "l", "ml", "mmol", "umol", "µmol", "μmol", "nmol", "pmol", "pg", "ng", "ug", "µg",
                "μg", "iu", "u", "meq", "fl", "mmhg", "kg", "m2", "bpm", "min", "beats", "per", "cells", "k", "thou",
                "mil", "million", "x10", "mol", "x", "µl", "μl", "ul", "nl", "percent"}
@@ -295,12 +293,14 @@ _GRAMMAR = {
                  "less", "than", "under", "below"},
     "sex": _SEX_AGE_WORDS, "age": _SEX_AGE_WORDS,
     "weight": {"weight", "weigh", "weighs", "wt", "body", "kg", "kgs", "kilo", "kilos", "kilogram", "kilograms",
-               "lb", "lbs", "pound", "pounds", "am"},
+               "lb", "lbs", "pound", "pounds", "am", "about", "around", "approx", "approximately", "now", "current",
+               "currently"},
     "height": {"height", "tall", "ht", "cm", "centimeter", "centimeters", "centimetre", "centimetres", "m", "meter",
-               "meters", "metre", "metres", "in", "inch", "inches", "ft", "feet", "foot", "am", "stand"},
+               "meters", "metre", "metres", "in", "inch", "inches", "ft", "feet", "foot", "am", "stand", "about",
+               "around"},
     "self_rated_health": {"self", "rated", "reported", "assessed", "general", "overall", "health", "status",
                           "healthy", "rating", "would", "say", "describe", "consider", "feel", "it", "as",
-                          "excellent", "very", "good", "fair", "poor"},
+                          "excellent", "very", "good", "fair", "poor", "now", "currently"},
     "health_vs_year_ago": {"health", "compared", "to", "with", "vs", "versus", "than", "one", "year", "ago", "past",
                            "months", "feel", "has", "have", "got", "getting", "gotten", "become", "became", "better",
                            "improved", "worse", "same", "unchanged", "similar", "overall", "general", "since",
@@ -309,7 +309,8 @@ _GRAMMAR = {
                           "physicians", "clinic", "medical", "healthcare", "health", "care", "appointment",
                           "appointments", "check", "checkup", "checkups", "up", "ups", "saw", "seen", "see", "went",
                           "to", "times", "time", "per", "each", "every", "year", "month", "week", "yearly", "monthly",
-                          "weekly", "annually", "annual", "past", "this", "in", "months", "have", "had", "been",
+                          "weekly", "annually", "annual", "past", "last", "this", "in", "months", "have", "had",
+                          "been",
                           "was", "were", "not", "never", "no", "haven't", "didn't", "n't", "once", "twice", "none",
                           "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"},
     "grimage": {"grim", "grimage", "age", "accel", "acceleration", "ageaccelgrim", "epigenetic", "clock", "year",
@@ -689,6 +690,15 @@ def _check_age(it: Item) -> str:
         return "words that are not an age or a sex"   # "male, 82 kg", "fitness age 42", "walk 50 m daily"
     if _NOT_AN_AGE.search(low):
         return "the quote is about another age"
+    if re.search(r"\b(?:was|were|last year|ago|when|then|back|in (?:19|20)\d{2})\b", low):
+        return "an age of another time"          # "I was 58 years old"
+    if it.ctx is not None:                       # and in its statement: "my HbA1c was 9 % at age 45"
+        line, cs, ce = it.ctx
+        before, after = unify(line[cs:it.start]), unify(line[it.end:ce])
+        if re.search(r"\b(?:at|when|since|until|till|from|by|before|after|was|were|of|aged? at)\s*$", before) \
+                or _NOT_AN_AGE.search(before) or re.search(
+                    r"\b(?:ago|last year|when|then|back|in (?:19|20)\d{2}|at the time|at diagnosis)\b", after):
+            return "an age of another time in its statement"
     numbers = {m.group(1) for rx in _AGE_PHRASES for m in rx.finditer(low)}
     if len(numbers) != 1:
         return "no single age phrase in the quote"
@@ -745,8 +755,8 @@ def _check_health(it: Item) -> str:
         found.add("good")
     if found != {rating}:
         return "the rating word is not alone in the quote" if found else "no rating word in the quote"
-    if not re.search(r"\b(?:health|healthy|feel|self[- ]rated|overall|general)\b", low):
-        return "the quote is not about health"
+    if not re.search(r"\bhealth\b|\bself[- ]rated\b", low):
+        return "the quote is not about health"   # "I feel good about it"
     if re.search(r"\b(?:not|isn'?t|never|hardly|no)\b|n't\b|\b(?:dont|doesnt|wouldnt|cant|isnt)\b", low):
         return "a negated rating"
     if _unexplained(low, _GRAMMAR["self_rated_health"]):
@@ -769,6 +779,8 @@ def _check_trend(it: Item) -> str:
         return "the trend word is not alone in the quote" if found else "no trend word"
     if not re.search(r"year ago|last year|past year|12 months|a year back|than a year|this time last year", low):
         return "not a comparison with a year ago"
+    if not re.search(r"\b(?:than|compared|vs|versus|since|getting|got|gotten|become|became|improved)\b", low):
+        return "no comparison in the quote"      # "health better a year ago": then, or now?
     if re.search(r"\b(?:not|never|no)\b|n't\b|\b(?:dont|doesnt|wouldnt|cant)\b", low):
         return "a negated trend"
     if _unexplained(low, _GRAMMAR["health_vs_year_ago"]):
@@ -809,14 +821,16 @@ def _check_visits(it: Item) -> str:
         period, factor = "month", 12
     elif re.search(r"\bper week\b|\ba week\b|/\s*week|\bweekly\b|\beach week\b|\bevery week\b", low):
         period, factor = "week", 52
-    elif re.search(r"\b(?:\d+|two|three|five|several)\s+(?:years|months|weeks)\b|\bdecade\b|\bever\b|"
-                   r"\blifetime\b", low.replace("12 months", "")):
-        return "a period other than a year, a month or a week"
     elif re.search(r"\bper year\b|\ba year\b|/\s*year|\byearly\b|\bannual(?:ly)?\b|\blast year\b|\bpast year\b|"
                    r"\b12 months\b|\bthis year\b", low):
         period, factor = "year", 1
     else:
         period, factor = "unstated", 1
+    rest = re.sub(r"(?:per|a|each|every|/)\s*(?:week|month|year)\b|\b(?:weekly|monthly|yearly|annually|annual)\b"
+                  r"|\b(?:last|past|this)\s+year\b|\bin the (?:past|last) (?:year|12 months)\b"
+                  r"|\b(?:past|last) 12 months\b|\b12 months\b", " ", low)
+    if re.search(r"\b(?:days?|weeks?|months?|years?|decades?|ever|lifetime)\b", rest):
+        return "a period other than a year, a month or a week"   # "every six months", "this month"
     if it.raw["period"] != period:
         return f"the period reads {period}, the model says {it.raw['period']}"
     it.fact = Fact("healthcare_visits", number=str(n * factor))
@@ -1055,8 +1069,10 @@ def _with_model(text: str, rules: ParsedPatient, ex: Extraction) -> PatientRead:
         wording = "; ".join(dict.fromkeys(render(f) for f in facts))
         outcomes = {rules.statements[i].outcome for i in sts}
         canonical = is_canonical(original)
-        dropped = _leftover(lines[line], first.start, last.end,
-                            [it for it in its if it.fact is not None and it.tight])
+        tight = [it for it in its if it.fact is not None and it.tight]
+        dropped = _leftover(lines[line], first.start, last.end, tight)
+        # a silent rewrite needs more: its quotes hold the statement but for filler
+        dropped_strict = _leftover(lines[line], first.start, last.end, tight, strict=True)
 
         for it in its:
             if it.note:
@@ -1157,7 +1173,25 @@ def _with_model(text: str, rules: ParsedPatient, ex: Extraction) -> PatientRead:
                                           "the model reads it as (it leaves out part of what the rules read)",
                                           blocking=False))
             continue
+        if dropped_strict:
+            suggestions.append(Suggestion(*span, original, [wording], "the model reads it as",
+                                          blocking=False))
+            continue
         subs.append(Substitution(*span, original, list(dict.fromkeys(render(f) for f in facts)), tuple(sts)))
+
+    # a rewrite only on a line every other statement of which the rules read (or that is
+    # rewritten too): an unread neighbour may carry what the rewrite means ("Before
+    # metformin, | my HbA1c was 9 %"; "My mother has diabetes. | Her HbA1c is 9 %")
+    while True:
+        rewritten = {i for s_ in subs for i in s_.statements}
+        unsafe = [s_ for s_ in subs if any(st.line == s_.line and st.index not in rewritten
+                                           and st.outcome != "read" for st in rules.statements)]
+        if not unsafe:
+            break
+        for s_ in unsafe:
+            subs.remove(s_)
+            out.notes.append(f"the model read '{s_.original}' as '{'; '.join(s_.lines)}'; not used, since "
+                             f"something else on its line was not read")
 
     # rewrite, read again, and keep only rewrites that add exactly what they say
     while True:
@@ -1169,10 +1203,9 @@ def _with_model(text: str, rules: ParsedPatient, ex: Extraction) -> PatientRead:
         if not any(s.line in bad for s in subs):
             bad = {-1}                          # a rewrite changed another line: withdraw them all
         for s in [s for s in subs if s.line in bad or -1 in bad]:
-            subs.remove(s)
-            suggestions.append(Suggestion(s.line, s.start, s.end, s.original, ["; ".join(s.lines)],
-                                          "the model reads it as (not applied: it would change other lines)",
-                                          blocking=False))
+            subs.remove(s)                      # a note, not a button: in its context it reads otherwise
+            out.notes.append(f"the model read '{s.original}' as '{'; '.join(s.lines)}'; not used, since it "
+                             f"would change how other statements read")
 
     index = {orig: n for n, (orig, _, _) in enumerate(expected) if orig is not None}
     for n, (orig, _, sub) in enumerate(expected):
@@ -1187,18 +1220,22 @@ def _with_model(text: str, rules: ParsedPatient, ex: Extraction) -> PatientRead:
     return out
 
 
-_FILLER_WORDS = {"my", "the", "a", "an", "is", "was", "i", "im", "i'm", "ive", "i've", "have", "has", "had", "me",
-                 "and", "also", "too", "of", "current", "currently", "latest", "last", "recent", "most", "today",
-                 "todays", "today's", "level", "value", "result", "results", "been", "patient", "pt"}
+_FILLER_WORDS = _QUOTE_FILLER
 
 
-def _leftover(line: str, start: int, end: int, items: list) -> str:
+def _leftover(line: str, start: int, end: int, items: list, strict: bool = False) -> str:
     """The words of line[start:end] no quote covers, minus filler ("my", "was") and minus
     the grammar of the items' own kinds ("told" next to a diagnosis, "say" next to a
     health rating) — but a negation is never covered by anything but a quote."""
     covered = [False] * (end - start)
     for it in items:
-        for k in range(max(it.start, start), min(it.end, end)):
+        a = it.start
+        if it.kind == "lab":                     # "my last | HbA1c 6.1 %": the lead-in the lab check allows
+            lead = re.search(r"(?:\b(?:my|the|a|latest|last|recent|most recent|today'?s|current|repeat)\s+)+$",
+                             unify(line[start:a]))
+            if lead:
+                a = start + lead.start()
+        for k in range(max(a, start), min(it.end, end)):
             covered[k - start] = True
     rest = unify("".join(" " if cov else ch for ch, cov in zip(line[start:end], covered)))
     grammar = set()
@@ -1207,8 +1244,10 @@ def _leftover(line: str, start: int, end: int, items: list) -> str:
         if it.kind == "condition":
             for c in vocabulary().condition_info.values():
                 rest = re.sub(rf"\b(?:{c.terms})\b", " ", rest)
-    grammar -= _NEGATION_WORDS
+    grammar = set() if strict else grammar - _NEGATION_WORDS
     words = re.findall(r"[^\W_]+(?:[.'][^\W_]+)*", rest)
+    if strict:
+        words += re.findall(r"[%°×^]", rest)    # a unit left out of the quote: "HbA1c 6.1 | %"
     return " ".join(w for w in words if w.strip("'") not in _FILLER_WORDS and w not in grammar)
 
 

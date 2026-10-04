@@ -249,7 +249,12 @@ failures included, LRU ~128 — a cost saver only, never the Read/Build guarante
   context it does not account for ("before metformin", "dental health", "male, 82 kg").
   A statement is rewritten only when its quotes, with their kinds' grammar, account for
   all of it — a negation never counts as accounted for — and a partial reading is a
-  note, never a button. A claim's yes/no is read in its whole statement. Finally,
+  note, never a button. A *silent* rewrite is stricter than a wording to click: its quotes
+  must hold the statement but for plain filler (no grammar word, no unit, no "was" or
+  "last"), and every other statement on its line must be read by the rules — context in a
+  neighbour ("Before metformin, | my HbA1c was 9 %") is otherwise invisible. Age, sex and
+  condition claims are read against their statement. A claim's yes/no is read in its whole
+  statement. Finally,
   `read_values` must be unchanged by a rewrite: no value the rules read, combined
   questionnaire answers included, may move. Every reproduction is pinned in
   `tests/test_patient_read.py`.

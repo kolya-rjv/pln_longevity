@@ -846,3 +846,59 @@ def test_review_b_the_rules_wording_keeps_their_combined_answer():
     (s,) = r.suggestions
     assert s.blocking and s.wordings == ["diagnoses: prediabetes; never smoked"]
     assert read_patient_text(s.apply(text, s.wordings[0])).questionnaire["DIQ010"] == 3
+
+
+H = "58 year old male\nnever smoked\n"
+HF = "58 year old female\nnever smoked\n"
+REVIEW_D = [
+    # someone else's value through 'her' / 'his' and the sentence before
+    (HF + "My mother has diabetes. Her HbA1c is 9 %.", [_lab("Her HbA1c is 9 %", "hba1c")]),
+    (H + "My husband smokes. His cholesterol is 240 mg/dL.", [_lab("His cholesterol is 240 mg/dL", "total cholesterol")]),
+    # a time in the neighbouring statement or line
+    (H + "Before metformin, my HbA1c was 9 %", [_lab("my HbA1c was 9 %", "hba1c")]),
+    (H + "Two years ago, my HbA1c was 9.1 %", [_lab("my HbA1c was 9.1 %", "hba1c")]),
+    ("male\nnever smoked\nI retired in 2015.\nI was 58 years old.", [k("I was 58 years old", "age")]),
+    ("male\nnever smoked\nI was 58 years old", [k("I was 58 years old", "age")]),
+    ("male\nnever smoked\nI was 58 years old last year", [k("58 years old", "age")]),
+    ("male\nnever smoked\nIn 2015, I was 58 years old", [k("I was 58 years old", "age")]),
+    # one kind's grammar covering another kind's context
+    ("male\nnever smoked\nmy HbA1c was 9 % at age 45", [_lab("my HbA1c was 9 %", "hba1c"), k("age 45", "age")]),
+    # trend reversed; GrimAge sign outside the quote
+    (H + "my health was better a year ago", [k("better a year ago", "health_vs_year_ago", trend="better")]),
+    (H + "health better a year ago", [k("health better a year ago", "health_vs_year_ago", trend="better")]),
+    (H + "AgeAccelGrim 4 years younger",
+     [k("AgeAccelGrim 4 years", "grimage", direction="unstated", wording="acceleration")]),
+    (H + "my GrimAge acceleration 3 years less than my age",
+     [k("GrimAge acceleration 3 years", "grimage", direction="unstated", wording="acceleration")]),
+    # visits: the period dropped or not one of year / month / week
+    (H + "doctor visits 2 per month", [k("visits 2 per", "healthcare_visits", period="unstated")]),
+    (H + "I see my doctor twice a month", [k("my doctor twice", "healthcare_visits", period="unstated")]),
+    (H + "I see my GP once a week", [k("see my GP once", "healthcare_visits", period="unstated")]),
+    (H + "doctor visit every six months", [k("doctor visit every six months", "healthcare_visits", period="unstated")]),
+    (H + "no doctor visits this month", [k("no doctor visits this month", "healthcare_visits", period="unstated")]),
+    # a unit left outside the quote, then re-guessed
+    (H + "my bilirubin 2.5 mg/dL", [_lab("bilirubin 2.5", "total bilirubin")]),
+    (H + "my hemoglobin 6.0 mmol/L", [_lab("hemoglobin 6.0", "hemoglobin")]),
+    (H + "my NT-proBNP 600 pmol/L", [_lab("NT-proBNP 600", "nt-probnp")]),
+    (H + "my phosphorus 2.0 mg/dL", [_lab("phosphorus 2.0", "phosphorus")]),
+    (H + "my HbA1c 6.1 %", [_lab("HbA1c 6.1", "hba1c")]),
+    # a qualifier before the name
+    (H + "ref range: albumin 3.5 g/dL", [_lab("albumin 3.5 g/dL", "albumin")]),
+    (H + "min glucose 70 mg/dL", [_lab("glucose 70 mg/dL", "glucose")]),
+    (H + "baseline HbA1c 9.1 %", [_lab("baseline HbA1c 9.1 %", "hba1c")]),
+    # not a health rating
+    (H + "Quit drinking last month. I feel good about it.", [k("I feel good about it", "self_rated_health", rating="good")]),
+    (H + "overall rating excellent", [k("overall rating excellent", "self_rated_health", rating="excellent")]),
+]
+
+
+@pytest.mark.parametrize("text, items", REVIEW_D, ids=[f"{t.splitlines()[-1]}|{len(i)}" for t, i in REVIEW_D])
+def test_review_d_no_value_added_from_context_the_checks_do_not_see(text, items):
+    rules = read_patient_text(text)
+    r = read_patient(text, Recorded(*items))
+    assert not r.substitutions, (r.read_as, r.substitutions)
+    assert read_values(r.parsed) == read_values(rules)
+    for s in r.suggestions:                      # and no button would build it either
+        for w in s.wordings:
+            clicked = read_patient_text(s.apply(text, w))
+            assert not clicked.ok or read_values(clicked)["age"] in (None, rules.age), (w, clicked.age)

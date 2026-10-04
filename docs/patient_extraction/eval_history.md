@@ -57,6 +57,17 @@ fixes cost: all 218 usable corpus entries still read as expected; rewrites 40 (4
 rules read as usable that the model blocks 6 (9); texts with a wording to click 341 (576),
 the rest of the partial readings shown as notes.
 
+**After the second review round** (the commit after `46937c2`). A fresh reviewer, attacking
+the fixes, found nine ways to *add* a value the rules had not read — context in a
+neighbouring statement ("Before metformin, | my HbA1c was 9 %"; "My mother has diabetes. |
+Her HbA1c is 9 %"), a word the grammar allowed that changes meaning ("I was 58 years old",
+"at age 45", "4 years | younger", a unit left outside the quote and re-guessed 17x off,
+"visits 2 per | month"). A silent rewrite now needs its quotes to hold the statement but for
+plain filler, and every other statement on its line read by the rules; filler lost its
+meaning-bearing words; age, trend, visits and health checks read their context. Replaying run
+3 under this code: 218/218 usable corpus entries as expected, 39 rewrites, 6 texts the rules
+read as usable blocked, 339 texts with a wording to click.
+
 **Cost per Read.** About 5,400 prompt tokens, of which about 99% are a cached prefix (the
 instructions and the vocabulary come first, the person's text last), and about 165
 completion tokens (about 100 of them reasoning).
