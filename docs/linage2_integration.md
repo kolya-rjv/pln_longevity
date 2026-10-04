@@ -212,6 +212,19 @@ layer's form cannot be split; it runs in the scoped space and the answer carries
 naming the form that will not evaluate there. The Gradio chat does the same. Rule 16 of the
 translator prompt allows the combination, one form per line.
 
+**The patient stack.** Keeping the LinAge2 atoms out fixed the crash they caused, but
+building patients from typed text showed the shared space was still at its edge for *any*
+patient: a caller whose CRP or HbA1c z is 1.2, 2.0 or 0.31 aborts diagnose / supplements /
+ranking there (15 of 15 runs), while 0.3 or 0.5 happen to run, and dropping any one of a
+dozen unrelated files makes it run — the head-symbol budget of §5 again, failing in
+hyperon's space index (`trie.rs:179`, `unwrap()` on a hashed atom that is not there). The
+built-in patients abort too (`rank-interventions-for-patient`, `recommend-supplements-
+patient` for Patient001). So every program that names a patient runs in
+`core.pln_runner.patient_stack`: the runtime stack minus seven files no patient form reads.
+There all of those answer (+64 head symbols of margin), and wherever the full stack answers
+the result is byte-identical — including the three Patient001 outputs
+`tests/test_hallmark_targeting.py` captured on an earlier commit.
+
 Two pre-existing defects surfaced on the way and are fixed: `_normalize_query` split only
 at line ends, so `!(a) !(b)` on one line evaluated `a` and silently *added* `b` to the
 space; and `/query` validated the shared space without the caller's atoms, so every answer

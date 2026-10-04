@@ -1,0 +1,167 @@
+"""Questions that name a patient run in the patient stack (core.pln_runner.patient_stack).
+
+The full shared space sits at hyperon 0.2.10's head-symbol edge: patient forms abort
+it (a panic in its space index, uncatchable from Python) depending on details as
+small as one float — rank-interventions-for-patient for Patient001, the supplement
+forms for Patient001/002, and diagnose / supplements / ranking for a caller whose
+CRP z is 1.2. The patient stack drops seven files no patient form reads. These tests
+pin the three claims that justify it: the answers do not change where the full
+stack answers at all; the forms that aborted now answer; and there is margin.
+
+Every MeTTa run here is a SUBPROCESS: an abort must fail one test, not kill pytest.
+
+    pytest tests/test_patient_stack.py -q
+"""
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+REPO = Path(__file__).resolve().parent.parent
+PLN_CHAT = REPO / "pln_chat"
+if str(PLN_CHAT) not in sys.path:
+    sys.path.insert(0, str(PLN_CHAT))
+
+pytest.importorskip("fastapi")
+
+import api as api_module  # noqa: E402
+from core.patient_context import names_a_patient  # noqa: E402
+from core.pln_runner import PATIENT_STACK_EXCLUDED, patient_stack  # noqa: E402
+
+CALLER = ("(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n"
+          "(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me AgeAccelGrim 0.9375)\n"
+          "(MeasuredZ Caller_Me CRP {z})\n(MeasuredZ Caller_Me HbA1c {z})")
+DIAGNOSE = "!(diagnose-patient &self {P} (CellularSenescence ChronicInflammation InsulinResistance))"
+SUPPLEMENTS = "!(recommend-supplements-patient &self {P})"
+RANK = "!(rank-interventions-for-patient &self {P} (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)"
+RISK = "!(predict-risk-patient &self {P})"
+
+
+def _run(stack: str, query: str, extra: str = "") -> dict:
+    """Run one query in a fresh process; {'rc', 'status', 'atoms'}."""
+    probe = "\n".join([
+        "import sys, json",
+        f"sys.path.insert(0, {str(PLN_CHAT)!r})",
+        "import api",
+        "from core.pln_runner import patient_stack, run_query",
+        "kb = api._runtime_kb_paths()",
+        "kb = patient_stack(kb) if sys.argv[1] == 'patient' else kb",
+        "r = run_query(sys.argv[2], kb_files=kb, extra_atoms=sys.argv[3] or None)",
+        "print('RESULT ' + json.dumps({'status': r.status, 'atoms': [x.atom for x in r.results]}))",
+    ])
+    done = subprocess.run([sys.executable, "-c", probe, stack, query, extra],
+                          capture_output=True, text=True, timeout=600, cwd=str(REPO))
+    line = [ln for ln in done.stdout.splitlines() if ln.startswith("RESULT ")]
+    out = json.loads(line[0][7:]) if line else {"status": "abort", "atoms": []}
+    out["rc"] = done.returncode
+    return out
+
+
+# ═══════════════════════════ what it is ═══════════════════════════════════════
+
+def test_the_patient_stack_is_the_runtime_stack_minus_seven_named_files():
+    runtime = api_module._runtime_kb_paths()
+    names = [p.name for p in runtime]
+    assert set(PATIENT_STACK_EXCLUDED) <= set(names), "an excluded file left the runtime stack"
+    stack = patient_stack(runtime)
+    assert [p.name for p in stack] == [n for n in names if n not in PATIENT_STACK_EXCLUDED]
+    for needed in ("patient_profile.metta", "pln_abductive_diagnosis.metta", "pln_risk_prediction.metta",
+                   "pln_counterfactual.metta", "pln_intervention_ranking.metta",
+                   "pln_supplement_recommendation.metta", "lifestyle_evidence.metta"):
+        assert needed in {p.name for p in stack}
+
+
+@pytest.mark.parametrize("program, expected", [
+    ("(diagnose-patient &self Caller_Me (A))", True),
+    ("(predict-risk-patient &self Patient001)", True),
+    ("(match &self (Inheritance $x PatientProfile) $x)", False),
+    ("(match &self (UsesSpecies $e Mus_musculus) $e)", False),
+    ("(rank-drugage-lifespan (Rapamycin Metformin))", False),
+])
+def test_a_patient_question_is_recognised_by_its_patient(program, expected):
+    assert names_a_patient(program) is expected
+
+
+# ═══════════════════════════ it changes no answer ═════════════════════════════
+
+@pytest.mark.slow
+@pytest.mark.parametrize("patient, form", [
+    ("Patient001", DIAGNOSE), ("Patient001", RISK), ("Patient002", DIAGNOSE),
+    ("Patient002", RISK), ("Patient003", RANK), ("Patient003", SUPPLEMENTS),
+    ("Patient001", "!(counterfactual-patient &self {P} CellularSenescence)"),
+    ("Patient001", "!(decompose-grimage &self {P})"),
+])
+def test_where_the_full_stack_answers_the_patient_stack_answers_identically(patient, form):
+    q = form.format(P=patient)
+    full, scoped = _run("full", q), _run("patient", q)
+    assert full["rc"] == 0 and full["status"] == "ok", f"control: the full stack no longer answers {q}"
+    assert scoped["rc"] == 0 and scoped["atoms"] == full["atoms"]
+
+
+@pytest.mark.slow
+def test_patient001s_captured_outputs_are_what_a_patient_now_sees():
+    """tests/test_hallmark_targeting.py captured these three outputs on an earlier
+    commit and asserts them in the FULL stack, where the ranking now aborts the
+    process. Routed as production routes them, they are reproduced to the digit."""
+    risk = _run("patient", RISK.format(P="Patient001"))["atoms"][0]
+    assert "(point 0.12605177716424967)" in risk
+    dx = _run("patient", "!(diagnose-patient &self Patient001 "
+                         "(CellularSenescence MitochondrialDysfunction ChronicInflammation))")["atoms"][0]
+    assert re.findall(r"\(Hypothesis (\w+)", dx) == ["CellularSenescence", "ChronicInflammation",
+                                                     "MitochondrialDysfunction"]
+    rank = _run("patient", "!(rank-interventions-for-patient &self Patient001 (DasatinibPlusQuercetin "
+                           "Fisetin Spermidine Elamipretide) CoronaryHeartDisease)")["atoms"][0]
+    scored = re.findall(r"\(scored (\w+) ([-\d.eE]+)", rank)
+    assert [n for n, _ in scored] == ["DasatinibPlusQuercetin", "Fisetin", "Spermidine"]
+    assert float(scored[0][1]) == pytest.approx(0.2306046747621094, abs=1e-12)
+
+
+# ═══════════════════════════ it answers what aborted ══════════════════════════
+
+@pytest.mark.slow
+@pytest.mark.parametrize("patient, form", [
+    ("Patient001", RANK), ("Patient001", SUPPLEMENTS), ("Patient002", SUPPLEMENTS),
+])
+def test_the_built_in_patient_forms_that_aborted_now_answer(patient, form):
+    q = form.format(P=patient)
+    assert _run("patient", q)["status"] == "ok"
+    assert _run("full", q)["rc"] != 0, (
+        f"the full stack no longer aborts on {q}: the control is void (the engine or "
+        f"the KB changed) — the patient stack is still correct, re-measure the margin")
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("z", ["1.2", "2.0", "0.31"])
+@pytest.mark.parametrize("form", [DIAGNOSE, SUPPLEMENTS, RANK])
+def test_a_caller_patient_is_answered_whatever_its_values(z, form):
+    out = _run("patient", form.format(P="Caller_Me"), CALLER.format(z=z))
+    assert out["rc"] == 0 and out["status"] == "ok"
+
+
+@pytest.mark.slow
+def test_the_patient_stack_keeps_a_head_symbol_margin():
+    pad = "\n".join(f'(ProbeHead{i} ProbeSym{i} "probe {i}")' for i in range(32))
+    for form in (DIAGNOSE, SUPPLEMENTS, RANK):
+        out = _run("patient", form.format(P="Caller_Me"), CALLER.format(z="1.2") + "\n" + pad)
+        assert out["rc"] == 0 and out["status"] == "ok", (
+            "the patient stack no longer tolerates 32 extra head symbols on top of a caller "
+            "patient; something spent the margin")
+
+
+# ═══════════════════════════ it is where they run ═════════════════════════════
+
+def test_api_routes_a_patient_program_to_the_patient_stack(monkeypatch):
+    runtime = api_module._runtime_kb_paths()
+    assert api_module._generic_kb("(predict-risk-patient &self Patient001)") == patient_stack(runtime)
+    assert api_module._generic_kb("(match &self (UsesSpecies $e Mus_musculus) $e)") == runtime
+
+
+def test_the_chat_routes_the_same_way():
+    import app as app_module
+    assert app_module._generic_kb("(diagnose-patient &self Caller_Me (A))") == patient_stack(app_module._ALL_KB_PATHS)
+    assert app_module._generic_kb("(match &self (HasSex $e Hermaphrodite) $e)") == app_module._ALL_KB_PATHS

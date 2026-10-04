@@ -41,6 +41,7 @@ from core.drugage_router import (
     parse_drugage_query,
     route_drugage_ranking,
 )
+from core.patient_context import names_a_patient
 from core.executor import (
     PLNExecutionTimeout,
     PLNOverloaded,
@@ -58,6 +59,7 @@ from core.pln_runner import (
     PLNRunResult,
     linage2_patient_kb,
     merge_run_results,
+    patient_stack,
     run_query,
     run_query_parts,
 )
@@ -225,6 +227,11 @@ def _linage2_context() -> tuple:
     return _LINAGE2_CONTEXT
 
 
+def _generic_kb(metta_query: str) -> list[Path]:
+    """As api._generic_kb: a program that names a patient runs in the patient stack."""
+    return patient_stack(_ALL_KB_PATHS) if names_a_patient(metta_query) else _ALL_KB_PATHS
+
+
 def _build_context(selected_files: list[str]) -> tuple[OntologyRegistry, dict[str, str]]:
     """Load selected .metta files for the LLM system prompt context.
 
@@ -335,7 +342,7 @@ def chat(
                 )
                 parts = [
                     {"metta_query": split.linage2, "kb_files": linage_kb},
-                    {"metta_query": split.generic, "kb_files": _ALL_KB_PATHS},
+                    {"metta_query": split.generic, "kb_files": _generic_kb(split.generic)},
                 ]
                 pln_result = merge_run_results(
                     run_offloaded(
@@ -364,15 +371,16 @@ def chat(
             # invented one, and a populated predicate from a declared-but-empty
             # one — the UI used the registry alone and inherited both errors.
             validation = validate(translation.metta_query, registry, inventory)
+            generic_kb = _generic_kb(translation.metta_query)
             pln_result = run_offloaded(
                 "run_query",
                 {"metta_query": translation.metta_query,
                  "confidence_threshold": confidence_threshold,
-                 "kb_files": _ALL_KB_PATHS},
+                 "kb_files": generic_kb},
                 lambda: run_query(
                     metta_query=translation.metta_query,
                     confidence_threshold=confidence_threshold,
-                    kb_files=_ALL_KB_PATHS,
+                    kb_files=generic_kb,
                 ),
             )
     except (

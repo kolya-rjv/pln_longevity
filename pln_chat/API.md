@@ -370,6 +370,19 @@ formula). `GET /patients/markers` lists what is supported; `POST
 /patients/preview` shows the atoms and each marker's Elevated/Normal/Low status
 without running anything.
 
+**Where a patient question runs.** A program that names a patient — a built-in
+`Patient00N` or your `Caller_<id>` — runs in the *patient stack*: the shared
+runtime stack minus seven files no patient form reads (the DrugAge species and
+short entries, the DrugAge calibration, the human-evidence and hallmark-targeting
+layers, the López-Otín anchors, the measurement-type vocabulary). The full shared
+space sits at hyperon 0.2.10's head-symbol limit, and there the patient forms
+abort the interpreter depending on details as small as one float — built-in
+patients included (`rank-interventions-for-patient` for Patient001). In the
+patient stack they answer, with at least 64 head symbols of margin, and wherever
+the full stack answers at all the answer is byte-identical
+(`tests/test_patient_stack.py`). A program that names no patient runs in the full
+stack as before.
+
 **A z you send and a z we derive are not the same thing, and the atom cannot
 say which is which.** `Reference.to_z` standardises against a single POOLED
 mean and sd — there is no age/sex-stratified reference table in this

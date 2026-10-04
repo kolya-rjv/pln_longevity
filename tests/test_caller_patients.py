@@ -205,7 +205,10 @@ def test_the_reported_question_now_gets_a_real_answer():
     from core.pln_runner import run_query
 
     built = build_patient(THE_REPORTED_PATIENT)
-    kb = api_module._runtime_kb_paths()
+    # Routed as production routes a question that names a patient: the patient stack
+    # (core.pln_runner.patient_stack). In the full shared space both forms abort the
+    # process for this patient — tests/test_patient_stack.py measures why.
+    kb = api_module._generic_kb(f"(predict-risk-patient &self {built.patient_id})")
 
     risk = run_query(
         f"!(predict-risk-patient &self {built.patient_id})",

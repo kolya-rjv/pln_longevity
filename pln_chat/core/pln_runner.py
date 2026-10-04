@@ -113,6 +113,44 @@ def nhanes_patient_kb(*generated: Path) -> list[Path]:
     return list(NHANES_PATIENT_STACK) + [p for p in generated if p.exists()]
 
 
+# ── Patient stack ─────────────────────────────────────────────────────────────
+#
+# Where every question that NAMES A PATIENT runs: the shared runtime stack minus the
+# files no patient form reads. Measured, like the stacks above, and for the same
+# reason: the full shared space carries its 201 distinct head symbols with no
+# margin, and at that edge whether a query aborts hyperon 0.2.10 (a panic in its
+# space index, hyperon-space/src/index/trie.rs:179, `unwrap()` on a missing hashed
+# atom) depends on details as small as one float. Observed in the full space:
+#   * built-in patients: rank-interventions-for-patient (Patient001, Patient002),
+#     recommend-supplements-patient (Patient001, Patient002), supplement-for-patient
+#     (Patient001) all abort;
+#   * a caller-supplied patient: diagnose-patient, recommend-supplements-patient and
+#     rank-interventions-for-patient abort for CRP/HbA1c z in {0.31, 1.2, 2.0, 0.73,
+#     2.6} — 15 of 15 — while z = 0.3 or 0.5 happen to run; dropping any one of a
+#     dozen unrelated files also makes it run.
+# In this stack all of those answer, and wherever the full stack answers, this one
+# gives a BYTE-IDENTICAL answer (33 patient-form runs over the three built-in
+# patients), with at least 64 head symbols of margin on top of a caller patient
+# (tests/test_patient_stack.py). What it leaves out: the DrugAge species taxonomy and
+# short entries (the DrugAge ranking runs in its own DRUGAGE_STACK anyway), the
+# DrugAge calibration, the human-evidence and hallmark-targeting layers, the López-
+# Otín anchors and the measurement-type vocabulary — none of which a patient form reads.
+PATIENT_STACK_EXCLUDED: tuple[str, ...] = (
+    "measurement_types.metta",
+    "species_taxonomy.metta",
+    "drugage_entries.metta",
+    "hallmarks_lopezotin2023_anchors.metta",
+    "hallmark_targeting.metta",
+    "drugage_calibration.metta",
+    "human_evidence.metta",
+)
+
+
+def patient_stack(runtime_paths: list[Path]) -> list[Path]:
+    """The runtime stack, in its order, minus PATIENT_STACK_EXCLUDED."""
+    return [p for p in runtime_paths if p.name not in PATIENT_STACK_EXCLUDED]
+
+
 # ── LinAge2 clinical-clock stack ──────────────────────────────────────────────
 #
 # A QUERY-SCOPED space for the LinAge2 forms (pln_linage2.metta), routed to by

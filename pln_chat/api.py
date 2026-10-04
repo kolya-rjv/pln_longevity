@@ -129,12 +129,18 @@ from core.pln_runner import (
     PLNRunResult,
     linage2_patient_kb,
     merge_run_results,
+    patient_stack,
     run_cellage_effects,
     run_query,
     run_query_parts,
 )
 from core.linage2_builder import feature_listing as linage2_feature_listing
-from core.patient_context import patient_prompt_section, validation_text, with_injected
+from core.patient_context import (
+    names_a_patient,
+    patient_prompt_section,
+    validation_text,
+    with_injected,
+)
 from core.linage2_router import (
     DEFAULT_LEVERS as LINAGE2_DEFAULT_LEVERS,
     LINAGE2_FORMS,
@@ -3054,6 +3060,14 @@ def _offloaded_run(
     )
 
 
+def _generic_kb(metta_query: str) -> list[Path]:
+    """The shared runtime stack — or, for a program that names a patient, the
+    patient stack (core.pln_runner.patient_stack): the full space aborts on the
+    patient forms at its head-symbol edge, built-in patients included."""
+    runtime = _runtime_kb_paths()
+    return patient_stack(runtime) if names_a_patient(metta_query) else runtime
+
+
 def _validate_generic_with(
     metta_query: str, registry: OntologyRegistry, injected: Optional[str]
 ) -> ValidationResult:
@@ -3123,7 +3137,7 @@ def _run_linage2_program(
     parts = [
         {"metta_query": split.linage2, "kb_files": linage2_patient_kb(),
          "extra_atoms": linage_atoms},
-        {"metta_query": split.generic, "kb_files": _runtime_kb_paths(),
+        {"metta_query": split.generic, "kb_files": _generic_kb(split.generic),
          "extra_atoms": shared_atoms},
     ]
     results = run_offloaded(
@@ -3328,7 +3342,8 @@ def query(req: QueryRequest) -> QueryResponse:
         shared = patient.shared_atoms if patient is not None else None
         validation = _validate_generic_with(translation.metta_query, registry, shared)
         pln_result = _offloaded_run(
-            translation.metta_query, req.confidence_threshold, _runtime_kb_paths(), shared,
+            translation.metta_query, req.confidence_threshold,
+            _generic_kb(translation.metta_query), shared,
         )
 
     if pln_result.status == "error":
@@ -3519,7 +3534,8 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
                 },
             )
         pln_result = _offloaded_run(
-            req.metta_query, req.confidence_threshold, _runtime_kb_paths(), injected_shared
+            req.metta_query, req.confidence_threshold, _generic_kb(req.metta_query),
+            injected_shared,
         )
 
     if pln_result.status == "error":

@@ -7,12 +7,23 @@ the same question differently (tests/test_ui_api_parity.py).
 """
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 from core.patient_builder import BuiltPatient
 from ontology.inventory import merged_inventory
 from ontology.loader import parse_metta_text
 from ontology.registry import OntologyRegistry
+
+
+#: A built-in patient (Patient001 …) or a caller-supplied one (always `Caller_…`).
+_PATIENT_ID_RE = re.compile(r"(?<![A-Za-z0-9_])(?:Patient\d+|Caller_[A-Za-z][A-Za-z0-9_]*)(?![A-Za-z0-9_])")
+
+
+def names_a_patient(metta_query: str) -> bool:
+    """Does this program ask about a patient? Then it runs in the patient stack
+    (core.pln_runner.patient_stack), where the patient forms do not abort."""
+    return bool(_PATIENT_ID_RE.search(metta_query or ""))
 
 
 def with_injected(registry: OntologyRegistry, inventory, injected: Optional[str],
