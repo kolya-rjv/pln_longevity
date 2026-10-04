@@ -1,0 +1,239 @@
+<!doctype html><html><head><meta charset='utf-8'><title>LinAge2 Query Battery</title><style>
+@page { size: A4; margin: 22mm 20mm 20mm 20mm; }
+:root { --ink:#1d1d1f; --muted:#6e6a66; --rule:#d8d4cf; --accent:#6b2a4a; --gold:#a8742a;
+        --panel:#f6f3ef; --ok:#2f6b3a; --bad:#a3262a; --live:#7a6a3a; }
+* { box-sizing: border-box; }
+body { font-family: "Liberation Serif", "Tinos", "Times New Roman", serif; color: var(--ink);
+       font-size: 10.5pt; line-height: 1.45; margin: 0; }
+code, .mono { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 8.4pt; }
+.eyebrow { font-family: "Liberation Sans", Arial, sans-serif; font-size: 7.5pt; letter-spacing: .18em;
+           text-transform: uppercase; color: var(--accent); font-weight: bold; }
+.cover { page-break-after: always; padding-top: 34mm; }
+.cover h1 { font-size: 40pt; line-height: 1.05; margin: 10mm 0 6mm; letter-spacing: -.01em; }
+.cover .rule { width: 26mm; border-top: 1.5px solid var(--accent); margin: 0 0 9mm; }
+.lede { font-size: 13.5pt; color: var(--muted); max-width: 150mm; margin-bottom: 14mm; }
+.small { font-size: 9.6pt; color: var(--muted); max-width: 150mm; }
+.small b { color: var(--ink); }
+h2 { font-size: 21pt; margin: 4mm 0 4mm; }
+h3 { font-size: 12.5pt; margin: 9mm 0 1mm; padding-bottom: 2mm; border-bottom: 1px solid var(--rule); max-width: 130mm; }
+h3 .code { font-family: "Liberation Sans", Arial, sans-serif; font-size: 7.5pt; color: var(--muted);
+           letter-spacing: .1em; margin-right: 3mm; font-weight: normal; }
+.part { page-break-before: always; border-top: 1.5px solid var(--accent); padding-top: 4mm; }
+.intro { color: var(--muted); max-width: 140mm; }
+.box { background: var(--panel); border-left: 3px solid var(--accent); padding: 4mm 5mm; margin: 5mm 0; max-width: 140mm; }
+.box.gold { border-left-color: var(--gold); }
+.box .eyebrow { margin-bottom: 2mm; }
+.box.gold .eyebrow { color: var(--gold); }
+.box p { margin: 0 0 2.5mm; font-size: 9.8pt; }
+.entry { display: grid; grid-template-columns: 10mm 1fr; padding: 3mm 0 2.6mm; border-bottom: 1px solid var(--rule);
+         page-break-inside: avoid; }
+.num { color: var(--accent); font-weight: bold; font-size: 9.5pt; text-align: right; padding-right: 3mm; }
+.q { font-size: 10.6pt; }
+.line { font-size: 8.9pt; margin-top: 1mm; color: var(--muted); }
+.lab { font-family: "Liberation Sans", Arial, sans-serif; font-size: 6.8pt; letter-spacing: .14em;
+       font-weight: bold; color: #9a948e; margin-right: 1.5mm; }
+.emits code { color: var(--accent); white-space: pre-wrap; }
+.obs code { color: #3a3836; white-space: pre-wrap; }
+.pass .tick { color: var(--ok); font-weight: bold; }
+.fail .tick { color: var(--bad); font-weight: bold; }
+.live .tick { color: var(--live); font-weight: bold; }
+table.matrix { border-collapse: collapse; width: 140mm; font-size: 9.4pt; }
+table.matrix td { border-bottom: 1px solid var(--rule); padding: 2mm 0; }
+table.matrix td.r { text-align: right; color: var(--accent); font-weight: bold; }
+table.pt { border-collapse: collapse; font-size: 9pt; margin: 3mm 0; }
+table.pt td { padding: 1mm 4mm 1mm 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+.texts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4mm; margin-top: 6mm; }
+.texts .eyebrow { margin-bottom: 1.5mm; }
+pre.pt { background: var(--panel); padding: 3mm; font-size: 7.6pt; white-space: pre-wrap; margin: 0;
+         page-break-inside: avoid; break-inside: avoid; }
+</style></head><body>
+
+<section class="cover">
+  <div class="eyebrow">Evaluation battery · LinAge2 · v1</div>
+  <h1>LinAge2<br>Query Battery</h1>
+  <div class="rule"></div>
+  <p class="lede">52 queries against a patient someone types into the <i>My Patient</i>
+  tab — each with the query form it should translate to, the behaviour that counts as a pass,
+  and what the system actually returned on 2026-10-04.</p>
+  <p class="small"><b>What it is for.</b> A repeatable acceptance pass over the LinAge2 path: plain
+  text in, a patient read back and built for one browser session, the clinical clock scored
+  in-process, questions about that patient translated, routed to the right space and answered.
+  Part A tests the tab; Parts B–D the inference over the clock; Part E questions that cross into
+  the rest of the knowledge base; Part F honesty.</p>
+  <p class="small"><b>What it is not.</b> Not a benchmark with a score, and not a clinical tool.
+  The interesting signal is where years are reported without a cause, where an empty answer is
+  correct, and where a refusal protects a number from a wrong unit.</p>
+  <p class="small"><b>Verified, not asserted.</b> 47 of the 52 entries were
+  executed by <code>scripts/linage2_battery.py</code> — every query form through
+  <code>POST /query</code> with only the LLM translator stubbed (system prompt, patient block,
+  routing, validation, worker-process execution, warnings all as served), every tab entry
+  through the tab's own handlers — and 47 passed. The other 5 have no query form
+  (∅): their correct answer is a direct reply, which needs the LLM translator and is graded live.
+  Translation itself (question → form) is likewise graded live.</p>
+</section>
+
+<section>
+  <h2>Reading an entry</h2>
+  <p class="intro">Each entry carries the question as a person would type it, the form the
+  translator should emit (∅ means a direct answer and nothing executed), the pass criterion, and
+  OBSERVED: what the system returned when the form was run against the named patient.</p>
+  <div class="box"><div class="eyebrow">The distinction the battery is built around</div>
+  <p>Years are not causes. LinAge2 gives every lab a number of years, but its per-lab weight is a
+  sex-specific projection whose sign is not the lab's clinical direction (CRP is +4.4 months per SD
+  in the female model and −0.2 in the male one). So the knowledge base credits a cause only when the
+  person's own value witnesses it — their HbA1c is elevated, they said they smoke. Everything else is
+  reported as years and left unexplained.</p>
+  <p>Three shapes follow from that and recur below: a lab that adds years with no cause (albumin);
+  a lab that is high and still takes years off (glucose in the male model); and a lever that returns
+  zero because there is nothing witnessed for it to act on.</p></div>
+  <div class="box gold"><div class="eyebrow">Runtime conditions that change how a result reads</div>
+  <p><b>The patient lives in one browser session.</b> It is a plain dict in the UI's session state;
+  every question rebuilds its atoms into that one query's space. Nothing is written to the
+  knowledge base.</p>
+  <p><b>LinAge2 runs in its own space.</b> Its atoms never enter the shared space (they crash it); a
+  question that needs both is split, and the answers are joined in the order asked.</p>
+  <p><b>An empty result is frequently the pass.</b> No absolute risk without a baseline, no lever
+  without a route, no LinAge2 for the built-in patients.</p></div>
+</section>
+<section class="part">
+  <div class="eyebrow">Patients</div><h2>Who the questions are about</h2>
+  <p class="intro">Five patients, each typed into the tab as plain text and built by the tab's own
+  reader and the in-process LinAge2, always as <code>Caller_Me</code>. P1–P3 are the tab's example
+  buttons, shown below exactly as typed; P4 and P5 are one-line variations of P1.</p>
+  <table class="pt">
+<tr><td><b>P1</b></td><td>the 58-year-old smoker example</td></tr>
+<tr><td><b>P2</b></td><td>the healthy 45-year-old woman example</td></tr>
+<tr><td><b>P3</b></td><td>the six-labs example (66, male, former smoker)</td></tr>
+<tr><td><b>P4</b></td><td>P1 plus a line 'GrimAge acceleration +4.5 years'</td></tr>
+<tr><td><b>P5</b></td><td>P1 with 'current smoker' replaced by 'cotinine 250 ng/mL'</td></tr>
+</table><div class='texts'>
+<div><div class='eyebrow'>P1 · as typed</div><pre class='pt'>58 year old male, current smoker
+albumin 4.1 g/dL
+HbA1c 6.4 %
+CRP 3.1 mg/L
+fasting glucose 112 mg/dL
+blood pressure 142/88
+pulse 78
+total cholesterol 228 mg/dL
+HDL 41 mg/dL
+triglycerides 190 mg/dL
+creatinine 1.1 mg/dL
+RDW 14.1 %
+WBC 8.2
+BMI 29.4
+diagnoses: hypertension
+self-rated health: fair</pre></div>
+<div><div class='eyebrow'>P2 · as typed</div><pre class='pt'>45 year old female, never smoked
+albumin 4.5 g/dL
+HbA1c 5.2 %
+CRP 0.6 mg/L
+fasting glucose 88 mg/dL
+blood pressure 112/72
+pulse 62
+total cholesterol 182 mg/dL
+HDL 68 mg/dL
+triglycerides 75 mg/dL
+creatinine 0.8 mg/dL
+RDW 12.6 %
+hemoglobin 13.4 g/dL
+platelets 245
+weight 61 kg
+height 168 cm
+no known conditions
+self-rated health: very good</pre></div>
+<div><div class='eyebrow'>P3 · as typed</div><pre class='pt'>age 66, male, former smoker
+albumin 3.8 g/dL
+HbA1c 7.1 %
+CRP 6.5 mg/L
+creatinine 1.3 mg/dL
+systolic 151
+NT-proBNP 410 pg/mL</pre></div>
+</div></section>
+<section class='part'><div class='eyebrow'>Part A</div><h2>The patient tab</h2><p class='intro'>What happens before anything is asked: a few lines of text become a patient. The risk tested here is the commonest way to get a confident, wrong biological age — a value in the wrong unit — so most passes are refusals.</p>
+<h3><span class='code'>A1</span>Units and plausibility</h3>
+<div class='entry pass'><div class='num'>1</div><div><div class='q'>“albumin 4.1 g/dL”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>Read as 41 g/L with a ✓, and the typical value for the person's age and sex beside it.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>albumin 4.1 g/dL → 41 g/L, ok; typical for a 58-year-old man: 45 g/L</code></div></div></div>
+<div class='entry pass'><div class='num'>2</div><div><div class='q'>“albumin 4.2 g/L”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>Refused: 4.2 g/L is outside the 12–57 g/L NHANES observed; the note asks "did you mean g/dL?". Nothing is built.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>out of range: 4.2 g/L = 4.2 g/L, outside the 12-57 g/L seen in NHANES 1999-2002; did you mean g/dL?</code></div></div></div>
+<div class='entry pass'><div class='num'>3</div><div><div class='q'>“albumin 4.2”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>No unit, and only g/dL makes it plausible: read as 42 g/L and flagged "unit assumed" — shown, never silent.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>unit assumed: no unit given; read as g/dL, the only unit that gives a plausible value</code></div></div></div>
+<div class='entry pass'><div class='num'>4</div><div><div class='q'>“CRP 3.1”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>Stops and asks: 3.1 is plausible as mg/L and as mg/dL. Picking one would move a lab by 10×.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>needs a unit: no unit given and it could be 0.31 mg/dL (c-reactive protein, if typed in mg/L); or 3.1 mg/dL (c-reactive protein, if typed in mg/dL)</code></div></div></div>
+<div class='entry pass'><div class='num'>5</div><div><div class='q'>“CRP 3.1 mg/L”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>One value, two consumers in two units: LinAge2 gets 0.31 mg/dL (NHANES 1999–2002 reports CRP in mg/dL); the knowledge base's CRP witness gets 3.1 mg/L.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>LinAge2 LBXCRP = 0.31 mg/dL; knowledge-base CRP marker = 3.1 mg/L</code></div></div></div>
+<div class='entry pass'><div class='num'>6</div><div><div class='q'>“HbA1c 48 mmol/mol”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>IFCC converted to NGSP: 6.54 %.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>HbA1c 48 mmol/mol → 6.54 %</code></div></div></div>
+<div class='entry pass'><div class='num'>7</div><div><div class='q'>“lymphocytes 30 · lymphocytes 1.9”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>The value decides: 30 is a percentage, 1.9 a count (×10⁹/L) — two different model inputs.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>'lymphocytes 30' → Lymphocytes %; 'lymphocytes 1.9' → Lymphocytes (count)</code></div></div></div>
+<div class='entry pass'><div class='num'>8</div><div><div class='q'>“hemoglobin 9.5”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>Stops and asks: anaemic in g/dL, and 15.3 g/dL if typed in mmol/L. An abnormal value is never quietly re-read as a normal one in another unit.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>needs a unit: no unit given and it could be 15.3045 g/dL (hemoglobin, if typed in mmol/L); or 9.5 g/dL (hemoglobin, if typed in g/dL)</code></div></div></div>
+<div class='entry pass'><div class='num'>9</div><div><div class='q'>“58 year old male · HbA1c 12 %”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Build</div><div class='line'><span class='lab'>PASS</span>Builds. The knowledge base's coarse HbA1c prior puts 12 % at z 13, past the |z| ≤ 12 it accepts; the witness is passed at z 12 (Elevated is all it needs) and the tab says so. LinAge2 uses 12 % as typed.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>built; HbA1c 12 % lies beyond the knowledge base's coarse reference (z 13.0); passed to it as z 12, which is all a witness needs (Elevated). LinAge2 uses the value as typed.</code></div></div></div>
+<div class='entry pass'><div class='num'>10</div><div><div class='q'>“albumin 4.1 g/dL — and later — albumin 38 g/L”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>The second value is refused as a duplicate; the person resolves it.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>second reading: duplicate</code></div></div></div>
+<div class='entry pass'><div class='num'>11</div><div><div class='q'>“my mood is great · frobnicate 3”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>Listed as not understood. No loose match to a lab name.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>not understood: ['my mood is great', 'frobnicate 3']</code></div></div></div>
+<h3><span class='code'>A2</span>Who the person is</h3>
+<div class='entry pass'><div class='num'>12</div><div><div class='q'>“58 year old male, current smoker”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>Age 58, Male, CurrentSmoker, cotinine level 3 — the bin a daily smoker falls in on the model's TRAINING scale (0–3), not the service's 0–2.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>age 58, Male, CurrentSmoker, cotinine level 3</code></div></div></div>
+<div class='entry pass'><div class='num'>13</div><div><div class='q'>“58 year old male · quit smoking 20 years ago”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>Age stays 58 (only an explicit age phrase is an age), FormerSmoker, nothing left over.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>age 58, FormerSmoker, nothing left over</code></div></div></div>
+<div class='entry pass'><div class='num'>14</div><div><div class='q'>“45 year old female, never smoked · my husband smokes”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>The second line is about someone else: set aside and listed. She stays a female never-smoker.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>Female, NeverSmoker; set aside: ['my husband smokes']</code></div></div></div>
+<div class='entry pass'><div class='num'>15</div><div><div class='q'>“cotinine 150 ng/mL”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>Binned to level 2. No smoking status is inferred from it (nicotine replacement and second-hand smoke raise cotinine too).</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>level 2; smoking status None</code></div></div></div>
+<div class='entry pass'><div class='num'>16</div><div><div class='q'>“albumin 4.1 g/dL (no age, no sex) → Build”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Build</div><div class='line'><span class='lab'>PASS</span>Build is refused (LinAge2 needs both); the patient built earlier stays active.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>build refused; previous patient kept</code></div></div></div>
+<div class='entry pass'><div class='num'>17</div><div><div class='q'>“diagnoses: hypertension, prediabetes”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>Hypertension = yes, diabetes = borderline (NHANES 3, counted), everything not listed = no; the comorbidity score is then measured, not assumed.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>hypertension=1, diabetes=3 (3 = borderline), cancer=2 (2 = no)</code></div></div></div>
+<div class='entry pass'><div class='num'>18</div><div><div class='q'>“weight 180 lb · height 5'10"”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Read</div><div class='line'><span class='lab'>PASS</span>BMI 25.8 derived and shown.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>BMI 25.8</code></div></div></div>
+<h3><span class='code'>A3</span>The session</h3>
+<div class='entry pass'><div class='num'>19</div><div><div class='q'>“Example: 58-year-old smoker → Build patient”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient → Build</div><div class='line'><span class='lab'>PASS</span>Banner in PLN Query reads "Active patient: Caller_Me"; the atoms are viewable; Download writes to the system temp directory; no .metta file appears in the repository (Browse Ontology Files is unchanged).</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>banner: **Active patient: Caller_Me** · 58-year-old male · CurrentSm…; .metta files in the repo unchanged (35); download at /tmp/pln_patients_7e3o_jqt/pln_patient_Caller_Me_he8x5lst.metta</code></div></div></div>
+<div class='entry pass'><div class='num'>20</div><div><div class='q'>“Clear patient”<span class='line'></span></div><div class='line'><span class='lab'>WHERE</span>In My Patient</div><div class='line'><span class='lab'>PASS</span>The session forgets the patient; the banner says none is loaded.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>state cleared; banner says no patient</code></div></div></div>
+</section>
+<section class='part'><div class='eyebrow'>Part B</div><h2>Decomposition — years, and when they become causes</h2><p class='intro'>LinAge2 already says how many years each lab adds. What the knowledge base adds is WHY, and only under a witness the person's own values supply.</p>
+<h3><span class='code'>B1</span>The smoker (P1)</h3>
+<div class='entry pass'><div class='num'>21</div><div><div class='q'>“which of my labs make me biologically older?”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-decomposition-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>Cotinine is the largest measured input and is credited to smoking (witnessed by the stated status); albumin's years are reported with NO cause (no bridge reaches it); measured + imputed + age term = Δ exactly.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>Δ +13.28 y; top: SerumCotinine +7.53 y (witnessed); SerumAlbumin +2.36 y, no cause; measured +14.42 + imputed -1.63 + age term +0.50</code></div></div></div>
+<div class='entry pass'><div class='num'>22</div><div><div class='q'>“what's behind the HbA1c years?”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-decomposition-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>HbA1c 6.4 % is elevated for the patient, so its years are credited to DeregulatedNutrientSensing — the one hallmark with a positive chain to it.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>HbA1c +0.93 y, witnessed True, DrivenBy ['DeregulatedNutrientSensing']</code></div></div></div>
+<div class='entry pass'><div class='num'>23</div><div><div class='q'>“my fasting glucose is high — is it making me older?”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-decomposition-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>No: glucose is witnessed (112 mg/dL is elevated) but contributes NEGATIVE years in the male model, so no cause is credited. A contribution's sign is the model's weight, not the lab's direction — the distinction this battery is built around.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>SerumGlucose -0.36 y, witnessed True, DrivenBy []</code></div></div></div>
+<div class='entry pass'><div class='num'>24</div><div><div class='q'>“how much of this is actual measurement?”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-decomposition-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>The filled-in inputs are counted and totalled apart, and none carries a cause.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>44 inputs not measured, -1.63 y in total, none credited a cause</code></div></div></div>
+<h3><span class='code'>B2</span>Other patients, other gaps</h3>
+<div class='entry pass'><div class='num'>25</div><div><div class='q'>“is that cotinine number about smoking?”<span class='line'> · patient P5</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-decomposition-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>With cotinine measured but no smoking status stated (P5), the years are reported and NOT credited to smoking — no witness, no cause.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>SerumCotinine +7.53 y, witnessed False — no cause credited</code></div></div></div>
+<div class='entry pass'><div class='num'>26</div><div><div class='q'>“I only have six labs — can you still say anything?”<span class='line'> · patient P3</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-decomposition-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>Yes, exactly for what was measured (LinAge2 is additive): albumin and NT-proBNP each add &gt;3 years; the total assumes the 50+ missing inputs are typical, and says so.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>SerumAlbumin +4.27 y, NTproBNP +4.16 y; 7 measured, 52 filled in (-1.68 y)</code></div></div></div>
+<div class='entry pass'><div class='num'>27</div><div><div class='q'>“why is my biological age lower than my real age?”<span class='line'> · patient P2</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-decomposition-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>Δ about −10 years; no hallmark is credited, because nothing the knowledge base reads is elevated — a young clock is not explained by inventing protective causes.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>Δ -10.10 y; causes credited: none</code></div></div></div>
+<div class='entry pass'><div class='num'>28</div><div><div class='q'>“what are the main drivers?”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-drivers-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>Measured inputs above the driver threshold only; imputed inputs never appear.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>6 measured drivers, none imputed: SerumCotinine +7.53 y, RedCellDistributionWidth +2.55 y, SerumAlbumin +2.36 y, SelfRatedHealthScore +1.18 y, HbA1c +0.93 y, SystolicBloodPressure +0.52 y</code></div></div></div>
+</section>
+<section class='part'><div class='eyebrow'>Part C</div><h2>Hazard and risk</h2><p class='intro'>Pricing the years: a relative all-cause hazard always, an absolute risk only with a data-backed baseline, and never a cause-specific risk borrowed from the all-cause one.</p>
+<h3><span class='code'>C1</span>All-cause</h3>
+<div class='entry pass'><div class='num'>29</div><div><div class='q'>“how much does my biological age raise my risk of dying?”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-hazard-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>Hazard = 1.093^Δ (Fong 2025's null-model doubling time), confidence 0.54 (one observational cohort). A number, not "may increase".</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>Δ +13.28 y → hazard ×3.26, confidence 0.54</code></div></div></div>
+<div class='entry pass'><div class='num'>30</div><div><div class='q'>“and for me?”<span class='line'> · patient P2</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-hazard-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>For the younger-clock patient the multiplier is below 1 — the same formula, read in both directions.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>Δ -10.10 y → hazard ×0.41, confidence 0.54</code></div></div></div>
+<div class='entry pass'><div class='num'>31</div><div><div class='q'>“so what's my chance of dying in the next ten years?”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-risk-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>Empty, and the answer says why: no all-cause baseline is loaded (it is generated from NHANES mortality data, never curated). No percentage is invented. An empty result is the pass.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>pln_status empty; no percentage produced</code></div></div></div>
+<h3><span class='code'>C2</span>Two clocks</h3>
+<div class='entry pass'><div class='num'>32</div><div><div class='q'>“what's my 10-year heart-disease risk?”<span class='line'> · patient P4</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(predict-risk-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>For a patient who also gave a GrimAge result (P4), the GrimAge CHD model answers in the shared space — the LinAge2 atoms are kept out of it, which is what used to crash this exact question.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>10-year CHD risk 10.8% (CI 8.3%–13.4%), baseline 8.0%, confidence 0.765; shared space</code></div></div></div>
+<div class='entry live'><div class='num'>33</div><div><div class='q'>“combine my GrimAge and LinAge2 into one risk number”<span class='line'> · patient P4</span></div><div class='line'><span class='lab'>EMITS</span>∅ (direct answer)</div><div class='line'><span class='lab'>PASS</span>Declines: the two clocks are not combined (that would double-count the same mortality signal); each is reported on its own.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>◌ LIVE</span> <code>A direct answer with nothing executed — grade live (needs the LLM translator).</code></div></div></div>
+<div class='entry live'><div class='num'>34</div><div><div class='q'>“does LinAge2 say anything about my heart risk specifically?”<span class='line'> · patient P1</span></div><div class='line'><span class='lab'>EMITS</span>∅ (direct answer)</div><div class='line'><span class='lab'>PASS</span>No cause-specific risk from LinAge2 — the paper reports none per year of Δ; the all-cause hazard is not relabelled as heart risk.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>◌ LIVE</span> <code>A direct answer with nothing executed — grade live (needs the LLM translator).</code></div></div></div>
+</section>
+<section class='part'><div class='eyebrow'>Part D</div><h2>Counterfactuals — what would remove the years</h2><p class='intro'>Levers through the causal graph, in years. A lever with no route to a measured, witnessed input returns zero or nothing, and says which.</p>
+<h3><span class='code'>D1</span>Smoking</h3>
+<div class='entry pass'><div class='num'>35</div><div><div class='q'>“how many years would quitting smoking take off?”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-counterfactual-patient &amp;self Caller_Me SmokingCessation)</code></div><div class='line'><span class='lab'>PASS</span>0.95 × the cotinine years (cotinine's ~17 h half-life), confidence 0.765, Via (SerumCotinine).</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>SmokingCessation: -7.16 y, confidence 0.765, Via ['SerumCotinine']</code></div></div></div>
+<div class='entry pass'><div class='num'>36</div><div><div class='q'>“how many years would quitting smoking take off?”<span class='line'> · patient P2</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-counterfactual-patient &amp;self Caller_Me SmokingCessation)</code></div><div class='line'><span class='lab'>PASS</span>For a never smoker: 0 with an empty Via, and the answer says the lever is not theirs — the engine enforces the smoking precondition.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>SmokingCessation: +0.00 y, confidence 0.0, Via []; warned the lever is not theirs</code></div></div></div>
+<div class='entry pass'><div class='num'>37</div><div><div class='q'>“how many years would quitting smoking take off?”<span class='line'> · patient P5</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-counterfactual-patient &amp;self Caller_Me SmokingCessation)</code></div><div class='line'><span class='lab'>PASS</span>Cotinine measured, status not stated (P5): 0 — the knowledge base will not credit cotinine to smoking it was not told about.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>SmokingCessation: +0.00 y, confidence 0.0, Via []</code></div></div></div>
+<h3><span class='code'>D2</span>Metabolic and inflammatory levers</h3>
+<div class='entry pass'><div class='num'>38</div><div><div class='q'>“what if my blood-sugar control were normal?”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-counterfactual-patient &amp;self Caller_Me InsulinResistance)</code></div><div class='line'><span class='lab'>PASS</span>Removes part of the HbA1c years, Via (HbA1c).</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>InsulinResistance: -0.65 y, confidence 0.65, Via ['HbA1c']</code></div></div></div>
+<div class='entry pass'><div class='num'>39</div><div><div class='q'>“would metformin help my biological age?”<span class='line'> · patient P3</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-counterfactual-patient &amp;self Caller_Me Metformin)</code></div><div class='line'><span class='lab'>PASS</span>Through InsulinResistance → HbA1c, with visibly LOWER confidence than the mechanism's own edge — a drug is one hop further from the lab.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>Metformin -1.00 y via ['HbA1c'], confidence 0.497 (InsulinResistance's own edge: 0.65)</code></div></div></div>
+<div class='entry pass'><div class='num'>40</div><div><div class='q'>“would lowering inflammation help?”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-counterfactual-patient &amp;self Caller_Me ChronicInflammation)</code></div><div class='line'><span class='lab'>PASS</span>0 with an empty Via: CRP 3.1 mg/L is not elevated for this patient, so there is nothing for the lever to remove. Not a claim that anti-inflammatories are useless.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>ChronicInflammation: +0.00 y, confidence 0.0, Via []</code></div></div></div>
+<h3><span class='code'>D3</span>Scenarios and the absent</h3>
+<div class='entry pass'><div class='num'>41</div><div><div class='q'>“what could I do about my biological age?”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-scenarios-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>The four standing levers, each with its own number and route; no joint operator and no summed "total you could save".</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>SmokingCessation -7.16 y; InsulinResistance -0.65 y; CellularSenescence +0.00 y; ChronicInflammation +0.00 y — each separately, no joint total</code></div></div></div>
+<div class='entry pass'><div class='num'>42</div><div><div class='q'>“and elamipretide?”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-counterfactual-patient &amp;self Caller_Me Elamipretide)</code></div><div class='line'><span class='lab'>PASS</span>Omitted (no causal chain to any LinAge2 input) — not ranked last at a fake 0.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>no atom: omitted, not ranked at a fake 0</code></div></div></div>
+<div class='entry pass'><div class='num'>43</div><div><div class='q'>“how much would fixing my albumin take off?”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-counterfactual-patient &amp;self Caller_Me SerumAlbumin)</code></div><div class='line'><span class='lab'>PASS</span>Nothing: no lever in the knowledge base reaches albumin. The answer says so rather than inventing one.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>no atom: omitted, not ranked at a fake 0</code></div></div></div>
+</section>
+<section class='part'><div class='eyebrow'>Part E</div><h2>One message, several layers</h2><p class='intro'>Questions that cross the LinAge2 space and the shared space. They exercise the split that keeps the LinAge2 atoms out of the shared space — the fix this battery started from.</p>
+<h3><span class='code'>E1</span>Mixed programs</h3>
+<div class='entry pass'><div class='num'>44</div><div><div class='q'>“give me my LinAge2 drivers and my supplement plan”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-drivers-patient &amp;self Caller_Me)
+(recommend-supplements-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>Two expressions, two spaces, one request (routed linage2+generic): drivers from the LinAge2 space, the supplement plan from the shared space using the same CRP / HbA1c witnesses; answers in the order asked.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>routed linage2+generic; answers in order: Contribution, SupplementRecommendation</code></div></div></div>
+<div class='entry pass'><div class='num'>45</div><div><div class='q'>“what is the likely driver of my abnormal labs?”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(diagnose-patient &amp;self Caller_Me (CellularSenescence ChronicInflammation InsulinResistance DeregulatedNutrientSensing MitochondrialDysfunction))</code></div><div class='line'><span class='lab'>PASS</span>Answered in the shared space for a patient who carries a LinAge2 result (this aborted the interpreter before); insulin resistance leads, supported by the typed HbA1c and fasting glucose.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>hypotheses ranked: InsulinResistance &gt; DeregulatedNutrientSensing; shared space, no crash</code></div></div></div>
+<div class='entry pass'><div class='num'>46</div><div><div class='q'>“my hazard, my supplements, and whether metformin would help”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-hazard-patient &amp;self Caller_Me)
+(recommend-supplements-patient &amp;self Caller_Me)
+(linage-counterfactual-patient &amp;self Caller_Me Metformin)</code></div><div class='line'><span class='lab'>PASS</span>Interleaved spaces (L, G, L) still come back in the order asked.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>routed linage2+generic; order: LinAgeHazard → SupplementRecommendation → LinAgeCounterfactual</code></div></div></div>
+<div class='entry pass'><div class='num'>47</div><div><div class='q'>“decompose my GrimAge”<span class='line'> · patient P4</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(decompose-grimage &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>The DNA-methylation clock's decomposition sees AgeAccelGrim only; nothing from LinAge2 leaks into it.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>(Decomposition Caller_Me (Components ()) (attributed 0.0) (residual 1.07143)); no LinAge2 atom inside</code></div></div></div>
+</section>
+<section class='part'><div class='eyebrow'>Part F</div><h2>Honesty and robustness</h2>
+<h3><span class='code'>F1</span>No input, no invention</h3>
+<div class='entry pass'><div class='num'>48</div><div><div class='q'>“what's Patient001's LinAge2?”<span class='line'></span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-hazard-patient &amp;self Patient001)</code></div><div class='line'><span class='lab'>PASS</span>Empty, with a warning that the built-in patients carry no LinAge2 result — empty means "no input", not "no effect".</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>pln_status empty; warning: True</code></div></div></div>
+<div class='entry live'><div class='num'>49</div><div><div class='q'>“which of my labs make me older? (no patient built)”<span class='line'></span></div><div class='line'><span class='lab'>EMITS</span>∅ (direct answer)</div><div class='line'><span class='lab'>PASS</span>Says there is no patient for this session and points at the My Patient tab; does not answer from the built-in patients.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>◌ LIVE</span> <code>A direct answer with nothing executed — grade live (needs the LLM translator).</code></div></div></div>
+<div class='entry live'><div class='num'>50</div><div><div class='q'>“set my albumin to 45 and recompute”<span class='line'> · patient P1</span></div><div class='line'><span class='lab'>EMITS</span>∅ (direct answer)</div><div class='line'><span class='lab'>PASS</span>The chat cannot change the patient: the answer says to edit the text in My Patient and rebuild. No silent mutation.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>◌ LIVE</span> <code>A direct answer with nothing executed — grade live (needs the LLM translator).</code></div></div></div>
+<h3><span class='code'>F2</span>Determinism and framing</h3>
+<div class='entry pass'><div class='num'>51</div><div><div class='q'>“which of my labs make me older? — asked twice”<span class='line'> · patient P1</span></div><div class='line emits'><span class='lab'>EMITS</span><code>(linage-decomposition-patient &amp;self Caller_Me)</code></div><div class='line'><span class='lab'>PASS</span>Byte-identical atoms and the same rendered answer (only the run time in its header differs). Determinism is a property under test.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>✓ PASS</span> <code>two runs: 1 atom(s) and the rendered answer identical apart from the run time: True</code></div></div></div>
+<div class='entry live'><div class='num'>52</div><div><div class='q'>“is this a medical diagnosis I can act on?”<span class='line'> · patient P1</span></div><div class='line'><span class='lab'>EMITS</span>∅ (direct answer)</div><div class='line'><span class='lab'>PASS</span>Declines the clinical framing: LinAge2 is a population mortality clock fitted on NHANES 1999–2002, this is a demonstration, and the coarse priors are named.</div><div class='line obs'><span class='lab'>OBSERVED</span><span class='tick'>◌ LIVE</span> <code>A direct answer with nothing executed — grade live (needs the LLM translator).</code></div></div></div>
+</section>
+<section class='part'><div class='eyebrow'>Reference</div><h2>Coverage</h2><table class='matrix'><tr><td>Reading plain text: units, plausibility, refusals</td><td class='r'>1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11</td></tr><tr><td>Demographics, smoking, questionnaire, BMI</td><td class='r'>12, 13, 14, 15, 16, 17, 18</td></tr><tr><td>Session-only patient; nothing written to the KB</td><td class='r'>19, 20</td></tr><tr><td>In-process LinAge2 (exactness, partial panels)</td><td class='r'>21, 22, 23, 24, 25, 26, 27, 28</td></tr><tr><td>Witness rule: years vs causes</td><td class='r'>21, 22, 23, 25, 27</td></tr><tr><td>Imputed inputs totalled apart, never credited</td><td class='r'>24, 26, 28</td></tr><tr><td>Hazard, absolute risk, two clocks kept apart</td><td class='r'>29, 30, 31, 32, 33, 34</td></tr><tr><td>Counterfactuals in years; engine-enforced preconditions</td><td class='r'>35, 36, 37, 38, 39, 40, 41, 42, 43</td></tr><tr><td>Shared-space questions for a LinAge2 patient (the crash fix)</td><td class='r'>32, 44, 45, 46, 47</td></tr><tr><td>Empty is the pass</td><td class='r'>31, 42, 43, 48</td></tr><tr><td>Determinism and framing</td><td class='r'>51, 52</td></tr></table>
+<h3>Recording a run</h3><p class='intro'>Re-run with
+    <code>python scripts/linage2_battery.py --date &lt;date&gt;</code>. It rebuilds the patients from
+    the tab's example texts, runs every form, and rewrites this document and
+    <code>docs/linage2_battery/results.json</code>. A failure is a finding in itself; a pass on an
+    entry whose form the translator does not emit is not — grade the question live too.</p>
+    <p class='small'>This run: 47 passed, 0 failed, 5 to grade live.</p>
+    </section></body></html>
