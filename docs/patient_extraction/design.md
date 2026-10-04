@@ -243,4 +243,14 @@ failures included, LRU ~128 — a cost saver only, never the Read/Build guarante
   measured, and a negated mention ("never smoked or vaped") is none.
 - **A text refused only for a missing age or sex** ("58F") may be completed by a checked
   age/sex rewrite; every other refusal stands (the property tests hold exactly that).
+- **What the adversarial review added to §4.** Grounding also needs word and number
+  boundaries ("glucose 10" is not in "glucose 105"). Every kind has a grammar
+  (`_GRAMMAR`): a quote with words outside it is refused, so a claim cannot carry
+  context it does not account for ("before metformin", "dental health", "male, 82 kg").
+  A statement is rewritten only when its quotes, with their kinds' grammar, account for
+  all of it — a negation never counts as accounted for — and a partial reading is a
+  note, never a button. A claim's yes/no is read in its whole statement. Finally,
+  `read_values` must be unchanged by a rewrite: no value the rules read, combined
+  questionnaire answers included, may move. Every reproduction is pinned in
+  `tests/test_patient_read.py`.
 
