@@ -42,6 +42,21 @@ as usable, most of them rightly ("smoker, quit during covid", "former smoker, qu
 by vaping", "patches"). 142 of 4,612 items failed the checks, mostly quotes about someone
 else or without a smoking word. This run's extractions are the replay fixture.
 
+**After the adversarial review** (`46be389` and the commit after it). Three independent
+reviewers, each playing a hostile model, got confident wrong patients through the model
+route — a rewrite that dropped words its quote did not hold ("Non-HDL", "retired at 65
+years old", "… but is 6.0 % now"), quotes cut inside a number or word ("glucose 10" in
+"glucose 105", "diabetic" in "nondiabetic"), a lenient second item covering those words, a
+combination of lines flipping a combined answer, a missing age filled from "male, 82 kg" —
+and one hang. All are fixed and pinned (REVIEW_A / REVIEW_B in
+`tests/test_patient_read.py`): every quote must be accounted for by its kind's grammar, a
+rewrite needs its quotes to hold the whole statement, a partial reading is a note and never a
+button, and a final check refuses any rewrite that changes a value the rules read. The prompt
+did not change, so run 3's recorded extractions replayed under the final code show what the
+fixes cost: all 218 usable corpus entries still read as expected; rewrites 40 (46); texts the
+rules read as usable that the model blocks 6 (9); texts with a wording to click 341 (576),
+the rest of the partial readings shown as notes.
+
 **Cost per Read.** About 5,400 prompt tokens, of which about 99% are a cached prefix (the
 instructions and the vocabulary come first, the person's text last), and about 165
 completion tokens (about 100 of them reasoning).

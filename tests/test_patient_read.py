@@ -24,7 +24,7 @@ for p in (str(PLN_CHAT), str(REPO / "tests")):
         sys.path.insert(0, p)
 
 from core.patient_extract import ExtractError, Extraction, check_output  # noqa: E402
-from core.patient_read import read_patient  # noqa: E402
+from core.patient_read import read_patient, read_values  # noqa: E402
 from core.patient_text import read_patient_text  # noqa: E402
 from core.patient_vocabulary import vocabulary  # noqa: E402
 
@@ -734,10 +734,16 @@ def test_a_whole_quote_is_still_rewritten():
     assert r.parsed.ok and (r.parsed.age, r.parsed.sex) == (58, "Male")
 
 
-def test_a_partial_quote_is_a_wording_that_says_what_it_leaves_out():
-    r = read_patient(T + "my HbA1c was 9.1 % at diagnosis but is 6.0 % now", Recorded(_lab("HbA1c was 9.1 %", "hba1c")))
-    (s,) = r.suggestions
-    assert s.wordings == ["HbA1c 9.1 %"] and "leaves out: 'at diagnosis but 6.0 now'" in s.reason
+def test_a_partial_quote_is_a_note_never_a_wording_to_click():
+    """A click would drop what the quotes leave out ('not', 'HDL', 'at diagnosis ...')."""
+    for text, items in ((T + "my HbA1c was 9.1 % at diagnosis but is 6.0 % now", [_lab("HbA1c was 9.1 %", "hba1c")]),
+                        (T + "I have not seen a doctor once this year",
+                         [k("seen a doctor once this year", "healthcare_visits", period="year")]),
+                        (T + "my HDL cholesterol 45 mg/dL", [_lab("cholesterol 45 mg/dL", "total cholesterol")])):
+        r = read_patient(text, Recorded(*items))
+        assert not r.suggestions and not r.substitutions, (text, r.suggestions)
+    assert any("diagnosis but 6.0 now'" in n for n in read_patient(
+        T + "my HbA1c was 9.1 % at diagnosis but is 6.0 % now", Recorded(_lab("HbA1c was 9.1 %", "hba1c"))).notes)
 
 
 def test_review_c_a_rewrite_that_changes_the_next_line_ends_the_read():
@@ -761,3 +767,82 @@ def test_review_c_a_model_quote_cannot_escape_its_code_span():
     md, *_ = patient_tab.on_read_model(T + "albumin 4.1 g/dL", Recorded(
         k("x` **Ready** ![](https://evil.example/a.png) `", "age")))
     assert "![](" not in md.replace("`x' **Ready** ![](https://evil.example/a.png) '`", "")
+
+
+B = "58 year old male\nnever smoked\n"
+REVIEW_B = [
+    # a condition the rules read, flipped through a combination of lines
+    (B + "No diabetes or prediabetes, thankfully",
+     [condition("prediabetes", "diabetes", "borderline"),
+      condition("No diabetes or prediabetes, thankfully", "diabetes", "no")]),
+    (B + "prediabetes, no diabetes, no other problems to speak of",
+     [k("prediabetes, no diabetes, no other problems to speak of", "no_other_conditions"),
+      condition("no diabetes", "diabetes", "no")]),
+    # a lenient second item 'covering' the words that should stop a rewrite
+    ("female, retired at 65 years old\nnever smoked",
+     [k("female, retired at 65 years old", "sex", sex="female"), k("65 years old", "age")]),
+    ("female, biological age 45 years old (TruAge)\nnever smoked",
+     [k("female, biological age 45 years old (TruAge)", "sex", sex="female"), k("45 years old", "age")]),
+    ("never smoked\n58 year old male, Non-HDL cholesterol 160 mg/dL",
+     [k("58 year old", "age"), k("58 year old male, Non-HDL cholesterol 160 mg/dL", "sex", sex="male"),
+      _lab("HDL cholesterol 160 mg/dL", "hdl cholesterol")]),
+    (B + "target LDL 70 mg/dL, no other issues",
+     [_lab("LDL 70 mg/dL", "ldl cholesterol"), k("target LDL 70 mg/dL, no other issues", "no_other_conditions")]),
+    ("never smoked, retired at 65 years old\nfemale",
+     [smoking("never smoked, retired at 65 years old", "never"), k("65 years old", "age")]),
+    # a qualifier in another script
+    (B + "целевой LDL 70 mg/dL", [_lab("LDL 70 mg/dL", "ldl cholesterol")]),
+    (B + "до лечения HbA1c 9 %", [_lab("HbA1c 9 %", "hba1c")]),
+    # a missing age or sex filled from what is not one
+    ("male, 82 kg\nnever smoked", [k("male, 82 kg", "age"), k("male, 82 kg", "sex", sex="male")]),
+    ("male, fitness age 42 (Garmin)\nnever smoked",
+     [k("male, fitness age 42 (Garmin)", "age"), k("male, fitness age 42 (Garmin)", "sex", sex="male")]),
+    ("I walk 50 m daily\nnever smoked", [k("I walk 50 m daily", "age"), k("I walk 50 m daily", "sex", sex="male")]),
+    ("gender: M / F\n58 year old\nnever smoked", [k("gender: M / F", "sex", sex="male")]),
+    # health answers reversed, quoted whole
+    (B + "I wouldn't say my health is poor", [k("I wouldn't say my health is poor", "self_rated_health", rating="poor")]),
+    (B + "I don't feel my health is poor", [k("I don't feel my health is poor", "self_rated_health", rating="poor")]),
+    (B + "dental health: poor", [k("dental health: poor", "self_rated_health", rating="poor")]),
+    (B + "mental health: poor", [k("mental health: poor", "self_rated_health", rating="poor")]),
+    (B + "self-rated health: fair\nI can't say my health is worse than a year ago",
+     [k("I can't say my health is worse than a year ago", "health_vs_year_ago", trend="worse")]),
+    (B + "self-rated health: fair\nI felt better a year ago",
+     [k("I felt better a year ago", "health_vs_year_ago", trend="better")]),
+    # a value of another time, quoted whole
+    (B + "my HbA1c was 9 % before metformin", [_lab("my HbA1c was 9 % before metformin", "hba1c")]),
+    (B + "height 178 cm\nmy weight was 95 kg before the diet", [k("my weight was 95 kg before the diet", "weight")]),
+    (B + "my CRP was 15 mg/L when I had covid", [_lab("my CRP was 15 mg/L when I had covid", "c-reactive protein")]),
+    # a denied condition
+    ("58 year old male without hep A\nnever smoked",
+     [k("58 year old", "age"), k("male", "sex", sex="male"),
+      condition("58 year old male without hep A", "liver condition")]),
+    ("58 year old male without hep A\nnever smoked", [condition("without hep A", "liver condition")]),
+    (B + "I have no idea what my medical history is",
+     [k("I have no idea what my medical history is", "no_other_conditions")]),
+]
+
+
+@pytest.mark.parametrize("text, items", REVIEW_B, ids=[f"{t.splitlines()[-1]}|{len(i)}" for t, i in REVIEW_B])
+def test_review_b_no_wrong_value_through_the_model_route(text, items):
+    rules = read_patient_text(text)
+    r = read_patient(text, Recorded(*items))
+    assert read_values(r.parsed) == read_values(rules), (r.read_as, r.substitutions)
+    if any(x.kind != "missing" for x in rules.all_problems()) or (rules.age is None or rules.sex is None):
+        assert not r.parsed.ok
+
+
+def test_review_b_the_rules_wording_keeps_their_combined_answer():
+    """'prediabetes' then 'no diabetes' is borderline to the rules; their wording says so."""
+    from core.patient_read import _rules_wording
+
+    wording = _rules_wording({"conditions": {"DIQ010": 2}, "smoking": ("NeverSmoker", 0)}, {"DIQ010": 3})
+    assert wording == "diagnoses: prediabetes; never smoked"
+    assert read_patient_text("58 year old male\n" + wording.replace("; ", "\n")).questionnaire["DIQ010"] == 3
+    # the reproduction: the disagreement still blocks; the only button is the rules' wording,
+    # which keeps prediabetes (the model's quote left words out, so it gets none)
+    text = "58 year old male\nprediabetes, no diabetes, never smoked"
+    r = read_patient(text, Recorded(smoking("prediabetes, no diabetes, never smoked", "current")))
+    assert not r.parsed.ok and not r.substitutions
+    (s,) = r.suggestions
+    assert s.blocking and s.wordings == ["diagnoses: prediabetes; never smoked"]
+    assert read_patient_text(s.apply(text, s.wordings[0])).questionnaire["DIQ010"] == 3
