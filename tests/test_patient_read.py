@@ -119,13 +119,24 @@ def test_an_unread_lab_line_is_rewritten_with_its_own_number_and_unit():
     assert r.parsed.ok and not r.parsed.not_understood
 
 
-def test_an_unread_condition_is_rewritten_only_with_its_own_term():
+def test_an_unread_condition_is_only_ever_suggested():
+    """An unread line that names one of the 23 conditions is a refusal of the rules (it
+    would be answered No); the model's reading of it is a wording, never a rewrite."""
     text = "58 year old male\nI was told I have T2D\nmy doctor worries about my heart"
     r = read_patient(text, Recorded(condition("T2D", "diabetes"),
                                     condition("my heart", "coronary heart disease")))
-    assert r.parsed.questionnaire["DIQ010"] == 1 and "diagnoses: diabetes" in r.read_as
+    assert not r.parsed.ok and r.read_as == text and "DIQ010" not in r.parsed.questionnaire
+    assert [s.wordings for s in r.suggestions] == [["diagnoses: diabetes"]]
     assert any("does not say it" in n for n in r.notes)                 # inferred: a note
-    assert r.parsed.questionnaire.get("MCQ160C") != 1
+
+
+def test_an_unread_age_and_lab_are_rewritten_beside_a_refused_line():
+    text = "58 yo M\nmy albumin was 4.1 g/dL\nI was told I have T2D"
+    r = read_patient(text, Recorded(k("58 yo M", "age"), k("58 yo M", "sex", sex="male"),
+                                    lab("albumin was 4.1 g/dL", "albumin"), condition("T2D", "diabetes")))
+    assert r.read_as == "58 year old; male\nAlbumin 4.1 g/dL\nI was told I have T2D"
+    assert (r.parsed.age, r.parsed.sex) == (58, "Male") and r.parsed.readings[0].code == "LBDSALSI"
+    assert not r.parsed.ok and r.suggestions[0].wordings == ["diagnoses: diabetes"]
 
 
 def test_a_model_number_never_replaces_the_typed_one():
@@ -155,22 +166,22 @@ def test_a_unit_refusal_is_a_suggestion_too():
 
 
 def test_a_smoking_status_only_the_model_read_blocks_until_clicked():
-    text = "58 year old male\nnonsmoker"
-    assert read_patient_text(text).ok                    # the rules lose it, quietly
-    r = read_patient(text, Recorded(smoking("nonsmoker", "never")))
+    text = "58 year old male\nquit the pipe in 2010"
+    assert read_patient_text(text).ok and read_patient_text(text).smoking is None   # not read
+    r = read_patient(text, Recorded(smoking("quit the pipe in 2010", "former")))
     assert not r.parsed.ok and r.parsed.smoking is None and r.read_as == text
     (s,) = r.suggestions
-    assert s.blocking and s.wordings == ["never smoked"]
-    after = read_patient(s.apply(text, s.wordings[0]), Recorded(smoking("never smoked", "never")))
-    assert after.parsed.ok and after.parsed.smoking == "NeverSmoker"
+    assert s.blocking and s.wordings == ["former smoker"]
+    after = read_patient(s.apply(text, s.wordings[0]), Recorded(smoking("former smoker", "former")))
+    assert after.parsed.ok and after.parsed.smoking == "FormerSmoker"
 
 
 # ═══════════════════════════ disagreements ══════════════════════════════════════
 
 def test_a_smoking_disagreement_blocks_with_both_wordings():
-    text = "58 year old male\nI never quit smoking"
-    assert read_patient_text(text).smoking == "FormerSmoker"           # round 4: confident, wrong
-    r = read_patient(text, Recorded(smoking("I never quit smoking", "current")))
+    text = "58 year old male\nex-smoker"
+    assert read_patient_text(text).ok and read_patient_text(text).smoking == "FormerSmoker"
+    r = read_patient(text, Recorded(smoking("ex-smoker", "current")))
     assert not r.parsed.ok
     (p,) = [x for x in r.parsed.all_problems() if x.kind == "disagreement"]
     assert "the rules read former smoker, the model reads current smoker" in p
@@ -178,11 +189,17 @@ def test_a_smoking_disagreement_blocks_with_both_wordings():
     assert s.blocking and s.wordings == ["current smoker", "former smoker"]
 
 
+def test_a_refusal_of_the_rules_keeps_its_own_message_and_gets_the_models_wording():
+    text = "58 year old male\nI never quit smoking"                    # round 4: was read as former
+    r = read_patient(text, Recorded(smoking("I never quit smoking", "current")))
+    assert not r.parsed.ok and r.parsed.all_problems() == read_patient_text(text).all_problems()
+    assert [s.wordings for s in r.suggestions] == [["current smoker"]]
+
+
 def test_an_intensity_disagreement_blocks_too():
-    r = read_patient("58 year old male\noccasionally smokes",
-                     Recorded(smoking("occasionally smokes", "current", occasional=True)))
-    assert read_patient_text("58 year old male\noccasionally smokes").cotinine_level == 3
-    assert not r.parsed.ok and r.suggestions[0].wordings == ["occasional smoker", "current smoker"]
+    r = read_patient("58 year old male\nlight smoker", Recorded(smoking("light smoker", "current")))
+    assert read_patient_text("58 year old male\nlight smoker").cotinine_level == 1
+    assert not r.parsed.ok and r.suggestions[0].wordings == ["current smoker", "occasional smoker"]
 
 
 def test_occasional_needs_its_word_in_the_quote():
@@ -211,27 +228,34 @@ def test_a_lab_disagreement_is_a_note_and_the_rules_value_stands():
     assert ("albumin 4.1 g/dL", "lab", "the quote does not name total protein exactly once") in r.discarded
 
 
-def test_a_condition_disagreement_is_a_note_with_a_wording():
+def test_a_refused_list_gets_the_models_wording():
     text = "58 year old male\ndiagnoses: hypertension, T2D"
+    assert not read_patient_text(text).ok                              # round 4: T2D was dropped as No
     r = read_patient(text, Recorded(condition("hypertension", "hypertension"), condition("T2D", "diabetes")))
-    assert r.parsed.ok and r.parsed.questionnaire.get("BPQ020") == 1
-    assert any("differently from the rules" in n for n in r.notes)
+    assert not r.parsed.ok
     (s,) = r.suggestions
     assert not s.blocking and s.wordings == ["diagnoses: hypertension; diagnoses: diabetes"]
+    fixed = s.apply(text, s.wordings[0])
+    assert read_patient_text(fixed).questionnaire["DIQ010"] == 1
+
+
+def test_a_lab_or_condition_the_model_reads_differently_is_a_note():
+    text = "58 year old male\nCRP 3.1 mg/L"
+    r = read_patient(text, Recorded(lab("CRP 3.1 mg/L", "c-reactive protein")))
+    assert r.parsed.ok and not r.notes and not r.suggestions             # agreement: nothing to say
 
 
 # ═══════════════════════════ what code checks in a claim ══════════════════════
 
 def test_vaping_or_nicotine_replacement_next_to_never_smoked_blocks():
-    text = "58 year old male\nnever smoked but use nicotine patches"
-    assert read_patient_text(text).ok                    # round 4: cotinine 0, wrongly
-    r = read_patient(text, Recorded(smoking("never smoked but use nicotine patches", "never",
-                                            other="nicotine_replacement")))
+    text = "58 year old male, never smoked\nuses pouches daily"     # the rules read it as nothing
+    assert read_patient_text(text).ok
+    r = read_patient(text, Recorded(smoking("uses pouches daily", "unclear", other="smokeless")))
     assert not r.parsed.ok and any(x.kind == "vaping" for x in r.parsed.all_problems())
     measured = read_patient(text + "\ncotinine 250 ng/mL",
-                            Recorded(smoking("never smoked but use nicotine patches", "never",
-                                             other="nicotine_replacement")))
-    assert measured.parsed.ok and measured.parsed.cotinine_level == 3
+                            Recorded(smoking("uses pouches daily", "unclear", other="smokeless")))
+    assert not any(x.kind == "vaping" for x in measured.parsed.all_problems())
+    assert any("measured cotinine" in n for n in measured.notes)
 
 
 def test_cannabis_is_not_tobacco():
@@ -262,12 +286,15 @@ def test_an_unclear_non_medical_statement_is_a_note():
 
 
 def test_a_dated_hospital_stay_is_outside_the_window_and_blocks():
+    from core.patient_read import Item, _check_condition
+
     text = "58 year old male\ndiagnoses: hypertension\nhospitalized in 2015"
-    assert read_patient_text(text).questionnaire["HUQ070"] == 1          # round 4: wrong
+    assert not read_patient_text(text).ok                                # round 4: was a Yes
     r = read_patient(text, Recorded(condition("hospitalized in 2015", "overnight hospital stay")))
-    assert not r.parsed.ok
-    (p,) = [x for x in r.parsed.all_problems() if "past 12 months" in x]
-    assert p.topic == "condition"
+    assert not r.parsed.ok and any("past 12 months" in n for n in r.notes)
+    it = Item({"quote": "hospitalized in 2015", "kind": "condition", "condition": "overnight hospital stay",
+               "answer": "yes"}, "condition", 0, 0, 20, "hospitalized in 2015")
+    assert _check_condition(it) == "" and it.fact is None and "past 12 months" in it.problem[0]
 
 
 def test_an_excluded_wording_blocks():
@@ -507,6 +534,10 @@ def test_no_grounded_output_makes_a_refused_text_usable_or_flips_a_read_value(te
             assert after["labs"].get(code) == pytest.approx(val), (code, items)
 
 
+#: the first line of a round-4 reproduction that is itself an age/sex header
+HEADER = r"""(?i)^(?:\d{2}\s*(?:year|yr|y|,|m\b|f\b)|age\b|aged\b|(?:male|female|man|woman|sex|gender)\b|i'?m \d|[mf]\s*,?\s*\d)"""
+
+
 def _round4_texts():
     """Every quoted reproduction in docs/patient_extraction/review_round4.json, as typed."""
     import json
@@ -517,7 +548,8 @@ def _round4_texts():
     for f in d["confirmed"] + d["critic_unverified"]:
         for a, b in re.findall(r"'([^'\n]{3,200})'|\"([^\"\n]{3,200})\"", f["reproduction"]):
             t = (a or b).replace("\\n", "\n")
-            out.add(t if re.match(r"^\d{2}\s*year old|^age ", t) else "58 year old male\n" + t)
+            header = re.match(HEADER, t)                # a header test brings its own age and sex
+            out.add(t if header else "58 year old male\n" + t)
     return sorted(out)
 
 
@@ -542,9 +574,10 @@ def test_no_grounded_output_flips_a_value_on_the_round4_texts(chunk):
             r = read_patient(text, Recorded(*items))
             rewrites += bool(r.substitutions)
             assert kept <= {str(x) for x in r.parsed.all_problems()}, (text, items)
-            if not rules.ok:
+            if any(x.kind != "missing" for x in rules.all_problems()):
                 assert not r.parsed.ok, (text, items, r.read_as)
                 continue
+            # refused only for a missing age or sex ("58F"): a checked age/sex may complete it
             if not r.parsed.ok:
                 continue
             after = _values(r.parsed)

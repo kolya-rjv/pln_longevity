@@ -32,6 +32,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Optional
 
 from core.linage2_model import compute_linage2, load_model
@@ -169,6 +170,12 @@ _ALIAS_INDEX.sort(key=lambda e: -len(e[0]))           # longest alias wins
 
 
 _SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
+#: Typography as keyboards and word processors make it, one character for one (so
+#: offsets into a statement still hold): dashes, curly quotes, odd spaces.
+_UNIFY = str.maketrans({**{c: "-" for c in "\u2010\u2011\u2012\u2013\u2014\u2015\u2212\ufe58\ufe63\uff0d"},
+                        **{c: "'" for c in "\u2018\u2019\u201a\u201b\u2032\u02bc"},
+                        **{c: '"' for c in "\u201c\u201d\u201e\u201f\u2033"},
+                        **{c: " " for c in "\u00a0\u2002\u2003\u2007\u2009\u200a\u202f\u3000\t"}})
 
 
 def normalise_unit(text: str) -> str:
@@ -418,22 +425,49 @@ _AGE_RES = (
     re.compile(r"^(?:i'?m\s+|i am\s+|my\s+)?(?:age|aged)\s*(?:is|:|=)?\s*(\d{1,3})\b"),
     re.compile(r"^(\d{1,3})\s*(?:years?|yrs?)$"),
 )
+#: words before an age phrase that make it the age something happened at, or someone
+#: else's, or a clock's — not the person's age now
+_AGE_CONTEXT = re.compile(r"\b(?:since|at|when|until|till|from|by|after|before|diagnosed|dx|onset|was|were|became|"
+                          r"retired|menopause|biological|bio|metabolic|epigenetic|grim\s*age|linage|pheno\s*age|"
+                          r"clock|heart|lung|brain|child|son|daughter|husband|wife|partner|father|mother|born|"
+                          r"quit|started|stopped|age of)\b")
 _SEX_RES = (
     (re.compile(r"\b(?:female|woman|lady)\b|\bsex\s*[:=]\s*f\b"), "Female"),
     (re.compile(r"\b(?:male|man|gentleman)\b|\bsex\s*[:=]\s*m\b"), "Male"),
 )
 #: A statement about somebody else — or about smoke the person did not smoke — is set
 #: aside whole: "my husband smokes", "male partner", "family history of diabetes".
-_SOMEONE_ELSE = re.compile(
-    r"\b(?:husband|wife|partner|spouse|boyfriend|girlfriend|father|mother|dad|mum|mom|parents?|"
-    r"son|daughter|child|children|kids?|brother|sister|siblings?|friends?|room-?mate|colleague|"
-    r"co-?worker|family|grand(?:mother|father|parent)s?|uncle|aunt|cousin)\b"
-    r"|second[- ]?hand|passive(?:ly)? smok")
+_OTHERS = (r"husband|wife|partner|spouse|boyfriend|girlfriend|father|mother|dad|mum|mom|parents?|"
+           r"son|daughter|child|children|kids?|brother|sister|siblings?|friends?|room-?mate|colleague|"
+           r"co-?worker|family|grand(?:mother|father|parent)s?|uncle|aunt|cousin")
+#: smoke the person did not smoke: set aside whatever else the statement says
+_EXPOSURE = re.compile(rf"second[- ]?hand|passive(?:ly)? smok|\b(?:lives?|living|works?|working|stay(?:s|ing)?|"
+                       rf"grew up|married to|surrounded by|around)\s+(?:with\s+)?(?:a\s+|other\s+|heavy\s+)?"
+                       rf"smokers?\b|\b(?:lives?|living|works?|working|stay(?:s|ing)?|grew up)\s+with\s+"
+                       rf"(?:(?:a|my|his|her|their)\s+)?(?:\w+\s+)?(?:{_OTHERS})\b|\b(?:{_OTHERS})\s+(?:who|that)\s+smok")
+_SOMEONE_ELSE = re.compile(rf"\b(?:{_OTHERS})\b|{_EXPOSURE.pattern}")
+#: ... and a statement whose subject is the other person: "my husband smokes", "but my
+#: wife doesn't", "family history of diabetes". One that only mentions someone ("smokes
+#: with friends", "diabetes like my mother") may be the person's own, and is asked about.
+_OTHER_SUBJECT = re.compile(rf"^(?:(?:but|and|also|though|although|while|whereas)\s+)?"
+                            rf"(?:(?:my|his|her|our|their|the|a|an)\s+)?(?:(?:step|grand|older|younger|late|ex)"
+                            rf"[- ]?)?(?:{_OTHERS})\b")
 #: Only a clause that is about smoking is read for a smoking status ("can't stop
 #: snacking" is not a smoker). Cotinine level 0 vs 3 is about 8.8 years on the clock.
-_SMOKING_TOPIC = re.compile(r"\bsmok\w*|\bcigs?\b|\bcigar\w*|\btobacco\b|\bnicotin\w*"
-                            r"|\bvap(?:e|es|ed|ing|er|ers)\b|\be-?cig\w*|\bpack[- ]?years?\b|\bpacks?\b")
+_SMOKING_TOPIC = re.compile(r"\bsmok\w*|\b(?:non|ex|chain)-?smok\w*|\bcigs?\b|\bcigar\w*|\btobacco\b|\bnicotin\w*"
+                            r"|\bvap(?:e|es|ed|ing|er|ers)\b|\be-?cig\w*|\bpack[- ]?years?\b|\bpacks?\b"
+                            r"|\bsnus\b|\bzyn\b|\bchewing tobacco\b|\bnicotine (?:patch\w*|gum|pouch\w*)")
 _VAPING = re.compile(r"\bvap(?:e|es|ed|ing|er|ers)\b|\be-?cig\w*")
+#: nicotine that is not smoked: raises cotinine, is not smoking to the knowledge base
+_OTHER_NICOTINE = re.compile(r"\bvap\w*|\be-?cig\w*|\bjuul\w*|\bsnus\b|\bchew\w*|\bdip\b|\bzyn\b|\bpouch(?:es)?\b"
+                             r"|\bpatch(?:es)?\b|\bnicotine (?:gum|lozenges?|spray|inhaler|replacement)\b|\bnrt\b")
+#: smoked, but not tobacco: LinAge2 reads tobacco exposure
+_CANNABIS = re.compile(r"\b(?:weed|cannabis|marijuana|marihuana|pot|joints?|cbd|thc|hash(?:ish)?|ganja|"
+                       r"blunts?|spliffs?)\b")
+#: how often, when it is not every day
+_OCCASIONAL_WORDS = re.compile(r"\b(?:occasional(?:ly)?|rarely|seldom|sometimes|social(?:ly)?|weekends?|"
+                               r"part(?:y|ies)|now and then|once in a while|a little|some ?days?|lightly|"
+                               r"few|(?:a|per|each|every|/)\s*(?:week|month))\b")
 #: (pattern, status, cotinine level, kind). Order matters: negated and past before
 #: current; within an alternation, longer answers first. "generic" is a bare "smoker",
 #: which a following "quit 2015" turns into a former smoker.
@@ -452,7 +486,7 @@ _SMOKING = (
      "CurrentSmoker", 3, "still"),
     (r"\b(?:smok(?:ing|er)|tobacco(?: use)?)(?: status| history)?\s*(?:[:=?]|-)\s*"
      r"(?:former smoker|ex-?smoker|former|ex|past|quit|no longer|stopped)\b"
-     r"|\b(?:former|ex|previous|past|reformed)[- ]?(?:\w+[- ])?smoker\b"
+     r"|\b(?:former|ex|previous|past|reformed|prior)[- ]?(?:\w+[- ])?smoker\b"
      r"|\b(?:quit|stopped|gave up) (?:smoking|cigarettes|tobacco)\b|\bused to (?:smoke|be an? (?:\w+ )?smoker)\b"
      r"|\bwas an? (?:\w+ )?smoker\b|\bno longer smok\w*|\b(?:don'?t|do not|doesn'?t|does not) smoke any ?more\b"
      r"|\bsmok(?:ed|er)(?= until\b)|\bsmok\w*\s*[(\-]?\s*(?:quit|stopped|gave up)\s+(?:in\s+)?"
@@ -466,14 +500,16 @@ _SMOKING = (
     (r"\b(?:smok(?:ing|er|es)|tobacco(?: use)?)(?: status)?\s*[:=]\s*(?:current smoker|current|yes|daily|"
      r"every day|y)\b|\b(?:heavy|daily|current|chain)[- ]?smoker\b|\bsmokes? (?:daily|every day)\b"
      r"|\bi(?:'m| am) an? (?:\w+ )?smoker\b|\bi smoke\b|\bsmokes\b|\bsmoking(?= (?:since|for)\b)"
-     r"|\b\d+\s*(?:cigarettes?|cigs?|packs?)\s*(?:a|per|each|/)\s*day\b|\b(?:half|one|two|a) packs? (?:a|per) day\b",
+     r"|\b(?!0+\b)\d+\s*(?:cigarettes?|cigs?|packs?)\s*(?:a|per|each|/)\s*day\b|\b(?:half|one|two|a) packs? (?:a|per) day\b",
      "CurrentSmoker", 3, "current"),
     (r"\bsmoker\b", "CurrentSmoker", 3, "generic"),
 )
 #: What the rest of a smoking clause, or the clause after it, says about time.
-_PAST_CUE = re.compile(r"\b(?:quit|quitted|stopped|gave up|given up|until|till|no longer|any ?more|used to|was|were|"
-                       r"ago|former|ex|previous|past|before)\b"
-                       r"|\b(?:19|20)\d{2}\s*(?:-|–|to)\s*(?:19|20)\d{2}\b")
+_STRONG_PAST = re.compile(r"\b(?:quit|quitted|stopped|gave up|given up|until|till|no longer|any ?more|used to|"
+                          r"former|ex|previous(?:ly)?|formerly|prior)\b"
+                          r"|\b(?:19|20)\d{2}\s*(?:-|–|to)\s*(?:19|20)\d{2}\b")
+_PAST_CUE = re.compile(_STRONG_PAST.pattern + r"|\b(?:was|were|ago|past|before|smoked|once|youth|college|"
+                       r"university|school|ever|teens?|army|military|navy)\b")
 _PRESENT_CUE = re.compile(r"\b(?:still|again|restarted|relaps\w*|back on|back to|now|current(?:ly)?|daily|"
                           r"every day|a day|per day|each day|a week|per week|as much|as often|as many|heavily|"
                           r"down to|cut(?:ting)? down|less|trying|want\w*|plans?|planning|hoping|going to|"
@@ -500,6 +536,23 @@ _TEMPORARY_QUIT = re.compile(r"\b(?:quit\w*|stopped|gave up)\s+(?:smoking\s+)?fo
                              r"some)\s+(?:days?|weeks?|months?|years?|while)\b|\bfor a while\b"
                              r"|\b(?:quit|stopped)\s+(?:\d+|a few|several|many)\s+times\b")
 _STILL_KINDS = ("still", "light", "moderate", "current")
+#: "stopped drinking", "gave up alcohol": a quit that is about something else
+_OTHER_HABIT = re.compile(
+    r"\b(?:quit\w*|stopped|gave up|given up|used to|relaps\w*)\s+(?!(?:smok|cig|tobacco|it\b|in\b|at\b|on\b|"
+    r"when|after|before|for\b|since|cold|complet|entire|recent|again|last|this|years?\b|months?\b|ago\b|the\b|"
+    r"a\b|an\b|about|around|over|almost|nearly|\d|one|two|three|four|five|six|seven|eight|nine|ten|twenty|"
+    r"thirty|forty|fifty|several|many|few|some|yet|now|then|but|and|too|already|recently|last|just|"
+    r"\W|$))[a-z]+")
+#: a clause that only says the one before is uncertain
+_UNSURE_ALONE = re.compile(r"^(?:but\s+|though\s+)?(?:(?:i'?m|i am)\s+)?(?:not sure|unsure|uncertain|maybe|"
+                           r"possibly|probably|i think|can'?t remember|don'?t remember)\b")
+_WHO_SMOKING = {("NeverSmoker", 0): "never smoked", ("FormerSmoker", 0): "former smoker",
+                ("CurrentSmoker", 3): "current smoker", ("CurrentSmoker", 1): "occasional smoker",
+                ("CurrentSmoker", 2): "moderate smoker"}
+#: words in the clause (or line) after a smoking clause that change when or how much
+_AFTER_SMOKING = re.compile(r"\b(?:quit|quitted|stopped|gave up|given up|relaps\w*|started again|restarted|back on|"
+                            r"used to|no longer|any ?more|unknown|unsure|not sure|occasional(?:ly)?|rarely|"
+                            r"socially|weekends?|now and then)\b|\bn/?a\b|\?")
 #: Everything a read smoking clause may say besides its status; what is left after
 #: removing it is read like any other statement ("58 year old male smoker no diabetes").
 _SMOKING_DETAIL = re.compile(
@@ -507,7 +560,8 @@ _SMOKING_DETAIL = re.compile(
     r"pack[- ]?years?|use[sd]?|user|status|history|quit|quitted|stopped|gave|given|up|until|till|since|ago|for|at|in|"
     r"on|age|aged|about|around|approx\w*|years?|yrs?|months?|weeks?|days?|daily|a|an|per|each|every|or|and|"
     r"but|with|friends|weekends?|parties|socially|occasionally|still|now|currently|current|heavy|light|social|"
-    r"occasional|moderate|chain|former|ex|previous|past|reformed|was|were|used|to|be|been|i|i'm|im|am|is|have|"
+    r"occasional|moderate|chain|former|ex|previous(?:ly)?|formerly|prior|past|reformed|was|were|used|to|be|been|i|"
+    r"i'm|im|i'?ve|ve|am|is|have|"
     r"has|had|my|me|half|one|two|three|cold|turkey|when|then|last|this|year|started|began|teens?|"
     r"jan(?:uary)?|feb(?:ruary)?|march|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|"
     r"nov(?:ember)?|dec(?:ember)?|times?|too|also|only|approximately)\b|\d+(?:\.\d+)?|[,.:;=/\-()'?~+–]")
@@ -586,11 +640,25 @@ _DIAG_QUALIFIERS = re.compile(
 #: Such a piece is never dropped as "not one of the conditions LinAge2 counts".
 _MEDICAL_WORDS = re.compile(
     r"\b(?:heart|cardiac|coronary|kidney|renal|liver|hepat\w*|lung|pulmonary|bronch\w*|thyroid|bone|"
-    r"fractur\w*|broken|osteo\w*|cancer|tumou?r|malignan\w*|stroke|tia|blood pressure|bp|"
+    r"fractur\w*|broken|osteo\w*|cancers?|tumou?rs?|malignan\w*|strokes?|tia|blood pressure|bp|hip|wrist|spine|"
+    r"spinal|vertebra\w*|"
     r"diabet\w*|dm|anemi\w*|anaemi\w*|arthrit\w*|joints?|memory|dementia|confus\w*|hospital\w*|asthma|"
     r"emphysema|copd|obes\w*|overweight|angina|infarct\w*|attack|failure)\b")
 _DIAG_HEADER = re.compile(r"^(?:diagnos[ie]s|known conditions|conditions?|medical history|history of|"
                           r"history|has|with|i have)\b\s*[:=]?\s*", re.I)
+@lru_cache(maxsize=1)
+def _condition_terms() -> "re.Pattern":
+    """Every reviewed word for one of the 23 conditions: the rules' own patterns and the
+    synonyms core.patient_vocabulary adds ('T2D', 'MI', 'hypertensive', 'strokes')."""
+    from core.patient_vocabulary import vocabulary
+    return re.compile(r"\b(?:" + "|".join(c.terms for c in vocabulary().condition_info.values()) + r")\b")
+
+
+def _names_condition(text: str) -> bool:
+    low = text.lower()
+    return bool(_condition_terms().search(low) or _MEDICAL_WORDS.search(low))
+
+
 _HEALTH = {"excellent": 1, "very good": 2, "good": 3, "fair": 4, "poor": 5}
 _TREND = {"better": 1, "worse": 2, "same": 3, "about the same": 3, "unchanged": 3}
 
@@ -616,6 +684,33 @@ def _strip_offset(seg: str) -> tuple[int, str]:
     return a + b + c, w
 
 
+#: a list headed by a negation: "denies HTN, DM2, CAD", "no diabetes, prediabetes"
+_NEGATION_HEAD = re.compile(r"^(?:i\s+)?(?:have\s+|had\s+)?(?:no|not|never|denies|denied|negative for|free of|"
+                            r"without|no (?:history|hx) of|never had)\b")
+#: a lab value: one of the reader's names, then a number
+_LAB_START = re.compile(r"^(?:" + "|".join(re.escape(a) for a, _ in _ALIAS_INDEX) + r")(?![a-z0-9])\s*"
+                        r"(?:level|value)?\s*(?:[:=]|is|of|was)?\s*(?:\d|\.\d)"
+                        r"|^(?:blood pressure|bp)\s*[:=]?\s*\d{2,3}\s*/")
+_ABBREVIATIONS = {"vs", "dr", "mr", "mrs", "ms", "st", "approx", "eg", "ie", "etc", "incl", "wt", "ht", "yr",
+                  "yrs", "hx", "dx", "pt", "no", "y", "o", "a"}
+
+
+def _segments(line: str):
+    """(offset, text) of each part of a line between ';' and sentence ends ('. ' before a
+    word: "No diabetes. Hypertension." is two statements), never after an abbreviation."""
+    cuts = [m.start() for m in re.finditer(";", line)]
+    for m in re.finditer(r"\.\s+(?=[A-Za-z])", line):
+        word = re.search(r"([A-Za-z.]+)$", line[:m.start()])
+        if word and (len(word.group(1).replace(".", "")) <= 1
+                     or word.group(1).replace(".", "").lower() in _ABBREVIATIONS):
+            continue
+        cuts.append(m.start())
+    start = 0
+    for cut in sorted(cuts) + [len(line)]:
+        yield start, line[start:cut]
+        start = cut + 1
+
+
 def _statements(text: str) -> list[tuple[int, int, int, str]]:
     """(line number, start, end, statement): a line splits at ';' and at ', ' before a
     word. A diagnosis list ("diagnoses: a, b", "no known conditions except a, b") stays
@@ -623,9 +718,7 @@ def _statements(text: str) -> list[tuple[int, int, int, str]]:
     `start`/`end` are offsets into the line as typed (a whole list spans its pieces)."""
     out: list[tuple[int, int, int, str]] = []
     for line_no, line in enumerate((text or "").splitlines()):
-        pos = 0
-        for raw in line.split(";"):
-            raw_start, pos = pos, pos + len(raw) + 1
+        for raw_start, raw in _segments(line):
             off, seg = _strip_offset(raw)
             if not seg:
                 continue
@@ -643,7 +736,9 @@ def _statements(text: str) -> list[tuple[int, int, int, str]]:
                 cut = m.end() if m else cut
             whole = (_DIAG_HEADER.match(seg) and not re.match(r"^(?:has|history of|with)\b", seg, re.I)) \
                 or re.match(r"^(?:i have\s+)?no\b.*\b(?:except|apart from|other than|besides|aside from)\b",
-                            seg, re.I)
+                            seg, re.I) \
+                or (len(pieces) > 1 and _NEGATION_HEAD.match(seg.translate(_UNIFY).lower())
+                    and any(_names_condition(part) for _, _, part in pieces[1:]))
             if not whole:
                 out.extend((line_no, a, b, part) for a, b, part in pieces)
                 continue
@@ -654,8 +749,9 @@ def _statements(text: str) -> list[tuple[int, int, int, str]]:
                 group.clear()
 
             for a, b, part in pieces:
-                if _SMOKING_TOPIC.search(part.lower()):
-                    if group:
+                if _SMOKING_TOPIC.search(part.lower()) or _LAB_START.match(part.lower()) \
+                        or _SOMEONE_ELSE.search(part.lower()):
+                    if group:           # smoking, a lab value, someone else, in a list: its own
                         flush()
                     out.append((line_no, a, b, part))
                 else:
@@ -756,7 +852,40 @@ def _read_lab(stmt: str, low: str) -> Optional[Reading]:
     return None
 
 
-def _read_diagnoses(text: str) -> tuple[list[tuple[str, int]], list[str], bool]:
+#: "asthma or COPD, not sure which": two candidates are not two diagnoses
+_UNCERTAIN = re.compile(r"\bnot sure\b|\bunsure\b|\buncertain\b|\bmaybe\b|\bpossibl[ey]\b|\bprobabl[ey]\b|"
+                        r"\bwhich one\b|\beither\b|\bsuspected\b|\?")
+#: negations that cover every item after them, whatever joins the items
+_LIST_NEGATION = re.compile(r"^(?:denies|denied|negative for|free of|without|no (?:history|hx) of|never had)\b")
+#: a form's answer slot left empty, dashed or 0 after a condition: not a Yes
+_FORM_ANSWER = re.compile(r"[:=]\s*(?:0|-+|–+|\.+)?\s*$|\s-\s*0\s*$")
+#: a negation that qualifies treatment, control or time, not the diagnosis itself
+_NEGATED_QUALIFIED = re.compile(r"\b(?:treated|untreated|controlled|uncontrolled|well|poorly|since|for|recent(?:ly)?|"
+                                r"past|severe|mild|ago|years?|yrs?|months?|any ?more|longer|currently|now)\b")
+_WINDOWED = ("HUQ070", "MCQ053")
+
+
+def _old(body: str, years_back: int) -> bool:
+    """A time reference that puts the event before the item's window."""
+    from datetime import date
+    this_year = date.today().year
+    if any(int(y) < this_year - years_back for y in re.findall(r"\b((?:19|20)\d{2})\b", body)):
+        return True
+    return bool(re.search(r"\b(?:\d+|two|three|four|five|several|many)\s+years?\s+ago\b|\bhistory of\b|\bhx of\b"
+                          r"|\bas a (?:child|kid|teen\w*)\b|\bprevious(?:ly)?\b|\bprior\b|\bonce\b|\blong ago\b"
+                          r"|\bin the past\b(?!\s+(?:\d+|twelve|three|year|few))", body))
+
+
+#: the item's own window, as its canonical phrase says it: not a qualifier of a 'no'
+_WINDOW_PHRASE = re.compile(r"\b(?:in|during|over) the (?:past|last) (?:(?:12|twelve|3|three) months|year)\b")
+
+
+#: HUQ070 is an overnight stay in the past 12 months; MCQ053 treatment for anemia in
+#: the past 3 months — a dated or 'history of' event is outside them
+_OUTSIDE_WINDOW = {"HUQ070": lambda body: _old(body, 1), "MCQ053": lambda body: _old(body, 0)}
+
+
+def _read_diagnoses(text: str, context: str = "") -> tuple[list[tuple[str, int]], list[str], bool]:
     """'hypertension, no diabetes and prediabetes' -> (found, ignored, unclear).
 
     found: [(item, answer)…]. ignored: pieces that name no condition LinAge2 counts and
@@ -765,11 +894,28 @@ def _read_diagnoses(text: str) -> tuple[list[tuple[str, int]], list[str], bool]:
     lisinopril") — the statement is then not used, and the caller refuses it."""
     found: list[tuple[str, int]] = []
     ignored: list[str] = []
-    for piece in re.split(r",|;|&|\band\b|\bor\b", text):
-        piece = piece.strip(" .")
+    if _UNCERTAIN.search(text):
+        return found, ignored, True             # "asthma or COPD, not sure which"
+    parts = re.split(r"(,|;|&|\band\b|\bor\b|\bnor\b)", text)
+    head = _NEGATION.match(parts[0].strip(" ."))
+    covering = bool(head and _LIST_NEGATION.match(parts[0].strip(" .")))
+    head_items: set = set()
+    for n in range(0, len(parts), 2):
+        piece = parts[n].strip(" .")
+        sep = parts[n - 1].strip() if n else ""
         if not piece:
             continue
+        if _FORM_ANSWER.search(piece):
+            return found, ignored, True         # "diabetes: 0", "stroke: -", "cancer:"
         negated = bool(_NEGATION.match(piece))
+        if not negated and n and head:
+            # a negation heading the list: "denies X, Y", "no X or Y" cover the rest;
+            # a bare "no X, Y" or "no X and Y" might not — unless Y is X's borderline
+            if covering or sep in ("or", "nor"):
+                negated = True
+            elif not (head_items == {"DIQ010"} and re.fullmatch(r"(?:has\s+|have\s+)?(?:pre-?diabet\w*|"
+                                                               r"borderline diabet\w*)", piece)):
+                return found, ignored, True
         body = _NEGATION.sub("", piece)
         hits = []
         rest = body
@@ -778,12 +924,22 @@ def _read_diagnoses(text: str) -> tuple[list[tuple[str, int]], list[str], bool]:
                 hits.append((item, 2 if negated else answer))
                 rest = re.sub(rf"\b(?:{pattern})\b", " ", rest)
         if not hits:
-            if _MEDICAL_WORDS.search(body):
+            if _MEDICAL_WORDS.search(body) or _condition_terms().search(body):
                 return found, ignored, True
             ignored.append(piece)
             continue
         if re.sub(r"\s", "", _DIAG_QUALIFIERS.sub(" ", rest)):
             return found, ignored, True
+        qualifiers = _WINDOW_PHRASE.sub(" ", body)
+        if {item for item, _ in hits} == {"MCQ053"}:
+            qualifiers = re.sub(r"\b(?:treated|treatment)(?:\s+for)?\b", " ", qualifiers)   # the item is treatment
+        if negated and (len(hits) > 1 or _NEGATED_QUALIFIED.search(qualifiers)):
+            return found, ignored, True         # "never treated hypertension", "no asthma since 2010"
+        if not negated and any(item in _WINDOWED and _OUTSIDE_WINDOW[item](f"{context} {body}")
+                               for item, _ in hits):
+            return found, ignored, True         # "hospitalized in 2010": not the past 12 months
+        if n == 0:
+            head_items = {item for item, _ in hits}
         found.extend(hits)
     return found, ignored, False
 
@@ -836,9 +992,15 @@ def read_patient_text(text: str) -> ParsedPatient:
                 "ambiguous", "smoking", statements)
 
     def set_smoking(status: str, level: int, stmt: str) -> None:
+        before = p.smoking
         set_once("smoking", status, "smoking status", stmt)
         cur.facts["smoking"] = (status, level)          # what the words say, level included
         if p.smoking != status:
+            return
+        if before == status and not p.cotinine_measured and p.cotinine_level not in (None, level):
+            problem(f"two different smoking intensities: cotinine level {p.cotinine_level} and {level} "
+                    f"(from '{stmt}'); keep one ('current smoker', 'occasional smoker')",
+                    "contradiction", "smoking")
             return
         if p.cotinine_measured:
             if level != p.cotinine_level:
@@ -852,6 +1014,20 @@ def read_patient_text(text: str) -> ParsedPatient:
     def read_smoking(rest: str, stmt: str, line_no: int, idx: int) -> Optional[str]:
         """Read the smoking status of a clause about smoking. Returns what is left of
         the clause to read as anything else, or None when the clause is used up."""
+        if re.match(r"^\s*smokeless\b", rest):
+            if re.match(r"^\s*smokeless(?: tobacco)?(?: use)?\s*[:=\-?]?\s*(?:never(?: used)?|no|none|n|denies)\s*$", rest):
+                p.notes.append(f"'{stmt}': smokeless tobacco is not smoking; it does not change the smoking status")
+                cur.facts["note"] = "smokeless"
+                return None
+            problem(f"'{stmt}': smokeless tobacco raises cotinine, which LinAge2 reads, but is not smoking to "
+                    f"the knowledge base; give 'cotinine N ng/mL' if you have it, and your smoking status on "
+                    f"its own line", "vaping", "smoking")
+            return None
+        if _CANNABIS.search(rest):
+            problem(f"'{stmt}': cannabis is not tobacco, and LinAge2 reads tobacco exposure (cotinine); "
+                    f"say your tobacco smoking on its own ('never smoked', 'former smoker', "
+                    f"'current smoker')", "ambiguous", "smoking")
+            return None
         for pattern, status, level, kind in _SMOKING:
             if not re.search(pattern, rest):
                 continue
@@ -859,21 +1035,50 @@ def read_patient_text(text: str) -> ParsedPatient:
             if any(st != status and re.search(pat, reduced) for pat, st, _, _ in _SMOKING):
                 unsure(stmt)            # "quit smoking after I failed to quit"
                 return None
+            if kind == "never":         # "no history of smoking or diabetes": the 'no' carries
+                carried = re.match(r"\s*(or|nor|and)\b(.*)$", reduced)
+                if carried and _names_condition(carried.group(2)):
+                    if carried.group(1) == "and":
+                        unsure(stmt)
+                        return None
+                    reduced = " no " + carried.group(2)
             timed = _SINCE.sub(" ", re.sub(r"\ba day in (?:my|his|her|their) life\b", " ", reduced))
             if kind == "never":
                 doubt = (_PRESENT_CUE.search(timed) or _PAST_CUE.search(timed) or _YEAR.search(timed)
-                         or re.search(r"\b(?:since|until|ago)\b", reduced))
+                         or re.search(r"\b(?:since|until|ago)\b", reduced)
+                         or re.search(r"^\s*[:=?-]\s*(?:no|n|false|0)\b", reduced)       # "never smoker: no"
+                         or re.search(r"\bfor\s+(?:the\s+)?(?:past\s+|last\s+)?(?:about\s+|over\s+)?\d+\s*"
+                                      r"(?:years?|yrs?|months?|weeks?|days?)\b", reduced))  # "smoke-free for 10 years"
             elif kind == "former":
-                doubt = _PRESENT_CUE.search(timed)
+                doubt = (_PRESENT_CUE.search(timed) or re.search(r"\b(?:smoke|smokes|smoking)\b", timed)
+                         or _TEMPORARY_QUIT.search(rest))
             elif kind == "generic":
                 doubt = _NEGATION_CUE.search(timed) or (
-                    _YEAR.search(timed) and not _PAST_CUE.search(timed))
+                    _YEAR.search(timed) and not _PAST_CUE.search(timed)) or (
+                    _PAST_CUE.search(timed) and _PRESENT_CUE.search(timed)) or (
+                    re.search(r"[:=?-]\s*(?:0|nil|none|false|neg(?:ative)?|denie[sd]|absent|-+)?\s*$", rest))
                 if not doubt and _PAST_CUE.search(timed):
-                    status, level, kind = "FormerSmoker", 0, "former"   # "smoker (1990-2015)"
+                    if not _STRONG_PAST.search(timed):
+                        doubt = True    # "smoker in my youth", "was hospitalized": said, not when
+                    else:
+                        status, level, kind = "FormerSmoker", 0, "former"   # "smoker (1990-2015)"
             else:                       # explicitly smoking now
                 doubt = _NEGATION_CUE.search(timed) or _PAST_CUE.search(timed) or _YEAR.search(timed)
+            if not doubt and status == "CurrentSmoker":
+                count = re.search(r"\b(\d+)\s*(?:-\s*\d+\s*)?(?:cigarettes?|cigs?)\s*(?:a|per|each|/)\s*day\b", rest)
+                if level == 3 and (_OCCASIONAL_WORDS.search(rest) or (count and int(count.group(1)) < 10)):
+                    doubt = True        # "occasionally smokes", "smokes 2 cigarettes a day": not level 3
+                elif level == 1 and (re.search(r"\bpacks?\b", rest) or (count and int(count.group(1)) >= 10)):
+                    doubt = True        # "light smoker (20 cigarettes a day)"
             if doubt:
                 unsure(stmt)
+                return None
+            nicotine = _OTHER_NICOTINE.search(reduced)
+            if nicotine and not re.search(r"\b(?:never|no|not|nor|without|don'?t|doesn'?t)\b|n't\b|\bor\s*$",
+                                          re.split(r"[,;.]|\bbut\b", reduced[:nicotine.start()])[-1]):
+                problem(f"'{stmt}': vaping or other nicotine (snus, chew, patches, pouches) raises cotinine, "
+                        f"which LinAge2 reads, but is not smoking to the knowledge base; give 'cotinine N "
+                        f"ng/mL' if you have it, and your smoking status on its own line", "vaping", "smoking")
                 return None
             before = p.smoking
             set_smoking(status, level, stmt)
@@ -894,6 +1099,11 @@ def read_patient_text(text: str) -> ParsedPatient:
                     f"base; give 'cotinine N ng/mL' if you have it, and your smoking status "
                     f"('never smoked', 'former smoker', 'current smoker')", "vaping", "smoking")
             return None
+        if _OTHER_NICOTINE.search(rest) and not re.search(r"\bsmok|\bcig|\btobacco(?! use)", rest):
+            problem(f"'{stmt}': nicotine that is not smoked (snus, chew, patches, pouches) raises cotinine, "
+                    f"which LinAge2 reads, but is not smoking to the knowledge base; give 'cotinine N "
+                    f"ng/mL' if you have it, and your smoking status on its own line", "vaping", "smoking")
+            return None
         problem(f"'{stmt}' is about smoking and was not understood; say it in one "
                 f"phrase: 'current smoker', 'former smoker, quit 2010' or 'never smoked'",
                 "not_understood", "smoking")
@@ -904,20 +1114,28 @@ def read_patient_text(text: str) -> ParsedPatient:
         kind = last_smoking["kind"]
         if kind is None:                # that clause was refused: already a problem
             return
+        said = f"{last_smoking['stmt']}, {stmt}"
+        origin = last_smoking["origin"]
+        cur.joined_to = origin
+        both = (origin, cur.index)
+        if _names_condition(low):       # "quit after my heart attack": both, so neither is lost
+            problem(f"'{said}' says when you quit and names a condition; put the condition on its own "
+                    f"line ('diagnoses: …') and your smoking in one phrase ('former smoker, quit 2010')",
+                    "ambiguous", "smoking", both)
+            last_smoking["kind"] = None
+            return
         if _TEMPORARY_QUIT.search(low) and not _PRESENT_CUE.search(low):
             when = "temporary"
         elif _PRESENT_CUE.search(low) or cue in ("started again", "restarted", "relapsed", "back on it",
                                                   "back on", "back", "still"):
             when = "present"
+        elif cue in ("started", "since") and not _STRONG_PAST.search(low):
+            when = "neutral"            # "since 1990", "started 30 years ago"
         elif cue in ("quit", "stopped", "gave up", "given up", "until", "till", "no longer") \
                 or cue.startswith("not any") or _PAST_CUE.search(low):
             when = "past"
         else:
-            when = "neutral"            # "since 1990", "started at 16"
-        said = f"{last_smoking['stmt']}, {stmt}"
-        origin = last_smoking["origin"]
-        cur.joined_to = origin
-        both = (origin, cur.index)
+            when = "neutral"            # "started at 16"
         if when == "temporary" or kind == "never":
             unsure(said, both)
         elif when == "present" and kind == "former":
@@ -929,6 +1147,8 @@ def read_patient_text(text: str) -> ParsedPatient:
                 unsure(said, both)
                 return
             p.smoking = None            # "smoker, quit 2015": a former smoker
+            if not p.cotinine_measured:
+                p.cotinine_level = None
             set_smoking("FormerSmoker", 0, said)
             p.statements[origin].facts["smoking"] = ("FormerSmoker", 0)
             last_smoking["kind"] = "former"
@@ -963,6 +1183,14 @@ def read_patient_text(text: str) -> ParsedPatient:
             p.questionnaire[item] = value
             diagnosed.add(item)
 
+    def answer_once(item: str, value: int, what: str, stmt: str) -> bool:
+        """A second, different answer to a health question is a contradiction."""
+        cur.facts.setdefault("questionnaire", {})[item] = value
+        if item in p.questionnaire and p.questionnaire[item] != value:
+            problem(f"two different {what} answers (from '{stmt}'); keep one", "contradiction", "other")
+            return False
+        return True
+
     def note_ignored(ignored: list[str]) -> None:
         if ignored:
             cur.facts["ignored"] = list(ignored)
@@ -973,15 +1201,32 @@ def read_patient_text(text: str) -> ParsedPatient:
     for idx, (line_no, s_start, s_end, stmt) in enumerate(_statements(text)):
         cur = Statement(idx, line_no, s_start, s_end, stmt)
         p.statements.append(cur)
-        low = stmt.lower().strip()
+        low = stmt.translate(_UNIFY).lower().strip()
+        orig_stmt = stmt
 
         # ── the clause right after a smoking clause, saying when ───────────────
+        right_after = last_smoking["idx"] == idx - 1 and last_smoking["kind"] is not None
         if last_smoking["line"] == line_no and last_smoking["idx"] == idx - 1:
             m = _MODIFIER.match(low)
             if m and _MODIFIER_REST.match(m.group("rest")):
                 last_smoking["idx"] = idx
                 modify_smoking(low, stmt, m.group("cue"))
                 continue
+        if right_after and (last_smoking["line"] == line_no or last_smoking["line"] == line_no - 1) \
+                and not _SMOKING_TOPIC.search(low) and _AFTER_SMOKING.search(low) \
+                and not _OTHER_HABIT.search(low) \
+                and (last_smoking["line"] == line_no or _MODIFIER.match(low)):
+            # "smoker, now quit", "smoker\nquit 2015", "former smoker\nrelapsed": when, unread
+            unsure(f"{last_smoking['stmt']}, {stmt}", (last_smoking["origin"], idx))
+            cur.joined_to = last_smoking["origin"]
+            last_smoking["kind"] = None
+            continue
+
+        # ── "asthma or COPD, not sure which": the clause before is not a diagnosis ──
+        if idx and p.statements[idx - 1].line == line_no and _UNSURE_ALONE.match(low):
+            problem(f"'{p.statements[idx - 1].text}, {stmt}': not sure is not a diagnosis; write only what a "
+                    f"doctor told you ('diagnoses: …')", "ambiguous", "condition", (idx - 1, idx))
+            continue
 
         # ── about somebody else: set aside, and say so ────────────────────────
         if _SOMEONE_ELSE.search(low):
@@ -991,7 +1236,17 @@ def read_patient_text(text: str) -> ParsedPatient:
                         f"on its own line ('never smoked', 'former smoker', 'current smoker')",
                         "someone_else", "smoking")
                 continue
-            if not (_SMOKING_TOPIC.search(low) and _FIRST_PERSON_SMOKING.match(low)):
+            own = _SMOKING_TOPIC.search(low) and _FIRST_PERSON_SMOKING.match(low)
+            if not own and not _EXPOSURE.search(low) and not _OTHER_SUBJECT.match(low) and (
+                    _SMOKING_TOPIC.search(low) or _names_condition(low) or _AGE_RES[0].search(low)
+                    or _AGE_RES[1].search(low)):
+                # "smokes with friends", "diabetes like my mother", "58 year old male with family
+                # history of diabetes": someone else is mentioned, but the statement is the person's
+                problem(f"'{stmt}' mentions someone else and something about you; put what is yours on "
+                        f"its own line, without the other person", "someone_else",
+                        "smoking" if _SMOKING_TOPIC.search(low) else "condition")
+                continue
+            if not own:
                 p.set_aside.append(Remark(stmt, idx))
                 cur.facts["set_aside"] = True
                 continue
@@ -1010,6 +1265,11 @@ def read_patient_text(text: str) -> ParsedPatient:
                         f"clock produces (±30); check the value", "unit", "grimage")
             else:
                 cur.facts["grimage"] = years
+                prev = p.extra_markers.get("AgeAccelGrim")
+                if prev is not None and prev["value"] != years:
+                    problem(f"two different GrimAge accelerations: {prev['value']:+g} and {years:+g}; keep one",
+                            "contradiction", "grimage")
+                    continue
                 p.extra_markers["AgeAccelGrim"] = {"value": years, "unit": "years"}
                 p.notes.append(f"GrimAge acceleration {years:+g} years: the knowledge base's 10-year "
                                f"heart-disease model reads it; it is never combined with LinAge2")
@@ -1020,6 +1280,8 @@ def read_patient_text(text: str) -> ParsedPatient:
         for rx in _AGE_RES:
             m = rx.search(rest)
             if m:
+                if _AGE_CONTEXT.search(rest[:m.start()]):
+                    break               # "diagnosed at 45 years old", "biological age 62 years old"
                 set_once("age", float(m.group(1)), "age", stmt)
                 rest = rest[:m.start()] + " " + rest[m.end():]
                 break
@@ -1074,24 +1336,33 @@ def read_patient_text(text: str) -> ParsedPatient:
             note_ignored(ignored)
             continue
         m = re.match(r"(?:(?:self[- ](?:rated|reported|assessed)|general|overall|my)\s+)?health"
-                     r"(?:\s+status)?\s*(?:is|:|=|-)?\s*(excellent|very good|good|fair|poor)\b", low)
+                     r"(?:\s+status)?\s*(?:is|:|=|-)?\s*(excellent|very good|good|fair|poor)\s*\.?\s*$", low)
         if m:
+            if not answer_once("HUQ010", _HEALTH[m.group(1)], "self-rated health", stmt):
+                continue
             p.questionnaire["HUQ010"] = _HEALTH[m.group(1)]
             cur.facts.setdefault("questionnaire", {})["HUQ010"] = _HEALTH[m.group(1)]
             p.questionnaire_notes.append(f"self-rated health: {m.group(1)}")
             continue
         m = re.match(r"health (?:compared (?:to|with)|vs\.?|versus) (?:(?:a|one|1) year ago|last year)"
-                     r"\s*[:=]?\s*(better|worse|about the same|same|unchanged)\b", low) or \
-            re.match(r"health (?:is )?(?:getting |got )?(better|worse)\b", low)
+                     r"\s*[:=]?\s*(better|worse|about the same|same|unchanged)\s*\.?\s*$", low) or \
+            re.match(r"health (?:is )?(?:getting |got )?(better|worse)(?:\s+than\s+(?:(?:a|one|1) year ago|"
+                     r"last year))?\s*\.?\s*$", low)
         if m:
+            if not answer_once("HUQ020", _TREND[m.group(1)], "health-trend", stmt):
+                continue
             p.questionnaire["HUQ020"] = _TREND[m.group(1)]
             cur.facts.setdefault("questionnaire", {})["HUQ020"] = _TREND[m.group(1)]
             p.questionnaire_notes.append(f"health vs a year ago: {m.group(1)}")
             continue
         m = re.match(r"(?:healthcare|health care|doctor'?s?|gp|physician|medical|clinic) visits?"
-                     r"(?: (?:last|in the (?:last|past)) year| per year| a year)?\s*[:=]?\s*(\d+)\b", low)
+                     r"(?: (?:last|in the (?:last|past)) year| per year| a year)?\s*[:=]?\s*(\d+)"
+                     r"(?:\s*(?:per year|a year|/\s*year|last year|in the (?:last|past) (?:year|12 months)))?"
+                     r"\s*\.?\s*$", low)
         if m:
             n = int(m.group(1))
+            if not answer_once("HUQ050", _visits_category(n), "healthcare-visits", stmt):
+                continue
             p.questionnaire["HUQ050"] = _visits_category(n)
             cur.facts.setdefault("questionnaire", {})["HUQ050"] = _visits_category(n)
             p.questionnaire_notes.append(f"healthcare visits {n} -> NHANES category "
@@ -1102,7 +1373,7 @@ def read_patient_text(text: str) -> ParsedPatient:
             no_conditions = said_none = True    # "diagnoses: none"
             cur.facts["no_conditions"] = "all"
             continue
-        found, ignored, unclear = _read_diagnoses(diag_text)
+        found, ignored, unclear = _read_diagnoses(diag_text, context=low)
         if found and not unclear:
             if no_conditions and any(a != 2 and i not in allowed for i, a in found):
                 problem(f"'{stmt}' contradicts 'no known conditions'; write 'no other "
@@ -1151,7 +1422,8 @@ def read_patient_text(text: str) -> ParsedPatient:
             continue
 
         # ── cotinine as a lab: ng/mL, or an explicit level ────────────────────
-        m = re.match(rf"(?:serum )?cotinine\s*(level)?\s*[:=]?\s*{_NUM}\s*(ng/ml|ug/l|µg/l)?\s*$", low)
+        m = re.match(rf"(?:serum )?cotinine\s*(level)?\s*(?:[:=]|\bis\b|\bwas\b)?\s*{_NUM}\s*"
+                     rf"(ng\s*/\s*ml|[uµμ]g\s*/\s*l)?\s*\.?\s*$", low)
         if m:
             v = float(m.group(2))
             if m.group(3):
@@ -1178,6 +1450,18 @@ def read_patient_text(text: str) -> ParsedPatient:
         reading = _read_lab(stmt, low)
         if reading is not None:
             add(reading)
+        elif "smoking" in cur.facts:
+            # what the smoking clause did not use may change what it means: "I never quit
+            # smoking" (never), "tried to quit smoking" (tried), "non- smoker" (non)
+            said = _WHO_SMOKING.get(cur.facts["smoking"], cur.facts["smoking"][0])
+            problem(f"'{orig_stmt}' reads as '{said}', but '{stmt}' in it was not understood; say your "
+                    f"smoking in one phrase ('current smoker', 'former smoker, quit 2010', 'never smoked') "
+                    f"and put anything else on its own line", "ambiguous", "smoking")
+            cur.leftover = stmt
+        elif "cotinine" in low:
+            problem(f"'{stmt}' mentions cotinine but was not read; write it as 'cotinine 250 ng/mL' or "
+                    f"'cotinine level 0-3', on its own line", "unit", "cotinine")
+            cur.leftover = stmt
         else:
             p.not_understood.append(Remark(stmt, idx))
             cur.leftover = stmt
@@ -1186,6 +1470,7 @@ def read_patient_text(text: str) -> ParsedPatient:
     # answered No next to a list); one that only suggests one is lost only next to a list.
     lost = [u for u in p.not_understood
             if any(re.search(rf"\b(?:{pat})\b", u.lower()) for pat, _, _ in _DIAGNOSES)
+            or _condition_terms().search(u.lower())
             or ((diagnosed or said_none) and _MEDICAL_WORDS.search(u.lower()))]
     for u in lost:
         p.problems.append(Problem(
@@ -1235,6 +1520,12 @@ def read_patient_text(text: str) -> ParsedPatient:
                                       said("weight_kg") + said("height_cm")))
         else:
             p.notes.append(f"BMI {bmi:.1f} from weight and height")
+    elif p.weight_kg and p.height_cm and not seen["BMXBMI"].blocking:
+        bmi = p.weight_kg / (p.height_cm / 100) ** 2
+        if abs(bmi - seen["BMXBMI"].value) > 1.5:
+            p.problems.append(Problem(f"BMI {seen['BMXBMI'].value:g} was typed, but weight and height give "
+                                      f"{bmi:.1f}; keep the one that is right", "contradiction", "weight",
+                                      said("weight_kg") + said("height_cm")))
     _outcomes(p)
     return p
 
