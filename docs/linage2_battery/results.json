@@ -189,7 +189,7 @@
    "patient": null,
    "pass_criterion": "Banner in PLN Query reads \"Active patient: Caller_Me\"; the atoms are viewable; Download writes to the system temp directory; no .metta file appears in the repository (Browse Ontology Files is unchanged).",
    "status": "pass",
-   "observed": "banner: **Active patient: Caller_Me** · 58-year-old male · CurrentSm…; .metta files in the repo unchanged (35); download at /tmp/pln_patients_7e3o_jqt/pln_patient_Caller_Me_he8x5lst.metta"
+   "observed": "banner: **Active patient: Caller_Me** · 58-year-old male · CurrentSm…; .metta files in the repo unchanged (35); download at /tmp/pln_patients_…/pln_patient_Caller_Me_….metta"
   },
   {
    "n": 20,
