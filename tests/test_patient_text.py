@@ -279,7 +279,7 @@ def test_two_different_ages_are_a_problem_not_a_last_wins():
     ("58 year old male, used to be a smoker", "FormerSmoker", 0),
     ("58 year old male, no longer smokes", "FormerSmoker", 0),
     ("58 year old male, smoker (quit 2010)", "FormerSmoker", 0),
-    ("58 year old male, smoker, quit in 2010", "FormerSmoker", 0),
+    ("58 year old male, smoker - quit 5 years ago", "FormerSmoker", 0),
     ("58 year old male, smoker? no", "NeverSmoker", 0),
     ("58 year old male, smoker: yes", "CurrentSmoker", 3),
     ("58 year old male, smoker, no plans to quit", "CurrentSmoker", 3),
@@ -292,11 +292,37 @@ def test_negated_past_and_ongoing_smoking(text, status, level):
 
 
 @pytest.mark.parametrize("text", ["not a current smoker", "not currently a smoker",
-                                  "heavy smoker? not sure"])
+                                  "heavy smoker? not sure", "current smoker (quit 2015)",
+                                  "current smoker - quit 2015", "smoker - n/a", "smoker: n/a",
+                                  "quit smoking after I failed to quit 5 times"])
 def test_a_smoking_phrase_it_cannot_pin_down_is_asked_not_guessed(text):
     p = read_patient_text("58 year old male, " + text)
     assert p.smoking is None and p.cotinine_level is None
     assert not p.ok and any("cannot tell whether you smoke" in x for x in p.all_problems())
+
+
+@pytest.mark.parametrize("text", [
+    "58 year old male, current smoker, quit 2015",          # one line, split at the comma
+    "58 year old male, smoker, quit in 2010",
+    "58 year old male, heavy smoker, until 2010",
+    "58 year old male, smoker (1990-2015)",
+    "58 year old male, current smoker, quit for 6 months in 2019",
+    "58 year old male\n20 cigarettes a day",
+    "58 year old male\nvapes daily",
+])
+def test_an_unread_piece_of_a_smoking_history_blocks_the_build(text):
+    p = read_patient_text(text)
+    assert not p.ok and any("smoking" in x for x in p.all_problems())
+
+
+def test_a_time_piece_after_something_else_is_not_blamed_on_smoking():
+    p = read_patient_text("58 year old male\ncurrent smoker, hypertension, since 2010")
+    assert p.ok and p.questionnaire["BPQ020"] == 1 and p.not_understood == ["since 2010"]
+
+
+def test_someone_elses_clause_after_a_comma_leaves_the_persons_own_status():
+    p = read_patient_text("58 year old male, current smoker, but my wife doesn't")
+    assert (p.smoking, p.cotinine_level, p.ok) == ("CurrentSmoker", 3, True) and p.set_aside
 
 
 @pytest.mark.parametrize("text", [
@@ -349,10 +375,13 @@ def test_no_other_conditions_keeps_the_diagnoses_and_one_note_says_so():
 @pytest.mark.parametrize("text", [
     "62 year old male\ndiagnoses: hypertension\nno known conditions",
     "62 year old male\nno known conditions\ndiagnoses: hypertension",
+    "62 year old male\nno known conditions other than diabetes\nhypertension",
+    "62 year old male\nno known conditions\nno other conditions except diabetes",
+    "62 year old male\ndiagnoses: diabetes\nno diabetes",
 ])
 def test_no_conditions_and_a_diagnosis_contradict(text):
     p = read_patient_text(text)
-    assert not p.ok and any("contradicts" in x for x in p.all_problems())
+    assert not p.ok and any("contradicts" in x or "differently" in x for x in p.all_problems())
 
 
 def test_a_glucose_not_marked_fasting_is_said_not_to_be_a_witness():
@@ -411,3 +440,27 @@ def test_a_real_but_extreme_value_still_builds_and_witnesses(line):
     built = build_patient(payload)
     marker = next(m for m in built.markers if m.name in ("HbA1c", "FastingGlucose"))
     assert marker.status == "Elevated" and p.witness_notes
+
+
+@pytest.mark.parametrize("text, item", [
+    ("58 year old male\nhypertension\nno conditions apart from hypertension", "BPQ020"),
+    ("58 year old male\nno known conditions except diabetes\ndiagnoses: diabetes", "DIQ010"),
+    ("58 year old male\nasthma, but otherwise healthy", "MCQ010"),
+])
+def test_consistent_diagnoses_are_not_called_contradictions(text, item):
+    p = read_patient_text(text)
+    assert p.ok and p.questionnaire[item] == 1 and p.questionnaire["MCQ220"] == 2
+
+
+@pytest.mark.parametrize("text", [
+    "58 year old male\ndiagnoses: hypertension, high cholesterol\nno other conditions",
+    "58 year old male\nhad a stroke\nno other conditions",
+])
+def test_an_unread_line_cannot_become_a_no_by_default(text):
+    p = read_patient_text(text)
+    assert not p.ok and any("would be lost" in x or "not understood" in x for x in p.all_problems())
+
+
+def test_an_unknown_lab_next_to_diagnoses_is_only_not_understood():
+    p = read_patient_text("58 year old male\nvitamin D 30 ng/mL\ndiagnoses: hypertension")
+    assert p.ok and p.not_understood == ["vitamin D 30 ng/mL"]

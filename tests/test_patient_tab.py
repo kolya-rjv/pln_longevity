@@ -226,3 +226,10 @@ def test_old_downloads_are_pruned(monkeypatch):
     new = Path(_build(SMOKER)["download"]["value"])
     assert new.exists() and not old.exists() and new.parent == old.parent
 
+
+
+def test_the_questionnaire_caveat_names_only_what_was_assumed():
+    summary = _build("62 year old female, never smoked\ndiagnoses: hypertension\nhealth: poor\n"
+                     "albumin 4.0 g/dL")["summary"]
+    assert "no healthcare visits in the past year (fs3Score)" in summary
+    assert "assumed no diagnoses" not in summary and "'good' self-rated health" not in summary

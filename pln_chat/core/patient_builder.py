@@ -610,7 +610,8 @@ def build_patient(
                "&self <Patient> SmokingCessation) reads the cotinine input instead and "
                "does not need it." if built_linage2 is not None and smoking == "CurrentSmoker"
                else " The LinAge2 smoking counterfactual returns 0 for a former smoker "
-               "as well: it removes current tobacco exposure, and there is none."
+               "as well: the knowledge base credits cotinine years to smoking only for "
+               "a stated current smoker."
                if built_linage2 is not None else "")
         )
     # The symmetric case, which used to be silent and was the worse one: an

@@ -323,10 +323,13 @@ def compute_linage2(
         )
     assumed = [s for s in ("fs1Score", "fs2Score", "fs3Score") if provenance[s] == ASSUMED]
     if assumed:
+        default = {"fs1Score": "no diagnoses (fs1Score)",
+                   "fs2Score": "'good' self-rated health, unchanged from a year ago (fs2Score)",
+                   "fs3Score": "no healthcare visits in the past year (fs3Score)"}
         warnings.append(
-            "Questionnaire not answered for " + ", ".join(assumed) + ": assumed no "
-            "diagnoses, 'good' self-rated health and no healthcare visits, as the "
-            "LinAge2 service does — flagged as not measured."
+            "Questionnaire not answered for " + ", ".join(assumed) + ": assumed "
+            + "; ".join(default[s] for s in assumed) + ", as the LinAge2 service does — "
+            "flagged as not measured."
         )
 
     not_measured = sorted({c for c, p in provenance.items() if p != MEASURED})

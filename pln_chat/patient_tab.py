@@ -203,7 +203,7 @@ def _write_download(built: BuiltPatient) -> str:
 _TAB_WORDING = (
     ("The LinAge2 block was sent without any of the markers",
      "None of your values can be a knowledge-base witness (CRP, HbA1c, or a glucose marked "
-     "fasting) and you are not a current smoker. The per-lab years are reported, but no "
+     "fasting) and current smoking was not stated. The per-lab years are reported, but no "
      "cause can be credited and every counterfactual returns 0: a lab's years carry the sign "
      "of LinAge2's sex-specific weights, so the knowledge base needs your own elevated value "
      "to call a lab high."),

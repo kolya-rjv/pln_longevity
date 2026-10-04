@@ -386,11 +386,15 @@ two different ages are a problem, not last-one-wins; a statement about someone e
 husband smokes", "male partner", "family history of diabetes", second-hand smoke) is set
 aside and listed; negated, past and ongoing smoking are told apart ("not a smoker",
 "never been a smoker", "former heavy smoker", "smoker (quit 2010)", "trying to quit", "can't
-quit"), and a smoker phrase in a clause that negates it in a way no pattern pins down ("not a
-current smoker") is asked about, not read as smoking; a measured cotinine is never replaced
-by the level a smoking phrase implies, in either order; "no diabetes" is a No, "no known
-conditions except hypertension" a single Yes, "no other conditions" keeps the diagnoses
-listed, and "no known conditions" next to a diagnosis is a contradiction to fix; weight, height, cotinine and GrimAge need an explicit unit or
+quit"); a smoking phrase whose remainder says something else ("not a current smoker",
+"current smoker (quit 2015)", "smoker: n/a") is asked about, and so is any unread piece of a
+smoking history ("heavy smoker, until 2010", "20 cigarettes a day") — cotinine level 0 vs 3
+is about 8.8 years, so these block the build rather than sit in "not understood"; a measured
+cotinine is never replaced by the level a smoking phrase implies, in either order; "no
+diabetes" is a No, "no known conditions except hypertension" a single Yes, "no other
+conditions" keeps the diagnoses listed, two different answers for one diagnosis are a
+contradiction to fix, and so is an unread line next to listed diagnoses (every diagnosis not
+listed is answered No, so one hidden in it would be lost); weight, height, cotinine and GrimAge need an explicit unit or
 form (a bare "GrimAge 46" is a clock age, not an acceleration); an abnormal value typed in
 the usual unit is never re-read as a normal value in another one (hemoglobin 9.5 asks);
 urea and urea nitrogen have their own mg/dL factors.
