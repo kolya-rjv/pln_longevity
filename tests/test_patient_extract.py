@@ -209,6 +209,17 @@ def test_a_reasoning_model_gets_no_temperature_and_the_client_never_retries(fake
     assert kw["messages"][1]["content"].endswith("58 year old male\nTEXT>>>")
 
 
+def test_gpt_6_luna_is_the_default_and_reasons(fake_openai, monkeypatch):
+    import config
+
+    install, _ = fake_openai
+    calls = install(_reply(json.dumps({"items": []})))
+    monkeypatch.setattr(config, "PLN_EXTRACT_MODEL", "gpt-6-luna")
+    assert px.OpenAIExtractor()("58 year old male").model == "gpt-6-luna"
+    (kw,) = calls.calls
+    assert "temperature" not in kw and kw["reasoning_effort"] == "low"
+
+
 def test_a_non_reasoning_model_gets_temperature_zero(fake_openai):
     install, _ = fake_openai
     calls = install(_reply(json.dumps({"items": []})))
@@ -288,7 +299,7 @@ def test_misconfiguration_fails_before_any_call(fake_openai, monkeypatch):
     assert calls.calls == []
 
 
-@pytest.mark.parametrize("model", ["gpt-5.4-mini", "gpt-5.4", "gpt-5-mini", "gpt-4.1-mini", "gpt-4o",
+@pytest.mark.parametrize("model", ["gpt-6-luna", "gpt-5.4-mini", "gpt-5.4", "gpt-5-mini", "gpt-4.1-mini", "gpt-4o",
                                    "gpt-4o-mini", "gpt-4o-2024-08-06", "o4-mini", "gpt-5.4-mini-2026-03-17"])
 def test_supported_models(model):
     assert px.SUPPORTED_MODELS.match(model)

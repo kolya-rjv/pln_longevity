@@ -25,7 +25,7 @@ OPENAI_MAX_RETRIES: int = max(0, int(os.getenv("OPENAI_MAX_RETRIES", "1")))
 # short and it never retries. It must support strict structured outputs; the name is
 # checked against core.patient_extract.SUPPORTED_MODELS, and an unsupported one is a
 # configuration error, never a silent fall-back to the rules.
-PLN_EXTRACT_MODEL: str = os.getenv("PLN_EXTRACT_MODEL", "gpt-5.4-mini")
+PLN_EXTRACT_MODEL: str = os.getenv("PLN_EXTRACT_MODEL", "gpt-6-luna")
 PLN_EXTRACT_TIMEOUT_SECONDS: float = float(os.getenv("PLN_EXTRACT_TIMEOUT_SECONDS", "20"))
 # GPT-5-family and o-series models take a reasoning effort instead of a temperature.
 PLN_EXTRACT_REASONING_EFFORT: str = os.getenv("PLN_EXTRACT_REASONING_EFFORT", "low")

@@ -39,9 +39,11 @@ from core.patient_vocabulary import vocabulary
 SUPPORTED_MODELS = re.compile(
     r"^(?:gpt-4o(?:-2024-08-06|-2024-11-20)?|gpt-4o-mini(?:-2024-07-18)?"
     r"|gpt-4\.1(?:-mini|-nano)?(?:-\d{4}-\d{2}-\d{2})?"
-    r"|gpt-5(?:\.\d)?(?:-mini|-nano)?(?:-\d{4}-\d{2}-\d{2})?|o3|o4-mini)$")
+    r"|gpt-5(?:\.\d)?(?:-mini|-nano)?(?:-\d{4}-\d{2}-\d{2})?|gpt-6-luna(?:-\d{4}-\d{2}-\d{2})?"
+    r"|o3|o4-mini)$")
 #: ... of which these reason: they take reasoning_effort and refuse a temperature
-REASONING_MODELS = re.compile(r"^(?:gpt-5|o\d)")
+#: (gpt-6-luna answers a temperature of 0 with a 400; checked live, 2026-10-05)
+REASONING_MODELS = re.compile(r"^(?:gpt-5|gpt-6|o\d)")
 
 STATUS = {"never": "NeverSmoker", "former": "FormerSmoker", "current": "CurrentSmoker"}
 SEX = {"male": "Male", "female": "Female"}
@@ -276,7 +278,7 @@ def configured_model() -> tuple[str, Optional[ExtractError]]:
         return model, ExtractError(
             "unsupported_model",
             f"PLN_EXTRACT_MODEL={model} does not support strict structured outputs; "
-            f"use e.g. gpt-5.4-mini, gpt-4.1-mini or gpt-4o-mini")
+            f"use e.g. gpt-6-luna, gpt-5.4-mini or gpt-4.1-mini")
     if not OPENAI_API_KEY:
         return model, ExtractError("no_key", "no OPENAI_API_KEY")
     return model, None
