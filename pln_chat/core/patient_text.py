@@ -550,7 +550,7 @@ _DIAGNOSES: tuple[tuple[str, str, int], ...] = (
     (r"spine fracture|spinal fracture|vertebral fracture|broken spine|fractured spine", "OSQ010C", 1),
     (r"osteoporosis", "OSQ060", 1),
     (r"memory problems?|memory loss|confusion", "PFQ056", 1),
-    (r"hospitali[sz]ed|overnight (?:in )?hospital|hospital stay", "HUQ070", 1),
+    (r"overnight (?:in )?hospital(?: stay)?|hospitali[sz]ed|hospital stay", "HUQ070", 1),
 )
 _ITEM_LABEL = {
     "BPQ020": "hypertension", "DIQ010": "diabetes", "KIQ020": "kidney disease", "MCQ010": "asthma",

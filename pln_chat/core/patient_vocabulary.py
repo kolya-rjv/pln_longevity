@@ -50,6 +50,113 @@ class LabGroup:
 
 
 @dataclass(frozen=True)
+class Condition:
+    """One of the 23 NHANES 1999-2002 questionnaire items behind fs1Score, as a model may
+    name it and as code checks it."""
+    item: str                                  # NHANES code
+    key: str                                   # what the model chooses (the reader's label)
+    question: str                              # the NHANES question, paraphrased closely
+    yes: str                                   # canonical phrase the rules read as Yes
+    no: str                                    # ... and as No
+    #: regex (casefolded text): the rules' own pattern for the item plus reviewed
+    #: synonyms. A model's claim about this item must quote one of them.
+    terms: str
+    #: regex: a quote with one of these is NOT this item (the question excludes it)
+    exclusions: str = ""
+    #: the question asks about a recent period, not "ever": "12 months" | "3 months"
+    window: str = ""
+    counted: bool = True                       # in fs1Score (MCQ160B is read, not counted)
+
+
+#: Per item: the NHANES wording, canonical phrases, synonyms the rules do not know,
+#: exclusions and time windows. The rules' own pattern (core.patient_text._DIAGNOSES)
+#: is added to the synonyms; drift() checks every item is here and every phrase is
+#: read back as its item (tests/test_patient_canonical.py).
+_CONDITION_INFO: dict[str, dict] = {
+    "BPQ020": dict(question="Ever told by a doctor or other health professional that you had "
+                            "hypertension, also called high blood pressure?",
+                   synonyms=r"hypertensive|hbp|essential hypertension"),
+    "DIQ010": dict(question="Other than during pregnancy, ever told by a doctor that you have "
+                            "diabetes or sugar diabetes? (yes / no / borderline = prediabetes)",
+                   synonyms=r"t[12]d|dm ?(?:ii|i|2|1)|type (?:ii|i|one|two) diabetes|diabetes mellitus"
+                            r"|insulin[- ]dependent|non[- ]insulin[- ]dependent|diabetic",
+                   exclusions=r"gestational|pregnan\w*"),
+    "KIQ020": dict(question="Ever told by a doctor that you had weak or failing kidneys? "
+                            "Not kidney stones, bladder or kidney infections, or incontinence.",
+                   synonyms=r"esrd|end[- ]stage (?:renal|kidney) disease|dialysis|nephropathy"
+                            r"|chronic renal (?:failure|disease|insufficiency)",
+                   exclusions=r"kidney stones?|renal (?:stones?|calculi|colic)|nephrolithiasis"
+                              r"|(?:kidney|bladder|urinary tract) infection|uti|pyelonephritis"
+                              r"|incontinen\w*|cyst"),
+    "MCQ010": dict(question="Ever told by a doctor that you have asthma?",
+                   synonyms=r"asthmatic"),
+    "MCQ053": dict(question="During the past 3 months, have you been on treatment for anemia "
+                            "('tired blood', 'low blood')?",
+                   synonyms=r"anemic|anaemic|iron[- ]deficiency anemia|iron[- ]deficiency anaemia",
+                   window="3 months"),
+    "MCQ160A": dict(question="Ever told by a doctor that you had arthritis?",
+                    synonyms=r"osteoarthritis|rheumatoid(?: arthritis)?|polyarthritis|psoriatic arthritis|ra|oa"),
+    "MCQ160B": dict(question="Ever told by a doctor that you had congestive heart failure?",
+                    synonyms=r"congestive heart failure|cardiac failure|hfref|hfpef|hfmref",
+                    counted=False),
+    "MCQ160C": dict(question="Ever told by a doctor that you had coronary heart disease?",
+                    synonyms=r"ihd|isch(?:a)?emic heart disease|coronary artery bypass|cabg"
+                             r"|coronary stents?|coronary (?:artery )?disease"),
+    "MCQ160D": dict(question="Ever told by a doctor that you had angina, also called angina pectoris?",
+                    synonyms=r"angina pectoris"),
+    "MCQ160E": dict(question="Ever told by a doctor that you had a heart attack (myocardial infarction)?",
+                    synonyms=r"mi|ami|stemi|nstemi|heart attacks"),
+    "MCQ160F": dict(question="Ever told by a doctor that you had a stroke? (A TIA or 'mini-stroke' "
+                             "is not a stroke.)",
+                    synonyms=r"strokes|cerebrovascular accidents?|isch(?:a)?emic stroke|hemorrhagic stroke",
+                    exclusions=r"tia|mini[- ]?strokes?|transient isch(?:a)?emic attacks?"),
+    "MCQ160G": dict(question="Ever told by a doctor that you had emphysema?",
+                    synonyms=r"chronic obstructive pulmonary disease"),
+    "MCQ160I": dict(question="Ever told by a doctor that you had a thyroid problem?",
+                    synonyms=r"hashimoto'?s?|graves'?(?: disease)?|goit(?:er|re)|thyroiditis"),
+    "MCQ160J": dict(question="Ever told by a doctor that you were overweight?",
+                    synonyms=r"obese"),
+    "MCQ160K": dict(question="Ever told by a doctor that you had chronic bronchitis? (Not a "
+                             "one-off acute bronchitis.)",
+                    synonyms=r"chronic bronchitis",
+                    exclusions=r"acute bronchitis"),
+    "MCQ160L": dict(question="Ever told by a doctor that you had any kind of liver condition?",
+                    synonyms=r"nafld|nash|masld|mash|hep(?:atitis)? [abc]|cirrhotic|steatosis"),
+    "MCQ220": dict(question="Ever told by a doctor that you had cancer or a malignancy of any kind?",
+                   synonyms=r"cancers|adenocarcinoma|carcinomas|sarcoma|myeloma|glioblastoma|glioma"
+                            r"|malignant",
+                   exclusions=r"benign|pre-?cancer\w*|non-?cancerous"),
+    "OSQ010A": dict(question="Ever told by a doctor that you had broken or fractured your hip?",
+                    synonyms=r"(?:broke|fractured) (?:my |his |her )?hip|hip fractures"),
+    "OSQ010B": dict(question="Ever told by a doctor that you had broken or fractured your wrist?",
+                    synonyms=r"(?:broke|fractured) (?:my |his |her )?wrist|wrist fractures"),
+    "OSQ010C": dict(question="Ever told by a doctor that you had broken or fractured your spine?",
+                    synonyms=r"(?:broke|fractured) (?:my |his |her )?(?:spine|back)|vertebral compression fracture"
+                             r"|compression fracture"),
+    "OSQ060": dict(question="Ever told by a doctor that you had osteoporosis (thin or brittle bones)? "
+                            "Osteopenia is not osteoporosis.",
+                   synonyms=r"osteoporotic",
+                   exclusions=r"osteopeni\w*"),
+    "PFQ056": dict(question="Are you limited in any way because of difficulty remembering or "
+                            "periods of confusion?",
+                   synonyms=r"dementia|alzheimer'?s?|cognitive impairment|mci"),
+    "HUQ070": dict(question="During the past 12 months, were you a patient in a hospital overnight? "
+                            "(Not an overnight stay in the emergency room.)",
+                   synonyms=r"hospitalised|admitted to (?:the )?hospital|inpatient",
+                   exclusions=r"emergency room|\ber\b|a&e",
+                   window="12 months"),
+}
+#: canonical phrases that are not simply the reader's label
+_PHRASES = {
+    "DIQ010": ("diabetes", "no diabetes"),
+    "MCQ053": ("anemia treated in the past 3 months", "not treated for anemia in the past 3 months"),
+    "HUQ070": ("overnight hospital stay in the past 12 months",
+               "no overnight hospital stay in the past 12 months"),
+}
+BORDERLINE = "prediabetes"                     # DIQ010 = 3, the only borderline answer
+
+
+@dataclass(frozen=True)
 class Vocabulary:
     smoking_statuses: tuple[str, ...]
     #: NHANES code -> (KB symbol, description), as linage2_core.metta declares them
@@ -58,6 +165,8 @@ class Vocabulary:
     labs: dict
     #: NHANES item -> plain label, the 23 conditions LinAge2's comorbidity score reads
     conditions: dict
+    #: NHANES item -> Condition (wording, phrases, terms, exclusions, window)
+    condition_info: dict
 
 
 def _read(path: Path) -> str:
@@ -95,6 +204,22 @@ def _lab_groups() -> dict:
     return groups
 
 
+def _conditions(items: list[str]) -> dict:
+    from core.patient_text import _DIAGNOSES, _ITEM_LABEL
+
+    out = {}
+    for q in items:
+        info = _CONDITION_INFO.get(q, {})
+        label = _ITEM_LABEL.get(q, q)
+        rules = [pat for pat, item, _ in _DIAGNOSES if item == q]
+        yes, no = _PHRASES.get(q, (label, f"no {label}"))
+        out[q] = Condition(item=q, key=label, question=info.get("question", ""), yes=yes, no=no,
+                           terms="|".join(rules + ([info["synonyms"]] if info.get("synonyms") else [])),
+                           exclusions=info.get("exclusions", ""), window=info.get("window", ""),
+                           counted=info.get("counted", True))
+    return out
+
+
 @lru_cache(maxsize=1)
 def vocabulary() -> Vocabulary:
     from core.patient_text import _ITEM_LABEL
@@ -106,7 +231,7 @@ def vocabulary() -> Vocabulary:
     labs = _lab_groups()
     items = [q for q in model["questionnaire_items"] if q not in HEALTH_ITEMS]
     conditions = {q: _ITEM_LABEL.get(q, q) for q in items}
-    return Vocabulary(statuses, inputs, labs, conditions)
+    return Vocabulary(statuses, inputs, labs, conditions, _conditions(items))
 
 
 #: A unit inside a description's parentheses: "(mmol/L)", "(beats/min, 60-sec pulse)"
@@ -175,6 +300,15 @@ def drift() -> list[str]:
                    f"{sorted(set(_FS1_ITEMS) ^ set(v.conditions))}")
     if set(_ITEM_LABEL) != set(v.conditions):
         out.append("every condition needs a plain label in the reader")
+    if set(_CONDITION_INFO) != set(v.conditions):
+        out.append(f"every condition needs its NHANES wording here: "
+                   f"{sorted(set(_CONDITION_INFO) ^ set(v.conditions))}")
+    for q, c in v.condition_info.items():
+        if not c.question or not c.terms:
+            out.append(f"{q} has no question wording or no terms")
+        if c.counted != (q in lm.FS1_ITEMS):
+            out.append(f"{q} is {'' if c.counted else 'not '}marked counted, but fs1Score "
+                       f"{'counts' if q in lm.FS1_ITEMS else 'does not count'} it")
     if set(lm.FS1_ITEMS) | {"MCQ160B"} != set(v.conditions):
         out.append(f"the 23 conditions and linage2_model's fs1 items (+ MCQ160B, read but not "
                    f"counted) differ: {sorted((set(lm.FS1_ITEMS) | {'MCQ160B'}) ^ set(v.conditions))}")
