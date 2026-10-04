@@ -1,5 +1,9 @@
 # Research brief: what can the "My Patient" tab feed into the rest of the knowledge base?
 
+> **Status: done.** The research was completed in the cloud session — see `REPORT.md` for the
+> ranked, verified findings and the recommended plan. This brief remains as the record of the
+> question and its constraints; an implementation thread should start from `REPORT.md`.
+
 Run this in a local Claude Code thread on branch `linage2` (after applying the handover
 bundle; tip includes `282c854`). It is a **research task with small prototypes**, not a
 build-out: the output is a ranked, evidence-backed recommendation, plus the two or three

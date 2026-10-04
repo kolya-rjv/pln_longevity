@@ -219,8 +219,12 @@ ranking there (15 of 15 runs), while 0.3 or 0.5 happen to run, and dropping any 
 dozen unrelated files makes it run — the head-symbol budget of §5 again, failing in
 hyperon's space index (`trie.rs:179`, `unwrap()` on a hashed atom that is not there). The
 built-in patients abort too (`rank-interventions-for-patient`, `recommend-supplements-
-patient` for Patient001). So every program that names a patient runs in
+patient` for Patient001). So every program that names a patient, or reads patient facts
+(`MeasuredZ`, `PatientAge` …; `core.patient_context.reads_patients`), runs in
 `core.pln_runner.patient_stack`: the runtime stack minus seven files no patient form reads.
+Any other program runs in the full stack *without* a session patient's atoms
+(`patient_atoms_for`): holding a caller, the full space aborts as soon as a program
+enumerates patient facts.
 There all of those answer (+64 head symbols of margin), and wherever the full stack answers
 the result is byte-identical — including the three Patient001 outputs
 `tests/test_hallmark_targeting.py` captured on an earlier commit.

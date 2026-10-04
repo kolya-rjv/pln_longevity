@@ -1,0 +1,117 @@
+[
+ {
+  "name": "T_orig_supp_0",
+  "stack": "patient",
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n",
+  "timeout": 400
+ },
+ {
+  "name": "T_ua_supp_0",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n",
+  "timeout": 400
+ },
+ {
+  "name": "T_orig_supp_8",
+  "stack": "patient",
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me SerumAlbumin 0.3)\n(MeasuredZ Caller_Me RedCellDistributionWidth 0.3)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.3)\n(MeasuredZ Caller_Me SerumCreatinine 0.3)\n(MeasuredZ Caller_Me SystolicBloodPressure 0.3)\n(MeasuredZ Caller_Me UricAcid 0.3)\n(MeasuredZ Caller_Me BodyMassIndex 0.3)\n(MeasuredZ Caller_Me PulseRate 0.3)",
+  "timeout": 400
+ },
+ {
+  "name": "T_ua_supp_8",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me SerumAlbumin 0.3)\n(MeasuredZ Caller_Me RedCellDistributionWidth 0.3)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.3)\n(MeasuredZ Caller_Me SerumCreatinine 0.3)\n(MeasuredZ Caller_Me SystolicBloodPressure 0.3)\n(MeasuredZ Caller_Me UricAcid 0.3)\n(MeasuredZ Caller_Me BodyMassIndex 0.3)\n(MeasuredZ Caller_Me PulseRate 0.3)",
+  "timeout": 400
+ },
+ {
+  "name": "T_orig_supp_12",
+  "stack": "patient",
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me SerumAlbumin 0.3)\n(MeasuredZ Caller_Me RedCellDistributionWidth 0.3)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.3)\n(MeasuredZ Caller_Me SerumCreatinine 0.3)\n(MeasuredZ Caller_Me SystolicBloodPressure 0.3)\n(MeasuredZ Caller_Me UricAcid 0.3)\n(MeasuredZ Caller_Me BodyMassIndex 0.3)\n(MeasuredZ Caller_Me PulseRate 0.3)\n(MeasuredZ Caller_Me CalculatedLDL 0.3)\n(MeasuredZ Caller_Me AlanineAminotransferase 0.3)\n(MeasuredZ Caller_Me LymphocytePercent 0.3)\n(MeasuredZ Caller_Me Hemoglobin 0.3)",
+  "timeout": 400
+ },
+ {
+  "name": "T_ua_supp_12",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me SerumAlbumin 0.3)\n(MeasuredZ Caller_Me RedCellDistributionWidth 0.3)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.3)\n(MeasuredZ Caller_Me SerumCreatinine 0.3)\n(MeasuredZ Caller_Me SystolicBloodPressure 0.3)\n(MeasuredZ Caller_Me UricAcid 0.3)\n(MeasuredZ Caller_Me BodyMassIndex 0.3)\n(MeasuredZ Caller_Me PulseRate 0.3)\n(MeasuredZ Caller_Me CalculatedLDL 0.3)\n(MeasuredZ Caller_Me AlanineAminotransferase 0.3)\n(MeasuredZ Caller_Me LymphocytePercent 0.3)\n(MeasuredZ Caller_Me Hemoglobin 0.3)",
+  "timeout": 400
+ },
+ {
+  "name": "T_orig_supp_16",
+  "stack": "patient",
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me SerumAlbumin 0.3)\n(MeasuredZ Caller_Me RedCellDistributionWidth 0.3)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.3)\n(MeasuredZ Caller_Me SerumCreatinine 0.3)\n(MeasuredZ Caller_Me SystolicBloodPressure 0.3)\n(MeasuredZ Caller_Me UricAcid 0.3)\n(MeasuredZ Caller_Me BodyMassIndex 0.3)\n(MeasuredZ Caller_Me PulseRate 0.3)\n(MeasuredZ Caller_Me CalculatedLDL 0.3)\n(MeasuredZ Caller_Me AlanineAminotransferase 0.3)\n(MeasuredZ Caller_Me LymphocytePercent 0.3)\n(MeasuredZ Caller_Me Hemoglobin 0.3)\n(MeasuredZ Caller_Me PlateletCount 0.3)\n(MeasuredZ Caller_Me SerumSodium 0.3)\n(MeasuredZ Caller_Me SerumPotassium 0.3)\n(MeasuredZ Caller_Me BloodUreaNitrogen 0.3)",
+  "timeout": 400
+ },
+ {
+  "name": "T_ua_supp_16",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me SerumAlbumin 0.3)\n(MeasuredZ Caller_Me RedCellDistributionWidth 0.3)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.3)\n(MeasuredZ Caller_Me SerumCreatinine 0.3)\n(MeasuredZ Caller_Me SystolicBloodPressure 0.3)\n(MeasuredZ Caller_Me UricAcid 0.3)\n(MeasuredZ Caller_Me BodyMassIndex 0.3)\n(MeasuredZ Caller_Me PulseRate 0.3)\n(MeasuredZ Caller_Me CalculatedLDL 0.3)\n(MeasuredZ Caller_Me AlanineAminotransferase 0.3)\n(MeasuredZ Caller_Me LymphocytePercent 0.3)\n(MeasuredZ Caller_Me Hemoglobin 0.3)\n(MeasuredZ Caller_Me PlateletCount 0.3)\n(MeasuredZ Caller_Me SerumSodium 0.3)\n(MeasuredZ Caller_Me SerumPotassium 0.3)\n(MeasuredZ Caller_Me BloodUreaNitrogen 0.3)",
+  "timeout": 400
+ },
+ {
+  "name": "T_ua_supp_24",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me SerumAlbumin 0.3)\n(MeasuredZ Caller_Me RedCellDistributionWidth 0.3)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.3)\n(MeasuredZ Caller_Me SerumCreatinine 0.3)\n(MeasuredZ Caller_Me SystolicBloodPressure 0.3)\n(MeasuredZ Caller_Me UricAcid 0.3)\n(MeasuredZ Caller_Me BodyMassIndex 0.3)\n(MeasuredZ Caller_Me PulseRate 0.3)\n(MeasuredZ Caller_Me CalculatedLDL 0.3)\n(MeasuredZ Caller_Me AlanineAminotransferase 0.3)\n(MeasuredZ Caller_Me LymphocytePercent 0.3)\n(MeasuredZ Caller_Me Hemoglobin 0.3)\n(MeasuredZ Caller_Me PlateletCount 0.3)\n(MeasuredZ Caller_Me SerumSodium 0.3)\n(MeasuredZ Caller_Me SerumPotassium 0.3)\n(MeasuredZ Caller_Me BloodUreaNitrogen 0.3)\n(MeasuredZ Caller_Me NTproBNP 0.3)\n(MeasuredZ Caller_Me DiastolicBloodPressure 0.3)\n(MeasuredZ Caller_Me MeanCellVolume 0.3)\n(MeasuredZ Caller_Me SerumCalcium 0.3)\n(MeasuredZ Caller_Me SerumPhosphorus 0.3)\n(MeasuredZ Caller_Me SerumBilirubin 0.3)\n(MeasuredZ Caller_Me SerumChloride 0.3)\n(MeasuredZ Caller_Me SerumIron 0.3)",
+  "timeout": 400
+ },
+ {
+  "name": "T_ua_supp_32",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me SerumAlbumin 0.3)\n(MeasuredZ Caller_Me RedCellDistributionWidth 0.3)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.3)\n(MeasuredZ Caller_Me SerumCreatinine 0.3)\n(MeasuredZ Caller_Me SystolicBloodPressure 0.3)\n(MeasuredZ Caller_Me UricAcid 0.3)\n(MeasuredZ Caller_Me BodyMassIndex 0.3)\n(MeasuredZ Caller_Me PulseRate 0.3)\n(MeasuredZ Caller_Me CalculatedLDL 0.3)\n(MeasuredZ Caller_Me AlanineAminotransferase 0.3)\n(MeasuredZ Caller_Me LymphocytePercent 0.3)\n(MeasuredZ Caller_Me Hemoglobin 0.3)\n(MeasuredZ Caller_Me PlateletCount 0.3)\n(MeasuredZ Caller_Me SerumSodium 0.3)\n(MeasuredZ Caller_Me SerumPotassium 0.3)\n(MeasuredZ Caller_Me BloodUreaNitrogen 0.3)\n(MeasuredZ Caller_Me NTproBNP 0.3)\n(MeasuredZ Caller_Me DiastolicBloodPressure 0.3)\n(MeasuredZ Caller_Me MeanCellVolume 0.3)\n(MeasuredZ Caller_Me SerumCalcium 0.3)\n(MeasuredZ Caller_Me SerumPhosphorus 0.3)\n(MeasuredZ Caller_Me SerumBilirubin 0.3)\n(MeasuredZ Caller_Me SerumChloride 0.3)\n(MeasuredZ Caller_Me SerumIron 0.3)\n(MeasuredZ Caller_Me Ferritin 0.3)\n(MeasuredZ Caller_Me SerumFolate 0.3)\n(MeasuredZ Caller_Me VitaminB12 0.3)\n(MeasuredZ Caller_Me MonocyteCount 0.3)\n(MeasuredZ Caller_Me NeutrophilCount 0.3)\n(MeasuredZ Caller_Me BasophilCount 0.3)\n(MeasuredZ Caller_Me EosinophilCount 0.3)\n(MeasuredZ Caller_Me SerumCotinine 0.3)",
+  "timeout": 400
+ },
+ {
+  "name": "T_orig_rank_16",
+  "stack": "patient",
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me SerumAlbumin 0.3)\n(MeasuredZ Caller_Me RedCellDistributionWidth 0.3)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.3)\n(MeasuredZ Caller_Me SerumCreatinine 0.3)\n(MeasuredZ Caller_Me SystolicBloodPressure 0.3)\n(MeasuredZ Caller_Me UricAcid 0.3)\n(MeasuredZ Caller_Me BodyMassIndex 0.3)\n(MeasuredZ Caller_Me PulseRate 0.3)\n(MeasuredZ Caller_Me CalculatedLDL 0.3)\n(MeasuredZ Caller_Me AlanineAminotransferase 0.3)\n(MeasuredZ Caller_Me LymphocytePercent 0.3)\n(MeasuredZ Caller_Me Hemoglobin 0.3)\n(MeasuredZ Caller_Me PlateletCount 0.3)\n(MeasuredZ Caller_Me SerumSodium 0.3)\n(MeasuredZ Caller_Me SerumPotassium 0.3)\n(MeasuredZ Caller_Me BloodUreaNitrogen 0.3)",
+  "timeout": 400
+ },
+ {
+  "name": "T_ua_rank_16",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me SerumAlbumin 0.3)\n(MeasuredZ Caller_Me RedCellDistributionWidth 0.3)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.3)\n(MeasuredZ Caller_Me SerumCreatinine 0.3)\n(MeasuredZ Caller_Me SystolicBloodPressure 0.3)\n(MeasuredZ Caller_Me UricAcid 0.3)\n(MeasuredZ Caller_Me BodyMassIndex 0.3)\n(MeasuredZ Caller_Me PulseRate 0.3)\n(MeasuredZ Caller_Me CalculatedLDL 0.3)\n(MeasuredZ Caller_Me AlanineAminotransferase 0.3)\n(MeasuredZ Caller_Me LymphocytePercent 0.3)\n(MeasuredZ Caller_Me Hemoglobin 0.3)\n(MeasuredZ Caller_Me PlateletCount 0.3)\n(MeasuredZ Caller_Me SerumSodium 0.3)\n(MeasuredZ Caller_Me SerumPotassium 0.3)\n(MeasuredZ Caller_Me BloodUreaNitrogen 0.3)",
+  "timeout": 400
+ },
+ {
+  "name": "T_ua_rank_32",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me SerumAlbumin 0.3)\n(MeasuredZ Caller_Me RedCellDistributionWidth 0.3)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.3)\n(MeasuredZ Caller_Me SerumCreatinine 0.3)\n(MeasuredZ Caller_Me SystolicBloodPressure 0.3)\n(MeasuredZ Caller_Me UricAcid 0.3)\n(MeasuredZ Caller_Me BodyMassIndex 0.3)\n(MeasuredZ Caller_Me PulseRate 0.3)\n(MeasuredZ Caller_Me CalculatedLDL 0.3)\n(MeasuredZ Caller_Me AlanineAminotransferase 0.3)\n(MeasuredZ Caller_Me LymphocytePercent 0.3)\n(MeasuredZ Caller_Me Hemoglobin 0.3)\n(MeasuredZ Caller_Me PlateletCount 0.3)\n(MeasuredZ Caller_Me SerumSodium 0.3)\n(MeasuredZ Caller_Me SerumPotassium 0.3)\n(MeasuredZ Caller_Me BloodUreaNitrogen 0.3)\n(MeasuredZ Caller_Me NTproBNP 0.3)\n(MeasuredZ Caller_Me DiastolicBloodPressure 0.3)\n(MeasuredZ Caller_Me MeanCellVolume 0.3)\n(MeasuredZ Caller_Me SerumCalcium 0.3)\n(MeasuredZ Caller_Me SerumPhosphorus 0.3)\n(MeasuredZ Caller_Me SerumBilirubin 0.3)\n(MeasuredZ Caller_Me SerumChloride 0.3)\n(MeasuredZ Caller_Me SerumIron 0.3)\n(MeasuredZ Caller_Me Ferritin 0.3)\n(MeasuredZ Caller_Me SerumFolate 0.3)\n(MeasuredZ Caller_Me VitaminB12 0.3)\n(MeasuredZ Caller_Me MonocyteCount 0.3)\n(MeasuredZ Caller_Me NeutrophilCount 0.3)\n(MeasuredZ Caller_Me BasophilCount 0.3)\n(MeasuredZ Caller_Me EosinophilCount 0.3)\n(MeasuredZ Caller_Me SerumCotinine 0.3)",
+  "timeout": 400
+ }
+]

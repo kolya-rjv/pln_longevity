@@ -1,0 +1,336 @@
+[
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis CellularSenescence (stv 0.595 0.6253054502923161) 3.0 0.45928900265625006 (SupportedBy (CRP DNAmGDF15 DNAmPAI1))) (Hypothesis ChronicInflammation (stv 0.8 0.8775) 2.0 0.9425000000000001 (SupportedBy (CRP DNAmGDF15))))"
+  ],
+  "secs": 1.3,
+  "rc": 0,
+  "name": "FULL_ua_Patient001_diagnose-patient &",
+  "wall": 2.2
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(RiskPrediction Patient001 CoronaryHeartDisease (point 0.12605177716424967) (ci 0.096429609530651 0.15567394479784832) (confidence 0.765) (baseline 0.08) (multiplier 1.5756472145531208))"
+  ],
+  "secs": 0.44,
+  "rc": 0,
+  "name": "FULL_ua_Patient001_predict-risk-patie",
+  "wall": 1.4
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis InsulinResistance (stv 0.8 0.8775) 2.0 0.975 (SupportedBy (HbA1c FastingGlucose))))"
+  ],
+  "secs": 0.78,
+  "rc": 0,
+  "name": "FULL_ua_Patient002_diagnose-patient &",
+  "wall": 1.7
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(RiskPrediction Patient002 CoronaryHeartDisease (point 0.2170334555640622) (ci 0.1660305935065076 0.2680363176216168) (confidence 0.765) (baseline 0.15) (multiplier 1.4468897037604147))"
+  ],
+  "secs": 0.43,
+  "rc": 0,
+  "name": "FULL_ua_Patient002_predict-risk-patie",
+  "wall": 1.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 1.67,
+  "rc": 0,
+  "name": "FULL_ua_Patient003_rank-interventions",
+  "wall": 2.5
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Patient003 (Tier1HighConfidence ()) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 2.17,
+  "rc": 0,
+  "name": "FULL_ua_Patient003_recommend-suppleme",
+  "wall": 3.1
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(Counterfactual CellularSenescence AgeAccelGrim (expected-delta -0.22192968749999997) (signed Neg (stv 0.22192968749999997 0.31763845825852793)) (Via (DNAmPAI1 DNAmGDF15)))"
+  ],
+  "secs": 0.9,
+  "rc": 0,
+  "name": "FULL_ua_Patient001_counterfactual-pat",
+  "wall": 1.8
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(Decomposition Patient001 (Components ((Component DNAmPAI1 (z 1.8) (weight 0.125) (contribution 0.225) (DrivenBy (CellularSenescence))) (Component DNAmGDF15 (z 1.5) (weight 0.125) (contribution 0.1875) (DrivenBy (MitochondrialDysfunction CellularSenescence ChronicInflammation))))) (attributed 0.4125) (residual 1.1875))"
+  ],
+  "secs": 0.6,
+  "rc": 0,
+  "name": "FULL_ua_Patient001_decompose-grimage ",
+  "wall": 1.5
+ },
+ {
+  "status": "abort",
+  "atoms": [],
+  "err": "              at ./csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n  28:     0x7f886242a28b - __libc_start_main_impl\n                               at ./csu/../csu/libc-start.c:360:3\n  29:           0x600815 - _start\n  30:                0x0 - <unknown>\nthread caused non-unwinding panic. aborting.\n",
+  "rc": -6,
+  "name": "FULLABORT_ua_Patient001_rank-interventions",
+  "wall": 2.3
+ },
+ {
+  "status": "abort",
+  "atoms": [],
+  "err": "              at ./csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n  28:     0x7f3b79c2a28b - __libc_start_main_impl\n                               at ./csu/../csu/libc-start.c:360:3\n  29:           0x600815 - _start\n  30:                0x0 - <unknown>\nthread caused non-unwinding panic. aborting.\n",
+  "rc": -6,
+  "name": "FULLABORT_ua_Patient001_recommend-suppleme",
+  "wall": 1.3
+ },
+ {
+  "status": "abort",
+  "atoms": [],
+  "err": "              at ./csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n  28:     0x7fbb9942a28b - __libc_start_main_impl\n                               at ./csu/../csu/libc-start.c:360:3\n  29:           0x600815 - _start\n  30:                0x0 - <unknown>\nthread caused non-unwinding panic. aborting.\n",
+  "rc": -6,
+  "name": "FULLABORT_ua_Patient002_recommend-suppleme",
+  "wall": 1.9
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis CellularSenescence (stv 0.595 0.6253054502923161) 3.0 0.45928900265625006 (SupportedBy (CRP DNAmGDF15 DNAmPAI1))) (Hypothesis ChronicInflammation (stv 0.8 0.8775) 2.0 0.9425000000000001 (SupportedBy (CRP DNAmGDF15))))"
+  ],
+  "secs": 1.24,
+  "rc": 0,
+  "name": "PAT_ua_Patient001_diagnose-patient &",
+  "wall": 2.2
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored DasatinibPlusQuercetin 0.2306046747621094 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))))"
+  ],
+  "secs": 1.61,
+  "rc": 0,
+  "name": "PAT_ua_Patient001_rank-interventions",
+  "wall": 2.6
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Patient001 (Tier1HighConfidence ((SuppRec Omega3 (tier Tier1HighConfidence) (score 0.43260750000000003) (evidence MultipleHumanTrials 0.85) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15))))) (Tier2Promising ((SuppRec NMN (tier Tier2Promising) (score 0.16891875) (evidence SingleHumanTrial 0.7) (safety GenerallyWellTolerated 1.0) (Targets (DNAmGDF15))) (SuppRec Fisetin (tier Tier2Promising) (score 0.13434203327695315) (evidence AnimalStudies_Single 0.5) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15 DNAmPAI1))))) (NotRecommended ((SuppRec Resveratrol (tier NotRecommended) (score 0.07233801791835938) (evidence ITP_Negative 0.9) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15 DNAmPAI1))))) (Interactions ()))"
+  ],
+  "secs": 5.99,
+  "rc": 0,
+  "name": "PAT_ua_Patient001_recommend-suppleme",
+  "wall": 6.9
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Patient002 (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ((InteractionFlag Berberine Metformin \"Shared AMPK activation \u2014 additive glucose lowering; monitor and consult MD\"))))"
+  ],
+  "secs": 3.13,
+  "rc": 0,
+  "name": "PAT_ua_Patient002_recommend-suppleme",
+  "wall": 4.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 1.64,
+  "rc": 0,
+  "name": "PAT_ua_Patient003_rank-interventions",
+  "wall": 2.5
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis InsulinResistance (stv 0.8 0.8775) 2.0 0.975 (SupportedBy (HbA1c FastingGlucose))))"
+  ],
+  "secs": 0.67,
+  "rc": 0,
+  "name": "EX_orig_58-year-_dx",
+  "wall": 1.6
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 2.7,
+  "rc": 0,
+  "name": "EX_orig_58-year-_supp",
+  "wall": 3.6
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.6480162000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.56161404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 1.59,
+  "rc": 0,
+  "name": "EX_orig_58-year-_rank",
+  "wall": 2.5
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis InsulinResistance (stv 0.8 0.8775) 2.0 0.975 (SupportedBy (HbA1c FastingGlucose))))"
+  ],
+  "secs": 0.49,
+  "rc": 0,
+  "name": "EX_ua_58-year-_dx",
+  "wall": 1.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 1.53,
+  "rc": 0,
+  "name": "EX_ua_58-year-_supp",
+  "wall": 2.4
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.6480162000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.56161404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 1.03,
+  "rc": 0,
+  "name": "EX_ua_58-year-_rank",
+  "wall": 1.9
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "()"
+  ],
+  "secs": 0.39,
+  "rc": 0,
+  "name": "EX_orig_healthy _dx",
+  "wall": 1.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ()) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 1.66,
+  "rc": 0,
+  "name": "EX_orig_healthy _supp",
+  "wall": 2.5
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 1.33,
+  "rc": 0,
+  "name": "EX_orig_healthy _rank",
+  "wall": 2.2
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "()"
+  ],
+  "secs": 0.19,
+  "rc": 0,
+  "name": "EX_ua_healthy _dx",
+  "wall": 1.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ()) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 0.82,
+  "rc": 0,
+  "name": "EX_ua_healthy _supp",
+  "wall": 1.7
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 0.86,
+  "rc": 0,
+  "name": "EX_ua_healthy _rank",
+  "wall": 1.7
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis ChronicInflammation (stv 0.8 0.65) 1.0 0.52 (SupportedBy (CRP))) (Hypothesis InsulinResistance (stv 0.7 0.65) 1.0 0.45499999999999996 (SupportedBy (HbA1c))) (Hypothesis CellularSenescence (stv 0.5780000000000001 0.22244625000000004) 1.0 0.12857393250000004 (SupportedBy (CRP))))"
+  ],
+  "secs": 0.82,
+  "rc": 0,
+  "name": "EX_orig_six labs_dx",
+  "wall": 1.7
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Omega3 (tier Tier1HighConfidence) (score 0.23868) (evidence MultipleHumanTrials 0.85) (safety GenerallyWellTolerated 1.0) (Targets (CRP))) (SuppRec Berberine (tier Tier1HighConfidence) (score 0.18099900000000002) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c))))) (Tier2Promising ((SuppRec Fisetin (tier Tier2Promising) (score 0.03760787525625001) (evidence AnimalStudies_Single 0.5) (safety GenerallyWellTolerated 1.0) (Targets (CRP))))) (NotRecommended ((SuppRec Resveratrol (tier NotRecommended) (score 0.020250394368750004) (evidence ITP_Negative 0.9) (safety GenerallyWellTolerated 1.0) (Targets (CRP))))) (Interactions ()))"
+  ],
+  "secs": 3.55,
+  "rc": 0,
+  "name": "EX_orig_six labs_supp",
+  "wall": 4.5
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.34966620000000004 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.30304404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.09517685353312502 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 1.1,
+  "rc": 0,
+  "name": "EX_orig_six labs_rank",
+  "wall": 1.9
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis ChronicInflammation (stv 0.8 0.65) 1.0 0.52 (SupportedBy (CRP))) (Hypothesis InsulinResistance (stv 0.7 0.65) 1.0 0.45499999999999996 (SupportedBy (HbA1c))) (Hypothesis CellularSenescence (stv 0.5780000000000001 0.22244625000000004) 1.0 0.12857393250000004 (SupportedBy (CRP))))"
+  ],
+  "secs": 0.73,
+  "rc": 0,
+  "name": "EX_ua_six labs_dx",
+  "wall": 1.6
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Omega3 (tier Tier1HighConfidence) (score 0.23868) (evidence MultipleHumanTrials 0.85) (safety GenerallyWellTolerated 1.0) (Targets (CRP))) (SuppRec Berberine (tier Tier1HighConfidence) (score 0.18099900000000002) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c))))) (Tier2Promising ((SuppRec Fisetin (tier Tier2Promising) (score 0.03760787525625001) (evidence AnimalStudies_Single 0.5) (safety GenerallyWellTolerated 1.0) (Targets (CRP))))) (NotRecommended ((SuppRec Resveratrol (tier NotRecommended) (score 0.020250394368750004) (evidence ITP_Negative 0.9) (safety GenerallyWellTolerated 1.0) (Targets (CRP))))) (Interactions ()))"
+  ],
+  "secs": 2.64,
+  "rc": 0,
+  "name": "EX_ua_six labs_supp",
+  "wall": 3.5
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.34966620000000004 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.30304404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.09517685353312502 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 0.89,
+  "rc": 0,
+  "name": "EX_ua_six labs_rank",
+  "wall": 1.7
+ }
+]

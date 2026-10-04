@@ -1,0 +1,132 @@
+[
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 2.74,
+  "rc": 0,
+  "name": "T_orig_supp_0",
+  "wall": 3.6
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 1.61,
+  "rc": 0,
+  "name": "T_ua_supp_0",
+  "wall": 2.5
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 26.63,
+  "rc": 0,
+  "name": "T_orig_supp_8",
+  "wall": 27.5
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 4.88,
+  "rc": 0,
+  "name": "T_ua_supp_8",
+  "wall": 5.8
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 55.71,
+  "rc": 0,
+  "name": "T_orig_supp_12",
+  "wall": 56.6
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 7.21,
+  "rc": 0,
+  "name": "T_ua_supp_12",
+  "wall": 8.2
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 104.09,
+  "rc": 0,
+  "name": "T_orig_supp_16",
+  "wall": 105.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 10.06,
+  "rc": 0,
+  "name": "T_ua_supp_16",
+  "wall": 10.9
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 18.35,
+  "rc": 0,
+  "name": "T_ua_supp_24",
+  "wall": 19.2
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 30.61,
+  "rc": 0,
+  "name": "T_ua_supp_32",
+  "wall": 31.5
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.6480162000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.56161404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 51.35,
+  "rc": 0,
+  "name": "T_orig_rank_16",
+  "wall": 52.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.6480162000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.56161404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 5.13,
+  "rc": 0,
+  "name": "T_ua_rank_16",
+  "wall": 6.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.6480162000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.56161404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 14.26,
+  "rc": 0,
+  "name": "T_ua_rank_32",
+  "wall": 15.2
+ }
+]

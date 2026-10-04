@@ -1,0 +1,274 @@
+[
+ {
+  "name": "FULL_ua_Patient001_diagnose-patient &",
+  "stack": "full",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(diagnose-patient &self Patient001 (CellularSenescence ChronicInflammation InsulinResistance))"
+ },
+ {
+  "name": "FULL_ua_Patient001_predict-risk-patie",
+  "stack": "full",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(predict-risk-patient &self Patient001)"
+ },
+ {
+  "name": "FULL_ua_Patient002_diagnose-patient &",
+  "stack": "full",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(diagnose-patient &self Patient002 (CellularSenescence ChronicInflammation InsulinResistance))"
+ },
+ {
+  "name": "FULL_ua_Patient002_predict-risk-patie",
+  "stack": "full",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(predict-risk-patient &self Patient002)"
+ },
+ {
+  "name": "FULL_ua_Patient003_rank-interventions",
+  "stack": "full",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Patient003 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)"
+ },
+ {
+  "name": "FULL_ua_Patient003_recommend-suppleme",
+  "stack": "full",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Patient003)"
+ },
+ {
+  "name": "FULL_ua_Patient001_counterfactual-pat",
+  "stack": "full",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(counterfactual-patient &self Patient001 CellularSenescence)"
+ },
+ {
+  "name": "FULL_ua_Patient001_decompose-grimage ",
+  "stack": "full",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(decompose-grimage &self Patient001)"
+ },
+ {
+  "name": "FULLABORT_ua_Patient001_rank-interventions",
+  "stack": "full",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Patient001 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)"
+ },
+ {
+  "name": "FULLABORT_ua_Patient001_recommend-suppleme",
+  "stack": "full",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Patient001)"
+ },
+ {
+  "name": "FULLABORT_ua_Patient002_recommend-suppleme",
+  "stack": "full",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Patient002)"
+ },
+ {
+  "name": "PAT_ua_Patient001_diagnose-patient &",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(diagnose-patient &self Patient001 (CellularSenescence ChronicInflammation InsulinResistance))"
+ },
+ {
+  "name": "PAT_ua_Patient001_rank-interventions",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Patient001 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)"
+ },
+ {
+  "name": "PAT_ua_Patient001_recommend-suppleme",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Patient001)"
+ },
+ {
+  "name": "PAT_ua_Patient002_recommend-suppleme",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Patient002)"
+ },
+ {
+  "name": "PAT_ua_Patient003_rank-interventions",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Patient003 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)"
+ },
+ {
+  "name": "EX_orig_58-year-_dx",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation InsulinResistance))",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)"
+ },
+ {
+  "name": "EX_orig_58-year-_supp",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)"
+ },
+ {
+  "name": "EX_orig_58-year-_rank",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)"
+ },
+ {
+  "name": "EX_ua_58-year-_dx",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation InsulinResistance))",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)"
+ },
+ {
+  "name": "EX_ua_58-year-_supp",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)"
+ },
+ {
+  "name": "EX_ua_58-year-_rank",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)"
+ },
+ {
+  "name": "EX_orig_healthy _dx",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation InsulinResistance))",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 45)\n(PatientSex Caller_Me Female)\n(PatientSmoking Caller_Me NeverSmoker)\n(MeasuredZ Caller_Me CRP -1.20397)\n(MeasuredZ Caller_Me FastingGlucose -0.583333)\n(MeasuredZ Caller_Me HbA1c -0.6)"
+ },
+ {
+  "name": "EX_orig_healthy _supp",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 45)\n(PatientSex Caller_Me Female)\n(PatientSmoking Caller_Me NeverSmoker)\n(MeasuredZ Caller_Me CRP -1.20397)\n(MeasuredZ Caller_Me FastingGlucose -0.583333)\n(MeasuredZ Caller_Me HbA1c -0.6)"
+ },
+ {
+  "name": "EX_orig_healthy _rank",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 45)\n(PatientSex Caller_Me Female)\n(PatientSmoking Caller_Me NeverSmoker)\n(MeasuredZ Caller_Me CRP -1.20397)\n(MeasuredZ Caller_Me FastingGlucose -0.583333)\n(MeasuredZ Caller_Me HbA1c -0.6)"
+ },
+ {
+  "name": "EX_ua_healthy _dx",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation InsulinResistance))",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 45)\n(PatientSex Caller_Me Female)\n(PatientSmoking Caller_Me NeverSmoker)\n(MeasuredZ Caller_Me CRP -1.20397)\n(MeasuredZ Caller_Me FastingGlucose -0.583333)\n(MeasuredZ Caller_Me HbA1c -0.6)"
+ },
+ {
+  "name": "EX_ua_healthy _supp",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 45)\n(PatientSex Caller_Me Female)\n(PatientSmoking Caller_Me NeverSmoker)\n(MeasuredZ Caller_Me CRP -1.20397)\n(MeasuredZ Caller_Me FastingGlucose -0.583333)\n(MeasuredZ Caller_Me HbA1c -0.6)"
+ },
+ {
+  "name": "EX_ua_healthy _rank",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 45)\n(PatientSex Caller_Me Female)\n(PatientSmoking Caller_Me NeverSmoker)\n(MeasuredZ Caller_Me CRP -1.20397)\n(MeasuredZ Caller_Me FastingGlucose -0.583333)\n(MeasuredZ Caller_Me HbA1c -0.6)"
+ },
+ {
+  "name": "EX_orig_six labs_dx",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation InsulinResistance))",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 66)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me FormerSmoker)\n(MeasuredZ Caller_Me CRP 1.17865)\n(MeasuredZ Caller_Me HbA1c 3.2)"
+ },
+ {
+  "name": "EX_orig_six labs_supp",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 66)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me FormerSmoker)\n(MeasuredZ Caller_Me CRP 1.17865)\n(MeasuredZ Caller_Me HbA1c 3.2)"
+ },
+ {
+  "name": "EX_orig_six labs_rank",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 66)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me FormerSmoker)\n(MeasuredZ Caller_Me CRP 1.17865)\n(MeasuredZ Caller_Me HbA1c 3.2)"
+ },
+ {
+  "name": "EX_ua_six labs_dx",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation InsulinResistance))",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 66)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me FormerSmoker)\n(MeasuredZ Caller_Me CRP 1.17865)\n(MeasuredZ Caller_Me HbA1c 3.2)"
+ },
+ {
+  "name": "EX_ua_six labs_supp",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 66)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me FormerSmoker)\n(MeasuredZ Caller_Me CRP 1.17865)\n(MeasuredZ Caller_Me HbA1c 3.2)"
+ },
+ {
+  "name": "EX_ua_six labs_rank",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 66)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me FormerSmoker)\n(MeasuredZ Caller_Me CRP 1.17865)\n(MeasuredZ Caller_Me HbA1c 3.2)"
+ }
+]

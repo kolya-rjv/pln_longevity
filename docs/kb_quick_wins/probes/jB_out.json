@@ -1,0 +1,406 @@
+[
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis CellularSenescence (stv 0.595 0.6253054502923161) 3.0 0.45928900265625006 (SupportedBy (CRP DNAmGDF15 DNAmPAI1))) (Hypothesis ChronicInflammation (stv 0.8 0.8775) 2.0 0.9425000000000001 (SupportedBy (CRP DNAmGDF15))))"
+  ],
+  "secs": 2.09,
+  "rc": 0,
+  "name": "FULL_orig_Patient001_diagnose-patient &",
+  "wall": 3.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis CellularSenescence (stv 0.595 0.6253054502923161) 3.0 0.45928900265625006 (SupportedBy (CRP DNAmGDF15 DNAmPAI1))) (Hypothesis ChronicInflammation (stv 0.8 0.8775) 2.0 0.9425000000000001 (SupportedBy (CRP DNAmGDF15))))"
+  ],
+  "secs": 2.13,
+  "rc": 0,
+  "name": "FULL_mb_Patient001_diagnose-patient &",
+  "wall": 3.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(RiskPrediction Patient001 CoronaryHeartDisease (point 0.12605177716424967) (ci 0.096429609530651 0.15567394479784832) (confidence 0.765) (baseline 0.08) (multiplier 1.5756472145531208))"
+  ],
+  "secs": 0.42,
+  "rc": 0,
+  "name": "FULL_orig_Patient001_predict-risk-patie",
+  "wall": 1.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(RiskPrediction Patient001 CoronaryHeartDisease (point 0.12605177716424967) (ci 0.096429609530651 0.15567394479784832) (confidence 0.765) (baseline 0.08) (multiplier 1.5756472145531208))"
+  ],
+  "secs": 0.43,
+  "rc": 0,
+  "name": "FULL_mb_Patient001_predict-risk-patie",
+  "wall": 1.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis InsulinResistance (stv 0.8 0.8775) 2.0 0.975 (SupportedBy (HbA1c FastingGlucose))))"
+  ],
+  "secs": 1.9,
+  "rc": 0,
+  "name": "FULL_orig_Patient002_diagnose-patient &",
+  "wall": 2.8
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis InsulinResistance (stv 0.8 0.8775) 2.0 0.975 (SupportedBy (HbA1c FastingGlucose))))"
+  ],
+  "secs": 2.06,
+  "rc": 0,
+  "name": "FULL_mb_Patient002_diagnose-patient &",
+  "wall": 2.9
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(RiskPrediction Patient002 CoronaryHeartDisease (point 0.2170334555640622) (ci 0.1660305935065076 0.2680363176216168) (confidence 0.765) (baseline 0.15) (multiplier 1.4468897037604147))"
+  ],
+  "secs": 0.46,
+  "rc": 0,
+  "name": "FULL_orig_Patient002_predict-risk-patie",
+  "wall": 1.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(RiskPrediction Patient002 CoronaryHeartDisease (point 0.2170334555640622) (ci 0.1660305935065076 0.2680363176216168) (confidence 0.765) (baseline 0.15) (multiplier 1.4468897037604147))"
+  ],
+  "secs": 0.43,
+  "rc": 0,
+  "name": "FULL_mb_Patient002_predict-risk-patie",
+  "wall": 1.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 5.14,
+  "rc": 0,
+  "name": "FULL_orig_Patient003_rank-interventions",
+  "wall": 6.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 5.2,
+  "rc": 0,
+  "name": "FULL_mb_Patient003_rank-interventions",
+  "wall": 6.2
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Patient003 (Tier1HighConfidence ()) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 7.7,
+  "rc": 0,
+  "name": "FULL_orig_Patient003_recommend-suppleme",
+  "wall": 8.6
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Patient003 (Tier1HighConfidence ()) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 7.92,
+  "rc": 0,
+  "name": "FULL_mb_Patient003_recommend-suppleme",
+  "wall": 8.9
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(Counterfactual CellularSenescence AgeAccelGrim (expected-delta -0.22192968749999997) (signed Neg (stv 0.22192968749999997 0.31763845825852793)) (Via (DNAmPAI1 DNAmGDF15)))"
+  ],
+  "secs": 0.92,
+  "rc": 0,
+  "name": "FULL_orig_Patient001_counterfactual-pat",
+  "wall": 1.8
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(Counterfactual CellularSenescence AgeAccelGrim (expected-delta -0.22192968749999997) (signed Neg (stv 0.22192968749999997 0.31763845825852793)) (Via (DNAmPAI1 DNAmGDF15)))"
+  ],
+  "secs": 0.96,
+  "rc": 0,
+  "name": "FULL_mb_Patient001_counterfactual-pat",
+  "wall": 1.9
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(Decomposition Patient001 (Components ((Component DNAmPAI1 (z 1.8) (weight 0.125) (contribution 0.225) (DrivenBy (CellularSenescence))) (Component DNAmGDF15 (z 1.5) (weight 0.125) (contribution 0.1875) (DrivenBy (MitochondrialDysfunction CellularSenescence ChronicInflammation))))) (attributed 0.4125) (residual 1.1875))"
+  ],
+  "secs": 0.57,
+  "rc": 0,
+  "name": "FULL_orig_Patient001_decompose-grimage ",
+  "wall": 1.5
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(Decomposition Patient001 (Components ((Component DNAmPAI1 (z 1.8) (weight 0.125) (contribution 0.225) (DrivenBy (CellularSenescence))) (Component DNAmGDF15 (z 1.5) (weight 0.125) (contribution 0.1875) (DrivenBy (MitochondrialDysfunction CellularSenescence ChronicInflammation))))) (attributed 0.4125) (residual 1.1875))"
+  ],
+  "secs": 0.69,
+  "rc": 0,
+  "name": "FULL_mb_Patient001_decompose-grimage ",
+  "wall": 1.6
+ },
+ {
+  "status": "abort",
+  "atoms": [],
+  "err": "              at ./csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n  28:     0x7f688402a28b - __libc_start_main_impl\n                               at ./csu/../csu/libc-start.c:360:3\n  29:           0x600815 - _start\n  30:                0x0 - <unknown>\nthread caused non-unwinding panic. aborting.\n",
+  "rc": -6,
+  "name": "FULLABORT_mb_Patient001_rank-interventions",
+  "wall": 4.6
+ },
+ {
+  "status": "abort",
+  "atoms": [],
+  "err": "              at ./csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n  28:     0x7fd803c2a28b - __libc_start_main_impl\n                               at ./csu/../csu/libc-start.c:360:3\n  29:           0x600815 - _start\n  30:                0x0 - <unknown>\nthread caused non-unwinding panic. aborting.\n",
+  "rc": -6,
+  "name": "FULLABORT_mb_Patient001_recommend-suppleme",
+  "wall": 2.1
+ },
+ {
+  "status": "abort",
+  "atoms": [],
+  "err": "              at ./csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n  28:     0x7f9e1342a28b - __libc_start_main_impl\n                               at ./csu/../csu/libc-start.c:360:3\n  29:           0x600815 - _start\n  30:                0x0 - <unknown>\nthread caused non-unwinding panic. aborting.\n",
+  "rc": -6,
+  "name": "FULLABORT_mb_Patient002_recommend-suppleme",
+  "wall": 4.1
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(signed Neg (stv 0.33000000000000007 0.268515))"
+  ],
+  "secs": 0.08,
+  "rc": 0,
+  "name": "GEN_orig_0",
+  "wall": 1.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(signed Neg (stv 0.33000000000000007 0.268515))"
+  ],
+  "secs": 0.11,
+  "rc": 0,
+  "name": "GEN_mb_0",
+  "wall": 1.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 0.43,
+  "rc": 0,
+  "name": "GEN_orig_1",
+  "wall": 1.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 0.48,
+  "rc": 0,
+  "name": "GEN_mb_1",
+  "wall": 1.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis CellularSenescence (stv 0.595 0.6253054502923161) 3.0 0.45928900265625006 (SupportedBy (CRP DNAmGDF15 DNAmPAI1))) (Hypothesis ChronicInflammation (stv 0.8 0.8775) 2.0 0.9425000000000001 (SupportedBy (CRP DNAmGDF15))) (Hypothesis MitochondrialDysfunction (stv 0.75 0.65) 1.0 0.48750000000000004 (SupportedBy (DNAmGDF15))))"
+  ],
+  "secs": 1.17,
+  "rc": 0,
+  "name": "GEN_orig_2",
+  "wall": 2.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis CellularSenescence (stv 0.595 0.6253054502923161) 3.0 0.45928900265625006 (SupportedBy (CRP DNAmGDF15 DNAmPAI1))) (Hypothesis ChronicInflammation (stv 0.8 0.8775) 2.0 0.9425000000000001 (SupportedBy (CRP DNAmGDF15))) (Hypothesis MitochondrialDysfunction (stv 0.75 0.65) 1.0 0.48750000000000004 (SupportedBy (DNAmGDF15))))"
+  ],
+  "secs": 1.24,
+  "rc": 0,
+  "name": "GEN_mb_2",
+  "wall": 2.1
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(signed Neg (stv 0.48 0.49725))"
+  ],
+  "secs": 0.07,
+  "rc": 0,
+  "name": "GEN_orig_3",
+  "wall": 0.9
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(signed Neg (stv 0.48 0.49725))"
+  ],
+  "secs": 0.09,
+  "rc": 0,
+  "name": "GEN_mb_3",
+  "wall": 1.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "Outcome"
+  ],
+  "secs": 0.05,
+  "rc": 0,
+  "name": "GEN_orig_4",
+  "wall": 0.9
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "Outcome"
+  ],
+  "secs": 0.05,
+  "rc": 0,
+  "name": "GEN_mb_4",
+  "wall": 0.9
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis CellularSenescence (stv 0.595 0.6253054502923161) 3.0 0.45928900265625006 (SupportedBy (CRP DNAmGDF15 DNAmPAI1))) (Hypothesis ChronicInflammation (stv 0.8 0.8775) 2.0 0.9425000000000001 (SupportedBy (CRP DNAmGDF15))))"
+  ],
+  "secs": 1.97,
+  "rc": 0,
+  "name": "PAT_orig_Patient001_diagnose-patient &",
+  "wall": 2.8
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis CellularSenescence (stv 0.595 0.6253054502923161) 3.0 0.45928900265625006 (SupportedBy (CRP DNAmGDF15 DNAmPAI1))) (Hypothesis ChronicInflammation (stv 0.8 0.8775) 2.0 0.9425000000000001 (SupportedBy (CRP DNAmGDF15))))"
+  ],
+  "secs": 2.02,
+  "rc": 0,
+  "name": "PAT_mb_Patient001_diagnose-patient &",
+  "wall": 2.9
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored DasatinibPlusQuercetin 0.2306046747621094 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))))"
+  ],
+  "secs": 3.92,
+  "rc": 0,
+  "name": "PAT_orig_Patient001_rank-interventions",
+  "wall": 4.8
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored DasatinibPlusQuercetin 0.2306046747621094 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))))"
+  ],
+  "secs": 3.94,
+  "rc": 0,
+  "name": "PAT_mb_Patient001_rank-interventions",
+  "wall": 4.8
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Patient001 (Tier1HighConfidence ((SuppRec Omega3 (tier Tier1HighConfidence) (score 0.43260750000000003) (evidence MultipleHumanTrials 0.85) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15))))) (Tier2Promising ((SuppRec NMN (tier Tier2Promising) (score 0.16891875) (evidence SingleHumanTrial 0.7) (safety GenerallyWellTolerated 1.0) (Targets (DNAmGDF15))) (SuppRec Fisetin (tier Tier2Promising) (score 0.13434203327695315) (evidence AnimalStudies_Single 0.5) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15 DNAmPAI1))))) (NotRecommended ((SuppRec Resveratrol (tier NotRecommended) (score 0.07233801791835938) (evidence ITP_Negative 0.9) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15 DNAmPAI1))))) (Interactions ()))"
+  ],
+  "secs": 14.43,
+  "rc": 0,
+  "name": "PAT_orig_Patient001_recommend-suppleme",
+  "wall": 15.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Patient001 (Tier1HighConfidence ((SuppRec Omega3 (tier Tier1HighConfidence) (score 0.43260750000000003) (evidence MultipleHumanTrials 0.85) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15))))) (Tier2Promising ((SuppRec NMN (tier Tier2Promising) (score 0.16891875) (evidence SingleHumanTrial 0.7) (safety GenerallyWellTolerated 1.0) (Targets (DNAmGDF15))) (SuppRec Fisetin (tier Tier2Promising) (score 0.13434203327695315) (evidence AnimalStudies_Single 0.5) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15 DNAmPAI1))))) (NotRecommended ((SuppRec Resveratrol (tier NotRecommended) (score 0.07233801791835938) (evidence ITP_Negative 0.9) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15 DNAmPAI1))))) (Interactions ()))"
+  ],
+  "secs": 14.52,
+  "rc": 0,
+  "name": "PAT_mb_Patient001_recommend-suppleme",
+  "wall": 15.4
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Patient002 (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ((InteractionFlag Berberine Metformin \"Shared AMPK activation \u2014 additive glucose lowering; monitor and consult MD\"))))"
+  ],
+  "secs": 10.36,
+  "rc": 0,
+  "name": "PAT_orig_Patient002_recommend-suppleme",
+  "wall": 11.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Patient002 (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ((InteractionFlag Berberine Metformin \"Shared AMPK activation \u2014 additive glucose lowering; monitor and consult MD\"))))"
+  ],
+  "secs": 10.3,
+  "rc": 0,
+  "name": "PAT_mb_Patient002_recommend-suppleme",
+  "wall": 11.2
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 4.83,
+  "rc": 0,
+  "name": "PAT_orig_Patient003_rank-interventions",
+  "wall": 5.7
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+  ],
+  "secs": 4.97,
+  "rc": 0,
+  "name": "PAT_mb_Patient003_rank-interventions",
+  "wall": 5.8
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(LinAgeDecomposition Caller_Me (delta-years 13.277851) (Measured ((Contribution WhiteBloodCellCount (years 0.164814) Measured (ReadsOut None) (DrivenBy ())) (Contribution SystolicBloodPressure (years 0.52006) Measured (ReadsOut None) (DrivenBy ())) (Contribution SerumGlucose (years -0.356882) Measured (ReadsOut FastingGlucose (witnessed True)) (DrivenBy ())) (Contribution SerumCreatinine (years 0.138082) Measured (ReadsOut None) (DrivenBy ())) (Contribution SerumCotinine (years 7.532759) Measured (ReadsOut CurrentTobaccoExposure (witnessed True)) (DrivenBy ())) (Contribution SerumAlbumin (years 2.358947) Measured (ReadsOut None) (DrivenBy ())) (Contribution SelfRatedHealthScore (years 1.182356) Measured (ReadsOut None) (DrivenBy ())) (Contribution RedCellDistributionWidth (years 2.553143) Measured (ReadsOut None) (DrivenBy ())) (Contribution PulseRate (years 0.375691) Measured (ReadsOut None) (DrivenBy ())) (Contribution HbA1c (years 0.931633) Measured (ReadsOut HbA1c (witnessed True)) (DrivenBy (DeregulatedNutrientSensing))) (Contribution DiastolicBloodPressure (years -0.840857) Measured (ReadsOut None) (DrivenBy ())) (Contribution ComorbidityScore (years -0.001925) Measured (ReadsOut None) (DrivenBy ())) (Contribution CalculatedLDL (years 0.083134) Measured (ReadsOut None) (DrivenBy ())) (Contribution CRP (years -0.004246) Measured (ReadsOut CRP (witnessed False)) (DrivenBy ())) (Contribution BodyMassIndex (years -0.221252) Measured (ReadsOut None) (DrivenBy ())))) (Imputed ((Contribution VitaminB12 (years 0.006621) Imputed (ReadsOut None) (DrivenBy ())) (Contribution UrineCreatinine (years 0.014164) Imputed (ReadsOut None) (DrivenBy ())) (Contribution UrineAlbuminCreatinineRatio (years -0.149319) Imputed (ReadsOut None) (DrivenBy ())) (Contribution UrineAlbumin (years -0.967363) Imputed (ReadsOut None) (DrivenBy ())) (Contribution UricAcid (years 0.023511) Imputed (ReadsOut None) (DrivenBy ())) (Contribution TransferrinSaturation (years -0.051681) Imputed (ReadsOut None) (DrivenBy ())) (Contribution TotalProtein (years -0.010302) Imputed (ReadsOut None) (DrivenBy ())) (Contribution TotalIronBindingCapacity (years -0.089291) Imputed (ReadsOut None) (DrivenBy ())) (Contribution TotalBilirubin (years -0.028649) Imputed (ReadsOut None) (DrivenBy ())) (Contribution SerumSodium (years -0.171631) Imputed (ReadsOut None) (DrivenBy ())) (Contribution SerumPotassium (years 0.05619) Imputed (ReadsOut None) (DrivenBy ())) (Contribution SerumPhosphorus (years -0.006669) Imputed (ReadsOut None) (DrivenBy ())) (Contribution SerumIron (years 0.030407) Imputed (ReadsOut None) (DrivenBy ())) (Contribution SerumFolate (years 0.071126) Imputed (ReadsOut None) (DrivenBy ())) (Contribution SerumChloride (years -0.220241) Imputed (ReadsOut None) (DrivenBy ())) (Contribution SerumCalcium (years -0.039237) Imputed (ReadsOut None) (DrivenBy ())) (Contribution RedBloodCellCount (years -0.027387) Imputed (ReadsOut None) (DrivenBy ())) (Contribution PlateletCount (years 0.036679) Imputed (ReadsOut None) (DrivenBy ())) (Contribution NeutrophilPercent (years -0.005513) Imputed (ReadsOut None) (DrivenBy ())) (Contribution NeutrophilCount (years -0.166488) Imputed (ReadsOut None) (DrivenBy ())) (Contribution NTproBNP (years -0.246287) Imputed (ReadsOut None) (DrivenBy ())) (Contribution MonocytePercent (years 0.029115) Imputed (ReadsOut None) (DrivenBy ())) (Contribution MonocyteCount (years 0.039894) Imputed (ReadsOut None) (DrivenBy ())) (Contribution MeanPlateletVolume (years 0.027217) Imputed (ReadsOut None) (DrivenBy ())) (Contribution MeanCorpuscularVolume (years 0.103449) Imputed (ReadsOut None) (DrivenBy ())) (Contribution MeanCorpuscularHemoglobinConcentration (years -0.04927) Imputed (ReadsOut None) (DrivenBy ())) (Contribution MeanCorpuscularHemoglobin (years 0.04813) Imputed (ReadsOut None) (DrivenBy ())) (Contribution LymphocytePercent (years -0.009594) Imputed (ReadsOut None) (DrivenBy ())) (Contribution LymphocyteCount (years -0.007191) Imputed (ReadsOut None) (DrivenBy ())) (Contribution LactateDehydrogenase (years 0.153734) Imputed (ReadsOut None) (DrivenBy ())) (Contribution Hemoglobin (years -0.01559) Imputed (ReadsOut None) (DrivenBy ())) (Contribution Hematocrit (years 0.010699) Imputed (ReadsOut None) (DrivenBy ())) (Contribution HealthcareUseScore (years 0.178013) Imputed (ReadsOut None) (DrivenBy ())) (Contribution Globulin (years -0.025557) Imputed (ReadsOut None) (DrivenBy ())) (Contribution Ferritin (years -0.052742) Imputed (ReadsOut None) (DrivenBy ())) (Contribution EosinophilPercent (years 0.032897) Imputed (ReadsOut None) (DrivenBy ())) (Contribution EosinophilCount (years 0.022754) Imputed (ReadsOut None) (DrivenBy ())) (Contribution BloodUreaNitrogen (years -0.000862) Imputed (ReadsOut None) (DrivenBy ())) (Contribution Bicarbonate (years -0.001322) Imputed (ReadsOut None) (DrivenBy ())) (Contribution BasophilPercent (years -0.150228) Imputed (ReadsOut None) (DrivenBy ())) (Contribution BasophilCount (years -0.001593) Imputed (ReadsOut None) (DrivenBy ())) (Contribution AlkalinePhosphatase (years -0.031974) Imputed (ReadsOut None) (DrivenBy ())) (Contribution AST (years -0.017492) Imputed (ReadsOut None) (DrivenBy ())) (Contribution ALT (years 0.025444) Imputed (ReadsOut None) (DrivenBy ())))) (attributed-measured 14.415457) (attributed-imputed -1.6334289999999998) (age-term-residual 0.4958229999999999))"
+  ],
+  "secs": 3.45,
+  "rc": 0,
+  "name": "L2_orig_smoker_decomp",
+  "wall": 4.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(LinAgeDecomposition Caller_Me (delta-years 13.277851) (Measured ((Contribution WhiteBloodCellCount (years 0.164814) Measured (ReadsOut None) (DrivenBy ())) (Contribution SystolicBloodPressure (years 0.52006) Measured (ReadsOut None) (DrivenBy ())) (Contribution SerumGlucose (years -0.356882) Measured (ReadsOut FastingGlucose (witnessed True)) (DrivenBy ())) (Contribution SerumCreatinine (years 0.138082) Measured (ReadsOut None) (DrivenBy ())) (Contribution SerumCotinine (years 7.532759) Measured (ReadsOut CurrentTobaccoExposure (witnessed True)) (DrivenBy ())) (Contribution SerumAlbumin (years 2.358947) Measured (ReadsOut None) (DrivenBy ())) (Contribution SelfRatedHealthScore (years 1.182356) Measured (ReadsOut None) (DrivenBy ())) (Contribution RedCellDistributionWidth (years 2.553143) Measured (ReadsOut None) (DrivenBy ())) (Contribution PulseRate (years 0.375691) Measured (ReadsOut None) (DrivenBy ())) (Contribution HbA1c (years 0.931633) Measured (ReadsOut HbA1c (witnessed True)) (DrivenBy (DeregulatedNutrientSensing))) (Contribution DiastolicBloodPressure (years -0.840857) Measured (ReadsOut None) (DrivenBy ())) (Contribution ComorbidityScore (years -0.001925) Measured (ReadsOut None) (DrivenBy ())) (Contribution CalculatedLDL (years 0.083134) Measured (ReadsOut None) (DrivenBy ())) (Contribution CRP (years -0.004246) Measured (ReadsOut CRP (witnessed False)) (DrivenBy ())) (Contribution BodyMassIndex (years -0.221252) Measured (ReadsOut None) (DrivenBy ())))) (Imputed ((Contribution VitaminB12 (years 0.006621) Imputed (ReadsOut None) (DrivenBy ())) (Contribution UrineCreatinine (years 0.014164) Imputed (ReadsOut None) (DrivenBy ())) (Contribution UrineAlbuminCreatinineRatio (years -0.149319) Imputed (ReadsOut None) (DrivenBy ())) (Contribution UrineAlbumin (years -0.967363) Imputed (ReadsOut None) (DrivenBy ())) (Contribution UricAcid (years 0.023511) Imputed (ReadsOut None) (DrivenBy ())) (Contribution TransferrinSaturation (years -0.051681) Imputed (ReadsOut None) (DrivenBy ())) (Contribution TotalProtein (years -0.010302) Imputed (ReadsOut None) (DrivenBy ())) (Contribution TotalIronBindingCapacity (years -0.089291) Imputed (ReadsOut None) (DrivenBy ())) (Contribution TotalBilirubin (years -0.028649) Imputed (ReadsOut None) (DrivenBy ())) (Contribution SerumSodium (years -0.171631) Imputed (ReadsOut None) (DrivenBy ())) (Contribution SerumPotassium (years 0.05619) Imputed (ReadsOut None) (DrivenBy ())) (Contribution SerumPhosphorus (years -0.006669) Imputed (ReadsOut None) (DrivenBy ())) (Contribution SerumIron (years 0.030407) Imputed (ReadsOut None) (DrivenBy ())) (Contribution SerumFolate (years 0.071126) Imputed (ReadsOut None) (DrivenBy ())) (Contribution SerumChloride (years -0.220241) Imputed (ReadsOut None) (DrivenBy ())) (Contribution SerumCalcium (years -0.039237) Imputed (ReadsOut None) (DrivenBy ())) (Contribution RedBloodCellCount (years -0.027387) Imputed (ReadsOut None) (DrivenBy ())) (Contribution PlateletCount (years 0.036679) Imputed (ReadsOut None) (DrivenBy ())) (Contribution NeutrophilPercent (years -0.005513) Imputed (ReadsOut None) (DrivenBy ())) (Contribution NeutrophilCount (years -0.166488) Imputed (ReadsOut None) (DrivenBy ())) (Contribution NTproBNP (years -0.246287) Imputed (ReadsOut None) (DrivenBy ())) (Contribution MonocytePercent (years 0.029115) Imputed (ReadsOut None) (DrivenBy ())) (Contribution MonocyteCount (years 0.039894) Imputed (ReadsOut None) (DrivenBy ())) (Contribution MeanPlateletVolume (years 0.027217) Imputed (ReadsOut None) (DrivenBy ())) (Contribution MeanCorpuscularVolume (years 0.103449) Imputed (ReadsOut None) (DrivenBy ())) (Contribution MeanCorpuscularHemoglobinConcentration (years -0.04927) Imputed (ReadsOut None) (DrivenBy ())) (Contribution MeanCorpuscularHemoglobin (years 0.04813) Imputed (ReadsOut None) (DrivenBy ())) (Contribution LymphocytePercent (years -0.009594) Imputed (ReadsOut None) (DrivenBy ())) (Contribution LymphocyteCount (years -0.007191) Imputed (ReadsOut None) (DrivenBy ())) (Contribution LactateDehydrogenase (years 0.153734) Imputed (ReadsOut None) (DrivenBy ())) (Contribution Hemoglobin (years -0.01559) Imputed (ReadsOut None) (DrivenBy ())) (Contribution Hematocrit (years 0.010699) Imputed (ReadsOut None) (DrivenBy ())) (Contribution HealthcareUseScore (years 0.178013) Imputed (ReadsOut None) (DrivenBy ())) (Contribution Globulin (years -0.025557) Imputed (ReadsOut None) (DrivenBy ())) (Contribution Ferritin (years -0.052742) Imputed (ReadsOut None) (DrivenBy ())) (Contribution EosinophilPercent (years 0.032897) Imputed (ReadsOut None) (DrivenBy ())) (Contribution EosinophilCount (years 0.022754) Imputed (ReadsOut None) (DrivenBy ())) (Contribution BloodUreaNitrogen (years -0.000862) Imputed (ReadsOut None) (DrivenBy ())) (Contribution Bicarbonate (years -0.001322) Imputed (ReadsOut None) (DrivenBy ())) (Contribution BasophilPercent (years -0.150228) Imputed (ReadsOut None) (DrivenBy ())) (Contribution BasophilCount (years -0.001593) Imputed (ReadsOut None) (DrivenBy ())) (Contribution AlkalinePhosphatase (years -0.031974) Imputed (ReadsOut None) (DrivenBy ())) (Contribution AST (years -0.017492) Imputed (ReadsOut None) (DrivenBy ())) (Contribution ALT (years 0.025444) Imputed (ReadsOut None) (DrivenBy ())))) (attributed-measured 14.415457) (attributed-imputed -1.6334289999999998) (age-term-residual 0.4958229999999999))"
+  ],
+  "secs": 3.64,
+  "rc": 0,
+  "name": "L2_mb_smoker_decomp",
+  "wall": 4.5
+ }
+]

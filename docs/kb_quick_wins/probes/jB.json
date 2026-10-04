@@ -1,0 +1,294 @@
+[
+ {
+  "name": "FULL_orig_Patient001_diagnose-patient &",
+  "stack": "full",
+  "swap": {},
+  "query": "!(diagnose-patient &self Patient001 (CellularSenescence ChronicInflammation InsulinResistance))"
+ },
+ {
+  "name": "FULL_mb_Patient001_diagnose-patient &",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(diagnose-patient &self Patient001 (CellularSenescence ChronicInflammation InsulinResistance))"
+ },
+ {
+  "name": "FULL_orig_Patient001_predict-risk-patie",
+  "stack": "full",
+  "swap": {},
+  "query": "!(predict-risk-patient &self Patient001)"
+ },
+ {
+  "name": "FULL_mb_Patient001_predict-risk-patie",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(predict-risk-patient &self Patient001)"
+ },
+ {
+  "name": "FULL_orig_Patient002_diagnose-patient &",
+  "stack": "full",
+  "swap": {},
+  "query": "!(diagnose-patient &self Patient002 (CellularSenescence ChronicInflammation InsulinResistance))"
+ },
+ {
+  "name": "FULL_mb_Patient002_diagnose-patient &",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(diagnose-patient &self Patient002 (CellularSenescence ChronicInflammation InsulinResistance))"
+ },
+ {
+  "name": "FULL_orig_Patient002_predict-risk-patie",
+  "stack": "full",
+  "swap": {},
+  "query": "!(predict-risk-patient &self Patient002)"
+ },
+ {
+  "name": "FULL_mb_Patient002_predict-risk-patie",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(predict-risk-patient &self Patient002)"
+ },
+ {
+  "name": "FULL_orig_Patient003_rank-interventions",
+  "stack": "full",
+  "swap": {},
+  "query": "!(rank-interventions-for-patient &self Patient003 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)"
+ },
+ {
+  "name": "FULL_mb_Patient003_rank-interventions",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Patient003 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)"
+ },
+ {
+  "name": "FULL_orig_Patient003_recommend-suppleme",
+  "stack": "full",
+  "swap": {},
+  "query": "!(recommend-supplements-patient &self Patient003)"
+ },
+ {
+  "name": "FULL_mb_Patient003_recommend-suppleme",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Patient003)"
+ },
+ {
+  "name": "FULL_orig_Patient001_counterfactual-pat",
+  "stack": "full",
+  "swap": {},
+  "query": "!(counterfactual-patient &self Patient001 CellularSenescence)"
+ },
+ {
+  "name": "FULL_mb_Patient001_counterfactual-pat",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(counterfactual-patient &self Patient001 CellularSenescence)"
+ },
+ {
+  "name": "FULL_orig_Patient001_decompose-grimage ",
+  "stack": "full",
+  "swap": {},
+  "query": "!(decompose-grimage &self Patient001)"
+ },
+ {
+  "name": "FULL_mb_Patient001_decompose-grimage ",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(decompose-grimage &self Patient001)"
+ },
+ {
+  "name": "FULLABORT_mb_Patient001_rank-interventions",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Patient001 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)"
+ },
+ {
+  "name": "FULLABORT_mb_Patient001_recommend-suppleme",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Patient001)"
+ },
+ {
+  "name": "FULLABORT_mb_Patient002_recommend-suppleme",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Patient002)"
+ },
+ {
+  "name": "GEN_orig_0",
+  "stack": "full",
+  "swap": {},
+  "query": "!(infer &self Metformin CoronaryHeartDisease)"
+ },
+ {
+  "name": "GEN_mb_0",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(infer &self Metformin CoronaryHeartDisease)"
+ },
+ {
+  "name": "GEN_orig_1",
+  "stack": "full",
+  "swap": {},
+  "query": "!(rank-interventions &self (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)"
+ },
+ {
+  "name": "GEN_mb_1",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(rank-interventions &self (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)"
+ },
+ {
+  "name": "GEN_orig_2",
+  "stack": "full",
+  "swap": {},
+  "query": "!(diagnose &self (CellularSenescence ChronicInflammation MitochondrialDysfunction) (DNAmPAI1 DNAmGDF15 CRP))"
+ },
+ {
+  "name": "GEN_mb_2",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(diagnose &self (CellularSenescence ChronicInflammation MitochondrialDysfunction) (DNAmPAI1 DNAmGDF15 CRP))"
+ },
+ {
+  "name": "GEN_orig_3",
+  "stack": "full",
+  "swap": {},
+  "query": "!(infer &self Omega3 CRP)"
+ },
+ {
+  "name": "GEN_mb_3",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(infer &self Omega3 CRP)"
+ },
+ {
+  "name": "GEN_orig_4",
+  "stack": "full",
+  "swap": {},
+  "query": "!(match &self (Inheritance CoronaryHeartDisease $x) $x)"
+ },
+ {
+  "name": "GEN_mb_4",
+  "stack": "full",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(match &self (Inheritance CoronaryHeartDisease $x) $x)"
+ },
+ {
+  "name": "PAT_orig_Patient001_diagnose-patient &",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(diagnose-patient &self Patient001 (CellularSenescence ChronicInflammation InsulinResistance))"
+ },
+ {
+  "name": "PAT_mb_Patient001_diagnose-patient &",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(diagnose-patient &self Patient001 (CellularSenescence ChronicInflammation InsulinResistance))"
+ },
+ {
+  "name": "PAT_orig_Patient001_rank-interventions",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(rank-interventions-for-patient &self Patient001 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)"
+ },
+ {
+  "name": "PAT_mb_Patient001_rank-interventions",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Patient001 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)"
+ },
+ {
+  "name": "PAT_orig_Patient001_recommend-suppleme",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(recommend-supplements-patient &self Patient001)"
+ },
+ {
+  "name": "PAT_mb_Patient001_recommend-suppleme",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Patient001)"
+ },
+ {
+  "name": "PAT_orig_Patient002_recommend-suppleme",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(recommend-supplements-patient &self Patient002)"
+ },
+ {
+  "name": "PAT_mb_Patient002_recommend-suppleme",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Patient002)"
+ },
+ {
+  "name": "PAT_orig_Patient003_rank-interventions",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(rank-interventions-for-patient &self Patient003 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)"
+ },
+ {
+  "name": "PAT_mb_Patient003_rank-interventions",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Patient003 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)"
+ },
+ {
+  "name": "L2_orig_smoker_decomp",
+  "stack": "linage2",
+  "swap": {},
+  "query": "!(linage-decomposition-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me LinAgeAccel 1.53324)\n(LinAgeDelta Caller_Me 13.277851)\n(LinAgeContribution Caller_Me ALT 0.025444 Imputed)\n(LinAgeContribution Caller_Me AST -0.017492 Imputed)\n(LinAgeContribution Caller_Me AlkalinePhosphatase -0.031974 Imputed)\n(LinAgeContribution Caller_Me BasophilCount -0.001593 Imputed)\n(LinAgeContribution Caller_Me BasophilPercent -0.150228 Imputed)\n(LinAgeContribution Caller_Me Bicarbonate -0.001322 Imputed)\n(LinAgeContribution Caller_Me BloodUreaNitrogen -0.000862 Imputed)\n(LinAgeContribution Caller_Me BodyMassIndex -0.221252 Measured)\n(LinAgeContribution Caller_Me CRP -0.004246 Measured)\n(LinAgeContribution Caller_Me CalculatedLDL 0.083134 Measured)\n(LinAgeContribution Caller_Me ComorbidityScore -0.001925 Measured)\n(LinAgeContribution Caller_Me DiastolicBloodPressure -0.840857 Measured)\n(LinAgeContribution Caller_Me EosinophilCount 0.022754 Imputed)\n(LinAgeContribution Caller_Me EosinophilPercent 0.032897 Imputed)\n(LinAgeContribution Caller_Me Ferritin -0.052742 Imputed)\n(LinAgeContribution Caller_Me Globulin -0.025557 Imputed)\n(LinAgeContribution Caller_Me HbA1c 0.931633 Measured)\n(LinAgeContribution Caller_Me HealthcareUseScore 0.178013 Imputed)\n(LinAgeContribution Caller_Me Hematocrit 0.010699 Imputed)\n(LinAgeContribution Caller_Me Hemoglobin -0.015590 Imputed)\n(LinAgeContribution Caller_Me LactateDehydrogenase 0.153734 Imputed)\n(LinAgeContribution Caller_Me LymphocyteCount -0.007191 Imputed)\n(LinAgeContribution Caller_Me LymphocytePercent -0.009594 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularHemoglobin 0.048130 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularHemoglobinConcentration -0.049270 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularVolume 0.103449 Imputed)\n(LinAgeContribution Caller_Me MeanPlateletVolume 0.027217 Imputed)\n(LinAgeContribution Caller_Me MonocyteCount 0.039894 Imputed)\n(LinAgeContribution Caller_Me MonocytePercent 0.029115 Imputed)\n(LinAgeContribution Caller_Me NTproBNP -0.246287 Imputed)\n(LinAgeContribution Caller_Me NeutrophilCount -0.166488 Imputed)\n(LinAgeContribution Caller_Me NeutrophilPercent -0.005513 Imputed)\n(LinAgeContribution Caller_Me PlateletCount 0.036679 Imputed)\n(LinAgeContribution Caller_Me PulseRate 0.375691 Measured)\n(LinAgeContribution Caller_Me RedBloodCellCount -0.027387 Imputed)\n(LinAgeContribution Caller_Me RedCellDistributionWidth 2.553143 Measured)\n(LinAgeContribution Caller_Me SelfRatedHealthScore 1.182356 Measured)\n(LinAgeContribution Caller_Me SerumAlbumin 2.358947 Measured)\n(LinAgeContribution Caller_Me SerumCalcium -0.039237 Imputed)\n(LinAgeContribution Caller_Me SerumChloride -0.220241 Imputed)\n(LinAgeContribution Caller_Me SerumCotinine 7.532759 Measured)\n(LinAgeContribution Caller_Me SerumCreatinine 0.138082 Measured)\n(LinAgeContribution Caller_Me SerumFolate 0.071126 Imputed)\n(LinAgeContribution Caller_Me SerumGlucose -0.356882 Measured)\n(LinAgeContribution Caller_Me SerumIron 0.030407 Imputed)\n(LinAgeContribution Caller_Me SerumPhosphorus -0.006669 Imputed)\n(LinAgeContribution Caller_Me SerumPotassium 0.056190 Imputed)\n(LinAgeContribution Caller_Me SerumSodium -0.171631 Imputed)\n(LinAgeContribution Caller_Me SystolicBloodPressure 0.520060 Measured)\n(LinAgeContribution Caller_Me TotalBilirubin -0.028649 Imputed)\n(LinAgeContribution Caller_Me TotalIronBindingCapacity -0.089291 Imputed)\n(LinAgeContribution Caller_Me TotalProtein -0.010302 Imputed)\n(LinAgeContribution Caller_Me TransferrinSaturation -0.051681 Imputed)\n(LinAgeContribution Caller_Me UricAcid 0.023511 Imputed)\n(LinAgeContribution Caller_Me UrineAlbumin -0.967363 Imputed)\n(LinAgeContribution Caller_Me UrineAlbuminCreatinineRatio -0.149319 Imputed)\n(LinAgeContribution Caller_Me UrineCreatinine 0.014164 Imputed)\n(LinAgeContribution Caller_Me VitaminB12 0.006621 Imputed)\n(LinAgeContribution Caller_Me WhiteBloodCellCount 0.164814 Measured)"
+ },
+ {
+  "name": "L2_mb_smoker_decomp",
+  "stack": "linage2",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(linage-decomposition-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me LinAgeAccel 1.53324)\n(LinAgeDelta Caller_Me 13.277851)\n(LinAgeContribution Caller_Me ALT 0.025444 Imputed)\n(LinAgeContribution Caller_Me AST -0.017492 Imputed)\n(LinAgeContribution Caller_Me AlkalinePhosphatase -0.031974 Imputed)\n(LinAgeContribution Caller_Me BasophilCount -0.001593 Imputed)\n(LinAgeContribution Caller_Me BasophilPercent -0.150228 Imputed)\n(LinAgeContribution Caller_Me Bicarbonate -0.001322 Imputed)\n(LinAgeContribution Caller_Me BloodUreaNitrogen -0.000862 Imputed)\n(LinAgeContribution Caller_Me BodyMassIndex -0.221252 Measured)\n(LinAgeContribution Caller_Me CRP -0.004246 Measured)\n(LinAgeContribution Caller_Me CalculatedLDL 0.083134 Measured)\n(LinAgeContribution Caller_Me ComorbidityScore -0.001925 Measured)\n(LinAgeContribution Caller_Me DiastolicBloodPressure -0.840857 Measured)\n(LinAgeContribution Caller_Me EosinophilCount 0.022754 Imputed)\n(LinAgeContribution Caller_Me EosinophilPercent 0.032897 Imputed)\n(LinAgeContribution Caller_Me Ferritin -0.052742 Imputed)\n(LinAgeContribution Caller_Me Globulin -0.025557 Imputed)\n(LinAgeContribution Caller_Me HbA1c 0.931633 Measured)\n(LinAgeContribution Caller_Me HealthcareUseScore 0.178013 Imputed)\n(LinAgeContribution Caller_Me Hematocrit 0.010699 Imputed)\n(LinAgeContribution Caller_Me Hemoglobin -0.015590 Imputed)\n(LinAgeContribution Caller_Me LactateDehydrogenase 0.153734 Imputed)\n(LinAgeContribution Caller_Me LymphocyteCount -0.007191 Imputed)\n(LinAgeContribution Caller_Me LymphocytePercent -0.009594 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularHemoglobin 0.048130 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularHemoglobinConcentration -0.049270 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularVolume 0.103449 Imputed)\n(LinAgeContribution Caller_Me MeanPlateletVolume 0.027217 Imputed)\n(LinAgeContribution Caller_Me MonocyteCount 0.039894 Imputed)\n(LinAgeContribution Caller_Me MonocytePercent 0.029115 Imputed)\n(LinAgeContribution Caller_Me NTproBNP -0.246287 Imputed)\n(LinAgeContribution Caller_Me NeutrophilCount -0.166488 Imputed)\n(LinAgeContribution Caller_Me NeutrophilPercent -0.005513 Imputed)\n(LinAgeContribution Caller_Me PlateletCount 0.036679 Imputed)\n(LinAgeContribution Caller_Me PulseRate 0.375691 Measured)\n(LinAgeContribution Caller_Me RedBloodCellCount -0.027387 Imputed)\n(LinAgeContribution Caller_Me RedCellDistributionWidth 2.553143 Measured)\n(LinAgeContribution Caller_Me SelfRatedHealthScore 1.182356 Measured)\n(LinAgeContribution Caller_Me SerumAlbumin 2.358947 Measured)\n(LinAgeContribution Caller_Me SerumCalcium -0.039237 Imputed)\n(LinAgeContribution Caller_Me SerumChloride -0.220241 Imputed)\n(LinAgeContribution Caller_Me SerumCotinine 7.532759 Measured)\n(LinAgeContribution Caller_Me SerumCreatinine 0.138082 Measured)\n(LinAgeContribution Caller_Me SerumFolate 0.071126 Imputed)\n(LinAgeContribution Caller_Me SerumGlucose -0.356882 Measured)\n(LinAgeContribution Caller_Me SerumIron 0.030407 Imputed)\n(LinAgeContribution Caller_Me SerumPhosphorus -0.006669 Imputed)\n(LinAgeContribution Caller_Me SerumPotassium 0.056190 Imputed)\n(LinAgeContribution Caller_Me SerumSodium -0.171631 Imputed)\n(LinAgeContribution Caller_Me SystolicBloodPressure 0.520060 Measured)\n(LinAgeContribution Caller_Me TotalBilirubin -0.028649 Imputed)\n(LinAgeContribution Caller_Me TotalIronBindingCapacity -0.089291 Imputed)\n(LinAgeContribution Caller_Me TotalProtein -0.010302 Imputed)\n(LinAgeContribution Caller_Me TransferrinSaturation -0.051681 Imputed)\n(LinAgeContribution Caller_Me UricAcid 0.023511 Imputed)\n(LinAgeContribution Caller_Me UrineAlbumin -0.967363 Imputed)\n(LinAgeContribution Caller_Me UrineAlbuminCreatinineRatio -0.149319 Imputed)\n(LinAgeContribution Caller_Me UrineCreatinine 0.014164 Imputed)\n(LinAgeContribution Caller_Me VitaminB12 0.006621 Imputed)\n(LinAgeContribution Caller_Me WhiteBloodCellCount 0.164814 Measured)"
+ }
+]

@@ -1,0 +1,211 @@
+[
+ {
+  "name": "D_smoker_base_dx",
+  "stack": "patient",
+  "query": "!(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation MitochondrialDysfunction InsulinResistance DeregulatedNutrientSensing SmokingPackYears))",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)"
+ },
+ {
+  "name": "D_smoker_wit_mb_dx",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation MitochondrialDysfunction InsulinResistance DeregulatedNutrientSensing SmokingPackYears))",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me RedCellDistributionWidth 2.698)\n(MeasuredZ Caller_Me Hypoalbuminemia 1.686)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.73)\n(MeasuredZ Caller_Me Triglycerides 0.81)"
+ },
+ {
+  "name": "D_smoker_wit_both_dx",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta",
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation MitochondrialDysfunction InsulinResistance DeregulatedNutrientSensing SmokingPackYears))",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me RedCellDistributionWidth 2.698)\n(MeasuredZ Caller_Me Hypoalbuminemia 1.686)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.73)\n(MeasuredZ Caller_Me Triglycerides 0.81)"
+ },
+ {
+  "name": "D_smoker_wit_both_pad_dx",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta",
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation MitochondrialDysfunction InsulinResistance DeregulatedNutrientSensing SmokingPackYears))",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me RedCellDistributionWidth 2.698)\n(MeasuredZ Caller_Me Hypoalbuminemia 1.686)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.73)\n(MeasuredZ Caller_Me Triglycerides 0.81)\n(ProbeHead0 ProbeSym0 \"probe 0\")\n(ProbeHead1 ProbeSym1 \"probe 1\")\n(ProbeHead2 ProbeSym2 \"probe 2\")\n(ProbeHead3 ProbeSym3 \"probe 3\")\n(ProbeHead4 ProbeSym4 \"probe 4\")\n(ProbeHead5 ProbeSym5 \"probe 5\")\n(ProbeHead6 ProbeSym6 \"probe 6\")\n(ProbeHead7 ProbeSym7 \"probe 7\")\n(ProbeHead8 ProbeSym8 \"probe 8\")\n(ProbeHead9 ProbeSym9 \"probe 9\")\n(ProbeHead10 ProbeSym10 \"probe 10\")\n(ProbeHead11 ProbeSym11 \"probe 11\")\n(ProbeHead12 ProbeSym12 \"probe 12\")\n(ProbeHead13 ProbeSym13 \"probe 13\")\n(ProbeHead14 ProbeSym14 \"probe 14\")\n(ProbeHead15 ProbeSym15 \"probe 15\")\n(ProbeHead16 ProbeSym16 \"probe 16\")\n(ProbeHead17 ProbeSym17 \"probe 17\")\n(ProbeHead18 ProbeSym18 \"probe 18\")\n(ProbeHead19 ProbeSym19 \"probe 19\")\n(ProbeHead20 ProbeSym20 \"probe 20\")\n(ProbeHead21 ProbeSym21 \"probe 21\")\n(ProbeHead22 ProbeSym22 \"probe 22\")\n(ProbeHead23 ProbeSym23 \"probe 23\")\n(ProbeHead24 ProbeSym24 \"probe 24\")\n(ProbeHead25 ProbeSym25 \"probe 25\")\n(ProbeHead26 ProbeSym26 \"probe 26\")\n(ProbeHead27 ProbeSym27 \"probe 27\")\n(ProbeHead28 ProbeSym28 \"probe 28\")\n(ProbeHead29 ProbeSym29 \"probe 29\")\n(ProbeHead30 ProbeSym30 \"probe 30\")\n(ProbeHead31 ProbeSym31 \"probe 31\")"
+ },
+ {
+  "name": "D_six_base_dx",
+  "stack": "patient",
+  "query": "!(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation MitochondrialDysfunction InsulinResistance DeregulatedNutrientSensing SmokingPackYears))",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 66)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me FormerSmoker)\n(MeasuredZ Caller_Me CRP 1.17865)\n(MeasuredZ Caller_Me HbA1c 3.2)"
+ },
+ {
+  "name": "D_six_alb_both_dx",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta",
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation MitochondrialDysfunction InsulinResistance DeregulatedNutrientSensing SmokingPackYears))",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 66)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me FormerSmoker)\n(MeasuredZ Caller_Me CRP 1.17865)\n(MeasuredZ Caller_Me HbA1c 3.2)\n(MeasuredZ Caller_Me Hypoalbuminemia 2.698)"
+ },
+ {
+  "name": "D_smoker_base_supp",
+  "stack": "patient",
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)"
+ },
+ {
+  "name": "D_smoker_wit_mb_supp",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me RedCellDistributionWidth 2.698)\n(MeasuredZ Caller_Me Hypoalbuminemia 1.686)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.73)\n(MeasuredZ Caller_Me Triglycerides 0.81)"
+ },
+ {
+  "name": "D_smoker_wit_both_supp",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta",
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me RedCellDistributionWidth 2.698)\n(MeasuredZ Caller_Me Hypoalbuminemia 1.686)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.73)\n(MeasuredZ Caller_Me Triglycerides 0.81)"
+ },
+ {
+  "name": "D_smoker_wit_both_pad_supp",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta",
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me RedCellDistributionWidth 2.698)\n(MeasuredZ Caller_Me Hypoalbuminemia 1.686)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.73)\n(MeasuredZ Caller_Me Triglycerides 0.81)\n(ProbeHead0 ProbeSym0 \"probe 0\")\n(ProbeHead1 ProbeSym1 \"probe 1\")\n(ProbeHead2 ProbeSym2 \"probe 2\")\n(ProbeHead3 ProbeSym3 \"probe 3\")\n(ProbeHead4 ProbeSym4 \"probe 4\")\n(ProbeHead5 ProbeSym5 \"probe 5\")\n(ProbeHead6 ProbeSym6 \"probe 6\")\n(ProbeHead7 ProbeSym7 \"probe 7\")\n(ProbeHead8 ProbeSym8 \"probe 8\")\n(ProbeHead9 ProbeSym9 \"probe 9\")\n(ProbeHead10 ProbeSym10 \"probe 10\")\n(ProbeHead11 ProbeSym11 \"probe 11\")\n(ProbeHead12 ProbeSym12 \"probe 12\")\n(ProbeHead13 ProbeSym13 \"probe 13\")\n(ProbeHead14 ProbeSym14 \"probe 14\")\n(ProbeHead15 ProbeSym15 \"probe 15\")\n(ProbeHead16 ProbeSym16 \"probe 16\")\n(ProbeHead17 ProbeSym17 \"probe 17\")\n(ProbeHead18 ProbeSym18 \"probe 18\")\n(ProbeHead19 ProbeSym19 \"probe 19\")\n(ProbeHead20 ProbeSym20 \"probe 20\")\n(ProbeHead21 ProbeSym21 \"probe 21\")\n(ProbeHead22 ProbeSym22 \"probe 22\")\n(ProbeHead23 ProbeSym23 \"probe 23\")\n(ProbeHead24 ProbeSym24 \"probe 24\")\n(ProbeHead25 ProbeSym25 \"probe 25\")\n(ProbeHead26 ProbeSym26 \"probe 26\")\n(ProbeHead27 ProbeSym27 \"probe 27\")\n(ProbeHead28 ProbeSym28 \"probe 28\")\n(ProbeHead29 ProbeSym29 \"probe 29\")\n(ProbeHead30 ProbeSym30 \"probe 30\")\n(ProbeHead31 ProbeSym31 \"probe 31\")"
+ },
+ {
+  "name": "D_six_base_supp",
+  "stack": "patient",
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 66)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me FormerSmoker)\n(MeasuredZ Caller_Me CRP 1.17865)\n(MeasuredZ Caller_Me HbA1c 3.2)"
+ },
+ {
+  "name": "D_six_alb_both_supp",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta",
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(recommend-supplements-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 66)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me FormerSmoker)\n(MeasuredZ Caller_Me CRP 1.17865)\n(MeasuredZ Caller_Me HbA1c 3.2)\n(MeasuredZ Caller_Me Hypoalbuminemia 2.698)"
+ },
+ {
+  "name": "D_smoker_base_rank",
+  "stack": "patient",
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine Omega3 Fisetin DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)"
+ },
+ {
+  "name": "D_smoker_wit_mb_rank",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine Omega3 Fisetin DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me RedCellDistributionWidth 2.698)\n(MeasuredZ Caller_Me Hypoalbuminemia 1.686)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.73)\n(MeasuredZ Caller_Me Triglycerides 0.81)"
+ },
+ {
+  "name": "D_smoker_wit_both_rank",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta",
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine Omega3 Fisetin DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me RedCellDistributionWidth 2.698)\n(MeasuredZ Caller_Me Hypoalbuminemia 1.686)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.73)\n(MeasuredZ Caller_Me Triglycerides 0.81)"
+ },
+ {
+  "name": "D_smoker_wit_both_pad_rank",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta",
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine Omega3 Fisetin DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me RedCellDistributionWidth 2.698)\n(MeasuredZ Caller_Me Hypoalbuminemia 1.686)\n(MeasuredZ Caller_Me WhiteBloodCellCount 0.73)\n(MeasuredZ Caller_Me Triglycerides 0.81)\n(ProbeHead0 ProbeSym0 \"probe 0\")\n(ProbeHead1 ProbeSym1 \"probe 1\")\n(ProbeHead2 ProbeSym2 \"probe 2\")\n(ProbeHead3 ProbeSym3 \"probe 3\")\n(ProbeHead4 ProbeSym4 \"probe 4\")\n(ProbeHead5 ProbeSym5 \"probe 5\")\n(ProbeHead6 ProbeSym6 \"probe 6\")\n(ProbeHead7 ProbeSym7 \"probe 7\")\n(ProbeHead8 ProbeSym8 \"probe 8\")\n(ProbeHead9 ProbeSym9 \"probe 9\")\n(ProbeHead10 ProbeSym10 \"probe 10\")\n(ProbeHead11 ProbeSym11 \"probe 11\")\n(ProbeHead12 ProbeSym12 \"probe 12\")\n(ProbeHead13 ProbeSym13 \"probe 13\")\n(ProbeHead14 ProbeSym14 \"probe 14\")\n(ProbeHead15 ProbeSym15 \"probe 15\")\n(ProbeHead16 ProbeSym16 \"probe 16\")\n(ProbeHead17 ProbeSym17 \"probe 17\")\n(ProbeHead18 ProbeSym18 \"probe 18\")\n(ProbeHead19 ProbeSym19 \"probe 19\")\n(ProbeHead20 ProbeSym20 \"probe 20\")\n(ProbeHead21 ProbeSym21 \"probe 21\")\n(ProbeHead22 ProbeSym22 \"probe 22\")\n(ProbeHead23 ProbeSym23 \"probe 23\")\n(ProbeHead24 ProbeSym24 \"probe 24\")\n(ProbeHead25 ProbeSym25 \"probe 25\")\n(ProbeHead26 ProbeSym26 \"probe 26\")\n(ProbeHead27 ProbeSym27 \"probe 27\")\n(ProbeHead28 ProbeSym28 \"probe 28\")\n(ProbeHead29 ProbeSym29 \"probe 29\")\n(ProbeHead30 ProbeSym30 \"probe 30\")\n(ProbeHead31 ProbeSym31 \"probe 31\")"
+ },
+ {
+  "name": "D_six_base_rank",
+  "stack": "patient",
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine Omega3 Fisetin DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 66)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me FormerSmoker)\n(MeasuredZ Caller_Me CRP 1.17865)\n(MeasuredZ Caller_Me HbA1c 3.2)"
+ },
+ {
+  "name": "D_six_alb_both_rank",
+  "stack": "patient",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta",
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(rank-interventions-for-patient &self Caller_Me (Metformin Berberine Omega3 Fisetin DasatinibPlusQuercetin) CoronaryHeartDisease)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 66)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me FormerSmoker)\n(MeasuredZ Caller_Me CRP 1.17865)\n(MeasuredZ Caller_Me HbA1c 3.2)\n(MeasuredZ Caller_Me Hypoalbuminemia 2.698)"
+ },
+ {
+  "name": "DEDUP_orig_markers",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(patient-markers &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(MeasuredZ Caller_Me CRP 1.5)\n(MeasuredRaw Caller_Me CRP 3.0)\n(MeasuredZ Caller_Me HbA1c 2.0)"
+ },
+ {
+  "name": "DEDUP_orig_dx",
+  "stack": "patient",
+  "swap": {},
+  "query": "!(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation MitochondrialDysfunction InsulinResistance DeregulatedNutrientSensing SmokingPackYears))",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(MeasuredZ Caller_Me CRP 1.5)\n(MeasuredRaw Caller_Me CRP 3.0)\n(MeasuredZ Caller_Me HbA1c 2.0)"
+ },
+ {
+  "name": "DEDUP_ua_markers",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(patient-markers &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(MeasuredZ Caller_Me CRP 1.5)\n(MeasuredRaw Caller_Me CRP 3.0)\n(MeasuredZ Caller_Me HbA1c 2.0)"
+ },
+ {
+  "name": "DEDUP_ua_dx",
+  "stack": "patient",
+  "swap": {
+   "patient_profile.metta": "pp_ua.metta"
+  },
+  "query": "!(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation MitochondrialDysfunction InsulinResistance DeregulatedNutrientSensing SmokingPackYears))",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(MeasuredZ Caller_Me CRP 1.5)\n(MeasuredRaw Caller_Me CRP 3.0)\n(MeasuredZ Caller_Me HbA1c 2.0)"
+ },
+ {
+  "name": "L2_smoker_base_scen",
+  "stack": "linage2",
+  "query": "!(linage-scenarios-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me LinAgeAccel 1.53324)\n(LinAgeDelta Caller_Me 13.277851)\n(LinAgeContribution Caller_Me ALT 0.025444 Imputed)\n(LinAgeContribution Caller_Me AST -0.017492 Imputed)\n(LinAgeContribution Caller_Me AlkalinePhosphatase -0.031974 Imputed)\n(LinAgeContribution Caller_Me BasophilCount -0.001593 Imputed)\n(LinAgeContribution Caller_Me BasophilPercent -0.150228 Imputed)\n(LinAgeContribution Caller_Me Bicarbonate -0.001322 Imputed)\n(LinAgeContribution Caller_Me BloodUreaNitrogen -0.000862 Imputed)\n(LinAgeContribution Caller_Me BodyMassIndex -0.221252 Measured)\n(LinAgeContribution Caller_Me CRP -0.004246 Measured)\n(LinAgeContribution Caller_Me CalculatedLDL 0.083134 Measured)\n(LinAgeContribution Caller_Me ComorbidityScore -0.001925 Measured)\n(LinAgeContribution Caller_Me DiastolicBloodPressure -0.840857 Measured)\n(LinAgeContribution Caller_Me EosinophilCount 0.022754 Imputed)\n(LinAgeContribution Caller_Me EosinophilPercent 0.032897 Imputed)\n(LinAgeContribution Caller_Me Ferritin -0.052742 Imputed)\n(LinAgeContribution Caller_Me Globulin -0.025557 Imputed)\n(LinAgeContribution Caller_Me HbA1c 0.931633 Measured)\n(LinAgeContribution Caller_Me HealthcareUseScore 0.178013 Imputed)\n(LinAgeContribution Caller_Me Hematocrit 0.010699 Imputed)\n(LinAgeContribution Caller_Me Hemoglobin -0.015590 Imputed)\n(LinAgeContribution Caller_Me LactateDehydrogenase 0.153734 Imputed)\n(LinAgeContribution Caller_Me LymphocyteCount -0.007191 Imputed)\n(LinAgeContribution Caller_Me LymphocytePercent -0.009594 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularHemoglobin 0.048130 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularHemoglobinConcentration -0.049270 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularVolume 0.103449 Imputed)\n(LinAgeContribution Caller_Me MeanPlateletVolume 0.027217 Imputed)\n(LinAgeContribution Caller_Me MonocyteCount 0.039894 Imputed)\n(LinAgeContribution Caller_Me MonocytePercent 0.029115 Imputed)\n(LinAgeContribution Caller_Me NTproBNP -0.246287 Imputed)\n(LinAgeContribution Caller_Me NeutrophilCount -0.166488 Imputed)\n(LinAgeContribution Caller_Me NeutrophilPercent -0.005513 Imputed)\n(LinAgeContribution Caller_Me PlateletCount 0.036679 Imputed)\n(LinAgeContribution Caller_Me PulseRate 0.375691 Measured)\n(LinAgeContribution Caller_Me RedBloodCellCount -0.027387 Imputed)\n(LinAgeContribution Caller_Me RedCellDistributionWidth 2.553143 Measured)\n(LinAgeContribution Caller_Me SelfRatedHealthScore 1.182356 Measured)\n(LinAgeContribution Caller_Me SerumAlbumin 2.358947 Measured)\n(LinAgeContribution Caller_Me SerumCalcium -0.039237 Imputed)\n(LinAgeContribution Caller_Me SerumChloride -0.220241 Imputed)\n(LinAgeContribution Caller_Me SerumCotinine 7.532759 Measured)\n(LinAgeContribution Caller_Me SerumCreatinine 0.138082 Measured)\n(LinAgeContribution Caller_Me SerumFolate 0.071126 Imputed)\n(LinAgeContribution Caller_Me SerumGlucose -0.356882 Measured)\n(LinAgeContribution Caller_Me SerumIron 0.030407 Imputed)\n(LinAgeContribution Caller_Me SerumPhosphorus -0.006669 Imputed)\n(LinAgeContribution Caller_Me SerumPotassium 0.056190 Imputed)\n(LinAgeContribution Caller_Me SerumSodium -0.171631 Imputed)\n(LinAgeContribution Caller_Me SystolicBloodPressure 0.520060 Measured)\n(LinAgeContribution Caller_Me TotalBilirubin -0.028649 Imputed)\n(LinAgeContribution Caller_Me TotalIronBindingCapacity -0.089291 Imputed)\n(LinAgeContribution Caller_Me TotalProtein -0.010302 Imputed)\n(LinAgeContribution Caller_Me TransferrinSaturation -0.051681 Imputed)\n(LinAgeContribution Caller_Me UricAcid 0.023511 Imputed)\n(LinAgeContribution Caller_Me UrineAlbumin -0.967363 Imputed)\n(LinAgeContribution Caller_Me UrineAlbuminCreatinineRatio -0.149319 Imputed)\n(LinAgeContribution Caller_Me UrineCreatinine 0.014164 Imputed)\n(LinAgeContribution Caller_Me VitaminB12 0.006621 Imputed)\n(LinAgeContribution Caller_Me WhiteBloodCellCount 0.164814 Measured)"
+ },
+ {
+  "name": "L2_smoker_bridged_scen",
+  "stack": "linage2",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(linage-scenarios-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me LinAgeAccel 1.53324)\n(LinAgeDelta Caller_Me 13.277851)\n(LinAgeContribution Caller_Me ALT 0.025444 Imputed)\n(LinAgeContribution Caller_Me AST -0.017492 Imputed)\n(LinAgeContribution Caller_Me AlkalinePhosphatase -0.031974 Imputed)\n(LinAgeContribution Caller_Me BasophilCount -0.001593 Imputed)\n(LinAgeContribution Caller_Me BasophilPercent -0.150228 Imputed)\n(LinAgeContribution Caller_Me Bicarbonate -0.001322 Imputed)\n(LinAgeContribution Caller_Me BloodUreaNitrogen -0.000862 Imputed)\n(LinAgeContribution Caller_Me BodyMassIndex -0.221252 Measured)\n(LinAgeContribution Caller_Me CRP -0.004246 Measured)\n(LinAgeContribution Caller_Me CalculatedLDL 0.083134 Measured)\n(LinAgeContribution Caller_Me ComorbidityScore -0.001925 Measured)\n(LinAgeContribution Caller_Me DiastolicBloodPressure -0.840857 Measured)\n(LinAgeContribution Caller_Me EosinophilCount 0.022754 Imputed)\n(LinAgeContribution Caller_Me EosinophilPercent 0.032897 Imputed)\n(LinAgeContribution Caller_Me Ferritin -0.052742 Imputed)\n(LinAgeContribution Caller_Me Globulin -0.025557 Imputed)\n(LinAgeContribution Caller_Me HbA1c 0.931633 Measured)\n(LinAgeContribution Caller_Me HealthcareUseScore 0.178013 Imputed)\n(LinAgeContribution Caller_Me Hematocrit 0.010699 Imputed)\n(LinAgeContribution Caller_Me Hemoglobin -0.015590 Imputed)\n(LinAgeContribution Caller_Me LactateDehydrogenase 0.153734 Imputed)\n(LinAgeContribution Caller_Me LymphocyteCount -0.007191 Imputed)\n(LinAgeContribution Caller_Me LymphocytePercent -0.009594 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularHemoglobin 0.048130 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularHemoglobinConcentration -0.049270 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularVolume 0.103449 Imputed)\n(LinAgeContribution Caller_Me MeanPlateletVolume 0.027217 Imputed)\n(LinAgeContribution Caller_Me MonocyteCount 0.039894 Imputed)\n(LinAgeContribution Caller_Me MonocytePercent 0.029115 Imputed)\n(LinAgeContribution Caller_Me NTproBNP -0.246287 Imputed)\n(LinAgeContribution Caller_Me NeutrophilCount -0.166488 Imputed)\n(LinAgeContribution Caller_Me NeutrophilPercent -0.005513 Imputed)\n(LinAgeContribution Caller_Me PlateletCount 0.036679 Imputed)\n(LinAgeContribution Caller_Me PulseRate 0.375691 Measured)\n(LinAgeContribution Caller_Me RedBloodCellCount -0.027387 Imputed)\n(LinAgeContribution Caller_Me RedCellDistributionWidth 2.553143 Measured)\n(LinAgeContribution Caller_Me SelfRatedHealthScore 1.182356 Measured)\n(LinAgeContribution Caller_Me SerumAlbumin 2.358947 Measured)\n(LinAgeContribution Caller_Me SerumCalcium -0.039237 Imputed)\n(LinAgeContribution Caller_Me SerumChloride -0.220241 Imputed)\n(LinAgeContribution Caller_Me SerumCotinine 7.532759 Measured)\n(LinAgeContribution Caller_Me SerumCreatinine 0.138082 Measured)\n(LinAgeContribution Caller_Me SerumFolate 0.071126 Imputed)\n(LinAgeContribution Caller_Me SerumGlucose -0.356882 Measured)\n(LinAgeContribution Caller_Me SerumIron 0.030407 Imputed)\n(LinAgeContribution Caller_Me SerumPhosphorus -0.006669 Imputed)\n(LinAgeContribution Caller_Me SerumPotassium 0.056190 Imputed)\n(LinAgeContribution Caller_Me SerumSodium -0.171631 Imputed)\n(LinAgeContribution Caller_Me SystolicBloodPressure 0.520060 Measured)\n(LinAgeContribution Caller_Me TotalBilirubin -0.028649 Imputed)\n(LinAgeContribution Caller_Me TotalIronBindingCapacity -0.089291 Imputed)\n(LinAgeContribution Caller_Me TotalProtein -0.010302 Imputed)\n(LinAgeContribution Caller_Me TransferrinSaturation -0.051681 Imputed)\n(LinAgeContribution Caller_Me UricAcid 0.023511 Imputed)\n(LinAgeContribution Caller_Me UrineAlbumin -0.967363 Imputed)\n(LinAgeContribution Caller_Me UrineAlbuminCreatinineRatio -0.149319 Imputed)\n(LinAgeContribution Caller_Me UrineCreatinine 0.014164 Imputed)\n(LinAgeContribution Caller_Me VitaminB12 0.006621 Imputed)\n(LinAgeContribution Caller_Me WhiteBloodCellCount 0.164814 Measured)\n(MeasuresBiomarker RedCellDistributionWidth RedCellDistributionWidth)\n(MeasuresBiomarker SerumAlbumin Hypoalbuminemia)\n(MeasuredZ Caller_Me RedCellDistributionWidth 2.698)\n(MeasuredZ Caller_Me Hypoalbuminemia 1.686)"
+ },
+ {
+  "name": "L2_smoker_bridged_drivers",
+  "stack": "linage2",
+  "swap": {
+   "mechanistic_bridges.metta": "mb_all.metta"
+  },
+  "query": "!(linage-drivers-patient &self Caller_Me)",
+  "extra": "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)\n(MeasuredZ Caller_Me LinAgeAccel 1.53324)\n(LinAgeDelta Caller_Me 13.277851)\n(LinAgeContribution Caller_Me ALT 0.025444 Imputed)\n(LinAgeContribution Caller_Me AST -0.017492 Imputed)\n(LinAgeContribution Caller_Me AlkalinePhosphatase -0.031974 Imputed)\n(LinAgeContribution Caller_Me BasophilCount -0.001593 Imputed)\n(LinAgeContribution Caller_Me BasophilPercent -0.150228 Imputed)\n(LinAgeContribution Caller_Me Bicarbonate -0.001322 Imputed)\n(LinAgeContribution Caller_Me BloodUreaNitrogen -0.000862 Imputed)\n(LinAgeContribution Caller_Me BodyMassIndex -0.221252 Measured)\n(LinAgeContribution Caller_Me CRP -0.004246 Measured)\n(LinAgeContribution Caller_Me CalculatedLDL 0.083134 Measured)\n(LinAgeContribution Caller_Me ComorbidityScore -0.001925 Measured)\n(LinAgeContribution Caller_Me DiastolicBloodPressure -0.840857 Measured)\n(LinAgeContribution Caller_Me EosinophilCount 0.022754 Imputed)\n(LinAgeContribution Caller_Me EosinophilPercent 0.032897 Imputed)\n(LinAgeContribution Caller_Me Ferritin -0.052742 Imputed)\n(LinAgeContribution Caller_Me Globulin -0.025557 Imputed)\n(LinAgeContribution Caller_Me HbA1c 0.931633 Measured)\n(LinAgeContribution Caller_Me HealthcareUseScore 0.178013 Imputed)\n(LinAgeContribution Caller_Me Hematocrit 0.010699 Imputed)\n(LinAgeContribution Caller_Me Hemoglobin -0.015590 Imputed)\n(LinAgeContribution Caller_Me LactateDehydrogenase 0.153734 Imputed)\n(LinAgeContribution Caller_Me LymphocyteCount -0.007191 Imputed)\n(LinAgeContribution Caller_Me LymphocytePercent -0.009594 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularHemoglobin 0.048130 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularHemoglobinConcentration -0.049270 Imputed)\n(LinAgeContribution Caller_Me MeanCorpuscularVolume 0.103449 Imputed)\n(LinAgeContribution Caller_Me MeanPlateletVolume 0.027217 Imputed)\n(LinAgeContribution Caller_Me MonocyteCount 0.039894 Imputed)\n(LinAgeContribution Caller_Me MonocytePercent 0.029115 Imputed)\n(LinAgeContribution Caller_Me NTproBNP -0.246287 Imputed)\n(LinAgeContribution Caller_Me NeutrophilCount -0.166488 Imputed)\n(LinAgeContribution Caller_Me NeutrophilPercent -0.005513 Imputed)\n(LinAgeContribution Caller_Me PlateletCount 0.036679 Imputed)\n(LinAgeContribution Caller_Me PulseRate 0.375691 Measured)\n(LinAgeContribution Caller_Me RedBloodCellCount -0.027387 Imputed)\n(LinAgeContribution Caller_Me RedCellDistributionWidth 2.553143 Measured)\n(LinAgeContribution Caller_Me SelfRatedHealthScore 1.182356 Measured)\n(LinAgeContribution Caller_Me SerumAlbumin 2.358947 Measured)\n(LinAgeContribution Caller_Me SerumCalcium -0.039237 Imputed)\n(LinAgeContribution Caller_Me SerumChloride -0.220241 Imputed)\n(LinAgeContribution Caller_Me SerumCotinine 7.532759 Measured)\n(LinAgeContribution Caller_Me SerumCreatinine 0.138082 Measured)\n(LinAgeContribution Caller_Me SerumFolate 0.071126 Imputed)\n(LinAgeContribution Caller_Me SerumGlucose -0.356882 Measured)\n(LinAgeContribution Caller_Me SerumIron 0.030407 Imputed)\n(LinAgeContribution Caller_Me SerumPhosphorus -0.006669 Imputed)\n(LinAgeContribution Caller_Me SerumPotassium 0.056190 Imputed)\n(LinAgeContribution Caller_Me SerumSodium -0.171631 Imputed)\n(LinAgeContribution Caller_Me SystolicBloodPressure 0.520060 Measured)\n(LinAgeContribution Caller_Me TotalBilirubin -0.028649 Imputed)\n(LinAgeContribution Caller_Me TotalIronBindingCapacity -0.089291 Imputed)\n(LinAgeContribution Caller_Me TotalProtein -0.010302 Imputed)\n(LinAgeContribution Caller_Me TransferrinSaturation -0.051681 Imputed)\n(LinAgeContribution Caller_Me UricAcid 0.023511 Imputed)\n(LinAgeContribution Caller_Me UrineAlbumin -0.967363 Imputed)\n(LinAgeContribution Caller_Me UrineAlbuminCreatinineRatio -0.149319 Imputed)\n(LinAgeContribution Caller_Me UrineCreatinine 0.014164 Imputed)\n(LinAgeContribution Caller_Me VitaminB12 0.006621 Imputed)\n(LinAgeContribution Caller_Me WhiteBloodCellCount 0.164814 Measured)\n(MeasuresBiomarker RedCellDistributionWidth RedCellDistributionWidth)\n(MeasuresBiomarker SerumAlbumin Hypoalbuminemia)\n(MeasuredZ Caller_Me RedCellDistributionWidth 2.698)\n(MeasuredZ Caller_Me Hypoalbuminemia 1.686)"
+ }
+]

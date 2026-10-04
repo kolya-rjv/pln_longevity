@@ -1,0 +1,252 @@
+[
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis InsulinResistance (stv 0.8 0.8775) 2.0 0.975 (SupportedBy (HbA1c FastingGlucose))) (Hypothesis DeregulatedNutrientSensing (stv 0.6400000000000001 0.6159099375) 2.0 0.45630000000000004 (SupportedBy (HbA1c FastingGlucose))))"
+  ],
+  "secs": 1.06,
+  "rc": 0,
+  "name": "D_smoker_base_dx",
+  "wall": 2.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis InsulinResistance (stv 0.8 0.8775) 2.0 0.975 (SupportedBy (HbA1c FastingGlucose))) (Hypothesis ChronicInflammation (stv 0.5 0.84) 2.0 0.6 (SupportedBy (Hypoalbuminemia RedCellDistributionWidth))) (Hypothesis DeregulatedNutrientSensing (stv 0.6400000000000001 0.6159099375) 2.0 0.45630000000000004 (SupportedBy (HbA1c FastingGlucose))) (Hypothesis CellularSenescence (stv 0.36124999999999996 0.368507537775) 2.0 0.1483545375 (SupportedBy (Hypoalbuminemia RedCellDistributionWidth))))"
+  ],
+  "secs": 3.2,
+  "rc": 0,
+  "name": "D_smoker_wit_mb_dx",
+  "wall": 4.1
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis InsulinResistance (stv 0.8 0.8775) 2.0 0.975 (SupportedBy (HbA1c FastingGlucose))) (Hypothesis ChronicInflammation (stv 0.5 0.84) 2.0 0.6 (SupportedBy (Hypoalbuminemia RedCellDistributionWidth))) (Hypothesis DeregulatedNutrientSensing (stv 0.6400000000000001 0.6159099375) 2.0 0.45630000000000004 (SupportedBy (HbA1c FastingGlucose))) (Hypothesis CellularSenescence (stv 0.36124999999999996 0.368507537775) 2.0 0.1483545375 (SupportedBy (Hypoalbuminemia RedCellDistributionWidth))))"
+  ],
+  "secs": 2.13,
+  "rc": 0,
+  "name": "D_smoker_wit_both_dx",
+  "wall": 3.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis InsulinResistance (stv 0.8 0.8775) 2.0 0.975 (SupportedBy (HbA1c FastingGlucose))) (Hypothesis ChronicInflammation (stv 0.5 0.84) 2.0 0.6 (SupportedBy (Hypoalbuminemia RedCellDistributionWidth))) (Hypothesis DeregulatedNutrientSensing (stv 0.6400000000000001 0.6159099375) 2.0 0.45630000000000004 (SupportedBy (HbA1c FastingGlucose))) (Hypothesis CellularSenescence (stv 0.36124999999999996 0.368507537775) 2.0 0.1483545375 (SupportedBy (Hypoalbuminemia RedCellDistributionWidth))))"
+  ],
+  "secs": 2.09,
+  "rc": 0,
+  "name": "D_smoker_wit_both_pad_dx",
+  "wall": 3.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis ChronicInflammation (stv 0.8 0.65) 1.0 0.52 (SupportedBy (CRP))) (Hypothesis InsulinResistance (stv 0.7 0.65) 1.0 0.45499999999999996 (SupportedBy (HbA1c))) (Hypothesis DeregulatedNutrientSensing (stv 0.5599999999999999 0.38025000000000003) 1.0 0.21294 (SupportedBy (HbA1c))) (Hypothesis CellularSenescence (stv 0.5780000000000001 0.22244625000000004) 1.0 0.12857393250000004 (SupportedBy (CRP))))"
+  ],
+  "secs": 1.25,
+  "rc": 0,
+  "name": "D_six_base_dx",
+  "wall": 2.1
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis ChronicInflammation (stv 0.8 0.86) 2.0 0.8200000000000001 (SupportedBy (Hypoalbuminemia CRP))) (Hypothesis CellularSenescence (stv 0.5780000000000001 0.38210524925625006) 2.0 0.20275120125000004 (SupportedBy (Hypoalbuminemia CRP))) (Hypothesis InsulinResistance (stv 0.7 0.65) 1.0 0.45499999999999996 (SupportedBy (HbA1c))) (Hypothesis DeregulatedNutrientSensing (stv 0.5599999999999999 0.38025000000000003) 1.0 0.21294 (SupportedBy (HbA1c))))"
+  ],
+  "secs": 1.67,
+  "rc": 0,
+  "name": "D_six_alb_both_dx",
+  "wall": 2.6
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ()))"
+  ],
+  "secs": 2.66,
+  "rc": 0,
+  "name": "D_smoker_base_supp",
+  "wall": 3.5
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))) (SuppRec Omega3 (tier Tier1HighConfidence) (score 0.2754) (evidence MultipleHumanTrials 0.85) (safety GenerallyWellTolerated 1.0) (Targets (Hypoalbuminemia RedCellDistributionWidth))))) (Tier2Promising ((SuppRec Fisetin (tier Tier2Promising) (score 0.04339370221875) (evidence AnimalStudies_Single 0.5) (safety GenerallyWellTolerated 1.0) (Targets (Hypoalbuminemia RedCellDistributionWidth))))) (NotRecommended ((SuppRec Resveratrol (tier NotRecommended) (score 0.023365839656249998) (evidence ITP_Negative 0.9) (safety GenerallyWellTolerated 1.0) (Targets (Hypoalbuminemia RedCellDistributionWidth))))) (Interactions ()))"
+  ],
+  "secs": 18.76,
+  "rc": 0,
+  "name": "D_smoker_wit_mb_supp",
+  "wall": 19.7
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))) (SuppRec Omega3 (tier Tier1HighConfidence) (score 0.2754) (evidence MultipleHumanTrials 0.85) (safety GenerallyWellTolerated 1.0) (Targets (Hypoalbuminemia RedCellDistributionWidth))))) (Tier2Promising ((SuppRec Fisetin (tier Tier2Promising) (score 0.04339370221875) (evidence AnimalStudies_Single 0.5) (safety GenerallyWellTolerated 1.0) (Targets (Hypoalbuminemia RedCellDistributionWidth))))) (NotRecommended ((SuppRec Resveratrol (tier NotRecommended) (score 0.023365839656249998) (evidence ITP_Negative 0.9) (safety GenerallyWellTolerated 1.0) (Targets (Hypoalbuminemia RedCellDistributionWidth))))) (Interactions ()))"
+  ],
+  "secs": 7.19,
+  "rc": 0,
+  "name": "D_smoker_wit_both_supp",
+  "wall": 8.1
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))) (SuppRec Omega3 (tier Tier1HighConfidence) (score 0.2754) (evidence MultipleHumanTrials 0.85) (safety GenerallyWellTolerated 1.0) (Targets (Hypoalbuminemia RedCellDistributionWidth))))) (Tier2Promising ((SuppRec Fisetin (tier Tier2Promising) (score 0.04339370221875) (evidence AnimalStudies_Single 0.5) (safety GenerallyWellTolerated 1.0) (Targets (Hypoalbuminemia RedCellDistributionWidth))))) (NotRecommended ((SuppRec Resveratrol (tier NotRecommended) (score 0.023365839656249998) (evidence ITP_Negative 0.9) (safety GenerallyWellTolerated 1.0) (Targets (Hypoalbuminemia RedCellDistributionWidth))))) (Interactions ()))"
+  ],
+  "secs": 7.12,
+  "rc": 0,
+  "name": "D_smoker_wit_both_pad_supp",
+  "wall": 8.1
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Omega3 (tier Tier1HighConfidence) (score 0.23868) (evidence MultipleHumanTrials 0.85) (safety GenerallyWellTolerated 1.0) (Targets (CRP))) (SuppRec Berberine (tier Tier1HighConfidence) (score 0.18099900000000002) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c))))) (Tier2Promising ((SuppRec Fisetin (tier Tier2Promising) (score 0.03760787525625001) (evidence AnimalStudies_Single 0.5) (safety GenerallyWellTolerated 1.0) (Targets (CRP))))) (NotRecommended ((SuppRec Resveratrol (tier NotRecommended) (score 0.020250394368750004) (evidence ITP_Negative 0.9) (safety GenerallyWellTolerated 1.0) (Targets (CRP))))) (Interactions ()))"
+  ],
+  "secs": 3.55,
+  "rc": 0,
+  "name": "D_six_base_supp",
+  "wall": 4.5
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(SupplementRecommendation Caller_Me (Tier1HighConfidence ((SuppRec Omega3 (tier Tier1HighConfidence) (score 0.37638) (evidence MultipleHumanTrials 0.85) (safety GenerallyWellTolerated 1.0) (Targets (Hypoalbuminemia CRP))) (SuppRec Berberine (tier Tier1HighConfidence) (score 0.18099900000000002) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c))))) (Tier2Promising ((SuppRec Fisetin (tier Tier2Promising) (score 0.05930472636562501) (evidence AnimalStudies_Single 0.5) (safety GenerallyWellTolerated 1.0) (Targets (Hypoalbuminemia CRP))))) (NotRecommended ((SuppRec Resveratrol (tier NotRecommended) (score 0.03193331419687501) (evidence ITP_Negative 0.9) (safety GenerallyWellTolerated 1.0) (Targets (Hypoalbuminemia CRP))))) (Interactions ()))"
+  ],
+  "secs": 4.07,
+  "rc": 0,
+  "name": "D_six_alb_both_supp",
+  "wall": 5.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.6480162000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.56161404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Fisetin 0.030375591553125008 (signed Neg (stv 0.23205 0.13090106250000003))))"
+  ],
+  "secs": 2.28,
+  "rc": 0,
+  "name": "D_smoker_base_rank",
+  "wall": 3.1
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.6480162000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.56161404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.103277011280625 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Fisetin 0.07376929377187501 (signed Neg (stv 0.23205 0.13090106250000003))))"
+  ],
+  "secs": 7.42,
+  "rc": 0,
+  "name": "D_smoker_wit_mb_rank",
+  "wall": 8.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.6480162000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.56161404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.103277011280625 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Fisetin 0.07376929377187501 (signed Neg (stv 0.23205 0.13090106250000003))))"
+  ],
+  "secs": 2.92,
+  "rc": 0,
+  "name": "D_smoker_wit_both_rank",
+  "wall": 3.8
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.6480162000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.56161404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.103277011280625 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Fisetin 0.07376929377187501 (signed Neg (stv 0.23205 0.13090106250000003))))"
+  ],
+  "secs": 2.95,
+  "rc": 0,
+  "name": "D_smoker_wit_both_pad_rank",
+  "wall": 3.9
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.34966620000000004 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.30304404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.09517685353312502 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Fisetin 0.06798346680937502 (signed Neg (stv 0.23205 0.13090106250000003))))"
+  ],
+  "secs": 1.71,
+  "rc": 0,
+  "name": "D_six_base_rank",
+  "wall": 2.6
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((scored Metformin 0.34966620000000004 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.30304404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.12555244508625002 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Fisetin 0.08968031791875002 (signed Neg (stv 0.23205 0.13090106250000003))))"
+  ],
+  "secs": 1.94,
+  "rc": 0,
+  "name": "D_six_alb_both_rank",
+  "wall": 2.9
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(HbA1c CRP)"
+  ],
+  "secs": 0.28,
+  "rc": 0,
+  "name": "DEDUP_orig_markers",
+  "wall": 1.2
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis ChronicInflammation (stv 0.8 0.65) 1.0 0.52 (SupportedBy (CRP))) (Hypothesis InsulinResistance (stv 0.7 0.65) 1.0 0.45499999999999996 (SupportedBy (HbA1c))) (Hypothesis DeregulatedNutrientSensing (stv 0.5599999999999999 0.38025000000000003) 1.0 0.21294 (SupportedBy (HbA1c))) (Hypothesis CellularSenescence (stv 0.5780000000000001 0.22244625000000004) 1.0 0.12857393250000004 (SupportedBy (CRP))))"
+  ],
+  "secs": 1.33,
+  "rc": 0,
+  "name": "DEDUP_orig_dx",
+  "wall": 2.2
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "(CRP HbA1c)"
+  ],
+  "secs": 0.11,
+  "rc": 0,
+  "name": "DEDUP_ua_markers",
+  "wall": 1.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Hypothesis ChronicInflammation (stv 0.8 0.65) 1.0 0.52 (SupportedBy (CRP))) (Hypothesis InsulinResistance (stv 0.7 0.65) 1.0 0.45499999999999996 (SupportedBy (HbA1c))) (Hypothesis DeregulatedNutrientSensing (stv 0.5599999999999999 0.38025000000000003) 1.0 0.21294 (SupportedBy (HbA1c))) (Hypothesis CellularSenescence (stv 0.5780000000000001 0.22244625000000004) 1.0 0.12857393250000004 (SupportedBy (CRP))))"
+  ],
+  "secs": 1.18,
+  "rc": 0,
+  "name": "DEDUP_ua_dx",
+  "wall": 2.0
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((LinAgeCounterfactual Caller_Me SmokingCessation (expected-delta-years -7.15612105) (signed Neg (stv 7.15612105 0.765)) (Via (SerumCotinine))) (LinAgeCounterfactual Caller_Me InsulinResistance (expected-delta-years -0.6521431) (signed Neg (stv 0.6521431 0.65)) (Via (HbA1c))) (LinAgeCounterfactual Caller_Me CellularSenescence (expected-delta-years 0.0) (signed Neg (stv 0.0 0.0)) (Via ())) (LinAgeCounterfactual Caller_Me ChronicInflammation (expected-delta-years 0.0) (signed Neg (stv 0.0 0.0)) (Via ())))"
+  ],
+  "secs": 4.73,
+  "rc": 0,
+  "name": "L2_smoker_base_scen",
+  "wall": 5.6
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((LinAgeCounterfactual Caller_Me SmokingCessation (expected-delta-years -7.15612105) (signed Neg (stv 7.15612105 0.765)) (Via (SerumCotinine))) (LinAgeCounterfactual Caller_Me InsulinResistance (expected-delta-years -0.6521431) (signed Neg (stv 0.6521431 0.65)) (Via (HbA1c))) (LinAgeCounterfactual Caller_Me CellularSenescence (expected-delta-years -1.7744925124999997) (signed Neg (stv 1.7744925124999997 0.20533500000000002)) (Via (RedCellDistributionWidth SerumAlbumin))) (LinAgeCounterfactual Caller_Me ChronicInflammation (expected-delta-years -2.456045) (signed Neg (stv 2.456045 0.6)) (Via (RedCellDistributionWidth SerumAlbumin))))"
+  ],
+  "secs": 7.41,
+  "rc": 0,
+  "name": "L2_smoker_bridged_scen",
+  "wall": 8.3
+ },
+ {
+  "status": "ok",
+  "atoms": [
+   "((Contribution SystolicBloodPressure (years 0.52006) Measured (ReadsOut None) (DrivenBy ())) (Contribution SerumCotinine (years 7.532759) Measured (ReadsOut CurrentTobaccoExposure (witnessed True)) (DrivenBy ())) (Contribution SerumAlbumin (years 2.358947) Measured (ReadsOut Hypoalbuminemia (witnessed True)) (DrivenBy (ChronicInflammation CellularSenescence))) (Contribution SelfRatedHealthScore (years 1.182356) Measured (ReadsOut None) (DrivenBy ())) (Contribution RedCellDistributionWidth (years 2.553143) Measured (ReadsOut RedCellDistributionWidth (witnessed True)) (DrivenBy (ChronicInflammation CellularSenescence))) (Contribution HbA1c (years 0.931633) Measured (ReadsOut HbA1c (witnessed True)) (DrivenBy (DeregulatedNutrientSensing))))"
+  ],
+  "secs": 2.09,
+  "rc": 0,
+  "name": "L2_smoker_bridged_drivers",
+  "wall": 3.0
+ }
+]
