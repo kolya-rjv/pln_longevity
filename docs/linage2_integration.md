@@ -379,25 +379,38 @@ both mg/L and mg/dL fit; a value outside everything NHANES observed is refused, 
 that would fit. Each unit table is checked against the reference cohort's medians, which is
 how the CRP mg/dL error of §9 would have been caught.
 
-An adversarial review of the reader turned up the ways plain text produces a confident,
-wrong patient, and each is now a refusal or a rule (`tests/test_patient_text.py`): only an
-explicit age phrase is an age ("quit smoking 20 years ago" no longer makes someone 20), and
-two different ages are a problem, not last-one-wins; a statement about someone else ("my
-husband smokes", "male partner", "family history of diabetes", second-hand smoke) is set
-aside and listed; negated, past and ongoing smoking are told apart ("not a smoker",
-"never been a smoker", "former heavy smoker", "smoker (quit 2010)", "trying to quit", "can't
-quit"); a smoking phrase whose remainder says something else ("not a current smoker",
-"current smoker (quit 2015)", "smoker: n/a") is asked about, and so is any unread piece of a
-smoking history ("heavy smoker, until 2010", "20 cigarettes a day") — cotinine level 0 vs 3
-is about 8.8 years, so these block the build rather than sit in "not understood"; a measured
-cotinine is never replaced by the level a smoking phrase implies, in either order; "no
-diabetes" is a No, "no known conditions except hypertension" a single Yes, "no other
-conditions" keeps the diagnoses listed, two different answers for one diagnosis are a
-contradiction to fix, and so is an unread line next to listed diagnoses (every diagnosis not
-listed is answered No, so one hidden in it would be lost); weight, height, cotinine and GrimAge need an explicit unit or
-form (a bare "GrimAge 46" is a clock age, not an acceleration); an abnormal value typed in
-the usual unit is never re-read as a normal value in another one (hemoglobin 9.5 asks);
-urea and urea nitrogen have their own mg/dL factors.
+Four adversarial review rounds of the reader turned up the ways plain text produces a
+confident, wrong patient — and, when patched one pattern at a time, the ways each fix
+produced the next one. What it does now (`tests/test_patient_text.py`, and
+`tests/test_patient_text_corpus.py`, which pins every reproduction from those rounds with
+the outcome it must get):
+
+- *Age and people.* Only an explicit age phrase is an age ("quit smoking 20 years ago" does
+  not make someone 20), and two different ages are a problem. A statement about someone
+  else ("my husband smokes", "family history of diabetes", second-hand smoke) is set aside
+  and listed; "my wife and I smoke" is asked about.
+- *Smoking is read only from a clause about smoking* (smoking, cigarettes, tobacco,
+  nicotine, vaping, packs), so "can't stop snacking" is not a smoker. Never, former and
+  current are told apart in clinical and form styles too ("denies tobacco use", "Smoking
+  status: never", "20 cigarettes a day"). What the rest of that clause, or the clause right
+  after it, says about time ("quit 2010", "still am", "started again", "quit for 6 months")
+  is checked against the status: a former smoker who started again, or a current smoker
+  who quit in 2015, is asked about; a bare "smoker" then "quit 2015" is a former smoker.
+  Cotinine level 0 vs 3 is about 8.8 years, so anything about smoking that is not
+  understood blocks the build rather than sitting in "not understood". A measured
+  cotinine is never replaced by the level a smoking phrase implies, in either order.
+- *Diagnoses.* "No diabetes" is a No, "no known conditions except hypertension, asthma" two
+  Yeses, "no other conditions" keeps the listed ones; dates, stages and severity are
+  understood ("type 2 diabetes (2015)", "CKD stage 3"), as are common abbreviations (T2DM,
+  HTN, high BP, CVA); a piece that is not one of the 23 conditions LinAge2 counts ("high
+  cholesterol") is dropped with a note. Two different answers for one condition are a
+  contradiction to fix (except "no diabetes" with "prediabetes", which is borderline), and
+  an unread line that names or suggests a condition blocks the build — it would otherwise
+  be answered No. "Takes lisinopril" or "no alcohol" do not.
+- *Units.* Weight, height, cotinine and GrimAge need an explicit unit or form (a bare
+  "GrimAge 46" is a clock age, not an acceleration); an abnormal value typed in the usual
+  unit is never re-read as a normal value in another one (hemoglobin 9.5 asks); urea and
+  urea nitrogen have their own mg/dL factors.
 
 **One value, two consumers.** CRP typed once is LinAge2's `LBXCRP` (mg/dL) *and* the KB's
 `CRP` witness (mg/L); HbA1c likewise; a glucose is the `FastingGlucose` witness only when the
