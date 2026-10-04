@@ -445,3 +445,64 @@ def test_consistent_diagnoses_are_not_called_contradictions(text, item):
 def test_an_unknown_lab_next_to_diagnoses_is_only_not_understood():
     p = read_patient_text("58 year old male\nvitamin D 30 ng/mL\ndiagnoses: hypertension")
     assert p.ok and p.not_understood == ["vitamin D 30 ng/mL"]
+
+
+# ═══════════════════════════ statements, spans and typed problems ═══════════════
+# A model that reads the text may only rewrite what the rules did not understand, so
+# every statement and every problem says where it is and what kind it is. The strings
+# a caller sees do not change: a Problem is still a str.
+
+def test_every_statement_points_at_its_text():
+    text = "58 year old male, current smoker\n  - albumin 4.1 g/dL; CRP 3.1 mg/L\ndiagnoses: asthma,  arthritis"
+    p = read_patient_text(text)
+    lines = text.splitlines()
+    for st in p.statements:
+        typed = lines[st.line][st.start:st.end]
+        assert typed == st.text or typed.replace(",  ", ", ") == st.text, (st, typed)
+    assert [st.text for st in p.statements] == [
+        "58 year old male", "current smoker", "albumin 4.1 g/dL", "CRP 3.1 mg/L",
+        "diagnoses: asthma, arthritis"]
+    assert p.statements[0].facts == {"age": 58.0, "sex": "Male"}
+    assert p.statements[1].facts["smoking"] == ("CurrentSmoker", 3)
+    assert p.statements[2].facts["labs"] == {"LBDSALSI": pytest.approx(41.0)}
+    assert p.readings[0].statement == 2
+    assert p.statements[4].facts["conditions"] == {"MCQ010": 1, "MCQ160A": 1}
+    assert {st.outcome for st in p.statements} == {"read"}
+
+
+def test_problems_are_still_strings_with_a_kind_and_a_statement():
+    import copy
+    import json
+    import pickle
+
+    from core.patient_text import PROBLEM_KINDS, Problem
+
+    p = read_patient_text("58 year old\nI was a smoker, still am\nCRP 3.1\nfoo bar")
+    problems = p.all_problems()
+    assert all(isinstance(x, Problem) and isinstance(x, str) for x in problems)
+    by_kind = {x.kind: x for x in problems}
+    assert set(by_kind) <= set(PROBLEM_KINDS)
+    assert by_kind["missing"] == "no sex found ('male' or 'female'): LinAge2 has a separate model for each"
+    smoking = by_kind["ambiguous"]
+    assert smoking.topic == "smoking" and [p.statements[i].text for i in smoking.statements] == [
+        "I was a smoker", "still am"]
+    assert by_kind["unit"].topic == "lab" and p.statements[by_kind["unit"].statements[0]].text == "CRP 3.1"
+    assert p.not_understood == ["foo bar"] and p.not_understood[0].statement == 4
+    assert [st.outcome for st in p.statements] == ["read", "refused", "refused", "refused", "not_understood"]
+    # what the API and the tab do with them: serialise, copy (gr.State), pickle
+    assert json.loads(json.dumps(problems)) == [str(x) for x in problems]
+    for clone in (copy.deepcopy(p), pickle.loads(pickle.dumps(p))):
+        assert [(x.kind, x.statements) for x in clone.all_problems()] == \
+            [(x.kind, x.statements) for x in problems]
+
+
+def test_a_condition_that_would_be_lost_is_its_own_kind():
+    p = read_patient_text("58 year old male\ndiagnoses: hypertension\nheart trouble")
+    (lost,) = p.all_problems()
+    assert lost.kind == "lost_condition" and p.statements[lost.statements[0]].text == "heart trouble"
+
+
+def test_set_aside_statements_say_which_statement():
+    p = read_patient_text("58 year old male\nmy husband smokes")
+    assert p.set_aside == ["my husband smokes"] and p.set_aside[0].statement == 1
+    assert p.statements[1].outcome == "set_aside"

@@ -209,6 +209,59 @@ OK, ASSUMED_UNIT, NEEDS_UNIT, UNKNOWN_UNIT, OUT_OF_RANGE, DUPLICATE = (
 _BLOCKING = {NEEDS_UNIT, UNKNOWN_UNIT, OUT_OF_RANGE, DUPLICATE}
 
 
+#: What a problem is, so a caller can tell a judgement ("cannot tell", "contradicts",
+#: "about someone else", "vaping", a unit, a condition that would be lost) from a
+#: statement that was simply not understood, or something missing altogether.
+PROBLEM_KINDS = ("not_understood", "ambiguous", "contradiction", "someone_else", "vaping", "unit",
+                 "lost_condition", "missing")
+
+
+class Problem(str):
+    """A problem, as the text the person sees — still a plain `str` everywhere it was one —
+    carrying its kind, its topic and the statements (indexes into
+    ParsedPatient.statements) it is about."""
+    kind: str
+    topic: str
+    statements: tuple
+
+    def __new__(cls, text: str, kind: str = "ambiguous", topic: str = "other", statements=()):
+        obj = super().__new__(cls, text)
+        obj.kind, obj.topic, obj.statements = kind, topic, tuple(statements)
+        return obj
+
+
+class Remark(str):
+    """A statement that was not understood, or set aside: the text, and its statement."""
+    statement: int
+
+    def __new__(cls, text: str, statement: int = -1):
+        obj = super().__new__(cls, text)
+        obj.statement = statement
+        return obj
+
+
+@dataclass
+class Statement:
+    """One statement as the reader split the text: where it is, and what was read from it.
+
+    `start`/`end` are offsets into line `line` of the text as typed. `facts` holds what the
+    rules read from this statement alone (age, sex, smoking, labs, conditions, ...);
+    `outcome` sums it up: read | partly_read | not_understood | refused | set_aside."""
+    index: int
+    line: int
+    start: int
+    end: int
+    text: str
+    facts: dict = field(default_factory=dict)
+    outcome: str = "read"
+    leftover: str = ""                         # the part that was not understood
+    joined_to: int = -1                        # a smoking 'when' clause: the clause it modifies
+
+    def as_dict(self) -> dict:
+        return {"index": self.index, "line": self.line, "start": self.start, "end": self.end,
+                "text": self.text, "outcome": self.outcome}
+
+
 @dataclass
 class Reading:
     code: str
@@ -221,6 +274,7 @@ class Reading:
     status: str = OK
     note: str = ""
     fasting: bool = False
+    statement: int = -1                        # index into ParsedPatient.statements
 
     @property
     def blocking(self) -> bool:
@@ -257,14 +311,19 @@ class ParsedPatient:
     not_understood: list[str] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    #: every statement as the reader split the text, with what was read from each
+    statements: list[Statement] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
         return not self.problems and not any(r.blocking for r in self.readings)
 
     def all_problems(self) -> list[str]:
+        """Every problem, as strings (each a Problem: .kind, .topic, .statements)."""
         out = list(self.problems)
-        out += [f"{r.label}: {r.note}" for r in self.readings if r.blocking]
+        out += [Problem(f"{r.label}: {r.note}", "contradiction" if r.status == DUPLICATE else "unit",
+                        "lab", (r.statement,) if r.statement >= 0 else ())
+                for r in self.readings if r.blocking]
         return out
 
     def labs(self) -> dict[str, float]:
@@ -546,34 +605,63 @@ def _cotinine_level(ng_ml: float) -> int:
     return 0 if ng_ml < 10 else 1 if ng_ml < 100 else 2 if ng_ml < 200 else 3
 
 
-def _statements(text: str) -> list[tuple[int, str]]:
-    """(line number, statement): a line splits at ';' and at ', ' before a word. A
-    diagnosis list ("diagnoses: a, b", "no known conditions except a, b") stays whole,
-    except for a piece about smoking, which is always its own statement."""
-    out: list[tuple[int, str]] = []
+def _strip_offset(seg: str) -> tuple[int, str]:
+    """`seg.strip().strip("-•*").strip()`, and where the result starts in `seg`."""
+    t = seg.strip()
+    a = len(seg) - len(seg.lstrip())
+    u = t.strip("-•*")
+    b = len(t) - len(t.lstrip("-•*"))
+    w = u.strip()
+    c = len(u) - len(u.lstrip())
+    return a + b + c, w
+
+
+def _statements(text: str) -> list[tuple[int, int, int, str]]:
+    """(line number, start, end, statement): a line splits at ';' and at ', ' before a
+    word. A diagnosis list ("diagnoses: a, b", "no known conditions except a, b") stays
+    whole, except for a piece about smoking, which is always its own statement.
+    `start`/`end` are offsets into the line as typed (a whole list spans its pieces)."""
+    out: list[tuple[int, int, int, str]] = []
     for line_no, line in enumerate((text or "").splitlines()):
-        for seg in line.split(";"):
-            seg = seg.strip().strip("-•*").strip()
+        pos = 0
+        for raw in line.split(";"):
+            raw_start, pos = pos, pos + len(raw) + 1
+            off, seg = _strip_offset(raw)
             if not seg:
                 continue
-            pieces = [part.strip() for part in re.split(r",\s+(?=[A-Za-z])", seg) if part.strip()]
+            seg_start = raw_start + off
+            pieces: list[tuple[int, int, str]] = []
+            cut = 0
+            for m in list(re.finditer(r",\s+(?=[A-Za-z])", seg)) + [None]:
+                end = m.start() if m else len(seg)
+                part = seg[cut:end]
+                if part.strip():
+                    lead = len(part) - len(part.lstrip())
+                    text_ = part.strip()
+                    a = seg_start + cut + lead
+                    pieces.append((a, a + len(text_), text_))
+                cut = m.end() if m else cut
             whole = (_DIAG_HEADER.match(seg) and not re.match(r"^(?:has|history of|with)\b", seg, re.I)) \
                 or re.match(r"^(?:i have\s+)?no\b.*\b(?:except|apart from|other than|besides|aside from)\b",
                             seg, re.I)
             if not whole:
-                out.extend((line_no, part) for part in pieces)
+                out.extend((line_no, a, b, part) for a, b, part in pieces)
                 continue
-            group: list[str] = []
-            for part in pieces:
+            group: list[tuple[int, int, str]] = []
+
+            def flush() -> None:
+                out.append((line_no, group[0][0], group[-1][1], ", ".join(g[2] for g in group)))
+                group.clear()
+
+            for a, b, part in pieces:
                 if _SMOKING_TOPIC.search(part.lower()):
                     if group:
-                        out.append((line_no, ", ".join(group)))
-                        group = []
-                    out.append((line_no, part))
+                        flush()
+                    out.append((line_no, a, b, part))
                 else:
-                    group.append(part)
+                    group.append((a, b, part))
             if group:
-                out.append((line_no, ", ".join(group)))
+                flush()
     return out
 
 
@@ -706,7 +794,16 @@ def read_patient_text(text: str) -> ParsedPatient:
     p = ParsedPatient()
     seen: dict[str, Reading] = {}
 
+    _TOPIC = {"age": "age", "sex": "sex", "smoking": "smoking", "weight_kg": "weight",
+              "height_cm": "height"}
+
+    def problem(text_: str, kind: str, topic: str, statements=None) -> None:
+        p.problems.append(Problem(text_, kind, topic,
+                                  (cur.index,) if statements is None else statements))
+
     def add(reading: Reading) -> None:
+        reading.statement = cur.index
+        cur.facts.setdefault("labs", {})[reading.code] = reading.value
         prev = seen.get(reading.code)
         if prev is not None and not prev.blocking and not reading.blocking \
                 and abs((prev.value or 0) - (reading.value or 0)) > 1e-9:
@@ -720,21 +817,27 @@ def read_patient_text(text: str) -> ParsedPatient:
     allowed: set[str] = set()           # ... and the Yes it allowed: "except hypertension"
     said_none = False                   # either: every diagnosis not listed is a No
     #: the last smoking clause: its line, statement index, kind, and whether it set the status
-    last_smoking: dict = {"line": -1, "idx": -1, "kind": None, "set_here": False, "stmt": ""}
+    last_smoking: dict = {"line": -1, "idx": -1, "kind": None, "set_here": False, "stmt": "",
+                          "origin": -1}
+    cur = Statement(-1, -1, 0, 0, "")           # the statement being read
 
     def set_once(attr: str, value, what: str, stmt: str) -> None:
+        cur.facts[attr] = value
         current = getattr(p, attr)
         if current is not None and current != value:
-            p.problems.append(f"two different {what}s: {current} and {value} (from '{stmt}')")
+            problem(f"two different {what}s: {current} and {value} (from '{stmt}')", "contradiction",
+                    _TOPIC.get(attr, "other"))
         else:
             setattr(p, attr, value)
 
-    def unsure(stmt: str) -> None:
-        p.problems.append(f"'{stmt}': cannot tell whether you smoke now, used to, or never did; "
-                          f"write 'current smoker', 'former smoker, quit 2010' or 'never smoked'")
+    def unsure(stmt: str, statements=None) -> None:
+        problem(f"'{stmt}': cannot tell whether you smoke now, used to, or never did; "
+                f"write 'current smoker', 'former smoker, quit 2010' or 'never smoked'",
+                "ambiguous", "smoking", statements)
 
     def set_smoking(status: str, level: int, stmt: str) -> None:
         set_once("smoking", status, "smoking status", stmt)
+        cur.facts["smoking"] = (status, level)          # what the words say, level included
         if p.smoking != status:
             return
         if p.cotinine_measured:
@@ -774,23 +877,26 @@ def read_patient_text(text: str) -> ParsedPatient:
                 return None
             before = p.smoking
             set_smoking(status, level, stmt)
-            last_smoking.update(line=line_no, idx=idx, kind=kind, stmt=stmt,
+            last_smoking.update(line=line_no, idx=idx, kind=kind, stmt=stmt, origin=idx,
                                 set_here=before is None and p.smoking == status)
             return _SMOKING_DETAIL.sub(" ", reduced)
         if _VAPE_NEGATION.match(rest.strip()) and not re.search(r"\bsmok|\bcig|\btobacco", rest):
             p.notes.append(f"'{stmt}': vaping is not read; it does not change the smoking status")
+            cur.facts["note"] = "vaping"
             return None
         if _PACK_YEARS_ONLY.match(rest.strip()):
             p.notes.append(f"'{stmt}': pack-years are not a LinAge2 input (it reads cotinine); "
                            f"they do not set a smoking status")
+            cur.facts["note"] = "pack-years"
             return None
         if _VAPING.search(rest) and not re.search(r"\bsmok|\bcig|\btobacco", rest):
-            p.problems.append(f"'{stmt}': vaping raises cotinine but is not smoking to the knowledge "
-                              f"base; give 'cotinine N ng/mL' if you have it, and your smoking status "
-                              f"('never smoked', 'former smoker', 'current smoker')")
+            problem(f"'{stmt}': vaping raises cotinine but is not smoking to the knowledge "
+                    f"base; give 'cotinine N ng/mL' if you have it, and your smoking status "
+                    f"('never smoked', 'former smoker', 'current smoker')", "vaping", "smoking")
             return None
-        p.problems.append(f"'{stmt}' is about smoking and was not understood; say it in one "
-                          f"phrase: 'current smoker', 'former smoker, quit 2010' or 'never smoked'")
+        problem(f"'{stmt}' is about smoking and was not understood; say it in one "
+                f"phrase: 'current smoker', 'former smoker, quit 2010' or 'never smoked'",
+                "not_understood", "smoking")
         return None
 
     def modify_smoking(low: str, stmt: str, cue: str) -> None:
@@ -809,18 +915,22 @@ def read_patient_text(text: str) -> ParsedPatient:
         else:
             when = "neutral"            # "since 1990", "started at 16"
         said = f"{last_smoking['stmt']}, {stmt}"
+        origin = last_smoking["origin"]
+        cur.joined_to = origin
+        both = (origin, cur.index)
         if when == "temporary" or kind == "never":
-            unsure(said)
+            unsure(said, both)
         elif when == "present" and kind == "former":
-            unsure(said)
+            unsure(said, both)
         elif when == "past" and kind in _STILL_KINDS:
-            unsure(said)
+            unsure(said, both)
         elif when == "past" and kind == "generic":
             if not last_smoking["set_here"] or p.smoking != "CurrentSmoker":
-                unsure(said)
+                unsure(said, both)
                 return
             p.smoking = None            # "smoker, quit 2015": a former smoker
             set_smoking("FormerSmoker", 0, said)
+            p.statements[origin].facts["smoking"] = ("FormerSmoker", 0)
             last_smoking["kind"] = "former"
             p.notes.append(f"'{said}' read as a former smoker")
             return
@@ -835,17 +945,19 @@ def read_patient_text(text: str) -> ParsedPatient:
         for item, value in found:
             prev = merged.get(item)
             if prev is not None and prev != value and {prev, value} != {2, 3}:
-                p.problems.append(f"'{stmt}' answers {_ITEM_LABEL[item]} both ways; keep one")
+                problem(f"'{stmt}' answers {_ITEM_LABEL[item]} both ways; keep one",
+                        "contradiction", "condition")
                 return
             merged[item] = 3 if {prev, value} == {2, 3} else value
+        cur.facts.setdefault("conditions", {}).update(merged)
         for item, value in list(merged.items()):
             prev = p.questionnaire.get(item) if item in diagnosed else None
             if prev is not None and prev != value:
                 if {prev, value} == {2, 3}:
                     merged[item] = 3
                 else:
-                    p.problems.append(f"'{stmt}' answers {_ITEM_LABEL[item]} differently from an "
-                                      f"earlier line; keep one")
+                    problem(f"'{stmt}' answers {_ITEM_LABEL[item]} differently from an "
+                            f"earlier line; keep one", "contradiction", "condition")
                     return
         for item, value in merged.items():
             p.questionnaire[item] = value
@@ -853,11 +965,14 @@ def read_patient_text(text: str) -> ParsedPatient:
 
     def note_ignored(ignored: list[str]) -> None:
         if ignored:
+            cur.facts["ignored"] = list(ignored)
             p.questionnaire_notes.append(
                 "not among the conditions LinAge2's comorbidity score counts (not used): "
                 + ", ".join(f"'{x}'" for x in ignored))
 
-    for idx, (line_no, stmt) in enumerate(_statements(text)):
+    for idx, (line_no, s_start, s_end, stmt) in enumerate(_statements(text)):
+        cur = Statement(idx, line_no, s_start, s_end, stmt)
+        p.statements.append(cur)
         low = stmt.lower().strip()
 
         # ── the clause right after a smoking clause, saying when ───────────────
@@ -872,11 +987,13 @@ def read_patient_text(text: str) -> ParsedPatient:
         if _SOMEONE_ELSE.search(low):
             if _SMOKING_TOPIC.search(low) and re.search(r"\b(?:i|we|both)\b", low) \
                     and not _FIRST_PERSON_SMOKING.match(low):
-                p.problems.append(f"'{stmt}' is about you and someone else; say your own smoking "
-                                  f"on its own line ('never smoked', 'former smoker', 'current smoker')")
+                problem(f"'{stmt}' is about you and someone else; say your own smoking "
+                        f"on its own line ('never smoked', 'former smoker', 'current smoker')",
+                        "someone_else", "smoking")
                 continue
             if not (_SMOKING_TOPIC.search(low) and _FIRST_PERSON_SMOKING.match(low)):
-                p.set_aside.append(stmt)
+                p.set_aside.append(Remark(stmt, idx))
+                cur.facts["set_aside"] = True
                 continue
 
         # ── a GrimAge result (before demographics: "4.5 years" is not an age) ─
@@ -885,12 +1002,14 @@ def read_patient_text(text: str) -> ParsedPatient:
         if m:
             years = float(m.group(3) + m.group(4))
             if not (m.group(2) or m.group(3) or low.startswith("ageaccelgrim")):
-                p.problems.append(f"'{stmt}' looks like a GrimAge clock AGE; give the acceleration "
-                                  f"(clock age minus your age), e.g. 'GrimAge acceleration +4 years'")
+                problem(f"'{stmt}' looks like a GrimAge clock AGE; give the acceleration "
+                        f"(clock age minus your age), e.g. 'GrimAge acceleration +4 years'",
+                        "ambiguous", "grimage")
             elif abs(years) > 30:
-                p.problems.append(f"GrimAge acceleration {years:+g} years is outside anything the "
-                                  f"clock produces (±30); check the value")
+                problem(f"GrimAge acceleration {years:+g} years is outside anything the "
+                        f"clock produces (±30); check the value", "unit", "grimage")
             else:
+                cur.facts["grimage"] = years
                 p.extra_markers["AgeAccelGrim"] = {"value": years, "unit": "years"}
                 p.notes.append(f"GrimAge acceleration {years:+g} years: the knowledge base's 10-year "
                                f"heart-disease model reads it; it is never combined with LinAge2")
@@ -924,31 +1043,33 @@ def read_patient_text(text: str) -> ParsedPatient:
         # ── questionnaire ────────────────────────────────────────────────────
         if _OTHERWISE.match(low):
             said_none = True                    # "asthma, but otherwise healthy"
+            cur.facts["no_conditions"] = "otherwise"
             continue
         m = _NO_CONDITIONS.match(low)
         if m:
             exceptions, ignored, unclear = _read_diagnoses(m.group(1)) if m.group(1) else ([], [], False)
             if unclear:
-                p.problems.append(f"'{stmt}': the exception was not understood, and every "
-                                  f"other diagnosis would be answered No; name it as a diagnosis "
-                                  f"(e.g. 'no other conditions except hypertension')")
+                problem(f"'{stmt}': the exception was not understood, and every "
+                        f"other diagnosis would be answered No; name it as a diagnosis "
+                        f"(e.g. 'no other conditions except hypertension')", "ambiguous", "condition")
                 continue
             other = bool(_NO_OTHER.match(low))
             excepted = {i for i, a in exceptions if a != 2}
             listed_yes = [i for i in sorted(diagnosed) if p.questionnaire.get(i) in (1, 3)
                           and i not in excepted]
             if listed_yes and not other:
-                p.problems.append(f"'{stmt}' contradicts the diagnoses already given "
-                                  f"({', '.join(_ITEM_LABEL[i] for i in listed_yes)}); "
-                                  f"write 'no other conditions' if those are all")
+                problem(f"'{stmt}' contradicts the diagnoses already given "
+                        f"({', '.join(_ITEM_LABEL[i] for i in listed_yes)}); "
+                        f"write 'no other conditions' if those are all", "contradiction", "condition")
                 continue
             if no_conditions and excepted - allowed:
-                p.problems.append(f"'{stmt}' contradicts an earlier 'no known conditions'; "
-                                  f"keep one of the two")
+                problem(f"'{stmt}' contradicts an earlier 'no known conditions'; "
+                        f"keep one of the two", "contradiction", "condition")
                 continue
             if not other:
                 no_conditions, allowed = True, allowed | excepted
             said_none = True
+            cur.facts["no_conditions"] = "other" if other else "all"
             answer(exceptions, stmt)
             note_ignored(ignored)
             continue
@@ -956,6 +1077,7 @@ def read_patient_text(text: str) -> ParsedPatient:
                      r"(?:\s+status)?\s*(?:is|:|=|-)?\s*(excellent|very good|good|fair|poor)\b", low)
         if m:
             p.questionnaire["HUQ010"] = _HEALTH[m.group(1)]
+            cur.facts.setdefault("questionnaire", {})["HUQ010"] = _HEALTH[m.group(1)]
             p.questionnaire_notes.append(f"self-rated health: {m.group(1)}")
             continue
         m = re.match(r"health (?:compared (?:to|with)|vs\.?|versus) (?:(?:a|one|1) year ago|last year)"
@@ -963,6 +1085,7 @@ def read_patient_text(text: str) -> ParsedPatient:
             re.match(r"health (?:is )?(?:getting |got )?(better|worse)\b", low)
         if m:
             p.questionnaire["HUQ020"] = _TREND[m.group(1)]
+            cur.facts.setdefault("questionnaire", {})["HUQ020"] = _TREND[m.group(1)]
             p.questionnaire_notes.append(f"health vs a year ago: {m.group(1)}")
             continue
         m = re.match(r"(?:healthcare|health care|doctor'?s?|gp|physician|medical|clinic) visits?"
@@ -970,18 +1093,21 @@ def read_patient_text(text: str) -> ParsedPatient:
         if m:
             n = int(m.group(1))
             p.questionnaire["HUQ050"] = _visits_category(n)
+            cur.facts.setdefault("questionnaire", {})["HUQ050"] = _visits_category(n)
             p.questionnaire_notes.append(f"healthcare visits {n} -> NHANES category "
                                          f"{_visits_category(n)}")
             continue
         diag_text = _DIAG_HEADER.sub("", low) if _DIAG_HEADER.match(low) else low
         if _DIAG_HEADER.match(low) and re.fullmatch(r"\s*(?:none|nil|no|n/?a)\.?\s*", diag_text):
             no_conditions = said_none = True    # "diagnoses: none"
+            cur.facts["no_conditions"] = "all"
             continue
         found, ignored, unclear = _read_diagnoses(diag_text)
         if found and not unclear:
             if no_conditions and any(a != 2 and i not in allowed for i, a in found):
-                p.problems.append(f"'{stmt}' contradicts 'no known conditions'; write 'no other "
-                                  f"conditions' with the diagnoses, or drop one of the two")
+                problem(f"'{stmt}' contradicts 'no known conditions'; write 'no other "
+                        f"conditions' with the diagnoses, or drop one of the two",
+                        "contradiction", "condition")
                 continue
             answer(found, stmt)
             note_ignored(ignored)
@@ -996,12 +1122,13 @@ def read_patient_text(text: str) -> ParsedPatient:
         m = re.match(rf"weight\s*[:=]?\s*{_NUM}\s*(kg|kgs|lb|lbs|pounds)?\s*$", low)
         if m:
             if not m.group(2):
-                p.problems.append(f"'{stmt}': give the weight's unit (kg or lb)")
+                problem(f"'{stmt}': give the weight's unit (kg or lb)", "unit", "weight")
                 continue
             w = float(m.group(1))
             w = w * 0.45359237 if m.group(2).startswith(("lb", "pound")) else w
             if not 25 <= w <= 350:
-                p.problems.append(f"'{stmt}' = {w:.0f} kg, outside 25-350 kg; check the value and unit")
+                problem(f"'{stmt}' = {w:.0f} kg, outside 25-350 kg; check the value and unit",
+                        "unit", "weight")
             else:
                 set_once("weight_kg", w, "weight", stmt)
             continue
@@ -1009,7 +1136,7 @@ def read_patient_text(text: str) -> ParsedPatient:
         m2 = re.match(r"height\s*[:=]?\s*(\d)\s*'\s*(\d{1,2})\s*(?:\"|'')?\s*$", low)
         if m or m2:
             if m and not m.group(2):
-                p.problems.append(f"'{stmt}': give the height's unit (cm, m or in, or 5'10\")")
+                problem(f"'{stmt}': give the height's unit (cm, m or in, or 5'10\")", "unit", "height")
                 continue
             if m:
                 h, unit = float(m.group(1)), m.group(2)
@@ -1017,7 +1144,8 @@ def read_patient_text(text: str) -> ParsedPatient:
             else:
                 h = (int(m2.group(1)) * 12 + int(m2.group(2))) * 2.54
             if not 100 <= h <= 230:
-                p.problems.append(f"'{stmt}' = {h:.0f} cm, outside 100-230 cm; check the value and unit")
+                problem(f"'{stmt}' = {h:.0f} cm, outside 100-230 cm; check the value and unit",
+                        "unit", "height")
             else:
                 set_once("height_cm", h, "height", stmt)
             continue
@@ -1032,11 +1160,13 @@ def read_patient_text(text: str) -> ParsedPatient:
             elif m.group(1) and v in (0, 1, 2, 3):
                 level, note = int(v), f"cotinine level {int(v)} as given"
             else:
-                p.problems.append(f"'{stmt}': give cotinine in ng/mL (e.g. 'cotinine 250 ng/mL') "
-                                  f"or as 'cotinine level 0-3'")
+                problem(f"'{stmt}': give cotinine in ng/mL (e.g. 'cotinine 250 ng/mL') "
+                        f"or as 'cotinine level 0-3'", "unit", "cotinine")
                 continue
+            cur.facts["cotinine"] = level
             if p.cotinine_measured and p.cotinine_level != level:
-                p.problems.append(f"two different cotinine levels: {p.cotinine_level} and {level}")
+                problem(f"two different cotinine levels: {p.cotinine_level} and {level}",
+                        "contradiction", "cotinine")
                 continue
             if p.cotinine_level is not None and p.cotinine_level != level:
                 said = p.cotinine_note.split(" (")[0]
@@ -1049,7 +1179,8 @@ def read_patient_text(text: str) -> ParsedPatient:
         if reading is not None:
             add(reading)
         else:
-            p.not_understood.append(stmt)
+            p.not_understood.append(Remark(stmt, idx))
+            cur.leftover = stmt
 
     # An unread line that names one of the 23 conditions would be lost (assumed No, or
     # answered No next to a list); one that only suggests one is lost only next to a list.
@@ -1057,9 +1188,11 @@ def read_patient_text(text: str) -> ParsedPatient:
             if any(re.search(rf"\b(?:{pat})\b", u.lower()) for pat, _, _ in _DIAGNOSES)
             or ((diagnosed or said_none) and _MEDICAL_WORDS.search(u.lower()))]
     for u in lost:
-        p.problems.append(f"'{u}' mentions a medical condition but was not understood, and it "
-                          f"would be answered No; write it as 'diagnoses: …' with the condition "
-                          f"(e.g. 'diagnoses: stroke') or remove it")
+        p.problems.append(Problem(
+            f"'{u}' mentions a medical condition but was not understood, and it "
+            f"would be answered No; write it as 'diagnoses: …' with the condition "
+            f"(e.g. 'diagnoses: stroke') or remove it", "lost_condition", "condition",
+            (getattr(u, "statement", -1),)))
     p.not_understood = [u for u in p.not_understood if u not in lost]
     if diagnosed or said_none:
         yes = [_ITEM_LABEL[i] + (" (borderline)" if p.questionnaire[i] == 3 else "")
@@ -1071,12 +1204,17 @@ def read_patient_text(text: str) -> ParsedPatient:
             "diagnoses: " + (", ".join(yes) if yes else "none")
             + (f"; not: {', '.join(no)}" if no else "")
             + " — every diagnosis not listed is answered No"))
+    def said(attr: str) -> tuple:
+        return tuple(st.index for st in p.statements if attr in st.facts)
+
     if p.age is None:
-        p.problems.append("no age found (e.g. '58 year old' or 'age 58')")
+        p.problems.append(Problem("no age found (e.g. '58 year old' or 'age 58')", "missing", "age"))
     elif not 20 <= p.age <= 90:
-        p.problems.append(f"age {p.age:g} is outside 20-90, the ages LinAge2's reference covers")
+        p.problems.append(Problem(f"age {p.age:g} is outside 20-90, the ages LinAge2's reference covers",
+                                  "unit", "age", said("age")))
     if p.sex is None:
-        p.problems.append("no sex found ('male' or 'female'): LinAge2 has a separate model for each")
+        p.problems.append(Problem("no sex found ('male' or 'female'): LinAge2 has a separate model for each",
+                                  "missing", "sex"))
     if p.cotinine_level is not None and p.smoking is None:
         p.notes.append("cotinine was given without a smoking status: the knowledge base credits "
                        "cotinine years to smoking only for a stated current smoker")
@@ -1092,11 +1230,27 @@ def read_patient_text(text: str) -> ParsedPatient:
         bmi = p.weight_kg / (p.height_cm / 100) ** 2
         lo, hi = _range("BMXBMI")
         if not lo <= bmi <= hi:
-            p.problems.append(f"BMI {bmi:.1f} from weight and height is outside the {lo:g}-{hi:g} "
-                              f"NHANES observed; check them")
+            p.problems.append(Problem(f"BMI {bmi:.1f} from weight and height is outside the {lo:g}-{hi:g} "
+                                      f"NHANES observed; check them", "unit", "weight",
+                                      said("weight_kg") + said("height_cm")))
         else:
             p.notes.append(f"BMI {bmi:.1f} from weight and height")
+    _outcomes(p)
     return p
+
+
+def _outcomes(p: ParsedPatient) -> None:
+    """Sum up each statement: refused, set aside, (partly) not understood, or read."""
+    refused = {i for x in p.all_problems() for i in getattr(x, "statements", ())}
+    for st in p.statements:
+        if st.index in refused:
+            st.outcome = "refused"
+        elif st.facts.get("set_aside"):
+            st.outcome = "set_aside"
+        elif st.leftover:
+            st.outcome = "partly_read" if any(k != "ignored" for k in st.facts) else "not_understood"
+        else:
+            st.outcome = "read"
 
 
 EXAMPLES: dict[str, str] = {
