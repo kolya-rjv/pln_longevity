@@ -171,9 +171,13 @@ fact: the name, the number and the unit of a measurement; any negation ("no", "n
 "denies", "not") and any time words ("quit in 2010", "per month", "in the past 3 \
 months") that change what it means. Never paraphrase, never join words from two places.
 2. Never invent, round or convert a number or unit; code copies them from your quote.
-3. One item per fact: "58 yo M" gives an `age` and a `sex` item, both quoting "58 yo M". \
-A list ("diagnoses: hypertension, asthma") gives one `condition` item per condition, \
-each quoting as little as identifies it with its negation, if any ("no diabetes").
+3. One item per fact: "58 yo M" gives an `age` and a `sex` item, both quoting "58 yo M" \
+(a quote has at least 3 characters: never quote a bare "M" or "58"). A list \
+("diagnoses: hypertension, asthma") gives one `condition` item per condition, each \
+quoting as little as identifies it with its negation, if any ("no diabetes"). When one \
+negation covers a list ("denies HTN, DM2, CAD"; "no history of cancer, stroke, or \
+heart attack"), quote from the negation through the item ("denies HTN, DM2"), so the \
+quote shows the negation and is still a contiguous span of the text.
 4. Read every statement, including ones that look simple. Skip only words with no \
 health content.
 5. A statement about someone else (family, partner, friends, patients) or about smoke \
@@ -195,11 +199,21 @@ percentage and a count (lymphocytes): pick the group; the unit decides which.
 - cotinine: a serum cotinine test result, only when a number is written.
 - smoking: the person's own TOBACCO smoking. status: "never" (never smoked tobacco), \
 "former" (smoked, and does not now), "current" (smokes now, any amount), "unclear". \
-occasional: true only when the text says they smoke occasionally, socially, rarely, on \
-some days, at weekends, or lightly. other_nicotine: what else the statement says they \
-use or are exposed to — "vaping" (vapes, e-cigarettes), "nicotine_replacement" \
-(patches, gum, lozenges), "smokeless" (chewing tobacco, snus, nicotine pouches), \
-"cannabis" (marijuana, weed — not tobacco), "secondhand" (other people's smoke), or "none".
+Follow the reader's conventions, and do not answer "unclear" for them: "smoker", \
+"smoker since 1990", "heavy smoker for 30 years", "trying to quit", "can't quit" are \
+current; a plain no with nothing about the past — "non-smoker", "doesn't smoke", \
+"smoker: no", "denies smoking", "no cigarettes", "tobacco: none", "never smoked \
+cigarettes" — is never; "ex-smoker", "quit in 2010", "used to smoke" are former. \
+"unclear" is for words that do not settle now / before / never ("smoked a pack a day \
+for 40 years", "tried to quit", "smoker: n/a"). Pack-years alone, or a statement only \
+about vaping, say nothing about smoking: give no smoking item for them, except that \
+someone who vapes or uses other nicotine NOW gets a smoking item (status "unclear" \
+unless their smoking is also stated) with other_nicotine set. occasional: true only \
+when the text says they smoke occasionally, socially, rarely, on some days, at \
+weekends, or lightly. other_nicotine: nicotine the person USES besides smoking (not \
+"never vaped") — "vaping" (vapes, e-cigarettes), "nicotine_replacement" (patches, gum, \
+lozenges), "smokeless" (chewing tobacco, snus, nicotine pouches), "cannabis" \
+(marijuana, weed — not tobacco), "secondhand" (other people's smoke), or "none".
 - condition: one of the conditions below, judged by its NHANES question. answer "yes", \
 "no", or "borderline" (only for prediabetes / borderline diabetes). Respect the \
 question's exclusions and time window.

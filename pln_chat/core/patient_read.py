@@ -229,6 +229,7 @@ _NUM = r"(?:\d+(?:\.\d+)?|\.\d+)"
 _SMOKE_WORD = re.compile(r"smok|cig|tobacco|nicotin|\bpacks?\b|pack[- ]?years?|cigar|\bpipe|vap|e-?cig|snus|"
                          r"\bchew|zyn|juul|pouch|patch|nicotine gum|lozenge|weed|cannabis|marijuana|\bpot\b|joint")
 _TOBACCO_WORD = re.compile(r"cig|tobacco|cigar|\bpacks?\b|\bpipe")
+_NICOTINE_WORD = re.compile(r"vap|e-?cig|juul|snus|\bchew|\bdip\b|zyn|pouch|patch|nicotine gum|lozenge|nrt")
 _OCCASIONAL = re.compile(r"\b(?:occasional(?:ly)?|social(?:ly)?|rarely|light(?:ly)?|some ?days?|weekends?|"
                          r"part(?:y|ies)|now and then|once in a while|sometimes|seldom|infrequent(?:ly)?)\b")
 _FLAG = re.compile(r"^(?:h|l|hh|ll|high|low|normal|abnormal|elevated|raised|ok|borderline|critical|wnl|"
@@ -374,6 +375,13 @@ def _check_smoking(it: Item, measured_cotinine: bool) -> str:
     if not _SMOKE_WORD.search(low):
         return "the quote has no smoking word"
     status, other = it.raw["status"], it.raw["other_nicotine"]
+    nicotine = _NICOTINE_WORD.search(low)
+    if other in ("vaping", "nicotine_replacement", "smokeless") and nicotine \
+            and re.search(r"\b(?:never|no|not|nor|without|don'?t|doesn'?t|didn'?t)\b|n't\b|\bor\s*$",
+                          re.split(r"[,;.]|\bbut\b", low[:nicotine.start()])[-1]):
+        other = "none"                           # "never smoked or vaped", "doesn't vape"
+    if status == "unclear" and other == "none" and not _TOBACCO_WORD.search(low) and not re.search(r"smok", low):
+        return "says nothing about smoking"      # "never vaped", "20 pack years" alone
     if other == "cannabis" and not _TOBACCO_WORD.search(low):
         it.problem = (f"'{it.quote}': cannabis is not tobacco, and LinAge2 reads tobacco exposure "
                       f"(cotinine); say your tobacco smoking on its own ('never smoked', 'former "
