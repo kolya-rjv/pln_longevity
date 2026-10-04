@@ -301,18 +301,8 @@ def test_a_smoking_phrase_it_cannot_pin_down_is_asked_not_guessed(text):
     assert not p.ok and any("cannot tell whether you smoke" in x for x in p.all_problems())
 
 
-@pytest.mark.parametrize("text", [
-    "58 year old male, current smoker, quit 2015",          # one line, split at the comma
-    "58 year old male, smoker, quit in 2010",
-    "58 year old male, heavy smoker, until 2010",
-    "58 year old male, smoker (1990-2015)",
-    "58 year old male, current smoker, quit for 6 months in 2019",
-    "58 year old male\n20 cigarettes a day",
-    "58 year old male\nvapes daily",
-])
-def test_an_unread_piece_of_a_smoking_history_blocks_the_build(text):
-    p = read_patient_text(text)
-    assert not p.ok and any("smoking" in x for x in p.all_problems())
+# More smoking and diagnosis phrasings, with the outcome each must get, are pinned in
+# tests/test_patient_text_corpus.py (every reproduction from the review rounds).
 
 
 def test_a_time_piece_after_something_else_is_not_blamed_on_smoking():
@@ -450,15 +440,6 @@ def test_a_real_but_extreme_value_still_builds_and_witnesses(line):
 def test_consistent_diagnoses_are_not_called_contradictions(text, item):
     p = read_patient_text(text)
     assert p.ok and p.questionnaire[item] == 1 and p.questionnaire["MCQ220"] == 2
-
-
-@pytest.mark.parametrize("text", [
-    "58 year old male\ndiagnoses: hypertension, high cholesterol\nno other conditions",
-    "58 year old male\nhad a stroke\nno other conditions",
-])
-def test_an_unread_line_cannot_become_a_no_by_default(text):
-    p = read_patient_text(text)
-    assert not p.ok and any("would be lost" in x or "not understood" in x for x in p.all_problems())
 
 
 def test_an_unknown_lab_next_to_diagnoses_is_only_not_understood():
