@@ -241,6 +241,8 @@ class ParsedPatient:
     smoking: Optional[str] = None              # NeverSmoker | FormerSmoker | CurrentSmoker
     cotinine_level: Optional[int] = None
     cotinine_note: str = ""
+    #: the level came from a cotinine value, not from words — words never replace it
+    cotinine_measured: bool = False
     readings: list[Reading] = field(default_factory=list)
     questionnaire: dict[str, int] = field(default_factory=dict)
     questionnaire_notes: list[str] = field(default_factory=list)
@@ -370,26 +372,38 @@ _SOMEONE_ELSE = re.compile(
     r"|second[- ]?hand|passive(?:ly)? smok")
 #: (pattern, status, cotinine level). Order matters: negated and past before current.
 _SMOKING = (
-    (r"\bnever[- ]?(?:a\s+)?smok\w*|\bnon[- ]?smok\w*|\b(?:do|does)(?:n'?t| not) smoke\b"
-     r"|\bnot an? smoker\b|\bno smoking\b|\bsmoke[- ]free\b"
-     r"|\bsmok(?:ing|er|es)\s*[:=]\s*(?:no|never|none|n)\b",
+    (r"\bnever (?:been |was |were )?(?:a\s+)?smok\w*|\bnever-?smok\w*|\bnon[- ]?smok\w*"
+     r"|\b(?:do|does)(?:n'?t| not) smoke\b(?! any ?more)|\bnot an? smoker\b|\bno smoking\b|\bsmoke[- ]free\b"
+     r"|\bsmok(?:ing|er|es)\s*(?:[:=?]|-)\s*(?:no|never|none|n)\b",
      "NeverSmoker", 0),
     # still smoking, whatever the sentence says about quitting
-    (r"\b(?:trying|want(?:s|ing)?|plan(?:s|ning)?|hoping|going) to (?:quit|stop)\b",
+    (r"\b(?:trying|want(?:s|ing)?|plan(?:s|ning)?|hoping|going) to (?:quit|stop)\b"
+     r"|\b(?:can'?t|cannot|can not|unable to|fail(?:ed|s)? to|struggl\w* to) (?:quit|stop)\b",
      "CurrentSmoker", 3),
     (r"\b(?:former|ex|previous|past|reformed)[- ]?(?:\w+[- ])?smoker\b"
-     r"|\b(?:quit|stopped|gave up) smoking\b|\bused to smoke\b|\bsmok(?:ed|er)(?= until\b)"
+     r"|\b(?:quit|stopped|gave up) smoking\b|\bused to (?:smoke|be an? (?:\w+ )?smoker)\b"
+     r"|\bwas an? (?:\w+ )?smoker\b|\bno longer smok\w*|\b(?:don'?t|do not|doesn'?t|does not) smoke any ?more\b"
+     r"|\bsmok(?:ed|er)(?= until\b)|\bsmok\w*\s*[(,\-]?\s*(?:quit|stopped|gave up)\b"
      r"|\bsmok(?:ing|er)\s*[:=]\s*(?:former|ex|past|quit)\b",
      "FormerSmoker", 0),
     (r"\b(?:light|occasional|social)[- ]?smoker\b|\bsmokes? (?:some|a few) days\b|\bsmokes? occasionally\b",
      "CurrentSmoker", 1),
     (r"\bmoderate[- ]?smoker\b", "CurrentSmoker", 2),
-    (r"\b(?:heavy|daily|current)[- ]?smoker\b|\bsmokes? (?:daily|every day)\b|\bsmoker\b|\bi smoke\b"
-     r"|\bsmokes\b|\bsmok(?:ing|er|es)\s*[:=]\s*(?:yes|current|daily|y)\b", "CurrentSmoker", 3),
+    (r"\bsmok(?:ing|er|es)\s*[:=]\s*(?:yes|current|daily|y)\b|\b(?:heavy|daily|current)[- ]?smoker\b"
+     r"|\bsmokes? (?:daily|every day)\b|\bsmoker\b|\bi smoke\b|\bsmokes\b", "CurrentSmoker", 3),
 )
-_FILLER = re.compile(r"\b(?:i'm|im|i am|a|an|the|i|am|is|who|and|old|patient|person|me|my|year|years|yo|"
+#: A current-smoker phrase in a clause that also negates or puts it in the past ("never
+#: been a smoker", "not a current smoker", "was a smoker", "smoker? no") is not read as
+#: smoking now: none of the patterns above pinned it down, so the reader asks instead.
+_SMOKING_DOUBT = re.compile(
+    r"\b(?:no|not|never|nope|nor|none|no longer|was|were|used to|quit|quitting|stopped|gave up|"
+    r"former|ex|previous|past|until|ago|any ?more|before)\b"
+    r"|\b(?:don|doesn|didn|isn|wasn|aren|weren|haven|hasn|hadn|can|won)'t\b"
+    r"|\b(?:dont|doesnt|didnt|isnt|wasnt|havent|hasnt|cant|cannot|wont)\b|\?")
+_FILLER = re.compile(r"\b(?:i'm|im|i am|a|an|the|i|am|is|have|has|who|and|old|patient|person|me|my|year|years|yo|"
                      r"aged?|sex|smoking|currently|current|status)\b|[,.:;=/\-()']")
 _DURATION = re.compile(r"\b\d+\s*(?:years?|yrs?|months?)\s+ago\b|\b(?:since|until|in)\s+\d{4}\b"
+                       r"|\b(?:19|20)\d{2}\b"
                        r"|\bfor\s+(?:the\s+(?:last|past)\s+)?\d+\s*(?:years?|yrs?|months?)\b")
 _NEGATION = re.compile(r"^(?:no|not|never|without|denies|denied|negative for|free of|nor)\b\s*")
 
@@ -451,6 +465,10 @@ def _cotinine_level(ng_ml: float) -> int:
     return 0 if ng_ml < 10 else 1 if ng_ml < 100 else 2 if ng_ml < 200 else 3
 
 
+_COMMA_SPLIT = re.compile(r",\s+(?=[A-Za-z])(?!(?:quit|quitting|stopped|gave up|but|trying|want\w*|"
+                          r"plan\w*|hoping|going to|no longer|since|until)\b)")
+
+
 def _statements(text: str) -> list[str]:
     out: list[str] = []
     for line in (text or "").splitlines():
@@ -461,7 +479,8 @@ def _statements(text: str) -> list[str]:
             if _DIAG_HEADER.match(seg) and not re.match(r"^(?:has|history of|with)\b", seg, re.I):
                 out.append(seg)                     # "diagnoses: a, b, c" stays whole
             else:
-                out.extend(p.strip() for p in re.split(r",\s+(?=[A-Za-z])", seg) if p.strip())
+                # "smoker, quit in 2010" / "smoker, trying to quit" is one statement
+                out.extend(p.strip() for p in re.split(_COMMA_SPLIT, seg) if p.strip())
     return out
 
 
@@ -595,6 +614,10 @@ def read_patient_text(text: str) -> ParsedPatient:
         seen.setdefault(reading.code, reading)
         p.readings.append(reading)
 
+    diagnosed: set[str] = set()         # items a statement answered, Yes or No
+    no_conditions = False               # "no known conditions" (not "no OTHER conditions")
+    said_none = False                   # either: every diagnosis not listed is a No
+
     def set_once(attr: str, value, what: str, stmt: str) -> None:
         current = getattr(p, attr)
         if current is not None and current != value:
@@ -640,15 +663,35 @@ def read_patient_text(text: str) -> ParsedPatient:
                 set_once("sex", sex, "sex", stmt)
                 rest = rx.sub(" ", rest)
                 break
-        for pattern, status, level in _SMOKING:
-            if re.search(pattern, rest):
-                set_once("smoking", status, "smoking status", stmt)
-                if p.smoking == status:
+        for i, (pattern, status, level) in enumerate(_SMOKING):
+            m = re.search(pattern, rest)
+            if not m:
+                continue
+            if status == "CurrentSmoker" and i > 1:
+                # the clause around the match: up to the nearest comma or semicolon
+                start = max(rest.rfind(",", 0, m.start()), rest.rfind(";", 0, m.start())) + 1
+                ends = [j for j in (rest.find(",", m.end()), rest.find(";", m.end())) if j >= 0]
+                clause = rest[start:min(ends) if ends else len(rest)]
+                if _SMOKING_DOUBT.search(clause.replace(m.group(0), " ")):
+                    p.problems.append(
+                        f"'{stmt}': cannot tell whether you smoke now, used to, or never did; "
+                        f"write 'current smoker', 'former smoker' or 'never smoked'")
+                    rest = rest.replace(clause, " ")
+                    break
+            set_once("smoking", status, "smoking status", stmt)
+            if p.smoking == status:
+                if p.cotinine_measured:
+                    if level != p.cotinine_level:
+                        p.notes.append(f"'{stmt}' would put cotinine at level {level}; the measured "
+                                       f"value is used ({p.cotinine_note})")
+                else:
                     p.cotinine_level = level
                     p.cotinine_note = (f"cotinine level {level} from '{stmt}' (training bins: 0 <10, "
                                        f"1 10-100, 2 100-200, 3 >=200 ng/mL)")
-                rest = re.sub(pattern, " ", rest)
-                break
+            rest = re.sub(pattern, " ", rest)
+            if i == 1:                              # "smoker, (no plans|trying) to quit"
+                rest = re.sub(r"\b(?:no|not|smok\w*|cigarettes?)\b", " ", rest)
+            break
         if rest != low:
             rest = _DURATION.sub(" ", rest)         # "quit smoking 20 years ago", "until 2015"
             leftover = re.sub(r"\s+", " ", _FILLER.sub(" ", rest)).strip()
@@ -663,14 +706,17 @@ def read_patient_text(text: str) -> ParsedPatient:
             if exceptions is None:
                 p.not_understood.append(stmt)
                 continue
-            for q in _FS1_ITEMS:
-                p.questionnaire[q] = 2
+            listed_yes = [i for i in diagnosed if p.questionnaire.get(i) in (1, 3)]
+            if listed_yes and not re.search(r"\bother\b", low):
+                p.problems.append(f"'{stmt}' contradicts the diagnoses already given "
+                                  f"({', '.join(_ITEM_LABEL[i] for i in listed_yes)}); "
+                                  f"write 'no other conditions' if those are all")
+                continue
+            no_conditions = no_conditions or not re.search(r"\bother\b", low)
+            said_none = True
             for item, answer in exceptions:
                 p.questionnaire[item] = answer
-            p.questionnaire_notes.append(
-                "no known conditions" + (" except " + ", ".join(_ITEM_LABEL[i] for i, a in exceptions
-                                                                 if a != 2) if exceptions else "")
-                + ": every other diagnosis answered No")
+                diagnosed.add(item)
             continue
         m = re.match(r"(?:self[- ]rated |general |overall )?health\s*(?:is|:|=)?\s*"
                      r"(excellent|very good|good|fair|poor)\b", low)
@@ -696,16 +742,13 @@ def read_patient_text(text: str) -> ParsedPatient:
         diag_text = _DIAG_HEADER.sub("", low) if _DIAG_HEADER.match(low) else low
         found = _read_diagnoses(diag_text)
         if found:
+            if no_conditions and any(a != 2 for _, a in found):
+                p.problems.append(f"'{stmt}' contradicts 'no known conditions'; write 'no other "
+                                  f"conditions' with the diagnoses, or drop one of the two")
+                continue
             for item, answer in found:
                 p.questionnaire[item] = answer
-            for q in _FS1_ITEMS:
-                p.questionnaire.setdefault(q, 2)
-            yes = [_ITEM_LABEL[i] + (" (borderline)" if a == 3 else "") for i, a in found if a != 2]
-            no = [_ITEM_LABEL[i] for i, a in found if a == 2]
-            p.questionnaire_notes.append(
-                "diagnoses: " + (", ".join(yes) if yes else "none")
-                + (f"; not: {', '.join(no)}" if no else "")
-                + " (anything not listed counts as No)")
+                diagnosed.add(item)
             continue
 
         # ── blood pressure, weight, height ─────────────────────────────────────
@@ -756,10 +799,13 @@ def read_patient_text(text: str) -> ParsedPatient:
                 p.problems.append(f"'{stmt}': give cotinine in ng/mL (e.g. 'cotinine 250 ng/mL') "
                                   f"or as 'cotinine level 0-3'")
                 continue
-            if p.cotinine_level is not None and p.cotinine_level != level and p.smoking is None:
+            if p.cotinine_measured and p.cotinine_level != level:
                 p.problems.append(f"two different cotinine levels: {p.cotinine_level} and {level}")
                 continue
-            p.cotinine_level, p.cotinine_note = level, note
+            if p.cotinine_level is not None and p.cotinine_level != level:
+                said = p.cotinine_note.split(" (")[0]
+                p.notes.append(f"{said[:1].upper()}{said[1:]} replaced by the measured value ({note})")
+            p.cotinine_level, p.cotinine_note, p.cotinine_measured = level, note, True
             continue
 
         # ── a lab value ────────────────────────────────────────────────────────
@@ -769,6 +815,16 @@ def read_patient_text(text: str) -> ParsedPatient:
         else:
             p.not_understood.append(stmt)
 
+    if diagnosed or said_none:
+        yes = [_ITEM_LABEL[i] + (" (borderline)" if p.questionnaire[i] == 3 else "")
+               for i in _FS1_ITEMS if i in diagnosed and p.questionnaire[i] != 2]
+        no = [_ITEM_LABEL[i] for i in _FS1_ITEMS if i in diagnosed and p.questionnaire[i] == 2]
+        for q in _FS1_ITEMS:
+            p.questionnaire.setdefault(q, 2)
+        p.questionnaire_notes.insert(0, (
+            "diagnoses: " + (", ".join(yes) if yes else "none")
+            + (f"; not: {', '.join(no)}" if no else "")
+            + " — every diagnosis not listed is answered No"))
     if p.age is None:
         p.problems.append("no age found (e.g. '58 year old' or 'age 58')")
     elif not 20 <= p.age <= 90:
@@ -778,6 +834,11 @@ def read_patient_text(text: str) -> ParsedPatient:
     if p.cotinine_level is not None and p.smoking is None:
         p.notes.append("cotinine was given without a smoking status: the knowledge base credits "
                        "cotinine years to smoking only for a stated current smoker")
+    glucose = next((r for r in p.readings if r.code == "LBDSGLSI" and not r.blocking), None)
+    if glucose is not None and not glucose.fasting:
+        p.notes.append("glucose was not marked fasting: LinAge2 uses it as typed, but the "
+                       "knowledge base's FastingGlucose witness needs a fasting value — write "
+                       "'fasting glucose …' if it was")
     if p.set_aside:
         p.notes.append("set aside (about someone else, or smoke you did not smoke): "
                        + "; ".join(f"'{s_}'" for s_ in p.set_aside))

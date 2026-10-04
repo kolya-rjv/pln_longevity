@@ -385,8 +385,12 @@ explicit age phrase is an age ("quit smoking 20 years ago" no longer makes someo
 two different ages are a problem, not last-one-wins; a statement about someone else ("my
 husband smokes", "male partner", "family history of diabetes", second-hand smoke) is set
 aside and listed; negated, past and ongoing smoking are told apart ("not a smoker",
-"former heavy smoker", "trying to quit"); "no diabetes" is a No, "no known conditions except
-hypertension" a single Yes; weight, height, cotinine and GrimAge need an explicit unit or
+"never been a smoker", "former heavy smoker", "smoker (quit 2010)", "trying to quit", "can't
+quit"), and a smoker phrase in a clause that negates it in a way no pattern pins down ("not a
+current smoker") is asked about, not read as smoking; a measured cotinine is never replaced
+by the level a smoking phrase implies, in either order; "no diabetes" is a No, "no known
+conditions except hypertension" a single Yes, "no other conditions" keeps the diagnoses
+listed, and "no known conditions" next to a diagnosis is a contradiction to fix; weight, height, cotinine and GrimAge need an explicit unit or
 form (a bare "GrimAge 46" is a clock age, not an acceleration); an abnormal value typed in
 the usual unit is never re-read as a normal value in another one (hemoglobin 9.5 asks);
 urea and urea nitrogen have their own mg/dL factors.
@@ -401,8 +405,10 @@ all it needs to say — and the tab says so, while LinAge2 uses the value as typ
 
 **What the tab shows.** The read table (value as typed, LinAge2 value, check, and the
 same-sex, same-age NHANES median as *Typical*); after Build, the biological age, the measured
-labs adding and removing years, the count and total of filled-in inputs, the builder's notes,
-the atoms, and suggested questions that jump to *PLN Query* with the question filled in.
+labs adding and removing years, the count and total of filled-in inputs, LinAge2's own caveats
+(an age outside 40-85 is flagged as an extrapolation under the headline; an unanswered
+questionnaire is said to be assumed), the builder's notes reworded for someone who typed text
+rather than sent z-scores, the atoms, and suggested questions that jump to *PLN Query* with the question filled in.
 Verified in a headless browser: build, banner, suggested question, download, and the
 unclear-unit refusal (`tests/test_patient_tab.py` covers the handlers and the chat wiring).
 

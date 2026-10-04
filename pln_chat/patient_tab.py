@@ -4,8 +4,9 @@ build a patient that lives only in this browser session, then ask about it.
 Nothing here is written into the knowledge base. The patient is a plain dict in a
 `gr.State` (one per browser session, gone on reload); every chat turn rebuilds its
 atoms with `build_patient` and injects them into that one query's space, exactly as
-`/query` does with a `patient` object. The "Download .metta" file is written to the
-system temp directory — never to an ontology folder, which every KB loader scans.
+`/query` does with a `patient` object. The "Download .metta" file is written to a
+temp directory (pruned after an hour) — never to an ontology folder, which every KB
+loader scans.
 
 The flow, and why it has two buttons:
 
@@ -16,8 +17,12 @@ The flow, and why it has two buttons:
 """
 from __future__ import annotations
 
+import atexit
 import os
+import shutil
 import tempfile
+import time
+from pathlib import Path
 from typing import Optional
 
 import gradio as gr
@@ -165,16 +170,62 @@ def render_banner(state: Optional[dict]) -> str:
     return " · ".join(bits)
 
 
+#: One directory per process for the downloads; files older than this are pruned on
+#: each build (Gradio serves a download from its own cache copy, made when it is shown).
+_DOWNLOAD_DIR = Path(tempfile.mkdtemp(prefix="pln_patients_"))
+_DOWNLOAD_TTL_S = 3600
+atexit.register(shutil.rmtree, _DOWNLOAD_DIR, True)
+
+
 def _write_download(built: BuiltPatient) -> str:
     """A .metta copy for the person to keep: a NEW temp file per build (never shared
-    between sessions), in the system temp directory — not a folder the KB loads."""
+    between sessions), in a temp directory — not a folder the KB loads."""
+    now = time.time()
+    for old in _DOWNLOAD_DIR.glob("*.metta"):
+        try:
+            if now - old.stat().st_mtime > _DOWNLOAD_TTL_S:
+                old.unlink()
+        except OSError:
+            pass
     header = (f";; {built.patient_id} — built in the PLN 'My Patient' tab for one browser\n"
               f";; session. Not part of the knowledge base; load it as extra_atoms or\n"
               f";; send the same text again to rebuild it.\n")
-    fd, path = tempfile.mkstemp(prefix=f"pln_patient_{built.patient_id}_", suffix=".metta")
+    _DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    fd, path = tempfile.mkstemp(prefix=f"pln_patient_{built.patient_id}_", suffix=".metta",
+                                dir=_DOWNLOAD_DIR)
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         fh.write(header + built.atoms + "\n")
     return path
+
+
+#: The builder's notes are written for /patients/preview callers, who send z-scores and
+#: whole LinAge2 blocks. The tab's user typed text: the same facts, in their terms.
+_TAB_WORDING = (
+    ("The LinAge2 block was sent without any of the markers",
+     "None of your values can be a knowledge-base witness (CRP, HbA1c, or a glucose marked "
+     "fasting) and you are not a current smoker. The per-lab years are reported, but no "
+     "cause can be credited and every counterfactual returns 0: a lab's years carry the sign "
+     "of LinAge2's sex-specific weights, so the knowledge base needs your own elevated value "
+     "to call a lab high."),
+    ("Standardised server-side from a raw value:",
+     None),     # rewritten below with its marker list
+    ("No AgeAccelGrim measurement:",
+     "No GrimAge acceleration given: the 10-year heart-disease risk model reads that clock "
+     "and returns nothing for you (add a line such as 'GrimAge acceleration +3 years' if you "
+     "have one). Diagnosis, supplement ranking and intervention ranking still work."),
+)
+
+
+def _in_tab_words(note: str) -> str:
+    for prefix, text in _TAB_WORDING:
+        if note.startswith(prefix):
+            if text is not None:
+                return text
+            markers = note[len(prefix):].split(".")[0].strip()
+            return (f"{markers}: turned into z-scores against one pooled reference (there is no "
+                    f"age- and sex-specific table here), so the knowledge base's Elevated / "
+                    f"Normal call on them is not adjusted for your age or sex.")
+    return note.replace("measurement was sent", "measurement was given")
 
 
 # ── handlers ──────────────────────────────────────────────────────────────────
@@ -188,13 +239,20 @@ def on_build(text: str, state: Optional[dict]):
     parsed = read_patient_text(text or "")
     reading = render_reading(parsed)
     try:
-        payload, _ = parsed.to_patient(PATIENT_ID)
+        payload, result = parsed.to_patient(PATIENT_ID)
         built = build_caller_patient(payload, ())
     except PatientSpecError as exc:
         return (reading, f"### Not built\n✗ {exc.message}", gr.update(),
                 gr.update(), render_banner(state), state, gr.update())
-    warnings = list(dict.fromkeys(parsed.witness_notes + built.warnings))
+    # the model's own caveats (age outside 40-85, questionnaire assumed); its count of
+    # filled-in labs repeats the builder's IMPUTED note, so it is left to that one
+    model_notes = [w for w in result.warnings if "were not given and were filled" not in w]
+    warnings = list(dict.fromkeys(model_notes + parsed.witness_notes
+                                  + [_in_tab_words(w) for w in built.warnings]))
     summary = render_summary(built)
+    caveat = next((w for w in model_notes if "extrapolation" in w), None)
+    if caveat:
+        summary = summary.replace("\n\n", f"\n\n⚠ {caveat}\n\n", 1)
     if warnings:
         summary += "\n\n<details><summary>Notes on this patient</summary>\n\n" + "\n".join(
             f"- {w}" for w in warnings) + "\n</details>"

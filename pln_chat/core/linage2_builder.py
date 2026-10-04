@@ -228,8 +228,8 @@ def build_linage2(
         warnings.append(
             f"LinAge2 delta of {delta:+.1f} years exceeds the largest delta Fong et al. "
             f"2025 report on NHANES ({PLAUSIBLE_ABS_DELTA_YEARS:g} years, in participants "
-            f"with heart failure, recent cancer or on dialysis). It is carried as sent; "
-            f"verify the inputs the service was given."
+            f"with heart failure, recent cancer or on dialysis). It is carried as computed; "
+            f"verify the inputs it was computed from."
         )
     if age is not None and abs(age - chrono) > AGE_TOLERANCE_YEARS:
         raise PatientSpecError(

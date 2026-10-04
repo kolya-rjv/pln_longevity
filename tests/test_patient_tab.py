@@ -200,3 +200,29 @@ def test_from_text_refuses_a_bad_id_with_a_422_not_a_500():
 
     assert asyncio.run(post({"text": SMOKER, "id": "X" * 60})).status_code == 422
     assert asyncio.run(post({"text": SMOKER, "id": "bad id"})).status_code == 422
+
+
+def test_the_models_caveats_reach_the_tab():
+    summary = _build("30 year old female\nalbumin 4.2 g/dL")["summary"]
+    assert "⚠ Age 30 is outside the ages LinAge2 was fitted on" in summary
+    assert "Questionnaire not answered" in summary
+
+
+def test_the_notes_speak_to_someone_who_typed_text():
+    summary = _build("60 year old female\nalbumin 4.0 g/dL")["summary"]
+    assert "None of your values can be a knowledge-base witness" in summary
+    assert "block was sent" not in summary and "Send `z`" not in summary
+    assert "GrimAge acceleration +3 years" in summary
+    former = _build(EXAMPLES["six labs only"])["summary"]
+    assert "returns 0 for a former smoker" in former and "does not need it" not in former
+    assert "turned into z-scores against one pooled reference" in former
+
+
+def test_old_downloads_are_pruned(monkeypatch):
+    import os
+    import time
+    old = Path(_build(SMOKER)["download"]["value"])
+    os.utime(old, (time.time() - 7200, time.time() - 7200))
+    new = Path(_build(SMOKER)["download"]["value"])
+    assert new.exists() and not old.exists() and new.parent == old.parent
+
