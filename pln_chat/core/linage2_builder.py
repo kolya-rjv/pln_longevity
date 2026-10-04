@@ -339,9 +339,10 @@ def build_linage2(
     if n_imputed:
         imputed_years = sum(c.years for c in contributions if c.imputed)
         warnings.append(
-            f"{n_imputed} of {len(contributions)} LinAge2 inputs were IMPUTED by the "
-            f"service (median of a same-sex, same-age-window reference cohort), "
-            f"contributing {imputed_years:+.2f} years in total. Imputed inputs are "
+            f"{n_imputed} of {len(contributions)} LinAge2 inputs were not measured but "
+            f"IMPUTED (the median of a same-sex, same-age reference cohort, a value "
+            f"derived from one, or a questionnaire default), contributing "
+            f"{imputed_years:+.2f} years in total. Imputed inputs are "
             f"carried under the `Imputed` flag: the engine totals them separately and "
             f"never credits a cause to one. Re-test them with real labs."
         )

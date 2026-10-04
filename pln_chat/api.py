@@ -99,7 +99,6 @@ from core.patient_builder import (
     MARKERS,
     BuiltPatient,
     PatientSpecError,
-    build_patient,
     marker_catalog,
 )
 from core.rate_limit import TokenBucketLimiter
@@ -135,8 +134,11 @@ from core.pln_runner import (
     run_query_parts,
 )
 from core.linage2_builder import feature_listing as linage2_feature_listing
+from core.patient_text import read_patient_text
 from core.patient_context import (
+    build_caller_patient,
     names_a_patient,
+    patient_knobs,
     patient_prompt_section,
     validation_text,
     with_injected,
@@ -500,33 +502,10 @@ def _patient_summaries() -> list[dict]:
 # policy, and sanitisation — see core/patient_builder.py for why the last one is
 # load-bearing.
 
-_SD_TO_YEARS_RE = re.compile(r"\(=\s*\(grimaccel-sd-to-years\)\s*([\d.]+)\s*\)")
-_ELEVATED_Z_RE = re.compile(r"\(=\s*\(elevated-z-threshold\)\s*([\d.]+)\s*\)")
-
-
 def _patient_knobs() -> tuple[float, float]:
-    """`grimaccel-sd-to-years` and `elevated-z-threshold`, read off the KB.
-
-    Both are documented tunables of the MeTTa layer. Reading them rather than
-    copying them keeps a caller's years->z conversion and the Elevated/Low
-    labels in lockstep with the engine that will consume them.
-    """
-    sd_to_years, elevated = 4.2, 1.0
-    try:
-        risk = (ONTOLOGY_DIR / "pln_risk_prediction.metta").read_text(encoding="utf-8")
-        m = _SD_TO_YEARS_RE.search(risk)
-        if m:
-            sd_to_years = float(m.group(1))
-    except OSError:
-        pass
-    try:
-        profile = (ONTOLOGY_DIR / "patient_profile.metta").read_text(encoding="utf-8")
-        m = _ELEVATED_Z_RE.search(profile)
-        if m:
-            elevated = float(m.group(1))
-    except OSError:
-        pass
-    return sd_to_years, elevated
+    """`grimaccel-sd-to-years` and `elevated-z-threshold`, read off the KB
+    (core.patient_context.patient_knobs — shared with the UI's My Patient tab)."""
+    return patient_knobs()
 
 
 def _known_patient_ids() -> set[str]:
@@ -537,14 +516,8 @@ def _build_caller_patient(payload: Optional[dict]) -> Optional[BuiltPatient]:
     """Validate and render a caller's patient, or raise a 422 explaining why."""
     if payload is None:
         return None
-    sd_to_years, elevated = _patient_knobs()
     try:
-        return build_patient(
-            payload,
-            existing_ids=_known_patient_ids(),
-            sd_to_years=sd_to_years,
-            elevated_threshold=elevated,
-        )
+        return build_caller_patient(payload, _known_patient_ids())
     except PatientSpecError as exc:
         raise HTTPException(
             status_code=422,
@@ -2983,6 +2956,57 @@ def patients_preview(patient: PatientIn) -> PatientPreviewResponse:
         has_linage2=built.has_linage2,
         linage2=built.linage2.as_dict() if built.linage2 is not None else None,
     )
+
+
+class PatientTextIn(BaseModel):
+    """A few lines of plain text about a person (the "My Patient" tab's input)."""
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(
+        ..., max_length=20_000,
+        description="Age, sex, smoking, lab values with units, diagnoses — one per line "
+                    "(e.g. '58 year old male, current smoker', 'albumin 4.1 g/dL', "
+                    "'diagnoses: hypertension'). Read by fixed rules, no LLM.",
+    )
+    id: str = Field(default="Me", max_length=48, pattern=r"^[A-Za-z][A-Za-z0-9_]*$",
+                    description="Letters, digits and underscores; becomes `Caller_<id>`.")
+
+
+class PatientTextResponse(BaseModel):
+    ok: bool = Field(description="Everything read is usable and LinAge2 could be scored.")
+    read: dict = Field(description="What was read: every value as typed, in LinAge2's unit, "
+                                   "with a status (ok / unit assumed / needs a unit / unknown "
+                                   "unit / out of range / duplicate), plus the questionnaire "
+                                   "answers and whatever was not understood.")
+    problems: list[str] = Field(description="Why `ok` is false — fix the text and resend.")
+    patient: Optional[dict] = Field(
+        default=None,
+        description="The patient, LinAge2 scored in-process: send it as `patient` to /query "
+                    "or /metta/run, or as the whole body of /patients/preview and "
+                    "/linage2/analyze. Null when `ok` is false.")
+    preview: Optional[PatientPreviewResponse] = None
+
+
+@app.post("/patients/from-text", response_model=PatientTextResponse)
+def patients_from_text(req: PatientTextIn) -> PatientTextResponse:
+    """Plain text -> a patient, as the UI's "My Patient" tab does it — no LLM.
+
+    A value whose unit cannot be pinned down is not guessed: `ok` is false and
+    `read` says which value and why (core/patient_text.py). Otherwise LinAge2 is
+    scored in-process (core/linage2_model.py) and the result is an ordinary
+    caller-supplied patient, previewed exactly as POST /patients/preview would.
+    """
+    parsed = read_patient_text(req.text)
+    if not parsed.ok:
+        return PatientTextResponse(ok=False, read=parsed.as_dict(), problems=parsed.all_problems())
+    try:
+        payload, _ = parsed.to_patient(req.id)
+    except PatientSpecError as exc:
+        raise HTTPException(status_code=422, detail={"code": exc.code, "message": exc.message,
+                                                      **exc.extra})
+    preview = patients_preview(PatientIn.model_validate(payload))
+    return PatientTextResponse(ok=True, read=parsed.as_dict(), problems=[], patient=payload,
+                               preview=preview)
 
 
 # ── LinAge2: the clinical clock ─────────────────────────────────────────────

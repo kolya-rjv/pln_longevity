@@ -41,7 +41,14 @@ from core.drugage_router import (
     parse_drugage_query,
     route_drugage_ranking,
 )
-from core.patient_context import names_a_patient
+from core.patient_builder import PatientSpecError
+from core.patient_context import (
+    build_caller_patient,
+    names_a_patient,
+    patient_prompt_section,
+    validation_text,
+    with_injected,
+)
 from core.executor import (
     PLNExecutionTimeout,
     PLNOverloaded,
@@ -63,6 +70,7 @@ from core.pln_runner import (
     run_query,
     run_query_parts,
 )
+from patient_tab import build_tab as build_patient_tab, render_banner as render_patient_banner
 from utils.formatting import format_bot_response
 from utils.logging import log_query, log_turn
 from utils.metta_highlight import highlight_metta
@@ -214,10 +222,10 @@ _LINAGE2_CONTEXT: Optional[tuple] = None
 def _linage2_context() -> tuple:
     """Registry + inventory over the LinAge2 scoped stack, built once.
 
-    The chat UI has no caller-supplied patient yet, so a LinAge2 form typed here
-    can only name a curated patient — none of whom carries a LinAge2 result — and
-    the honest answer is empty. The route exists so the UI and the API validate
-    and execute the same form the same way; the patient surface is the API's.
+    The UI's patient is the one built in the My Patient tab (patient_tab.py), held in
+    the session state and injected per query exactly as the API injects `patient`;
+    without one, a LinAge2 form can only name a curated patient — none of whom
+    carries a LinAge2 result — and the honest answer is empty, and warned.
     """
     global _LINAGE2_CONTEXT
     if _LINAGE2_CONTEXT is None:
@@ -271,6 +279,7 @@ def chat(
     show_metta: bool,
     show_explanation: bool,
     show_debug: bool,
+    patient_state: Optional[dict] = None,
 ) -> tuple[list[dict], str]:
     if not user_message.strip():
         return history, ""
@@ -280,6 +289,24 @@ def chat(
     registry, raw_contents = _build_context(selected_files)
     inventory = _runtime_inventory()
     system_prompt = build_system_prompt(registry, raw_contents, inventory)
+
+    # The "My Patient" tab's patient: a plain dict in this browser session's state,
+    # rebuilt into atoms for this one query — exactly what /query does with a
+    # `patient` object (core.patient_context), so the two surfaces agree. The
+    # LinAge2 atoms go only to the LinAge2 space; the shared space gets the rest.
+    patient = None
+    patient_note = None
+    if patient_state:
+        try:
+            patient = build_caller_patient(patient_state, ())
+        except PatientSpecError as exc:
+            # /query would refuse with a 422; a chat answers, and says it went without.
+            patient_note = (f"Your session patient could not be rebuilt ({exc.message}); this "
+                            f"answer did not use it. Rebuild it in **My Patient**.")
+    full_atoms = patient.atoms if patient is not None else None
+    shared_atoms = patient.shared_atoms if patient is not None else None
+    if patient is not None:
+        system_prompt += patient_prompt_section(patient)
 
     # Gradio 6 history is already a list of {role, content} dicts
     history_msgs: list[dict] = list(history)
@@ -332,17 +359,22 @@ def chat(
             # A program that also asks for something else is split, that part runs
             # in the shared space, both in ONE offloaded task, answers in program
             # order (api._run_linage2_program).
-            linage_registry, linage_inventory = _linage2_context()
+            linage_registry, linage_inventory = with_injected(*_linage2_context(), full_atoms)
+            shared_registry, shared_inventory = with_injected(registry, inventory, shared_atoms)
             linage_kb = linage2_patient_kb()
             if split.mixed:
                 validation = merge_validation_results(
-                    validate(split.linage2, linage_registry, linage_inventory),
-                    validate(split.generic, registry, inventory),
+                    validate(validation_text(full_atoms, split.linage2),
+                             linage_registry, linage_inventory),
+                    validate(validation_text(shared_atoms, split.generic),
+                             shared_registry, shared_inventory),
                     labels=("LinAge2 space", "shared space"),
                 )
                 parts = [
-                    {"metta_query": split.linage2, "kb_files": linage_kb},
-                    {"metta_query": split.generic, "kb_files": _generic_kb(split.generic)},
+                    {"metta_query": split.linage2, "kb_files": linage_kb,
+                     "extra_atoms": full_atoms},
+                    {"metta_query": split.generic, "kb_files": _generic_kb(split.generic),
+                     "extra_atoms": shared_atoms},
                 ]
                 pln_result = merge_run_results(
                     run_offloaded(
@@ -353,16 +385,19 @@ def chat(
                     split.positions(),
                 )
             else:
-                validation = validate(translation.metta_query, linage_registry, linage_inventory)
+                validation = validate(validation_text(full_atoms, translation.metta_query),
+                                      linage_registry, linage_inventory)
                 pln_result = run_offloaded(
                     "run_query",
                     {"metta_query": translation.metta_query,
                      "confidence_threshold": confidence_threshold,
-                     "kb_files": linage_kb},
+                     "kb_files": linage_kb,
+                     "extra_atoms": full_atoms},
                     lambda: run_query(
                         metta_query=translation.metta_query,
                         confidence_threshold=confidence_threshold,
                         kb_files=linage_kb,
+                        extra_atoms=full_atoms,
                     ),
                 )
             validation.warnings.extend(nesting_warnings(split))
@@ -370,17 +405,21 @@ def chat(
             # The inventory is what tells a real symbol (MTORC1, Mouse) from an
             # invented one, and a populated predicate from a declared-but-empty
             # one — the UI used the registry alone and inherited both errors.
-            validation = validate(translation.metta_query, registry, inventory)
+            shared_registry, shared_inventory = with_injected(registry, inventory, shared_atoms)
+            validation = validate(validation_text(shared_atoms, translation.metta_query),
+                                  shared_registry, shared_inventory)
             generic_kb = _generic_kb(translation.metta_query)
             pln_result = run_offloaded(
                 "run_query",
                 {"metta_query": translation.metta_query,
                  "confidence_threshold": confidence_threshold,
-                 "kb_files": generic_kb},
+                 "kb_files": generic_kb,
+                 "extra_atoms": shared_atoms},
                 lambda: run_query(
                     metta_query=translation.metta_query,
                     confidence_threshold=confidence_threshold,
                     kb_files=generic_kb,
+                    extra_atoms=shared_atoms,
                 ),
             )
     except (
@@ -410,10 +449,13 @@ def chat(
     # (pln_counterfactual.metta §3b), so the gate is applied here — and it has
     # to be applied on BOTH surfaces or they answer the same question
     # differently, which is the whole point of this file's parity tests.
+    if patient_note:
+        bot_response += f"\n\n> **Note.** {patient_note}"
+    known = {patient.patient_id} if patient is not None else ()
     for warning in (
-        lever_warnings(translation.metta_query)
+        lever_warnings(translation.metta_query, extra_atoms=full_atoms, known_patients=known)
         + scoped_form_warnings(translation.metta_query, _ALL_KB_PATHS, inventory)
-        + linage2_form_warnings(translation.metta_query)
+        + linage2_form_warnings(translation.metta_query, full_atoms)
     ):
         bot_response += f"\n\n> **Note.** {warning}"
 
@@ -690,18 +732,23 @@ with gr.Blocks(
     gr.Markdown(
         "# PLN Natural Language Query Interface\n"
         "Ask questions about the longevity knowledge base in plain English, "
+        "describe yourself in **My Patient** and ask about you, "
         "or expand the PLN ontology from a research paper."
     )
 
-    with gr.Tabs():
+    # The "My Patient" tab's patient — one per browser session, never stored.
+    patient_state = gr.State(None)
+
+    with gr.Tabs() as tabs:
 
         # ════════════════════════════════════════════════════════════════════
         # Tab 1 — PLN Query chat
         # ════════════════════════════════════════════════════════════════════
-        with gr.Tab("PLN Query"):
+        with gr.Tab("PLN Query", id="query"):
             with gr.Row():
                 # ── Main chat panel ────────────────────────────────────────
                 with gr.Column(scale=3):
+                    patient_banner = gr.Markdown(render_patient_banner(None))
                     chatbot = gr.Chatbot(
                         label="Conversation",
                         height=540,
@@ -760,6 +807,7 @@ with gr.Blocks(
                 user_input, chatbot,
                 ontology_checkboxes, model_dropdown, temperature_slider,
                 confidence_slider, show_metta_toggle, show_explanation_toggle, show_debug_toggle,
+                patient_state,
             ]
             _chat_outputs = [chatbot, user_input]
 
@@ -768,7 +816,13 @@ with gr.Blocks(
             clear_btn.click(fn=lambda: ([], ""), outputs=_chat_outputs)
 
         # ════════════════════════════════════════════════════════════════════
-        # Tab 2 — Browse Ontology Files
+        # Tab 2 — My Patient: plain text -> a patient for this session only
+        # ════════════════════════════════════════════════════════════════════
+        with gr.Tab("My Patient", id="patient"):
+            build_patient_tab(patient_state, patient_banner, user_input, tabs, "query")
+
+        # ════════════════════════════════════════════════════════════════════
+        # Tab 3 — Browse Ontology Files
         # ════════════════════════════════════════════════════════════════════
         with gr.Tab("Browse Ontology Files"):
             gr.Markdown(
@@ -810,7 +864,7 @@ with gr.Blocks(
             )
 
         # ════════════════════════════════════════════════════════════════════
-        # Tab 3 — Ontology Expander
+        # Tab 4 — Ontology Expander
         # ════════════════════════════════════════════════════════════════════
         with gr.Tab("Ontology Expander"):
             gr.Markdown(

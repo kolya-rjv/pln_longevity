@@ -269,9 +269,7 @@ of 0. Send the patient's own `CRP` / `HbA1c` / `FastingGlucose` (z or value) and
 5. **Two clocks are not combined.** A patient with both GrimAge and LinAge2 gets a CHD
    risk from one and a mortality hazard from the other; multiplying them would double-count
    (`docs/risk_prediction.md §3`).
-6. **Not in the chat UI's patient surface.** The Gradio chat routes and validates the forms
-   identically, but has no caller-supplied patient yet, so a LinAge2 form typed there is
-   honestly empty.
+6. ~~**Not in the chat UI's patient surface.**~~ Closed by §10: the **My Patient** tab.
 
 ## 8. Non-goals
 
@@ -350,4 +348,61 @@ and are corrected (they are what `GET /linage2/features` publishes).
 
 **Regenerating.** Re-run the script against a new upstream commit; the golden test pins the
 model file and the fixture to the same commit, so a half-regenerated pair fails loudly.
+
+## 10. The "My Patient" tab — a patient someone types, for one session
+
+**What it is.** A tab beside *PLN Query* where a person types a few lines —
+
+```
+58 year old male, current smoker
+albumin 4.1 g/dL
+HbA1c 6.4 %
+CRP 3.1 mg/L
+diagnoses: hypertension
+```
+
+— presses **Read** to see what was understood, **Build patient** to become `Caller_Me`, and
+then asks about "me" in *PLN Query*. Nothing is stored: the patient is a plain dict in a
+`gr.State` (one per browser session, gone on reload), and every chat turn rebuilds its atoms
+into that one query's space exactly as `/query` does with a `patient` object — the shared
+code is `core/patient_context.py`, and the LinAge2 atoms still go only to the LinAge2 space.
+The *Download .metta* copy is written to the system temp directory, never to a folder the
+KB loaders scan. `POST /patients/from-text` is the same reader over HTTP.
+
+**Reading text without guessing** (`core/patient_text.py`, fixed rules, no LLM). A lab value
+in the wrong unit is the commonest way to get a confident, wrong biological age (albumin 4.2
+read as g/L is −30 g/L from the median), so the reader refuses rather than guesses:
+an unknown name is listed as not understood; an unknown unit is refused with the accepted
+ones; a value **without** a unit is taken only when exactly one known unit puts it inside the
+middle 99% of NHANES adults (then shown as *unit assumed*) — `CRP 3.1` stops and asks, since
+both mg/L and mg/dL fit; a value outside everything NHANES observed is refused, naming the unit
+that would fit. Each unit table is checked against the reference cohort's medians, which is
+how the CRP mg/dL error of §9 would have been caught.
+
+An adversarial review of the reader turned up the ways plain text produces a confident,
+wrong patient, and each is now a refusal or a rule (`tests/test_patient_text.py`): only an
+explicit age phrase is an age ("quit smoking 20 years ago" no longer makes someone 20), and
+two different ages are a problem, not last-one-wins; a statement about someone else ("my
+husband smokes", "male partner", "family history of diabetes", second-hand smoke) is set
+aside and listed; negated, past and ongoing smoking are told apart ("not a smoker",
+"former heavy smoker", "trying to quit"); "no diabetes" is a No, "no known conditions except
+hypertension" a single Yes; weight, height, cotinine and GrimAge need an explicit unit or
+form (a bare "GrimAge 46" is a clock age, not an acceleration); an abnormal value typed in
+the usual unit is never re-read as a normal value in another one (hemoglobin 9.5 asks);
+urea and urea nitrogen have their own mg/dL factors.
+
+**One value, two consumers.** CRP typed once is LinAge2's `LBXCRP` (mg/dL) *and* the KB's
+`CRP` witness (mg/L); HbA1c likewise; a glucose is the `FastingGlucose` witness only when the
+line says *fasting*; the stated smoking status is both the cotinine level (training bins) and
+`PatientSmoking`. So causes can be credited without typing anything twice. The KB
+standardises its witnesses against coarse pooled priors and refuses |z| > 12 as a unit
+mistake, which a real HbA1c of 12 % exceeds; such a witness is passed at z 12 — Elevated is
+all it needs to say — and the tab says so, while LinAge2 uses the value as typed.
+
+**What the tab shows.** The read table (value as typed, LinAge2 value, check, and the
+same-sex, same-age NHANES median as *Typical*); after Build, the biological age, the measured
+labs adding and removing years, the count and total of filled-in inputs, the builder's notes,
+the atoms, and suggested questions that jump to *PLN Query* with the question filled in.
+Verified in a headless browser: build, banner, suggested question, download, and the
+unclear-unit refusal (`tests/test_patient_tab.py` covers the handlers and the chat wiring).
 

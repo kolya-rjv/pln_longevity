@@ -606,6 +606,9 @@ def build_patient(
             "return an expected delta of 0 with an empty (Via ()) for this "
             "patient. That zero means 'no measured pack-years signal to act on', "
             "not 'quitting would not help'."
+            + (" The LinAge2 smoking counterfactual (linage-counterfactual-patient "
+               "&self <Patient> SmokingCessation) reads serum cotinine instead and "
+               "does not need it." if built_linage2 is not None else "")
         )
     # The symmetric case, which used to be silent and was the worse one: an
     # elevated DNAm pack-years surrogate in someone who does not smoke. The
@@ -647,7 +650,9 @@ def build_patient(
             "have a properly standardised measurement."
         )
 
-    inert = [m.name for m in resolved if m.note]
+    # LinAgeAccel carries a note (it is read only in the LinAge2 scoped space) but it
+    # IS reasoned over there — the hazard is computed from it — so it is not inert.
+    inert = [m.name for m in resolved if m.note and m.name not in LINAGE_YEARS_MARKERS]
     if inert:
         warnings.append(
             "Carried but not yet reasoned over (no curated cause or effect edge "

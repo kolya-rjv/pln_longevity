@@ -279,6 +279,7 @@ to `pln_chat/logs/session_*.jsonl`. For browser clients, set
 | GET    | `/patients`        | List the built-in patient profiles                            |
 | GET    | `/patients/markers`| Which biomarkers a caller-supplied patient may carry, and in what units |
 | POST   | `/patients/preview`| Validate your own patient and see the atoms it becomes — no inference |
+| POST   | `/patients/from-text`| A few lines of plain text (age, sex, smoking, labs with units, diagnoses) -> what was read, and a patient with LinAge2 scored in-process — the UI's "My Patient" tab, no LLM |
 | GET    | `/linage2/features`| The LinAge2 clinical clock's 59 inputs (NHANES codes, KB symbols, which read out a KB biomarker), the forms, the scoped stack, whether an all-cause baseline is loaded |
 | POST   | `/linage2/analyze` | A patient's LinAge2 result, analysed without an LLM: per-lab years with causes credited under evidence, mortality hazard, absolute risk when a baseline exists, counterfactuals in years |
 | POST   | `/query`           | Ask a natural-language question of the KB (goes through the LLM translator) |
@@ -491,6 +492,19 @@ the biomarker it reads out is Elevated — or, for the cotinine input, when the
 patient is a `CurrentSmoker`. Send `CRP`, `HbA1c`, `FastingGlucose` (z or value)
 and `smoking` alongside the block; without them the years come back with no causes
 and every counterfactual is 0, and the builder warns you so.
+
+**Or just type it.** `POST /patients/from-text` takes `{"text": "58 year old male,
+current smoker\nalbumin 4.1 g/dL\nHbA1c 6.4 %\nCRP 3.1 mg/L"}` and scores LinAge2
+in-process from parameters extracted out of `Rejuve/LinAge2-Python` (matches the
+service to 2e-14 years; `docs/linage2_integration.md §9`), so no service and no
+pasted JSON are needed. It returns `read` — every value as typed, converted to
+LinAge2's unit, with a status — and, when everything is usable, `patient`: send it
+as `patient` anywhere above. A value whose unit cannot be pinned down (`CRP 3.1`:
+mg/L or mg/dL?) is not guessed; `ok` is false and `problems` says which. The same
+value doubles as the knowledge base's witness (CRP in mg/L, HbA1c, a *fasting*
+glucose, the stated smoking status), so causes can be credited without typing
+anything twice. This is what the Gradio UI's **My Patient** tab does; the patient
+then lives in that browser session only.
 
 **No LLM needed.** `POST /linage2/analyze` takes the same patient at the top level
 (the `linage2` block required, plus optional `levers`) and returns the whole
