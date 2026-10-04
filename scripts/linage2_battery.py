@@ -254,7 +254,8 @@ def t_build_session():
     after = sorted(str(x) for x in REPO.rglob("*.metta"))
     dl = Path(out[3]["value"])
     ok = ("Active patient: Caller_Me" in out[4] and before == after and REPO not in dl.parents)
-    return ok, f"banner: {out[4][:60]}…; .metta files in the repo unchanged ({len(after)}); download at {dl}"
+    where = re.sub(r"(?<=pln_patients_)[a-z0-9_]+(?=/)|(?<=_Me_)[a-z0-9_]+(?=\.metta$)", "…", str(dl))
+    return ok, f"banner: {out[4][:60]}…; .metta files in the repo unchanged ({len(after)}); download at {where}"
 
 
 def t_clear():
