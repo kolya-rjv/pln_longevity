@@ -44,7 +44,8 @@ from core.drugage_router import (
 from core.patient_builder import PatientSpecError
 from core.patient_context import (
     build_caller_patient,
-    names_a_patient,
+    patient_atoms_for,
+    reads_patients,
     patient_prompt_section,
     validation_text,
     with_injected,
@@ -236,8 +237,9 @@ def _linage2_context() -> tuple:
 
 
 def _generic_kb(metta_query: str) -> list[Path]:
-    """As api._generic_kb: a program that names a patient runs in the patient stack."""
-    return patient_stack(_ALL_KB_PATHS) if names_a_patient(metta_query) else _ALL_KB_PATHS
+    """As api._generic_kb: a program that names a patient or reads patient facts
+    runs in the patient stack."""
+    return patient_stack(_ALL_KB_PATHS) if reads_patients(metta_query) else _ALL_KB_PATHS
 
 
 def _build_context(selected_files: list[str]) -> tuple[OntologyRegistry, dict[str, str]]:
@@ -374,7 +376,7 @@ def chat(
                     {"metta_query": split.linage2, "kb_files": linage_kb,
                      "extra_atoms": full_atoms},
                     {"metta_query": split.generic, "kb_files": _generic_kb(split.generic),
-                     "extra_atoms": shared_atoms},
+                     "extra_atoms": patient_atoms_for(split.generic, shared_atoms)},
                 ]
                 pln_result = merge_run_results(
                     run_offloaded(
@@ -405,8 +407,11 @@ def chat(
             # The inventory is what tells a real symbol (MTORC1, Mouse) from an
             # invented one, and a populated predicate from a declared-but-empty
             # one — the UI used the registry alone and inherited both errors.
-            shared_registry, shared_inventory = with_injected(registry, inventory, shared_atoms)
-            validation = validate(validation_text(shared_atoms, translation.metta_query),
+            # The patient enters only a program that reads patients (patient_atoms_for):
+            # the full shared space aborts holding a caller when one enumerates them.
+            generic_atoms = patient_atoms_for(translation.metta_query, shared_atoms)
+            shared_registry, shared_inventory = with_injected(registry, inventory, generic_atoms)
+            validation = validate(validation_text(generic_atoms, translation.metta_query),
                                   shared_registry, shared_inventory)
             generic_kb = _generic_kb(translation.metta_query)
             pln_result = run_offloaded(
@@ -414,12 +419,12 @@ def chat(
                 {"metta_query": translation.metta_query,
                  "confidence_threshold": confidence_threshold,
                  "kb_files": generic_kb,
-                 "extra_atoms": shared_atoms},
+                 "extra_atoms": generic_atoms},
                 lambda: run_query(
                     metta_query=translation.metta_query,
                     confidence_threshold=confidence_threshold,
                     kb_files=generic_kb,
-                    extra_atoms=shared_atoms,
+                    extra_atoms=generic_atoms,
                 ),
             )
     except (

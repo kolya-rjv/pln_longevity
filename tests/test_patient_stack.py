@@ -30,7 +30,7 @@ if str(PLN_CHAT) not in sys.path:
 pytest.importorskip("fastapi")
 
 import api as api_module  # noqa: E402
-from core.patient_context import names_a_patient  # noqa: E402
+from core.patient_context import names_a_patient, patient_atoms_for, reads_patients  # noqa: E402
 from core.pln_runner import PATIENT_STACK_EXCLUDED, patient_stack  # noqa: E402
 
 CALLER = ("(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n"
@@ -165,3 +165,35 @@ def test_the_chat_routes_the_same_way():
     import app as app_module
     assert app_module._generic_kb("(diagnose-patient &self Caller_Me (A))") == patient_stack(app_module._ALL_KB_PATHS)
     assert app_module._generic_kb("(match &self (HasSex $e Hermaphrodite) $e)") == app_module._ALL_KB_PATHS
+
+
+# ═══════════════════════════ a loaded patient never reaches the full space ════
+
+@pytest.mark.parametrize("program, reads", [
+    ("(match &self (MeasuredZ $p CRP $z) ($p $z))", True),
+    ("(match &self (PatientAge $p $a) ($p $a))", True),
+    ("(match &self (InstanceOf $p PatientProfile) $p)", True),
+    ("(diagnose-patient &self Caller_Me (A))", True),
+    ("(infer &self Metformin CoronaryHeartDisease)", False),
+    ("(match &self (InstanceOf $x $t) ($x $t))", False),
+])
+def test_a_program_that_reads_patient_facts_is_recognised(program, reads):
+    assert reads_patients(program) is reads
+    assert patient_atoms_for(program, "(PatientAge Caller_Me 58)") == ("(PatientAge Caller_Me 58)" if reads else None)
+
+
+@pytest.mark.slow
+def test_listing_patient_facts_with_a_session_patient_loaded_does_not_abort():
+    """It used to: a generic program ran in the FULL space with the session patient's
+    atoms, and enumerating MeasuredZ there panics hyperon (trie.rs:179). Routed as
+    production routes it now, it answers and lists the caller too."""
+    q = "!(match &self (MeasuredZ $p CRP $z) ($p $z))"
+    caller = CALLER.format(z="1.2")
+    full = _run("full", q, caller)
+    assert full["rc"] != 0, "control: the full space no longer aborts here — the guard is still right"
+    assert api_module._generic_kb(q) == patient_stack(api_module._runtime_kb_paths())
+    routed = _run("patient", q, patient_atoms_for(q, caller) or "")
+    assert routed["rc"] == 0 and any("Caller_Me" in a for a in routed["atoms"])
+    generic = "!(infer &self Metformin CoronaryHeartDisease)"
+    assert patient_atoms_for(generic, caller) is None and api_module._generic_kb(generic) == api_module._runtime_kb_paths()
+

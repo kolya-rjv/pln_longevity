@@ -399,3 +399,18 @@ def test_the_api_model_reader_rewrites_and_suggests(monkeypatch):
     body = _post({"text": _TEXT, "reader": "model"}).json()
     assert body["reader_used"] == "rules" and body["model_error"]["code"] == "timeout"
     assert body["ok"] is False                                   # '58 yo M' alone: no sex
+
+
+def test_a_generic_question_with_a_patient_loaded_runs_without_the_patient(monkeypatch):
+    """The full shared space aborts when it holds a caller and a program enumerates
+    patient facts; a program that reads none never gets the patient's atoms."""
+    from core.pln_runner import patient_stack
+    state = _build(SMOKER)["state"]
+    app_module, seen, _ = _chat_with(monkeypatch, "(infer &self Metformin CoronaryHeartDisease)", state)
+    (task, kwargs), = seen["calls"]
+    assert kwargs["extra_atoms"] is None and kwargs["kb_files"] == app_module._ALL_KB_PATHS
+    _, seen, _ = _chat_with(monkeypatch, "(match &self (MeasuredZ $p CRP $z) ($p $z))", state)
+    (task, kwargs), = seen["calls"]
+    assert kwargs["kb_files"] == patient_stack(app_module._ALL_KB_PATHS)
+    assert "(MeasuredZ Caller_Me CRP " in kwargs["extra_atoms"]
+

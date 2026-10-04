@@ -67,6 +67,27 @@ def names_a_patient(metta_query: str) -> bool:
     return bool(_PATIENT_ID_RE.search(metta_query or ""))
 
 
+#: What a program reads when it asks about patients without naming one ("who has an
+#: elevated CRP?" -> (match &self (MeasuredZ $p CRP $z) ...)).
+_PATIENT_FACT_RE = re.compile(
+    r"(?<![\w-])(?:MeasuredZ|MeasuredRaw|MeasuredUnit|PatientAge|PatientSex|PatientSmoking|"
+    r"CurrentMedication|PatientProfile)(?![\w-])|[\w-]+-patient(?![\w-])")
+
+
+def reads_patients(metta_query: str) -> bool:
+    """Names a patient, or reads patient facts: such a program runs in the patient stack."""
+    return names_a_patient(metta_query) or bool(_PATIENT_FACT_RE.search(metta_query or ""))
+
+
+def patient_atoms_for(metta_query: str, atoms: Optional[str]) -> Optional[str]:
+    """A session patient's atoms enter only a program that reads patients — which runs
+    in the patient stack. The full shared space sits at hyperon's head-symbol edge:
+    holding a caller patient, it aborts as soon as a program enumerates patient facts
+    ((match &self (MeasuredZ $p CRP $z) ...)). A program that reads no patient fact has
+    no use for them, so it never gets them, and the full space never holds a caller."""
+    return atoms if reads_patients(metta_query) else None
+
+
 def with_injected(registry: OntologyRegistry, inventory, injected: Optional[str],
                   source_name: str = "<api-extra-atoms>"):
     """The (registry, inventory) of a space that holds `injected` on top of its KB.

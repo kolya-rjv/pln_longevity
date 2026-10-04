@@ -138,7 +138,8 @@ from core.patient_extract import OpenAIExtractor
 from core.patient_read import read_patient
 from core.patient_context import (
     build_caller_patient,
-    names_a_patient,
+    patient_atoms_for,
+    reads_patients,
     patient_knobs,
     patient_prompt_section,
     validation_text,
@@ -3135,11 +3136,15 @@ def _offloaded_run(
 
 
 def _generic_kb(metta_query: str) -> list[Path]:
-    """The shared runtime stack — or, for a program that names a patient, the
-    patient stack (core.pln_runner.patient_stack): the full space aborts on the
-    patient forms at its head-symbol edge, built-in patients included."""
+    """The shared runtime stack — or, for a program that names a patient or reads
+    patient facts, the patient stack (core.pln_runner.patient_stack): the full space
+    aborts on the patient forms at its head-symbol edge, built-in patients included."""
     runtime = _runtime_kb_paths()
-    return patient_stack(runtime) if names_a_patient(metta_query) else runtime
+    return patient_stack(runtime) if reads_patients(metta_query) else runtime
+
+
+def _join_atoms(*parts: Optional[str]) -> Optional[str]:
+    return "\n".join(part for part in parts if part) or None
 
 
 def _validate_generic_with(
@@ -3165,6 +3170,7 @@ def _run_linage2_program(
     confidence_threshold: float,
     validate_generic: Callable[[str], ValidationResult],
     strict: bool,
+    extra_atoms: Optional[str] = None,
 ) -> tuple[str, ValidationResult, PLNRunResult]:
     """Run a program that calls at least one LinAge2 form.
 
@@ -3172,7 +3178,9 @@ def _run_linage2_program(
     atom. A MIXED one ("my LinAge2 drivers and my supplement plan") is split per
     top-level expression (`split_linage2_program`): the LinAge2 forms run there, the
     rest in the shared space with `shared_atoms` — the patient minus its LinAge2
-    atoms, which that space cannot hold (BuiltPatient.shared_atoms). Both halves
+    atoms, which that space cannot hold (BuiltPatient.shared_atoms), and only if that
+    rest reads patients (`patient_atoms_for`) — plus the caller's own `extra_atoms`.
+    Both halves
     run in ONE offloaded task (one worker, one deadline, one admission) and the
     answers come back in program order. `strict` refuses an invalid program with a
     422 before anything runs (/metta/run); otherwise the verdict travels with the
@@ -3212,7 +3220,7 @@ def _run_linage2_program(
         {"metta_query": split.linage2, "kb_files": linage2_patient_kb(),
          "extra_atoms": linage_atoms},
         {"metta_query": split.generic, "kb_files": _generic_kb(split.generic),
-         "extra_atoms": shared_atoms},
+         "extra_atoms": _join_atoms(patient_atoms_for(split.generic, shared_atoms), extra_atoms)},
     ]
     results = run_offloaded(
         "run_query_parts",
@@ -3412,8 +3420,10 @@ def query(req: QueryRequest) -> QueryResponse:
         )
     else:
         # The shared space gets the patient WITHOUT its LinAge2 atoms: with them
-        # it aborts on the patient forms (BuiltPatient.shared_atoms).
-        shared = patient.shared_atoms if patient is not None else None
+        # it aborts on the patient forms (BuiltPatient.shared_atoms) — and only when
+        # the program reads patients (patient_atoms_for).
+        shared = patient_atoms_for(translation.metta_query,
+                                   patient.shared_atoms if patient is not None else None)
         validation = _validate_generic_with(translation.metta_query, registry, shared)
         pln_result = _offloaded_run(
             translation.metta_query, req.confidence_threshold,
@@ -3545,11 +3555,11 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
         part for part in (patient.atoms if patient else None, req.extra_atoms) if part
     ) or None
     # What the SHARED space gets: the patient without its LinAge2 atoms, which
-    # abort that space on the patient forms (BuiltPatient.shared_atoms).
-    injected_shared = "\n".join(
-        part for part in (patient.shared_atoms if patient else None, req.extra_atoms)
-        if part
-    ) or None
+    # abort that space on the patient forms (BuiltPatient.shared_atoms), and only
+    # for a program that reads patients (patient_atoms_for); the caller's own
+    # extra_atoms always.
+    patient_shared = patient.shared_atoms if patient else None
+    injected_shared = _join_atoms(patient_shared, req.extra_atoms)
 
     def validate_generic(metta_query: str) -> ValidationResult:
         if req.ontology_files is not None:
@@ -3591,7 +3601,8 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
             req.metta_query,
             split,
             linage_atoms=injected,
-            shared_atoms=injected_shared,
+            shared_atoms=patient_shared,
+            extra_atoms=req.extra_atoms,
             confidence_threshold=req.confidence_threshold,
             validate_generic=validate_generic,
             strict=True,
@@ -3609,7 +3620,7 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
             )
         pln_result = _offloaded_run(
             req.metta_query, req.confidence_threshold, _generic_kb(req.metta_query),
-            injected_shared,
+            _join_atoms(patient_atoms_for(req.metta_query, patient_shared), req.extra_atoms),
         )
 
     if pln_result.status == "error":
