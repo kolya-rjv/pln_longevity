@@ -154,22 +154,27 @@ def render_reading(parsed: ParsedPatient, read: Optional[PatientRead] = None) ->
     return "\n".join(lines)
 
 
+def _code(text: str) -> str:
+    """Text shown verbatim in a Markdown code span: nothing in it can close the span."""
+    return "`" + str(text).replace("`", "'").replace("\n", " ").replace("\r", " ") + "`"
+
+
 def _render_model_part(read: PatientRead) -> list:
     out = []
-    if read.read_as != read.text:
+    if read.substitutions:
         out += ["\n**Read as** — the model's rewrites of what the rules did not understand, which "
                 "the rules then read:", "```", read.read_as, "```"]
     if read.suggestions:
         out.append("\n**Wordings to choose** (the buttons below put one in place of what you typed, "
                    "and read again):")
         for s_ in read.suggestions:
-            words = " or ".join(f"`{w}`" for w in s_.wordings)
-            out.append(f"- {'⛔ ' if s_.blocking else ''}`{s_.original}` — {s_.reason}: {words}")
+            words = " or ".join(_code(w) for w in s_.wordings)
+            out.append(f"- {'⛔ ' if s_.blocking else ''}{_code(s_.original)} — {s_.reason}: {words}")
     for note in read.notes:
         out.append(f"- Model → {note}")
     if read.discarded:
         out.append(f"\n<details><summary>Model items not used ({len(read.discarded)})</summary>\n")
-        out += [f"- `{q}` ({kind}): {why}" for q, kind, why in read.discarded]
+        out += [f"- {_code(q)} ({_code(kind)}): {why}" for q, kind, why in read.discarded]
         out.append("</details>")
     return out
 
@@ -180,9 +185,19 @@ def suggestion_choices(read: Optional[PatientRead]) -> list:
     if read is None:
         return out
     for i, s_ in enumerate(read.suggestions):
+        # the part that tells the wordings apart goes first: "…; former smoker" vs "…; current smoker"
+        common = 0
+        if len(s_.wordings) > 1:
+            parts = [w.split("; ") for w in s_.wordings]
+            while all(len(p) > common + 1 and p[common] == parts[0][common] for p in parts):
+                common += 1
         for j, wording in enumerate(s_.wordings):
-            label = f"Use “{wording}” for “{s_.original}”"
-            out.append((i, j, label if len(label) <= 90 else label[:87] + "…"))
+            shown = ("…; " if common else "") + "; ".join(wording.split("; ")[common:])
+            label = f"Use “{shown}” for “{s_.original}”"
+            label = label if len(label) <= 90 else label[:87] + "…"
+            if any(label == o[2] for o in out):
+                label = f"{label[:80]} (choice {j + 1})"
+            out.append((i, j, label))
     return out[:SUGGESTION_SLOTS]
 
 
@@ -387,7 +402,7 @@ def on_build(text: str, state: Optional[dict], read: Optional[PatientRead] = Non
         summary += "\n\n<details><summary>Notes on this patient</summary>\n\n" + "\n".join(
             f"- {w}" for w in warnings) + "\n</details>"
     return (reading, summary, gr.update(value=built.atoms, visible=True),
-            gr.update(value=_write_download(built, read.read_as if read.read_as != read.text else None),
+            gr.update(value=_write_download(built, read.read_as if read.substitutions else None),
                       visible=True), render_banner(payload), payload, gr.update(visible=True))
 
 

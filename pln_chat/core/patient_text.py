@@ -539,7 +539,8 @@ _TEMPORARY_QUIT = re.compile(r"\b(?:quit\w*|stopped|gave up)\s+(?:smoking\s+)?fo
 _STILL_KINDS = ("still", "light", "moderate", "current")
 #: "stopped drinking", "gave up alcohol": a quit that is about something else
 _OTHER_HABIT = re.compile(
-    r"\b(?:quit\w*|stopped|gave up|given up|used to|relaps\w*)\s+(?:(?!smoking\b)[a-z]+ing\b|alcohol|"
+    r"\b(?:quit\w*|stopped|gave up|given up|used to|relaps\w*)\s+(?:(?!smoking\b|during\b|following\b|"
+    r"according\b|nothing\b|something\b|morning\b|evening\b|spring\b)[a-z]+ing\b|alcohol|"
     r"drinks?|booze|beer|wine|spirits|coffee|caffeine|sugar|sodas?|meat|dairy|gluten|carbs|junk food|"
     r"gambling|drugs?|my job|work|school|the gym|exercise|running|sports?)")
 #: a clause that only says the one before is uncertain
@@ -1128,6 +1129,12 @@ def read_patient_text(text: str) -> ParsedPatient:
         origin = last_smoking["origin"]
         cur.joined_to = origin
         both = (origin, cur.index)
+        if _OTHER_NICOTINE.search(low) and not re.search(r"\b(?:never|no|not|n't)\b", low):
+            problem(f"'{said}': vaping or other nicotine raises cotinine, which LinAge2 reads, but is not "
+                    f"smoking to the knowledge base; give 'cotinine N ng/mL' if you have it, and your "
+                    f"smoking status on its own line", "vaping", "smoking", both)
+            last_smoking["kind"] = None
+            return
         if _names_condition(low):       # "quit after my heart attack": both, so neither is lost
             problem(f"'{said}' says when you quit and names a condition; put the condition on its own "
                     f"line ('diagnoses: …') and your smoking in one phrase ('former smoker, quit 2010')",
@@ -1215,8 +1222,10 @@ def read_patient_text(text: str) -> ParsedPatient:
         orig_stmt = stmt
 
         # ── the clause right after a smoking clause, saying when ───────────────
+        first_of_line = not p.statements[:-1] or p.statements[-2].line != line_no
         right_after = last_smoking["kind"] is not None and (
-            last_smoking["idx"] == idx - 1 or last_smoking["line"] == line_no)
+            last_smoking["idx"] == idx - 1 or last_smoking["line"] == line_no
+            or (last_smoking["line"] == line_no - 1 and first_of_line))
         if last_smoking["line"] == line_no and last_smoking["idx"] == idx - 1:
             m = _MODIFIER.match(low)
             if m and _MODIFIER_REST.match(m.group("rest")):

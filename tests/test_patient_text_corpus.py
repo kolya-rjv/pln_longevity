@@ -168,6 +168,10 @@ SMOKING = [
     ("no cigarettes in 5 years", "X"), ("Smoker: no, ex", "X"), ("Smoker: no, previously yes", "X"),
     ("smoker (-)", "X"), ("current smoker: -", "X"), ("Current smoker: 0", "X"), ("marijuana", "X"),
     ("smoker: reformed", "F"),
+    # ── the adversarial review of the model route found these in the rules
+    ("smoker, pipe\nquit in 2015", "X"), ("current smoker, roll-ups\nquit 3 years ago", "X"),
+    ("former smoker, menthols\nstarted again last year", "X"),
+    ("smoker, quit during covid", "X"), ("former smoker, quit 2010 by vaping", "X"),
 ]
 
 

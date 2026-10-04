@@ -646,3 +646,118 @@ def test_replayed_live_extractions_leave_the_corpus_usable():
         else:
             agree += all(p.questionnaire.get(k) == v for k, v in expect.items())
     assert len(usable) > 150 and agree >= 0.95 * len(usable), (agree, len(usable))
+
+
+# ═══════════════════════════ the adversarial review of the model route ═════════
+# Each reproduction below got a confident, wrong patient (ok, a wrong value) through
+# the model route before it was fixed. T is the header the reproductions shared.
+
+T = "58 year old male\n"
+
+
+def _lab(q, g):
+    return {"quote": q, "kind": "lab", "lab": g}
+
+
+REVIEW_A = [
+    # the quote left words of the statement unchecked, and the rewrite dropped them
+    (T + "Non-HDL cholesterol 160 mg/dL", [_lab("HDL cholesterol 160 mg/dL", "hdl cholesterol")]),
+    (T + "Lipid panel: LDL cholesterol 130 mg/dL", [_lab("cholesterol 130 mg/dL", "total cholesterol")]),
+    (T + "direct bilirubin 0.3 mg/dL", [_lab("bilirubin 0.3 mg/dL", "total bilirubin")]),
+    (T + "my urine creatinine 88", [_lab("creatinine 88", "creatinine")]),
+    (T + "my HbA1c was 9.1 % at diagnosis but is 6.0 % now", [_lab("HbA1c was 9.1 %", "hba1c")]),
+    (T + "height 178 cm\nmy weight was 95 kg before the diet", [k("weight was 95 kg", "weight")]),
+    (T + "my health used to be excellent, now it is poor",
+     [k("health used to be excellent", "self_rated_health", rating="excellent")]),
+    (T + "I wouldn't say my health is excellent",
+     [k("my health is excellent", "self_rated_health", rating="excellent")]),
+    (T + "dental health: poor", [k("health: poor", "self_rated_health", rating="poor")]),
+    (T + "I can't say my health is better than a year ago",
+     [k("my health is better than a year ago", "health_vs_year_ago", trend="better")]),
+    (T + "height 178 cm\ntarget weight 70 kg", [k("weight 70 kg", "weight")]),
+    ("male\nretired at 65 years old", [k("65 years old", "age")]),
+    ("female\nwent through menopause at 51 years old", [k("51 years old", "age")]),
+    # the quote was cut inside a number or a word
+    (T + "my glucose 105 mg/dL", [_lab("glucose 10", "glucose")]),
+    (T + "my triglycerides 150 mg/dL", [_lab("triglycerides 15", "triglycerides")]),
+    (T + "my glucose 5,8 mmol/L", [_lab("glucose 5", "glucose")]),
+    (T + "weight 80 kg\nmy height 5'11\"", [k("height 5'1", "height")]),
+    (T + "non-fasting glucose 110 mg/dL", [_lab("fasting glucose 110 mg/dL", "fasting glucose")]),
+    (T + "VLDL 30 mg/dL", [_lab("LDL 30 mg/dL", "ldl cholesterol")]),
+    (T + "prealbumin 25", [_lab("albumin 25", "albumin")]),
+    (T + "nondiabetic", [condition("diabetic", "diabetes")]),
+    (T + "euthyroid", [condition("thyroid", "thyroid disease")]),
+    (T + "noncancerous polyp removed", [condition("cancer", "cancer")]),
+    (T + "prehypertension", [condition("hypertension", "hypertension")]),
+    (T + "ministroke", [condition("stroke", "stroke")]),
+    ("58 year old\nwork as a manager", [k("man", "sex", sex="male")]),
+    ("never smoked\natorvastatin 40 mg daily", [k("40 m", "sex", sex="male"), k("40 m", "age")]),
+    ("58 year old\ntemp 99 F", [k("99 F", "sex", sex="female")]),
+    ("58 year old\ntemp 99 F", [k("temp 99 F", "sex", sex="female")]),
+    # a bracketed qualifier, a comparator after the number
+    (T + "albumin (urine): 30", [_lab("albumin (urine): 30", "albumin")]),
+    (T + "Bilirubin (direct) 0.3 mg/dL", [_lab("Bilirubin (direct) 0.3 mg/dL", "total bilirubin")]),
+    (T + "Glucose (2 h) 140 mg/dL", [_lab("Glucose (2 h) 140 mg/dL", "glucose")]),
+    (T + "my CRP 5 mg/L or less", [_lab("CRP 5 mg/L or less", "c-reactive protein")]),
+    # visits: a negation, 'a week ago'
+    (T + "I have not seen a doctor once this year",
+     [k("seen a doctor once this year", "healthcare_visits", period="year")]),
+    (T + "saw the doctor once, a week ago", [k("saw the doctor once, a week ago", "healthcare_visits",
+                                               period="week")]),
+    (T + "visited my GP twice, the last time a month ago",
+     [k("visited my GP twice, the last time a month ago", "healthcare_visits", period="month")]),
+    # GrimAge: the sign in words; a spaced dash
+    (T + "GrimAge acceleration 3 years below my age",
+     [k("GrimAge acceleration 3 years below my age", "grimage", direction="unstated", wording="acceleration")]),
+    (T + "AgeAccelGrim negative 2.1",
+     [k("AgeAccelGrim negative 2.1", "grimage", direction="unstated", wording="acceleration")]),
+    (T + "GrimAge acceleration – 2.5 years",
+     [k("GrimAge acceleration – 2.5 years", "grimage", direction="signed", wording="acceleration")]),
+]
+
+
+@pytest.mark.parametrize("text, items", REVIEW_A, ids=[f"{t.splitlines()[-1]}|{i[0]['quote']}" for t, i in REVIEW_A])
+def test_review_a_no_rewrite_of_a_partial_or_cut_quote(text, items):
+    """None of these may produce a value the rules did not read: the model's reading is
+    at most a wording to click, or nothing."""
+    rules = read_patient_text(text)
+    r = read_patient(text, Recorded(*items))
+    assert not r.substitutions, (r.read_as, r.parsed.as_dict())
+    assert _values(r.parsed) == _values(rules)
+
+
+def test_a_whole_quote_is_still_rewritten():
+    """The fixes do not stop the rewrites they are for."""
+    r = read_patient(T + "my albumin was 4.1 g/dL", Recorded(_lab("albumin was 4.1 g/dL", "albumin")))
+    assert r.read_as == T + "Albumin 4.1 g/dL" and r.parsed.ok
+    r = read_patient("58, male", Recorded(k("58, male", "age"), k("58, male", "sex", sex="male")))
+    assert r.parsed.ok and (r.parsed.age, r.parsed.sex) == (58, "Male")
+
+
+def test_a_partial_quote_is_a_wording_that_says_what_it_leaves_out():
+    r = read_patient(T + "my HbA1c was 9.1 % at diagnosis but is 6.0 % now", Recorded(_lab("HbA1c was 9.1 %", "hba1c")))
+    (s,) = r.suggestions
+    assert s.wordings == ["HbA1c 9.1 %"] and "leaves out: 'at diagnosis but 6.0 now'" in s.reason
+
+
+def test_review_c_a_rewrite_that_changes_the_next_line_ends_the_read():
+    """It looped for ever: the rewrite of line 1 changed how line 2 read, and _check named
+    a line with no rewrite to withdraw."""
+    import threading
+
+    text = "current smoker, pipe\nno longer married, 58 year old male"
+    out = {}
+    t = threading.Thread(target=lambda: out.setdefault("r", read_patient(text, Recorded(
+        smoking("current smoker, pipe", "current")))), daemon=True)
+    t.start()
+    t.join(10)
+    assert "r" in out, "read_patient did not return"
+    assert not out["r"].substitutions
+
+
+def test_review_c_a_model_quote_cannot_escape_its_code_span():
+    import patient_tab
+
+    md, *_ = patient_tab.on_read_model(T + "albumin 4.1 g/dL", Recorded(
+        k("x` **Ready** ![](https://evil.example/a.png) `", "age")))
+    assert "![](" not in md.replace("`x' **Ready** ![](https://evil.example/a.png) '`", "")

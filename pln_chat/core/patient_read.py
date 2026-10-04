@@ -97,6 +97,18 @@ def _collapse(s: str, loose: bool = False) -> tuple[str, list[int]]:
 _EDGE = " .,;:!?\"'"
 
 
+def _bounded(line: str, a: int, b: int) -> bool:
+    """The span starts and ends where a word or a number does: "glucose 10" is not in
+    "glucose 105", "man" not in "manager", "diabetic" not in "nondiabetic"."""
+    if a > 0 and line[a].isalnum() and line[a - 1].isalnum():
+        return False
+    if b < len(line) and line[b - 1].isalnum() and line[b].isalnum():
+        return False
+    if line[b - 1].isdigit() and re.match(r"[.,]\d|'\d", line[b:b + 2]):
+        return False                            # "glucose 5" in "glucose 5,8"; 5'1 in 5'11
+    return True
+
+
 def _locate(quote: str, lines: list[str]) -> tuple[Optional[tuple[int, int, int]], str]:
     """(line, start, end) of the one place `quote` occurs, or None and why not."""
     for loose in (False, True):
@@ -111,7 +123,9 @@ def _locate(quote: str, lines: list[str]) -> tuple[Optional[tuple[int, int, int]
             c, idx = _collapse(line, loose)
             start = c.find(q)
             while start >= 0:
-                hits.append((n, idx[start], idx[start + len(q) - 1] + 1))
+                a, b = idx[start], idx[start + len(q) - 1] + 1
+                if _bounded(line, a, b):
+                    hits.append((n, a, b))
                 start = c.find(q, start + 1)
         if len(hits) == 1:
             return hits[0], ""
@@ -305,7 +319,9 @@ def _check_lab(it: Item) -> str:
         return "the number continues (a decimal comma, a ratio or a range)"
     unit = ""
     bu = m.group("bu")
-    if bu and normalise_unit(bu) in accepted:
+    if bu and normalise_unit(bu) not in accepted:
+        return "a qualifier in brackets after the name"      # "Bilirubin (direct)", "Glucose (2 h)"
+    if bu:
         unit = q[e + m.start("bu"):e + m.end("bu")]
     rest = tail.strip()
     if not unit:
@@ -325,6 +341,9 @@ def _check_lab(it: Item) -> str:
                 if first and not _FLAG.match(first.lower()) and not _CONTEXT_WORD.match(first.lower()) \
                         and not first.startswith(("(", "[")) and not re.match(r"^[<>≤≥\d]", first):
                     unit, rest = first, rest[len(first):]          # unknown: the rules will refuse it
+    if re.search(r"\bor (?:less|more|lower|higher|above|below|greater|under|over)\b|^\s*\+|\b(?:max|min|maximum|"
+                 r"minimum|at most|at least|up to)\b", unify(rest)):
+        return "a censored value (or less, or more)"
     left = _DATE.sub(" ", _RANGE.sub(" ", unify(rest)))
     left = re.sub(r"(?:<|>|≤|≥)\s*\d+(?:\.\d+)?", " ", left)      # a reference limit "(<5)"
     if re.search(r"\d", left):
@@ -527,7 +546,8 @@ def _sex_tokens(low: str) -> set:
         found.add(_SEX_WORDS[m.group(1)])
     for m in re.finditer(r"\b(?:sex|gender)\s*[:=]?\s*(male|female|m|f)\b", low):
         found.add(_SEX_WORDS[m.group(1)])
-    if not re.search(r"height|weight|tall|\bcm\b|\bkg\b|\blbs?\b|bmi|\bmm\b|met(?:er|re)|\bmg\b", low):
+    if not re.search(r"height|weight|tall|\bcm\b|\bkg\b|\blbs?\b|bmi|\bmm\b|met(?:er|re)|\bmg\b|temp|fever|°|º|"
+                     r"degrees?|\bdeg\b", low):
         for m in re.finditer(r"(?<![\d.])[1-9]\d\s*(?:y/?o|yo|y\.o\.?|yrs?|years?(?:\s*old)?|-year-old)?\s*[,/]?\s*"
                              r"([mf])\b(?!\s*[/\d])", low):
             found.add(_SEX_WORDS[m.group(1)])
@@ -617,6 +637,8 @@ def _check_health(it: Item) -> str:
         return "the quote is not about health"
     if re.search(r"\b(?:not|n't|isn'?t|never|hardly)\b", low):
         return "a negated rating"
+    if _PAST_WORDING.search(low):
+        return "a rating of another time"        # "my health used to be excellent"
     it.fact = Fact("self_rated_health", rating)
     return ""
 
@@ -635,10 +657,15 @@ def _check_trend(it: Item) -> str:
         return "not a comparison with a year ago"
     if re.search(r"\b(?:not|n't|never)\b", low):
         return "a negated trend"
+    if re.search(r"\bused to\b|\bwas\b|\bwere\b|\bhad been\b|\buntil\b|\bpreviously\b|\bformerly\b", low):
+        return "a trend of another time"
     it.fact = Fact("health_vs_year_ago", trend)
     return ""
 
 
+#: a health answer about another time than now
+_PAST_WORDING = re.compile(r"\bused to\b|\bwas\b|\bwere\b|\bhad been\b|\buntil\b|\bpreviously\b|\bformerly\b"
+                           r"|\bin the past\b|\bago\b|\bbefore\b|\bback in\b|\b(?:19|20)\d{2}\b")
 _COUNT_WORDS = {"once": 1, "twice": 2, "none": 0, "no": 0, "zero": 0, "never": 0, "one": 1, "two": 2,
                 "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
 
@@ -656,6 +683,10 @@ def _check_visits(it: Item) -> str:
         if len(nums) + len(words) != 1:
             return "not one count"
     n = int(nums[0]) if nums else _COUNT_WORDS[words[0]]
+    if n and re.search(r"\b(?:not|never|no|haven'?t|hasn'?t|didn'?t|don'?t|without)\b|n't\b", low):
+        return "a negated count"                 # "I have not seen a doctor once this year"
+    if re.search(r"\b(?:week|month|year|day)s?\s+ago\b|\blast (?:week|month)\b", low):
+        return "a time that is not a period"      # "once, a week ago"
     if re.search(r"\bper month\b|\ba month\b|/\s*month|\bmonthly\b|\beach month\b|\bevery month\b", low):
         period, factor = "month", 12
     elif re.search(r"\bper week\b|\ba week\b|/\s*week|\bweekly\b|\beach week\b|\bevery week\b", low):
@@ -684,6 +715,10 @@ def _check_grimage(it: Item) -> str:
     if len(m) != 1:
         return "not one number"
     sign, number = m[0]
+    if sign and re.search(r"[+-]\s+\d", low):
+        return "a dash that may be a separator, not a sign"
+    if re.search(r"\b(?:below|less|lower|under|negative|minus|above|more|over|positive|plus|behind|ahead)\b", low):
+        return "the sign is written in words the check does not read"
     direction = it.raw["direction"]
     older, younger = bool(re.search(r"\bolder\b", low)), bool(re.search(r"\byounger\b", low))
     if direction == "signed" and sign:
@@ -894,6 +929,8 @@ def _with_model(text: str, rules: ParsedPatient, ex: Extraction) -> PatientRead:
         wording = "; ".join(dict.fromkeys(render(f) for f in facts))
         outcomes = {rules.statements[i].outcome for i in sts}
         canonical = is_canonical(original)
+        dropped = _leftover(lines[line], first.start, last.end, [it for it in its if it.fact is not None])
+        leaves = f" (it leaves out: '{dropped}')" if dropped else ""
 
         for it in its:
             if it.note:
@@ -913,8 +950,8 @@ def _with_model(text: str, rules: ParsedPatient, ex: Extraction) -> PatientRead:
 
         if "refused" in outcomes:
             suggestions.append(Suggestion(*span, original, [wording],
-                                          "the rules could not use this as typed; the model reads it as",
-                                          blocking=False))
+                                          f"the rules could not use this as typed; the model reads it "
+                                          f"as{leaves}", blocking=False))
             continue
         rules_facts = _merge([rules.statements[i].facts for i in sts])
         model_facts = _merge([_line_facts(render(f)) for f in facts])
@@ -960,6 +997,17 @@ def _with_model(text: str, rules: ParsedPatient, ex: Extraction) -> PatientRead:
 
         # not (fully) understood by the rules: rewrite, unless the model alone says how the
         # person smokes (the same status the rules read from it may be rewritten)
+        if dropped:
+            # the quotes do not hold the whole statement: "Non-HDL ...", "... but is 6.0 % now",
+            # "retired at 65 years old" — what is left may change what it means
+            suggestions.append(Suggestion(*span, original, [wording], f"the model reads part of it as{leaves}",
+                                          blocking=bool(model_smoking and "smoking" not in rules_facts)))
+            if model_smoking and "smoking" not in rules_facts:
+                model_problems.append((
+                    f"'{original}' was not understood by the rules; the model reads part of it as "
+                    f"'{wording}'{leaves} — choose a wording or rewrite it", "not_understood", "smoking",
+                    tuple(sts), [wording], span + (original,)))
+            continue
         if model_smoking and "smoking" not in rules_facts:
             model_problems.append((
                 f"'{original}' was not understood by the rules; the model reads it as '{wording}' — use "
@@ -984,6 +1032,8 @@ def _with_model(text: str, rules: ParsedPatient, ex: Extraction) -> PatientRead:
         bad = _check(rules, final, expected, subs)
         if not bad:
             break
+        if not any(s.line in bad for s in subs):
+            bad = {-1}                          # a rewrite changed another line: withdraw them all
         for s in [s for s in subs if s.line in bad or -1 in bad]:
             subs.remove(s)
             suggestions.append(Suggestion(s.line, s.start, s.end, s.original, ["; ".join(s.lines)],
@@ -997,10 +1047,26 @@ def _with_model(text: str, rules: ParsedPatient, ex: Extraction) -> PatientRead:
     for ptext, pkind, ptopic, sts, _, _ in model_problems:
         final.problems.append(Problem(ptext, pkind, ptopic, tuple(index[i] for i in sts if i in index)))
     _outcomes(final)
-    out.read_as, out.parsed, out.substitutions = read_as, final, subs
+    out.read_as, out.parsed, out.substitutions = (read_as if subs else text), final, subs
     out.suggestions = sorted(suggestions, key=lambda s: (not s.blocking, s.line, s.start))
     out.notes = list(dict.fromkeys(out.notes))
     return out
+
+
+_FILLER_WORDS = {"my", "the", "a", "an", "is", "was", "i", "im", "i'm", "ive", "i've", "have", "has", "had", "me",
+                 "and", "also", "too", "of", "current", "currently", "latest", "last", "recent", "most", "today",
+                 "todays", "today's", "level", "value", "result", "results", "been", "patient", "pt"}
+
+
+def _leftover(line: str, start: int, end: int, items: list) -> str:
+    """The words of line[start:end] no quote covers, minus filler ("my", "was")."""
+    covered = [False] * (end - start)
+    for it in items:
+        for k in range(max(it.start, start), min(it.end, end)):
+            covered[k - start] = True
+    rest = "".join(" " if cov else ch for ch, cov in zip(line[start:end], covered))
+    words = re.findall(r"[a-z0-9']+(?:\.\d+)?", unify(rest))
+    return " ".join(w for w in words if w.strip("'") not in _FILLER_WORDS and w != "'")
 
 
 def _covers(model_facts: dict, key: str, val) -> bool:
