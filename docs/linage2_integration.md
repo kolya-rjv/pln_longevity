@@ -262,10 +262,79 @@ of 0. Send the patient's own `CRP` / `HbA1c` / `FastingGlucose` (z or value) and
 
 ## 8. Non-goals
 
-- Not a LinAge2 implementation. The model, its artifacts and its numpy pipeline stay in
-  `Rejuve/LinAge2-Python`; this repository consumes the service's response.
-- No per-feature weights in the KB (sex-specific, sign-flipping, retrain-sensitive).
+- ~~Not a LinAge2 implementation.~~ **Reversed in v2 (§9):** a demo cannot ask a person to
+  run a separate service and paste its JSON, so the model is now evaluated in-process from
+  parameters extracted out of `Rejuve/LinAge2-Python`. The service's response shape is
+  still the interface, and `patient.linage2` still accepts it.
+- No per-feature weights in the KB (sex-specific, sign-flipping, retrain-sensitive). This
+  still holds: v2 keeps them in a Python-side data file; the KB sees only years per input.
 - No numeric AUCs transcribed from figures (§1.3 of the evidence file says what is and is
   not recorded).
 - No stored patients.
+
+## 9. v2 — the model, copied in
+
+**Why.** The tab in which a person types their labs (and gets questions answered about
+themselves) cannot depend on a second service they would have to run and paste from.
+LinAge2 turned out to be small enough to carry: it is *additive* in its inputs.
+
+**What.** For a person of sex *s*, age *a* (months), and input *j* after imputation and
+derivation:
+
+```
+z_j     = clip( (BoxCox_j(x_j) − median_sj) / mad_sj , −6, 6 )     # ≤50-year-old reference, sex s
+years_j = (z_j − μZ_sj) · w_sj / 12                                 # w = SVD loadings × Cox β / β_age(null)
+delta   = Σ_j years_j + (a − μAge_s) · wAge_s / 12
+```
+
+(five inputs — the three questionnaire scores, cotinine, the basophil count — skip the
+median/MAD step). `scripts/extract_linage2_model.py`, run once against a LinAge2-Python
+checkout, reads every constant out of the artifacts and writes
+`data/linage2/linage2_model.json` (108 KB: 59 features × two sexes, plus a per-sex,
+per-year table of the reference medians the service imputes from, plus provenance — the
+upstream commit and a SHA-256 of every artifact). `pln_chat/core/linage2_model.py`
+evaluates it with no pandas, scipy, scikit-survival or pickles, and returns the service's
+`/predict` body, which `build_linage2` consumes unchanged.
+
+**Measured, not assumed.** The same script scores 48 random partial panels (both sexes,
+ages 25–84, ~35% of inputs missing, a third with a full questionnaire, cotinine 0–3)
+through the service's **own** `process_payload` and stores them as
+`tests/fixtures/linage2_golden.json`. The port matches every case to **2 × 10⁻¹⁴ years**,
+per input and in total (`tests/test_linage2_model.py`). Linearity is asserted directly:
+changing one input moves only that input's years — which is why a partial panel still
+gives exact years for everything that *was* measured, while the total assumes the rest
+are typical for the person's sex and age.
+
+**Deliberate departures from the service**, each tested:
+
+1. *Provenance.* The service flags only imputed **lab** inputs. Here a derived input is
+   flagged when any part of it was imputed (LDL from total cholesterol/HDL/triglycerides;
+   the urine albumin/creatinine ratio), and a questionnaire score is flagged as *assumed*
+   when its questions were not answered (the service silently assumes no diagnoses,
+   "good" health, no visits). Everything not measured carries `is_imputed`, so the KB
+   totals it apart and never credits a cause to it.
+2. *Cotinine on the training scale.* The model was fitted on `digiCot` bins (0: <10 ng/mL,
+   1: 10–100, 2: 100–200, 3: ≥200 — all four occur in the training matrix). The imputation
+   medians are taken over the digitized column; the service imputed the **raw** median
+   (~0.1 ng/mL) and read it as a level (≈ +0.3 y for a man).
+3. *Refusals instead of NaN* — negative values, unknown inputs, cotinine levels other than
+   0–3, ages outside 20–90 (warned outside the fitted 40–85).
+4. *Imputation per whole year of age* (the service's window at age × 12 months).
+
+**Problems found upstream** while porting (they live in `Rejuve/LinAge2-Python` and are not fixed here):
+
+| where | what | effect |
+|---|---|---|
+| `db_mapping.UNIT_SCALE` | albumin, total protein, globulin scaled ×0.1 labelled "g/dL → g/L" (that conversion is ×10) | albumin 4.2 g/dL becomes 0.42 g/L: **+10.5 y** from albumin alone vs +1.7 y at the correct 42 g/L |
+| `db_mapping` / KB comment | CRP documented as mg/L; NHANES 1999–2002 (and the reference cohort, median 0.14) is **mg/dL** | a mg/L value is read 10× too high |
+| `_smoke_db012_to_nhanes_lbx_cot` | a daily smoker maps to level 2; training has 0–3 and most smokers at 3 | ≈ −2.9 y for a male daily smoker |
+| `/predict` docstring | HUQ050 example answer `"8"` — HUQ050 is a 0–5 visit *category* | a raw count lands outside the trained range |
+| `linage2_service` on numpy ≥ 2.3 / pandas 3 | `float()` of a 1-element array; `foldOutliers` writes a read-only array | every request fails on an unpinned install |
+| service imputed flags | LDL / urine ratio built from imputed parts reported as measured; questionnaire defaults silent | overstates what was measured |
+
+`linage2_core.metta`'s CRP and cotinine comments carried the first two of those errors
+and are corrected (they are what `GET /linage2/features` publishes).
+
+**Regenerating.** Re-run the script against a new upstream commit; the golden test pins the
+model file and the fixture to the same commit, so a half-regenerated pair fails loudly.
 

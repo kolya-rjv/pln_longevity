@@ -177,7 +177,7 @@
 ;; folate / B12 / smoking exposure
 (ModelInput SerumFolate LinAge2)             (Inheritance SerumFolate ClinicalLabMeasurement)   ;; LBDFOLSI — Serum folate (nmol/L).
 (ModelInput VitaminB12 LinAge2)              (Inheritance VitaminB12 ClinicalLabMeasurement)   ;; LBDB12SI — Vitamin B12 (pmol/L).
-(ModelInput SerumCotinine LinAge2)           (Inheritance SerumCotinine ClinicalLabMeasurement)   ;; LBXCOT — Smoking status from serum cotinine, digitized: 0 non-smoker, 1 light/recent, 2 heavy/current.
+(ModelInput SerumCotinine LinAge2)           (Inheritance SerumCotinine ClinicalLabMeasurement)   ;; LBXCOT — Serum cotinine, digitized as the model was trained: 0 (<10 ng/mL, non-smoker), 1 (10-100), 2 (100-200), 3 (>=200, a typical daily smoker).
 ;; complete blood count — white cells
 (ModelInput WhiteBloodCellCount LinAge2)     (Inheritance WhiteBloodCellCount ClinicalLabMeasurement)   ;; LBXWBCSI — White blood cell count (x10^9/L).
 (ModelInput LymphocytePercent LinAge2)       (Inheritance LymphocytePercent ClinicalLabMeasurement)   ;; LBXLYPCT — Lymphocytes (%).
@@ -201,7 +201,7 @@
 (ModelInput PlateletCount LinAge2)           (Inheritance PlateletCount ClinicalLabMeasurement)   ;; LBXPLTSI — Platelet count (x10^9/L).
 (ModelInput MeanPlateletVolume LinAge2)      (Inheritance MeanPlateletVolume ClinicalLabMeasurement)   ;; LBXMPSI — Mean platelet volume, MPV (fL).
 ;; inflammation / glycemia / cardiac
-(ModelInput CRP LinAge2)                     (Inheritance CRP ClinicalLabMeasurement)   ;; LBXCRP — C-reactive protein (mg/L).
+(ModelInput CRP LinAge2)                     (Inheritance CRP ClinicalLabMeasurement)   ;; LBXCRP — C-reactive protein (mg/dL, as NHANES 1999-2002 reports it: 1 mg/L = 0.1 mg/dL).
 (ModelInput HbA1c LinAge2)                   (Inheritance HbA1c ClinicalLabMeasurement)   ;; LBXGH — Glycohemoglobin (HbA1c, %).
 (ModelInput NTproBNP LinAge2)                (Inheritance NTproBNP ClinicalLabMeasurement)   ;; SSBNP — N-terminal pro-B-type natriuretic peptide (NT-proBNP, pg/mL).
 ;; standard biochemistry profile (SI)
@@ -278,7 +278,7 @@
 ;; (Dempsey et al. 2013 measured 17.9 h, 95% CI 16.5-19.3, "similar to that
 ;; reported in adults"), so a quitter's serum cotinine reaches non-smoker levels
 ;; within days, and cotinine is the SRNT's recommended biochemical verification
-;; of abstinence. It is not 1.0 because LinAge2's LBXCOT is a three-level
+;; of abstinence. It is not 1.0 because LinAge2's LBXCOT is a four-level
 ;; digitization that also responds to second-hand exposure and nicotine
 ;; replacement, both of which survive quitting cigarettes.
 ;;
