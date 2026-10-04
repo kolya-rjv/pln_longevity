@@ -20,6 +20,18 @@ AVAILABLE_MODELS: list[str] = ["gpt-5.4-mini", "gpt-5.4", "gpt-4o", "gpt-4-turbo
 DEFAULT_TEMPERATURE: float = 0.2
 OPENAI_TIMEOUT_SECONDS: float = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60"))
 OPENAI_MAX_RETRIES: int = max(0, int(os.getenv("OPENAI_MAX_RETRIES", "1")))
+# The model that reads the My Patient text (core/patient_extract.py) has its own
+# settings: it is called while a person waits on the Read button, so its timeout is
+# short and it never retries. It must support strict structured outputs; the name is
+# checked against core.patient_extract.SUPPORTED_MODELS, and an unsupported one is a
+# configuration error, never a silent fall-back to the rules.
+PLN_EXTRACT_MODEL: str = os.getenv("PLN_EXTRACT_MODEL", "gpt-5.4-mini")
+PLN_EXTRACT_TIMEOUT_SECONDS: float = float(os.getenv("PLN_EXTRACT_TIMEOUT_SECONDS", "20"))
+# GPT-5-family and o-series models take a reasoning effort instead of a temperature.
+PLN_EXTRACT_REASONING_EFFORT: str = os.getenv("PLN_EXTRACT_REASONING_EFFORT", "low")
+# Longest text the model reader takes; longer text is read by the rules only (the UI)
+# or refused with 413 (the API, reader='model').
+PLN_EXTRACT_MAX_CHARS: int = int(os.getenv("PLN_EXTRACT_MAX_CHARS", "4000"))
 # Largest prompt (system + history + question) the API will SEND, in estimated
 # tokens. The default /query prompt pastes the curated .metta files verbatim and
 # already measures ~62k tokens; selecting a gene ETL file pushed it to 417k and

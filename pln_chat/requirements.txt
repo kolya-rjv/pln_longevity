@@ -1,5 +1,5 @@
 gradio>=4.0
-openai>=1.0
+openai>=1.40          # strict structured outputs, message.refusal (core/patient_extract.py)
 pydantic>=2.0
 python-dotenv>=1.0
 pypdf>=4.0          # PDF text extraction for the Ontology Expander pipeline
