@@ -10,7 +10,8 @@ of Fong et al. 2025, as served by `Rejuve/LinAge2-Python` — enter the knowledg
 request-scoped patient, and let the inference stack do with it what the service cannot:
 credit years to causes under evidence, price the delta as a hazard, and answer "what would
 remove those years" through the causal graph. **Patients stay stateless**: nothing is
-written to disk; the atoms live in one request's space.
+written to disk; the atoms live in one request's space(s) — the LinAge2 atoms only in
+the LinAge2 scoped space (§5, decision 4).
 
 > **Dependency / base.** Built on the `nhanes_integration` branch: it reuses `patient-z`
 > (raw-or-standardized lookup), the outcome-keyed `patient-baseline`, and the
@@ -174,8 +175,9 @@ layer re-measured, and the picture is subtler than a head count:
 | minimal stack (§2) + LinAge2, string facts removed | runs at **+32 new heads**; aborts at +64 |
 | minimal stack + a full generated all-cause baseline (12 field heads, 8 cells) | runs, and `linage-risk-patient` returns a number |
 | a fresh space with 1,000 heads, or 300 children under one node | runs — the trigger is an interaction, not a simple cap |
+| **shared** space + one LinAge2 **patient's** atoms (61: `LinAgeDelta`, 59 `LinAgeContribution`, the `LinAgeAccel` z) | **abort** on `diagnose-patient`, `predict-risk-patient`, `recommend-supplements-patient` for that patient; the same three answer without those 61 |
 
-Three decisions follow, each asserted in `tests/test_linage2.py`:
+Four decisions follow, each asserted in `tests/test_linage2.py`:
 
 1. **Scoped, not shared.** The LinAge2 files are never in `_INFERENCE_STACK`.
 2. **Minimal underneath.** `LINAGE2_PATIENT_STACK` drops `pln_intervention_ranking`,
@@ -185,6 +187,35 @@ Three decisions follow, each asserted in `tests/test_linage2.py`:
 3. **Codes as comments.** The 59 NHANES codes cost more than the space had as string
    atoms; as structured comments they cost nothing and stay the single source of truth
    (`GET /linage2/features` publishes them).
+4. **The patient is split too.** v1 kept the layer's *files* out of the shared space but
+   still injected every atom of a LinAge2 patient into it, so any non-LinAge2 question
+   about that patient — risk, differential, supplements — aborted (last row above;
+   measured on the server's process-per-query path, not only under pytest).
+   `BuiltPatient.shared_atoms` is the patient minus its LinAge2 atoms, and it is what
+   the shared space gets; `atoms` (everything) goes to the scoped space, the preview and
+   the translator's prompt. A subprocess test asserts both halves: the three forms answer
+   with `shared_atoms`, and still abort with `atoms` — the control that keeps the first
+   assertion meaningful.
+
+**Mixed programs.** A question that asks for both — "my LinAge2 drivers and my
+supplement plan" — used to route *wholesale* to the scoped space, whose minimal stack has
+no supplement layer. `split_linage2_program` now cuts a program per top-level expression
+(character-level: two expressions on one line are two; comments are ignored, so a
+`linage-*` name inside one routes nothing): the `linage-*` ones run in the scoped space
+with every atom, the rest in the shared space with `shared_atoms`, each part validated
+against the space it runs in (an issue names its space). Both parts run in **one**
+offloaded task (`run_query_parts`: one worker, one deadline, one admission — measured safe
+in either order), and each result atom carries the index of the expression that produced
+it, so the answers come back in program order even for L, G, L
+(`routed: "linage2+generic"`). An expression that *nests* a LinAge2 form inside another
+layer's form cannot be split; it runs in the scoped space and the answer carries a warning
+naming the form that will not evaluate there. The Gradio chat does the same. Rule 16 of the
+translator prompt allows the combination, one form per line.
+
+Two pre-existing defects surfaced on the way and are fixed: `_normalize_query` split only
+at line ends, so `!(a) !(b)` on one line evaluated `a` and silently *added* `b` to the
+space; and `/query` validated the shared space without the caller's atoms, so every answer
+about a caller-supplied patient reported its own id as "not found in loaded ontology".
 
 ## 6. The API surface
 
@@ -194,6 +225,7 @@ Three decisions follow, each asserted in `tests/test_linage2.py`:
 | `GET /linage2/features` | the 59 inputs, codes, descriptions, readouts, how a cause is credited, the stack, whether a baseline is loaded |
 | `POST /linage2/analyze` | LLM-free: decomposition, hazard, risk (if baseline), counterfactuals per lever, as JSON |
 | `routed: "linage2"` | a `linage-*` form was validated against and run in the scoped space |
+| `routed: "linage2+generic"` | a program mixing `linage-*` forms with others: each part ran in its own space, answers joined in order |
 | `markers.LinAgeAccel` | the bare delta (years or z) — hazard only; mutually exclusive with the block |
 
 Refusals, each a 422 with a code: `unknown_linage2_feature`, `duplicate_linage2_feature`,
@@ -236,3 +268,4 @@ of 0. Send the patient's own `CRP` / `HbA1c` / `FastingGlucose` (z or value) and
 - No numeric AUCs transcribed from figures (§1.3 of the evidence file says what is and is
   not recorded).
 - No stored patients.
+

@@ -184,8 +184,9 @@ markdown fences, no extra keys:
 16. LINAGE2 (the CLINICAL blood-panel clock) queries map to dedicated functions,
     NOT to hand-built match patterns, and ONLY for a patient the request says
     carries a LinAge2 result (a "THIS REQUEST'S PATIENT" block naming LinAgeDelta /
-    LinAgeContribution atoms). Use them verbatim, one per query, nothing else in
-    the same query — they run in their own space:
+    LinAgeContribution atoms). Use them verbatim. They run in their own space; a
+    query may combine them with other layers' forms, each as its OWN top-level
+    expression on its own line — never nested inside another form:
       - "which labs make <patient> biologically older", "break down my LinAge2 /
         biological age", "where do my extra years come from" ->
         (linage-decomposition-patient &self <Patient>)

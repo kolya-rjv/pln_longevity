@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from ontology.inventory import RuntimeInventory
 from ontology.registry import OntologyRegistry
@@ -86,6 +86,28 @@ class ValidationResult:
     #: Predicates the query uses that are DECLARED in the ontology but hold no
     #: ground facts in the runtime KB.
     ungrounded_predicates: List[str] = field(default_factory=list)
+
+
+def merge_validation_results(
+    *parts: ValidationResult, labels: Optional[Sequence[str]] = None
+) -> ValidationResult:
+    """One verdict for a program validated in pieces (one piece per space).
+
+    With `labels`, each piece's issues and warnings say which space raised them —
+    the same symbol can be fine in one space and unknown in the other.
+    """
+    def tag(i: int, text: str) -> str:
+        return f"[{labels[i]}] {text}" if labels else text
+
+    def unique(items):
+        return list(dict.fromkeys(items))
+
+    return ValidationResult(
+        valid=all(p.valid for p in parts),
+        issues=unique(tag(i, x) for i, p in enumerate(parts) for x in p.issues),
+        warnings=unique(tag(i, x) for i, p in enumerate(parts) for x in p.warnings),
+        ungrounded_predicates=unique(u for p in parts for u in p.ungrounded_predicates),
+    )
 
 
 def _balanced_parens(expr: str) -> bool:

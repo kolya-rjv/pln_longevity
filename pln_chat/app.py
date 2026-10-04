@@ -48,9 +48,19 @@ from core.executor import (
     run_offloaded,
 )
 from core.llm_translator import translate
-from core.metta_validator import ValidationResult, validate
-from core.linage2_router import linage2_form_warnings, parse_linage2_query
-from core.pln_runner import PLNRunResult, linage2_patient_kb, run_query
+from core.metta_validator import ValidationResult, merge_validation_results, validate
+from core.linage2_router import (
+    linage2_form_warnings,
+    nesting_warnings,
+    split_linage2_program,
+)
+from core.pln_runner import (
+    PLNRunResult,
+    linage2_patient_kb,
+    merge_run_results,
+    run_query,
+    run_query_parts,
+)
 from utils.formatting import format_bot_response
 from utils.logging import log_query, log_turn
 from utils.metta_highlight import highlight_metta
@@ -307,25 +317,48 @@ def chat(
                     confidence_threshold=confidence_threshold,
                 ),
             )
-        elif parse_linage2_query(translation.metta_query) is not None:
+        elif (split := split_linage2_program(translation.metta_query)).linage2:
             # A LinAge2 form (pln_linage2.metta). Its layer cannot join the shared
             # space — hyperon's head-symbol budget, linage2_core.metta header — so
             # it runs in core.pln_runner.LINAGE2_PATIENT_STACK, validated against
             # that space, exactly as the HTTP API does (tests/test_ui_api_parity).
+            # A program that also asks for something else is split, that part runs
+            # in the shared space, both in ONE offloaded task, answers in program
+            # order (api._run_linage2_program).
             linage_registry, linage_inventory = _linage2_context()
-            validation = validate(translation.metta_query, linage_registry, linage_inventory)
             linage_kb = linage2_patient_kb()
-            pln_result = run_offloaded(
-                "run_query",
-                {"metta_query": translation.metta_query,
-                 "confidence_threshold": confidence_threshold,
-                 "kb_files": linage_kb},
-                lambda: run_query(
-                    metta_query=translation.metta_query,
-                    confidence_threshold=confidence_threshold,
-                    kb_files=linage_kb,
-                ),
-            )
+            if split.mixed:
+                validation = merge_validation_results(
+                    validate(split.linage2, linage_registry, linage_inventory),
+                    validate(split.generic, registry, inventory),
+                    labels=("LinAge2 space", "shared space"),
+                )
+                parts = [
+                    {"metta_query": split.linage2, "kb_files": linage_kb},
+                    {"metta_query": split.generic, "kb_files": _ALL_KB_PATHS},
+                ]
+                pln_result = merge_run_results(
+                    run_offloaded(
+                        "run_query_parts",
+                        {"parts": parts, "confidence_threshold": confidence_threshold},
+                        lambda: run_query_parts(parts, confidence_threshold=confidence_threshold),
+                    ),
+                    split.positions(),
+                )
+            else:
+                validation = validate(translation.metta_query, linage_registry, linage_inventory)
+                pln_result = run_offloaded(
+                    "run_query",
+                    {"metta_query": translation.metta_query,
+                     "confidence_threshold": confidence_threshold,
+                     "kb_files": linage_kb},
+                    lambda: run_query(
+                        metta_query=translation.metta_query,
+                        confidence_threshold=confidence_threshold,
+                        kb_files=linage_kb,
+                    ),
+                )
+            validation.warnings.extend(nesting_warnings(split))
         else:
             # The inventory is what tells a real symbol (MTORC1, Mouse) from an
             # invented one, and a populated predicate from a declared-but-empty

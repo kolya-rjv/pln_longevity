@@ -346,7 +346,8 @@ changing: it reads `PatientAge`, `PatientSex` and `MeasuredZ` and nothing else.
 What was missing was a typed surface and sanitisation.
 
 `/query` and `/metta/run` now take a `patient` object. It is loaded into that
-request's space only and never written to disk:
+request's space(s) only and never written to disk (a `linage2` block's atoms go
+only to the LinAge2 scoped space — see "…and your LinAge2 result"):
 
 ```bash
 curl -X POST localhost:7860/query -H 'Content-Type: application/json' -d '{
@@ -449,7 +450,17 @@ What it becomes: the `LinAgeAccel` clock marker (`z = delta / linage-sd-to-years
 one `(LinAgeContribution <Patient> <Input> <years> Measured|Imputed)` atom per
 input. What it unlocks — the dedicated forms, which the translator emits for
 matching questions and which run in their own **query-scoped space**
-(`routed: "linage2"`; see "Demo query forms"):
+(`routed: "linage2"`; see "Demo query forms"). A program may mix them with other
+forms — "my LinAge2 drivers and my supplement plan" — and is then split per
+top-level expression: the `linage-*` forms run in the scoped space, the rest in the
+generic one, in one request (one deadline), and the answers come back in program
+order (`routed: "linage2+generic"`). Put each form on its own line: an expression
+that nests a LinAge2 form inside another form cannot be split, and the response
+warns about it. The generic
+space receives the patient **without** the LinAge2 atoms (`LinAgeDelta`,
+`LinAgeContribution`, the `LinAgeAccel` z): with them, hyperon 0.2.10 aborts on
+`diagnose-patient`, `predict-risk-patient` and `recommend-supplements-patient` for
+that patient, and nothing there reads them anyway.
 
 | form | answers |
 |---|---|

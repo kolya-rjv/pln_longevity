@@ -61,7 +61,9 @@ from core.linage2_router import (  # noqa: E402
     linage2_form_warnings,
     parse_linage2_query,
     parse_sexpr,
+    split_linage2_program,
 )
+from core.metta_validator import ValidationResult, merge_validation_results  # noqa: E402
 from core.patient_builder import PatientSpecError, build_patient  # noqa: E402
 from core.pln_runner import (  # noqa: E402
     LINAGE2_LAYER_FILES,
@@ -69,6 +71,7 @@ from core.pln_runner import (  # noqa: E402
     PLNAtomResult,
     PLNRunResult,
     linage2_patient_kb,
+    merge_run_results,
 )
 
 FIXTURE = REPO / "tests" / "fixtures" / "linage2_response.json"
@@ -285,6 +288,113 @@ def test_a_form_for_a_patient_with_no_delta_is_warned():
     assert not linage2_form_warnings("!(linage-hazard-patient &self Caller_X)",
                                      extra_atoms="(LinAgeDelta Caller_X 8.28)")
     assert not linage2_form_warnings("!(predict-risk-patient &self Patient001)")
+
+
+def test_the_shared_space_gets_the_patient_without_its_linage2_atoms():
+    """BuiltPatient.shared_atoms: the patient the SHARED space may hold. Everything
+    but the LinAge2 atoms, which abort that space on the patient forms."""
+    built = build_patient(_patient())
+    shared = built.shared_atoms.splitlines()
+    assert "(PatientSmoking Caller_W58 CurrentSmoker)" in shared
+    assert "(MeasuredZ Caller_W58 HbA1c 1.6)" in shared
+    for head in ("LinAgeDelta", "LinAgeContribution", "LinAgeAccel"):
+        assert head not in built.shared_atoms
+        assert head in built.atoms
+    assert set(shared) <= set(built.atoms.splitlines())
+    # nothing else is withheld: the difference is exactly the LinAge2 atoms
+    withheld = set(built.atoms.splitlines()) - set(shared)
+    assert all(("LinAge" in line) for line in withheld) and len(withheld) == 61
+    # a patient with no LinAge2 result loses nothing
+    plain = build_patient({"id": "P", "age": 50, "sex": "Male", "markers": {"CRP": 1.2}})
+    assert plain.shared_atoms == plain.atoms
+    # the bare clock marker is LinAge2-only too
+    bare = build_patient({"id": "B", "age": 50, "sex": "Male", "markers": {"LinAgeAccel": 0.5}})
+    assert "LinAgeAccel" in bare.atoms and "LinAgeAccel" not in bare.shared_atoms
+
+
+def test_a_mixed_program_is_split_by_space_in_order():
+    split = split_linage2_program(
+        "!(diagnose-patient &self Caller_W58 (InsulinResistance))\n"
+        ";; a comment line\n"
+        "!(linage-hazard-patient &self Caller_W58)\n"
+        "!(recommend-supplements-patient\n   &self Caller_W58)"
+    )
+    assert split.mixed and not split.linage2_first
+    assert split.linage2 == "!(linage-hazard-patient &self Caller_W58)"
+    assert split.generic.splitlines() == [
+        "!(diagnose-patient &self Caller_W58 (InsulinResistance))",
+        "!(recommend-supplements-patient &self Caller_W58)",
+    ]
+    pure = split_linage2_program("(linage-hazard-patient &self X)\n(linage-drivers-patient &self X)")
+    assert not pure.mixed and pure.linage2_first and pure.generic == ""
+    # a LinAge2 form nested inside another expression still runs where its layer is
+    nested = split_linage2_program("!(let $h (linage-hazard-patient &self X) $h)\n!(match &self (A $x) $x)")
+    assert nested.mixed and nested.linage2.startswith("!(let $h (linage-hazard")
+
+
+def test_the_split_is_per_expression_not_per_line():
+    """Two forms on ONE line are two expressions (the old line-based splitter glued
+    them, ran both in the scoped space, and evaluated only the first)."""
+    one_line = split_linage2_program(
+        "!(linage-hazard-patient &self X) !(recommend-supplements-patient &self X)")
+    assert one_line.mixed
+    assert one_line.linage2 == "!(linage-hazard-patient &self X)"
+    assert one_line.generic == "!(recommend-supplements-patient &self X)"
+    # a linage-* name inside a comment is not a LinAge2 form
+    commented = split_linage2_program(
+        ";; unlike (linage-hazard-patient &self X)\n"
+        "!(recommend-supplements-patient &self X) ; vs (linage-drivers-patient\n"
+        "!(diagnose-patient &self X (A))")
+    assert commented.linage2 == "" and len(commented.generic.splitlines()) == 2
+    # interleaved: every expression remembers where it sat
+    inter = split_linage2_program("(linage-hazard-patient &self X)\n(predict-risk-patient &self X)\n"
+                                  "(linage-drivers-patient &self X)")
+    assert inter.positions() == [[0, 2], [1]] and inter.linage2_first
+
+
+def test_a_nested_combination_is_named_not_silently_run():
+    from core.linage2_router import nesting_warnings
+    split = split_linage2_program("!(let $h (linage-hazard-patient &self X) (recommend-supplements-patient &self X))")
+    assert not split.mixed and split.nested
+    warnings = nesting_warnings(split)
+    assert warnings and "recommend-supplements-patient" in warnings[0]
+    assert not split_linage2_program("!(let $h (linage-hazard-patient &self X) $h)").nested
+
+
+def test_pieces_come_back_in_program_order():
+    lin = PLNRunResult(status="ok", mode="runtime", results=[
+        PLNAtomResult(atom="(L0)", expr_index=0), PLNAtomResult(atom="(L2)", expr_index=1)])
+    gen = PLNRunResult(status="ok", mode="runtime", results=[PLNAtomResult(atom="(G1)", expr_index=0)])
+    merged = merge_run_results([lin, gen], [[0, 2], [1]])
+    assert [r.atom for r in merged.results] == ["(L0)", "(G1)", "(L2)"]
+
+
+def test_issues_from_two_spaces_say_which_space():
+    v = merge_validation_results(
+        ValidationResult(valid=False, issues=["Unbalanced parentheses in MeTTa query."]),
+        ValidationResult(valid=False, issues=["Unbalanced parentheses in MeTTa query.", "x"]),
+        labels=("LinAge2 space", "shared space"),
+    )
+    assert v.issues == ["[LinAge2 space] Unbalanced parentheses in MeTTa query.",
+                        "[shared space] Unbalanced parentheses in MeTTa query.", "[shared space] x"]
+
+
+def test_merged_answers_keep_order_and_an_error_is_never_half_an_answer():
+    a = PLNRunResult(status="ok", results=[PLNAtomResult(atom="(A)")], query_time_ms=5, mode="runtime")
+    b = PLNRunResult(status="empty", results=[], query_time_ms=7, mode="runtime")
+    c = PLNRunResult(status="ok", results=[PLNAtomResult(atom="(C)")], query_time_ms=1, mode="runtime")
+    merged = merge_run_results([c, b, a])
+    assert [r.atom for r in merged.results] == ["(C)", "(A)"] and merged.status == "ok"
+    assert merged.query_time_ms == 13
+    assert merge_run_results([b, b]).status == "empty"
+    boom = PLNRunResult(status="error", error="aborted", mode="runtime")
+    assert merge_run_results([a, boom]) is boom
+    v = merge_validation_results(
+        ValidationResult(valid=True, warnings=["w1"], ungrounded_predicates=["P"]),
+        ValidationResult(valid=False, issues=["i1"], ungrounded_predicates=["P", "Q"]),
+    )
+    assert not v.valid and v.issues == ["i1"] and v.warnings == ["w1"]
+    assert v.ungrounded_predicates == ["P", "Q"]
 
 
 # ═══════════════════════════ the scoped space ════════════════════════════════
@@ -528,6 +638,53 @@ def test_the_scoped_stack_keeps_a_head_symbol_margin():
     )
 
 
+@pytest.mark.slow
+def test_the_shared_space_survives_a_patient_with_a_linage2_result():
+    """The crash this split exists for, measured in a subprocess because hyperon
+    0.2.10 aborts the PROCESS: with every atom of a LinAge2 patient in the shared
+    space, diagnose-patient, predict-risk-patient and recommend-supplements-patient
+    abort; with `shared_atoms` all three answer. The control run is what makes the
+    first assertion mean something — if it stops aborting, the engine changed and
+    the split may no longer be needed (it is still correct)."""
+    probe = "\n".join([
+        "import sys",
+        f"sys.path.insert(0, {str(PLN_CHAT)!r}); sys.path.insert(0, {str(REPO / 'tests')!r})",
+        "import api",
+        "from core.patient_builder import build_patient",
+        "from core.pln_runner import run_query",
+        "import test_linage2 as t",
+        "built = build_patient(t._patient(markers={'HbA1c': 1.6, 'CRP': 0.3, 'AgeAccelGrim': 1.6}))",
+        "atoms = built.shared_atoms if sys.argv[1] == 'shared' else built.atoms",
+        "kb = api._runtime_kb_paths()",
+        "for q in ('!(diagnose-patient &self Caller_W58 (CellularSenescence ChronicInflammation InsulinResistance))',",
+        "          '!(predict-risk-patient &self Caller_W58)',",
+        "          '!(recommend-supplements-patient &self Caller_W58)'):",
+        "    if sys.argv[2] and sys.argv[2] not in q: continue",
+        "    r = run_query(q, kb_files=kb, extra_atoms=atoms)",
+        "    assert r.status == 'ok', (q, r.status, r.error)",
+        "print('ok')",
+    ])
+
+    def run(which: str, only: str = "") -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, "-c", probe, which, only],
+            capture_output=True, text=True, timeout=900, cwd=str(REPO),
+        )
+
+    shared = run("shared")
+    assert shared.returncode == 0 and "ok" in shared.stdout, shared.stderr[-800:]
+    # The control, per form: each one must die of hyperon's ABORT (SIGABRT, a
+    # non-unwinding panic) with the full atoms — not of any other error, which
+    # would make this pass for the wrong reason.
+    for form in ("diagnose-patient", "predict-risk-patient", "recommend-supplements-patient"):
+        full = run("full", form)
+        assert full.returncode == -6 and "panic" in full.stderr, (
+            f"{form} no longer aborts the shared space with a LinAge2 patient's full "
+            f"atoms (rc={full.returncode}); the control is void, so this test no longer "
+            f"proves the split is what saves it. stderr: {full.stderr[-400:]}"
+        )
+
+
 # ═══════════════════════════ HTTP ════════════════════════════════════════════
 
 httpx = pytest.importorskip("httpx")
@@ -590,6 +747,138 @@ def test_metta_run_routes_a_linage_form_to_the_scoped_space_and_warns_without_a_
     body = _request("POST", "/metta/run", json={"metta_query": "!(linage-hazard-patient &self Patient001)"}).json()
     assert body["routed"] == "linage2" and body["pln_status"] == "empty"
     assert any("no LinAge2 result" in w for w in body["warnings"])
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("program", [
+    "!(diagnose-patient &self Caller_W58 (InsulinResistance ChronicInflammation))",
+    "!(predict-risk-patient &self Caller_W58)",
+    "!(recommend-supplements-patient &self Caller_W58)",
+])
+def test_a_plain_question_about_a_linage2_patient_is_answered(monkeypatch, program):
+    """THE crash, end to end: a non-LinAge2 question about a patient who carries a
+    LinAge2 result used to abort the worker (500 pln_worker_crashed). Through the
+    worker pool, so a regression is a 500, not a dead pytest."""
+    monkeypatch.setattr(executor_module, "PLN_WORKER_POOL_SIZE", 2)
+    patient = _patient(markers={"HbA1c": 1.6, "CRP": 0.3, "AgeAccelGrim": 1.6})
+    r = _request("POST", "/metta/run", json={"metta_query": program, "patient": patient})
+    body = r.json()
+    assert r.status_code == 200, body
+    assert body["routed"] is None and body["pln_status"] == "ok"
+    assert body["validation_valid"] is True
+
+
+@pytest.mark.slow
+def test_a_mixed_program_runs_each_part_in_its_own_space(monkeypatch):
+    """"My LinAge2 hazard AND my differential": the LinAge2 form in the scoped space
+    with every atom, the diagnosis in the shared space without the LinAge2 atoms.
+    Run through the worker pool so a regression is a 500, not a dead pytest."""
+    monkeypatch.setattr(executor_module, "PLN_WORKER_POOL_SIZE", 2)
+    program = ("!(linage-hazard-patient &self Caller_W58)\n"
+               "!(diagnose-patient &self Caller_W58 (InsulinResistance ChronicInflammation))")
+    r = _request("POST", "/metta/run", json={"metta_query": program, "patient": _patient()})
+    body = r.json()
+    assert r.status_code == 200, body
+    assert body["routed"] == "linage2+generic" and body["pln_status"] == "ok"
+    atoms = [x["atom"] for x in body["pln_results"]]
+    assert atoms[0].startswith("(LinAgeHazard Caller_W58")          # program order kept
+    assert any("Hypothesis InsulinResistance" in a for a in atoms[1:])
+    # the shared part is validated against the shared space: a LinAge2-only symbol
+    # used outside a linage-* form is refused there, before anything runs
+    bad = _request("POST", "/metta/run", json={
+        "metta_query": "!(linage-hazard-patient &self Caller_W58)\n!(match &self (LinAgeDelta Caller_W58 $d) $d)",
+        "patient": _patient()})
+    assert bad.status_code == 422 and bad.json()["detail"]["code"] == "invalid_metta_query"
+
+
+@pytest.mark.slow
+def test_an_interleaved_program_answers_in_order_with_one_offload(monkeypatch):
+    """L, G, L: the risk answer stays between the two LinAge2 answers, and the whole
+    program is ONE offloaded task — one worker, one deadline, one admission."""
+    monkeypatch.setattr(executor_module, "PLN_WORKER_POOL_SIZE", 2)
+    calls = []
+    real = api_module.run_offloaded
+
+    def spy(task, kwargs, inline, **kw):
+        calls.append(task)
+        return real(task, kwargs, inline, **kw)
+
+    monkeypatch.setattr(api_module, "run_offloaded", spy)
+    patient = _patient(markers={"HbA1c": 1.6, "CRP": 0.3, "AgeAccelGrim": 1.6})
+    program = ("!(linage-hazard-patient &self Caller_W58) !(predict-risk-patient &self Caller_W58)\n"
+               "!(linage-delta &self Caller_W58)")
+    r = _request("POST", "/metta/run", json={"metta_query": program, "patient": patient})
+    body = r.json()
+    assert r.status_code == 200, body
+    assert calls == ["run_query_parts"]
+    heads = [x["atom"].split()[0] for x in body["pln_results"]]
+    assert heads[0] == "(LinAgeHazard" and heads[1] == "(RiskPrediction" and len(heads) == 3
+
+
+@pytest.mark.slow
+def test_query_runs_a_mixed_translation_in_both_spaces(monkeypatch):
+    monkeypatch.setattr(executor_module, "PLN_WORKER_POOL_SIZE", 2)
+    translation = TranslationResult(
+        metta_query="(recommend-supplements-patient &self Caller_W58)\n(linage-drivers-patient &self Caller_W58)",
+        explanation="supplements, then LinAge2 drivers", intent="inference",
+        requires_pln_inference=True, confidence_filter=0.0,
+    )
+    monkeypatch.setattr(api_module, "translate", Mock(return_value=translation))
+    monkeypatch.setattr(api_module, "build_system_prompt", lambda registry, raw, inventory=None: "prompt")
+    r = _request("POST", "/query", json={"message": "supplements and LinAge2 drivers", "patient": _patient()})
+    body = r.json()
+    assert r.status_code == 200, body
+    assert body["routed"] == "linage2+generic" and body["pln_status"] == "ok"
+    assert "SupplementRecommendation Caller_W58" in body["answer"]
+    assert "(Contribution SerumCotinine" in body["answer"]          # the LinAge2 drivers
+    # both halves validated against the space they run in, patient atoms included:
+    # the caller's own id is not "not found in loaded ontology"
+    assert body["validation_valid"] is True, body["validation_issues"]
+
+
+def test_the_chat_splits_a_mixed_program_like_the_api(monkeypatch):
+    """Parity, behaviourally: the Gradio chat sends a mixed program as ONE
+    run_query_parts task, LinAge2 part to the scoped stack, and answers in order."""
+    import app as app_module
+    translation = TranslationResult(
+        metta_query="(predict-risk-patient &self Patient001)\n(linage-hazard-patient &self Patient001)",
+        explanation="", intent="inference", requires_pln_inference=True, confidence_filter=0.0)
+    monkeypatch.setattr(app_module, "translate", lambda **kw: translation)
+    monkeypatch.setattr(app_module, "log_query", lambda *a, **k: None)
+    monkeypatch.setattr(app_module, "log_turn", lambda *a, **k: None)
+    calls = []
+
+    def fake(task, kwargs, inline, **kw):
+        calls.append((task, kwargs))
+        return [PLNRunResult(status="ok", mode="runtime", results=[PLNAtomResult("(LIN)", expr_index=0)]),
+                PLNRunResult(status="ok", mode="runtime", results=[PLNAtomResult("(GEN)", expr_index=0)])]
+
+    monkeypatch.setattr(app_module, "run_offloaded", fake)
+    history, _ = app_module.chat(
+        user_message="q", history=[], selected_files=[], model="m", temperature=0.0,
+        confidence_threshold=0.0, show_metta=False, show_explanation=False, show_debug=False)
+    assert [task for task, _ in calls] == ["run_query_parts"]
+    parts = calls[0][1]["parts"]
+    assert parts[0]["metta_query"].startswith("(linage-hazard-patient")
+    assert parts[0]["kb_files"] == linage2_patient_kb()
+    assert parts[1]["metta_query"].startswith("(predict-risk-patient")
+    answer = history[-1]["content"]
+    assert answer.index("(GEN)") < answer.index("(LIN)")             # program order
+
+
+def test_a_generic_question_about_a_caller_patient_validates_clean(monkeypatch):
+    """Pre-existing: /query validated the shared space WITHOUT the patient's atoms,
+    so every answer about Caller_<id> carried 'Symbol(s) not found: Caller_<id>'."""
+    translation = TranslationResult(
+        metta_query="(diagnose-patient &self Caller_W58 (InsulinResistance))",
+        explanation="", intent="inference", requires_pln_inference=True, confidence_filter=0.0)
+    monkeypatch.setattr(api_module, "translate", Mock(return_value=translation))
+    monkeypatch.setattr(api_module, "build_system_prompt", lambda registry, raw, inventory=None: "prompt")
+    monkeypatch.setattr(api_module, "_offloaded_run",
+                        lambda *a, **k: PLNRunResult(status="empty", mode="runtime"))
+    r = _request("POST", "/query", json={"message": "q", "patient": _patient()})
+    body = r.json()
+    assert r.status_code == 200 and body["validation_valid"] is True, body["validation_issues"]
 
 
 def test_query_routes_a_translated_linage_form(monkeypatch):

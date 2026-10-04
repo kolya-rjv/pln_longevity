@@ -236,6 +236,16 @@ class BuiltPatient:
     #: Set when the caller sent a LinAge2 response under `linage2`.
     linage2: Optional["BuiltLinAge2"] = None
 
+    #: The same patient WITHOUT its LinAge2 atoms — what the SHARED execution space
+    #: gets. `atoms` (everything) is for the LinAge2 scoped space, the preview and
+    #: the translator's prompt. The split is measured, not tidiness: with the
+    #: LinAgeDelta / LinAgeContribution / LinAgeAccel atoms of one /predict response
+    #: in the shared space, hyperon 0.2.10 aborts on diagnose-patient,
+    #: predict-risk-patient and recommend-supplements-patient for that patient, and
+    #: the same three forms answer without them (tests/test_linage2.py). Nothing in
+    #: the shared space reads those atoms — its stack has no LinAge2 layer.
+    shared_atoms: str = ""
+
     @property
     def can_predict_risk(self) -> bool:
         has_clock = any(m.name == "AgeAccelGrim" for m in self.markers)
@@ -651,14 +661,19 @@ def build_patient(
         lines.append(f"(PatientSex {patient_id} {sex})")
     if smoking is not None:
         lines.append(f"(PatientSmoking {patient_id} {smoking})")
+    shared_lines = list(lines)
     for marker in sorted(resolved, key=lambda m: m.name):
-        lines.append(f"(MeasuredZ {patient_id} {marker.name} {marker.z:.6g})")
+        line = f"(MeasuredZ {patient_id} {marker.name} {marker.z:.6g})"
+        lines.append(line)
+        if marker.name not in LINAGE_YEARS_MARKERS:
+            shared_lines.append(line)
     if built_linage2 is not None:
         lines.append(built_linage2.atoms)
 
     return BuiltPatient(
         patient_id=patient_id,
         atoms="\n".join(lines),
+        shared_atoms="\n".join(shared_lines),
         markers=resolved,
         warnings=warnings,
         age=age,

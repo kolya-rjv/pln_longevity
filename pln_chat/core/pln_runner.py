@@ -207,6 +207,9 @@ def linage2_patient_kb(*generated: Path) -> list[Path]:
 class PLNAtomResult:
     atom: str
     stv: Optional[dict] = None   # {"strength": float, "confidence": float}
+    #: Which `!` expression of the program produced this atom (0-based), when the
+    #: runtime knows. Lets a program run in pieces be put back in program order.
+    expr_index: Optional[int] = None
 
 
 @dataclass
@@ -464,30 +467,128 @@ def _stv_from_atom(atom_str: str) -> Optional[dict]:
 
 
 def _iter_top_level_exprs(text: str):
-    """Yield each top-level S-expression from a MeTTa text block."""
-    buf: list[str] = []
+    """Yield each top-level S-expression of a MeTTa program, in order.
+
+    Character-level. It used to cut only at the end of a LINE whose parentheses
+    balanced, so `!(a) !(b)` on one line was one "expression": `_normalize_query`
+    put a `!` on the first only (the second was silently added to the space instead
+    of evaluated), and the LinAge2 splitter could not separate the two. Now: several
+    expressions on a line are several expressions; a `;` comment runs to the end of
+    its line (outside a string) and is dropped; a parenthesis inside a "string" does
+    not count; a `!` stays with the expression it prefixes; a bare top-level symbol
+    is an expression of its own. Whitespace outside strings collapses to one space.
+    """
+    out: list[str] = []
     depth = 0
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        # Strip comment-only lines
-        if line.startswith(";;") or line.startswith(";"):
+    in_str = escaped = False
+    i, n = 0, len(text)
+
+    def pending() -> str:
+        return "".join(out).strip()
+
+    while i < n:
+        ch = text[i]
+        if in_str:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_str = False
+            i += 1
             continue
-        for ch in line:
-            if ch == "(":
-                depth += 1
-            elif ch == ")":
-                depth -= 1
-        buf.append(line)
-        if depth <= 0 and buf:
-            expr = " ".join(buf).strip()
-            if expr:
-                yield expr
-            buf = []
-            depth = 0
-    if buf:
-        expr = " ".join(buf).strip()
-        if expr:
-            yield expr
+        if ch == ";":
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        if ch in " \t\r\n":
+            if depth > 0:
+                if out and out[-1] != " ":
+                    out.append(" ")
+            elif pending() and pending() != "!":
+                yield pending()
+                out = []
+            i += 1
+            continue
+        if ch == '"':
+            in_str = True
+            out.append(ch)
+        elif ch == "(":
+            if depth == 0 and pending() and pending() != "!":
+                yield pending()                      # a bare token glued to "("
+                out = []
+            depth += 1
+            out.append(ch)
+        elif ch == ")":
+            out.append(ch)
+            depth -= 1
+            if depth <= 0:
+                depth = 0
+                yield pending()
+                out = []
+        else:
+            out.append(ch)
+        i += 1
+    if pending():
+        yield pending()
+
+
+def split_top_level_exprs(text: str) -> list[str]:
+    """Every top-level S-expression of a MeTTa program, in order (comments dropped)."""
+    return list(_iter_top_level_exprs(text or ""))
+
+
+def merge_run_results(
+    parts: list[PLNRunResult],
+    positions: Optional[list[list[int]]] = None,
+) -> PLNRunResult:
+    """One result for a program that ran as several pieces in different spaces.
+
+    An error in any piece is the result: a half-answered program must not read as
+    a complete one. Otherwise the atoms are joined in PROGRAM order when
+    `positions` says where each piece's expressions sat in the original program
+    (`positions[k][j]` = original index of piece k's j-th expression) and the
+    runtime tagged its atoms with `expr_index`; atoms without a tag keep piece order.
+    """
+    if not parts:
+        return PLNRunResult(status="empty", mode="runtime" if PLN_RUNTIME_AVAILABLE else "stub")
+    for part in parts:
+        if part.status == "error":
+            return part
+    keyed = []
+    for k, part in enumerate(parts):
+        for seq, r in enumerate(part.results):
+            where = None
+            if positions is not None and r.expr_index is not None \
+                    and 0 <= r.expr_index < len(positions[k]):
+                where = positions[k][r.expr_index]
+            keyed.append(((where if where is not None else 10 ** 9 + k), k, seq, r))
+    keyed.sort(key=lambda t: t[:3])
+    results = [t[3] for t in keyed]
+    return PLNRunResult(
+        status="ok" if results else "empty",
+        results=results,
+        query_time_ms=sum(part.query_time_ms for part in parts),
+        mode=parts[0].mode,
+    )
+
+
+def run_query_parts(parts: list[dict], confidence_threshold: float = 0.0) -> list[PLNRunResult]:
+    """Run several programs, each against its own KB, one after another in THIS
+    process — so a program split across spaces costs one worker, one deadline and
+    one admission, like any other request. Each part: {metta_query, kb_files,
+    extra_atoms}. (Measured: the LinAge2 scoped stack and the shared stack run back
+    to back in one process in either order.)"""
+    return [
+        run_query(
+            part["metta_query"],
+            confidence_threshold=confidence_threshold,
+            kb_files=part.get("kb_files"),
+            extra_atoms=part.get("extra_atoms"),
+        )
+        for part in parts
+    ]
 
 
 def _normalize_query(metta_query: str) -> str:
@@ -577,10 +678,11 @@ def _hyperon_run(
             )
 
         results: list[PLNAtomResult] = []
-        for result_group in raw:
+        for index, result_group in enumerate(raw):
             for atom in result_group:
                 atom_str = str(atom)
-                results.append(PLNAtomResult(atom=atom_str, stv=_stv_from_atom(atom_str)))
+                results.append(PLNAtomResult(atom=atom_str, stv=_stv_from_atom(atom_str),
+                                             expr_index=index))
 
         results = _apply_threshold(results, confidence_threshold)
         return PLNRunResult(

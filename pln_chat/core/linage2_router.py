@@ -37,6 +37,7 @@ from core.pln_runner import (
     PLNRunResult,
     linage2_patient_kb,
     run_query,
+    split_top_level_exprs,
 )
 
 
@@ -84,6 +85,81 @@ def parse_linage2_query(metta_query: str) -> Optional[list[str]]:
     found = [m.group(1) for m in _FORM_RE.finditer(metta_query or "")]
     known = [f for f in found if f in LINAGE2_FORMS]
     return known or None
+
+
+@dataclass(frozen=True)
+class SplitProgram:
+    """A program cut into the part the LinAge2 scoped space runs and the rest.
+
+    A LinAge2 form cannot run in the shared space (its layer is not there), and a
+    shared-space form cannot run in the LinAge2 one (that stack is deliberately
+    minimal: no supplements, no diagnosis, no intervention ranking). So a question
+    that asks for both — "my LinAge2 drivers and my supplement plan" — is run as two
+    programs, one per space, and the answers are put back in program order.
+    """
+    linage2: str                     # the top-level expressions that call a linage-* form
+    generic: str                     # everything else, for the shared space
+    linage2_positions: tuple[int, ...] = ()   # where each linage2 expression sat
+    generic_positions: tuple[int, ...] = ()
+    #: expressions that NEST a linage-* form with another layer's form: they cannot
+    #: be split, run in the LinAge2 space, and the other form will not evaluate there
+    nested: tuple[str, ...] = ()
+
+    @property
+    def mixed(self) -> bool:
+        return bool(self.linage2) and bool(self.generic)
+
+    @property
+    def linage2_first(self) -> bool:
+        return bool(self.linage2_positions) and (
+            not self.generic_positions or self.linage2_positions[0] < self.generic_positions[0])
+
+    def positions(self) -> list[list[int]]:
+        """For merge_run_results: [linage2 part, generic part]."""
+        return [list(self.linage2_positions), list(self.generic_positions)]
+
+
+#: Grounded MeTTa operations and data constructors that may wrap a LinAge2 form
+#: without being "another layer's form".
+_STRUCTURAL_HEADS = frozenset({
+    "let", "let*", "match", "pair", "collapse", "superpose", "if", "case", "quote",
+    "unify", "and", "or", "not", "car-atom", "cdr-atom", "cons-atom", "size-atom",
+    "index-atom", "foldl-atom", "map-atom", "filter-atom", "sort-atom", "unique-atom",
+    "union-atom", "intersection-atom", "subtraction-atom", "max-atom", "min-atom",
+    "sum-atom", "get-type", "chain", "eval", "evalc", "id", "assertEqual",
+})
+_HEAD_RE = re.compile(r"\(\s*([a-z][a-z0-9\-*]*)")
+
+
+def split_linage2_program(metta_query: str) -> SplitProgram:
+    """Split a program by space, per top-level expression (comments ignored).
+
+    An expression that calls a linage-* form anywhere inside it runs in the LinAge2
+    space; if it also calls another layer's form, that is recorded in `nested`.
+    """
+    linage, generic, nested = [], [], []
+    lin_pos, gen_pos = [], []
+    for index, expr in enumerate(split_top_level_exprs(metta_query)):
+        if parse_linage2_query(expr) is not None:
+            linage.append(expr)
+            lin_pos.append(index)
+            others = sorted({h for h in _HEAD_RE.findall(expr)
+                             if not h.startswith("linage-") and h not in _STRUCTURAL_HEADS})
+            if others:
+                nested.append(f"{expr}  [also calls: {', '.join(others)}]")
+        else:
+            generic.append(expr)
+            gen_pos.append(index)
+    return SplitProgram("\n".join(linage), "\n".join(generic),
+                        tuple(lin_pos), tuple(gen_pos), tuple(nested))
+
+
+def nesting_warnings(split: SplitProgram) -> list[str]:
+    return [
+        "This expression nests a LinAge2 form with another layer's form, so it cannot "
+        "be split and runs in the LinAge2 space, where the other form does not "
+        f"evaluate: {n}. Put each form on its own line." for n in split.nested
+    ]
 
 
 _DELTA_RE = re.compile(r"\(LinAgeDelta\s+(\S+)\s+[-\d.eE]+\)")

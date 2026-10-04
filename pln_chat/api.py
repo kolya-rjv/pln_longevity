@@ -42,7 +42,7 @@ _ROOT = Path(__file__).parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from typing import Literal, Optional
+from typing import Callable, Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -80,11 +80,10 @@ from ontology.scoped_forms import scoped_form_warnings
 from ontology.write_gate import OntologyWriteRefused, guard_ontology_write
 from ontology.inventory import (
     inventory_for,
-    merged_inventory,
     schema_card,
     summarise_oversized,
 )
-from ontology.loader import load_specific_files, parse_metta_text
+from ontology.loader import load_specific_files
 from ontology.registry import BUILTIN_REGISTRY, OntologyRegistry
 from ontology.expander import run_expansion_pipeline
 from ontology.drugage_scoring import load_knobs
@@ -123,22 +122,28 @@ from core.drugage_router import (
     route_drugage_ranking,
 )
 from core.llm_translator import translate
-from core.metta_validator import ValidationResult, validate
+from core.metta_validator import ValidationResult, merge_validation_results, validate
 from core.pln_runner import (
     CELLAGE_STACK,
     LINAGE2_GENERATED_BASELINE,
+    PLNRunResult,
     linage2_patient_kb,
+    merge_run_results,
     run_cellage_effects,
     run_query,
+    run_query_parts,
 )
 from core.linage2_builder import feature_listing as linage2_feature_listing
+from core.patient_context import patient_prompt_section, validation_text, with_injected
 from core.linage2_router import (
     DEFAULT_LEVERS as LINAGE2_DEFAULT_LEVERS,
     LINAGE2_FORMS,
     analysis_program as linage2_analysis_program,
     collect_analysis as linage2_collect_analysis,
+    SplitProgram,
     linage2_form_warnings,
-    parse_linage2_query,
+    nesting_warnings,
+    split_linage2_program,
 )
 from ontology.inventory import inventory_for as _inventory_for_paths
 from utils.formatting import format_bot_response
@@ -1081,8 +1086,9 @@ class LinAge2In(BaseModel):
 class PatientIn(BaseModel):
     """A patient the CALLER supplies, scored for this request only.
 
-    Nothing is written to disk: the atoms live in the query's hyperon space and
-    disappear with it. The id is namespaced `Caller_…` so it can never collide
+    Nothing is written to disk: the atoms live in the query's hyperon space(s) and
+    disappear with them. (A LinAge2 block's atoms go only to the LinAge2 scoped
+    space; the shared space gets the rest — BuiltPatient.shared_atoms.) The id is namespaced `Caller_…` so it can never collide
     with a curated patient — submitting a second `Patient001` does not replace
     the first, it unions both and makes every answer non-deterministic.
 
@@ -1163,8 +1169,10 @@ class QueryRequest(BaseModel):
     patient: Optional[PatientIn] = Field(
         default=None,
         description="Ask about YOUR patient instead of a built-in one. The atoms "
-                    "are injected into this request's space only. Mention the "
-                    "returned id (or just say 'my patient') in `message`.",
+                    "are injected into this request's space(s) only — a LinAge2 "
+                    "block's into the LinAge2 scoped space, the rest into the "
+                    "shared one. Mention the returned id (or just say 'my "
+                    "patient') in `message`.",
     )
     show_metta: bool = Field(default=True, description="Include the generated MeTTa query in `answer`.")
     show_explanation: bool = Field(default=True, description="Include the NL explanation in `answer`.")
@@ -1237,7 +1245,10 @@ class QueryResponse(BaseModel):
                     "`(rank-drugage-lifespan ...)` form and got dispatched to the scoped "
                     "DrugAge engine instead of the generic KB (see POST /drugage/rank); "
                     "'linage2' when it called a `(linage-… &self <Patient> …)` form and "
-                    "ran in the LinAge2 scoped space (see GET /linage2/features).",
+                    "ran in the LinAge2 scoped space (see GET /linage2/features); "
+                    "'linage2+generic' when it mixed such forms with others — the "
+                    "LinAge2 forms ran in the scoped space, the rest in the generic "
+                    "one, and the results are joined in program order.",
     )
     usage: Optional[dict] = None
     patient: Optional["PatientPreviewResponse"] = Field(
@@ -1353,7 +1364,9 @@ class MettaRunResponse(BaseModel):
         description="Set to 'drugage_ranking' when metta_query was a "
                     "`(rank-drugage-lifespan ...)` form (see POST /drugage/rank); "
                     "'linage2' when it called a `linage-*` form, which runs in the "
-                    "LinAge2 query-scoped space rather than the generic one.",
+                    "LinAge2 query-scoped space rather than the generic one; "
+                    "'linage2+generic' when it mixed `linage-*` forms with others, "
+                    "each part running in its own space.",
     )
 
 
@@ -3007,25 +3020,6 @@ def _linage2_block_description() -> dict:
     }
 
 
-def _linage2_prompt_hint(patient: BuiltPatient) -> str:
-    return (
-        "This patient carries a LinAge2 clinical-clock result (LinAgeDelta and one "
-        "LinAgeContribution per lab). Questions about it — biological age, which labs "
-        "add years, mortality hazard or risk, what would remove years — map to the "
-        "dedicated LinAge2 forms, which take this patient id:\n"
-        f"  (linage-decomposition-patient &self {patient.patient_id})\n"
-        f"  (linage-drivers-patient &self {patient.patient_id})\n"
-        f"  (linage-hazard-patient &self {patient.patient_id})\n"
-        f"  (linage-risk-patient &self {patient.patient_id})\n"
-        f"  (linage-counterfactual-patient &self {patient.patient_id} <Lever>)\n"
-        f"  (linage-project-risk-patient &self {patient.patient_id} <Lever>)\n"
-        f"  (linage-scenarios-patient &self {patient.patient_id})\n"
-        "Use exactly one of them per query and nothing else in the same query — they "
-        "run in their own space. The GrimAge forms (predict-risk-patient, "
-        "decompose-grimage) read AgeAccelGrim and do NOT see the LinAge2 result.\n"
-    )
-
-
 @lru_cache(maxsize=1)
 def _linage2_context():
     """Registry + inventory over the LinAge2 scoped stack (static files; cached)."""
@@ -3037,15 +3031,107 @@ def _linage2_context():
 def _validate_linage2_query(metta_query: str, injected: Optional[str]) -> ValidationResult:
     """Validate a LinAge2 form against the space it will actually run in."""
     base_registry, base_inventory = _linage2_context()
-    registry = OntologyRegistry()
-    registry.merge(base_registry)
-    inventory = base_inventory
-    if injected:
-        registry.merge(parse_metta_text(injected, source_name="<api-extra-atoms>"))
-        inventory = merged_inventory(inventory, injected)
-    return validate(
-        "\n".join(part for part in (injected, metta_query) if part), registry, inventory
+    registry, inventory = with_injected(base_registry, base_inventory, injected)
+    return validate(validation_text(injected, metta_query), registry, inventory)
+
+
+def _offloaded_run(
+    metta_query: str, confidence_threshold: float, kb_files: list[Path],
+    extra_atoms: Optional[str],
+) -> PLNRunResult:
+    return run_offloaded(
+        "run_query",
+        {"metta_query": metta_query,
+         "confidence_threshold": confidence_threshold,
+         "kb_files": kb_files,
+         "extra_atoms": extra_atoms},
+        lambda: run_query(
+            metta_query=metta_query,
+            confidence_threshold=confidence_threshold,
+            kb_files=kb_files,
+            extra_atoms=extra_atoms,
+        ),
     )
+
+
+def _validate_generic_with(
+    metta_query: str, registry: OntologyRegistry, injected: Optional[str]
+) -> ValidationResult:
+    """Validate against the shared space as it will actually run: its KB PLUS the
+    atoms injected into it. Without them a caller's own patient id (Caller_W58) is
+    "not found in loaded ontology", and every answer about that patient carried a
+    validation issue on /query."""
+    merged, inventory = with_injected(registry, _runtime_inventory(), injected)
+    return validate(validation_text(injected, metta_query), merged, inventory)
+
+
+_SPACE_LABELS = ("LinAge2 space", "shared space")
+
+
+def _run_linage2_program(
+    metta_query: str,
+    split: SplitProgram,
+    *,
+    linage_atoms: Optional[str],
+    shared_atoms: Optional[str],
+    confidence_threshold: float,
+    validate_generic: Callable[[str], ValidationResult],
+    strict: bool,
+) -> tuple[str, ValidationResult, PLNRunResult]:
+    """Run a program that calls at least one LinAge2 form.
+
+    A pure LinAge2 program runs in the LinAge2 scoped space with every patient
+    atom. A MIXED one ("my LinAge2 drivers and my supplement plan") is split per
+    top-level expression (`split_linage2_program`): the LinAge2 forms run there, the
+    rest in the shared space with `shared_atoms` — the patient minus its LinAge2
+    atoms, which that space cannot hold (BuiltPatient.shared_atoms). Both halves
+    run in ONE offloaded task (one worker, one deadline, one admission) and the
+    answers come back in program order. `strict` refuses an invalid program with a
+    422 before anything runs (/metta/run); otherwise the verdict travels with the
+    answer (/query).
+    """
+    if not split.mixed:
+        validation = _validate_linage2_query(metta_query, linage_atoms)
+    else:
+        validation = merge_validation_results(
+            _validate_linage2_query(split.linage2, linage_atoms),
+            validate_generic(split.generic),
+            labels=_SPACE_LABELS,
+        )
+    validation.warnings.extend(nesting_warnings(split))
+    if strict and not validation.valid:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "invalid_metta_query",
+                "message": (
+                    "MeTTa validation failed against the LinAge2 scoped space; the "
+                    "query was not executed." if not split.mixed else
+                    "MeTTa validation failed (the program mixes LinAge2 forms, validated "
+                    "against the LinAge2 scoped space, with forms validated against the "
+                    "shared one — each issue names its space); the query was not executed."
+                ),
+                "issues": validation.issues,
+            },
+        )
+    if not split.mixed:
+        result = _offloaded_run(
+            metta_query, confidence_threshold, linage2_patient_kb(), linage_atoms
+        )
+        return "linage2", validation, result
+
+    parts = [
+        {"metta_query": split.linage2, "kb_files": linage2_patient_kb(),
+         "extra_atoms": linage_atoms},
+        {"metta_query": split.generic, "kb_files": _runtime_kb_paths(),
+         "extra_atoms": shared_atoms},
+    ]
+    results = run_offloaded(
+        "run_query_parts",
+        {"parts": parts, "confidence_threshold": confidence_threshold},
+        lambda: run_query_parts(parts, confidence_threshold=confidence_threshold),
+    )
+    return "linage2+generic", validation, merge_run_results(results, split.positions())
 
 
 @app.get("/linage2/features", response_model=LinAge2FeaturesResponse)
@@ -3178,18 +3264,8 @@ def query(req: QueryRequest) -> QueryResponse:
 
     patient = _build_caller_patient(req.patient.model_dump() if req.patient else None)
     if patient is not None:
-        # The translator has to know the id exists, or it will answer "I cannot
-        # compute a personalized risk from the current KB" — which is what the
-        # evaluation saw for a 45-year-old woman with LDL 130 and CRP 4.
-        system_prompt += (
-            "\n\n--- THIS REQUEST'S PATIENT ---\n"
-            f"The caller submitted a patient, loaded for this request only:\n"
-            f"{patient.atoms}\n"
-            f"Treat `{patient.patient_id}` as a valid <Patient> for every "
-            f"dedicated patient form. When the question says 'me', 'my', 'this "
-            f"patient' or gives no id, it means {patient.patient_id}.\n"
-            + (_linage2_prompt_hint(patient) if patient.has_linage2 else "")
-        )
+        # Shared with the Gradio chat (core.patient_context): same text, same place.
+        system_prompt += patient_prompt_section(patient)
 
     history_msgs = [turn.model_dump() for turn in req.history]
     prompt_tokens_estimate = _guard_prompt_size(
@@ -3230,46 +3306,29 @@ def query(req: QueryRequest) -> QueryResponse:
                 confidence_threshold=req.confidence_threshold,
             ),
         )
-    elif parse_linage2_query(translation.metta_query) is not None:
+    elif (split := split_linage2_program(translation.metta_query)).linage2:
         # A LinAge2 form. Its layer cannot live in the shared space (head-symbol
         # budget — linage2_core.metta header), so it is validated against and run
-        # in the LinAge2 scoped stack, with the caller's atoms. Same worker pool,
+        # in the LinAge2 scoped stack, with the caller's atoms; anything else the
+        # program asks for runs in the shared space beside it. Same worker pool,
         # same deadline, same admission limit as everything else.
-        routed = "linage2"
-        extra_atoms = patient.atoms if patient is not None else None
-        validation = _validate_linage2_query(translation.metta_query, extra_atoms)
-        kb_files = linage2_patient_kb()
-        pln_result = run_offloaded(
-            "run_query",
-            {"metta_query": translation.metta_query,
-             "confidence_threshold": req.confidence_threshold,
-             "kb_files": kb_files,
-             "extra_atoms": extra_atoms},
-            lambda: run_query(
-                metta_query=translation.metta_query,
-                confidence_threshold=req.confidence_threshold,
-                kb_files=kb_files,
-                extra_atoms=extra_atoms,
-            ),
+        routed, validation, pln_result = _run_linage2_program(
+            translation.metta_query,
+            split,
+            linage_atoms=patient.atoms if patient is not None else None,
+            shared_atoms=patient.shared_atoms if patient is not None else None,
+            confidence_threshold=req.confidence_threshold,
+            validate_generic=lambda q: _validate_generic_with(
+                q, registry, patient.shared_atoms if patient is not None else None),
+            strict=False,
         )
     else:
-        validation = validate(
-            translation.metta_query, registry, _runtime_inventory()
-        )
-        kb_files = _runtime_kb_paths()
-        extra_atoms = patient.atoms if patient is not None else None
-        pln_result = run_offloaded(
-            "run_query",
-            {"metta_query": translation.metta_query,
-             "confidence_threshold": req.confidence_threshold,
-             "kb_files": kb_files,
-             "extra_atoms": extra_atoms},
-            lambda: run_query(
-                metta_query=translation.metta_query,
-                confidence_threshold=req.confidence_threshold,
-                kb_files=kb_files,
-                extra_atoms=extra_atoms,
-            ),
+        # The shared space gets the patient WITHOUT its LinAge2 atoms: with them
+        # it aborts on the patient forms (BuiltPatient.shared_atoms).
+        shared = patient.shared_atoms if patient is not None else None
+        validation = _validate_generic_with(translation.metta_query, registry, shared)
+        pln_result = _offloaded_run(
+            translation.metta_query, req.confidence_threshold, _runtime_kb_paths(), shared,
         )
 
     if pln_result.status == "error":
@@ -3396,6 +3455,22 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
     injected = "\n".join(
         part for part in (patient.atoms if patient else None, req.extra_atoms) if part
     ) or None
+    # What the SHARED space gets: the patient without its LinAge2 atoms, which
+    # abort that space on the patient forms (BuiltPatient.shared_atoms).
+    injected_shared = "\n".join(
+        part for part in (patient.shared_atoms if patient else None, req.extra_atoms)
+        if part
+    ) or None
+
+    def validate_generic(metta_query: str) -> ValidationResult:
+        if req.ontology_files is not None:
+            _validate_ontology_files(req.ontology_files)
+        registry = (
+            _runtime_registry()
+            if req.ontology_files is None
+            else _build_context(req.ontology_files)[0]
+        )
+        return _validate_generic_with(metta_query, registry, injected_shared)
 
     routed: Optional[str] = None
     drugage_compounds = parse_drugage_query(req.metta_query)
@@ -3420,57 +3495,20 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
                 confidence_threshold=req.confidence_threshold,
             ),
         )
-    elif parse_linage2_query(req.metta_query) is not None:
-        # A LinAge2 form runs in its own scoped space (see /query for why).
-        routed = "linage2"
-        validation = _validate_linage2_query(req.metta_query, injected)
-        if not validation.valid:
-            raise HTTPException(
-                status_code=422,
-                detail={
-                    "code": "invalid_metta_query",
-                    "message": "MeTTa validation failed against the LinAge2 scoped "
-                               "space; the query was not executed.",
-                    "issues": validation.issues,
-                },
-            )
-        kb_files = linage2_patient_kb()
-        pln_result = run_offloaded(
-            "run_query",
-            {"metta_query": req.metta_query,
-             "confidence_threshold": req.confidence_threshold,
-             "kb_files": kb_files,
-             "extra_atoms": injected},
-            lambda: run_query(
-                metta_query=req.metta_query,
-                confidence_threshold=req.confidence_threshold,
-                kb_files=kb_files,
-                extra_atoms=injected,
-            ),
+    elif (split := split_linage2_program(req.metta_query)).linage2:
+        # A LinAge2 form runs in its own scoped space (see /query for why); the
+        # rest of a mixed program runs in the shared space beside it.
+        routed, validation, pln_result = _run_linage2_program(
+            req.metta_query,
+            split,
+            linage_atoms=injected,
+            shared_atoms=injected_shared,
+            confidence_threshold=req.confidence_threshold,
+            validate_generic=validate_generic,
+            strict=True,
         )
     else:
-        if req.ontology_files is not None:
-            _validate_ontology_files(req.ontology_files)
-        registry = (
-            _runtime_registry()
-            if req.ontology_files is None
-            else _build_context(req.ontology_files)[0]
-        )
-        inventory = _runtime_inventory()
-        if injected:
-            registry.merge(parse_metta_text(injected, source_name="<api-extra-atoms>"))
-            # `parse_metta_text` harvests only five shapes, so a perfectly
-            # ordinary scratch fact — `(MeasuredZ Probe NewMarker 1.2)`, which
-            # is the documented use of extra_atoms — left its own symbols
-            # unknown and 422'd the query that was about to use them. Build an
-            # inventory over the injected text too and union it in, so the
-            # symbols a caller just defined count as defined.
-            inventory = merged_inventory(inventory, injected)
-        validation = validate(
-            "\n".join(part for part in (injected, req.metta_query) if part),
-            registry,
-            inventory,
-        )
+        validation = validate_generic(req.metta_query)
         if not validation.valid:
             raise HTTPException(
                 status_code=422,
@@ -3480,19 +3518,8 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
                     "issues": validation.issues,
                 },
             )
-        kb_files = _runtime_kb_paths()
-        pln_result = run_offloaded(
-            "run_query",
-            {"metta_query": req.metta_query,
-             "confidence_threshold": req.confidence_threshold,
-             "kb_files": kb_files,
-             "extra_atoms": injected},
-            lambda: run_query(
-                metta_query=req.metta_query,
-                confidence_threshold=req.confidence_threshold,
-                kb_files=kb_files,
-                extra_atoms=injected,
-            ),
+        pln_result = _offloaded_run(
+            req.metta_query, req.confidence_threshold, _runtime_kb_paths(), injected_shared
         )
 
     if pln_result.status == "error":
