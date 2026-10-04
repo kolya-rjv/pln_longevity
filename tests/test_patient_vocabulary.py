@@ -27,5 +27,35 @@ def test_the_vocabulary_is_the_kbs():
     v = vocabulary()
     assert v.smoking_statuses == ("NeverSmoker", "FormerSmoker", "CurrentSmoker")
     assert len(v.model_inputs) == 59 and v.model_inputs["LBDSALSI"][0] == "SerumAlbumin"
-    assert COTININE in v.labs and "LBDSALSI" in v.labs and len(v.conditions) == 23
-    assert v.conditions["BPQ020"] == "hypertension"
+    assert len(v.conditions) == 23 and v.conditions["BPQ020"] == "hypertension"
+    # one lab entry per alias group: the reader, not the model, picks the input from the unit
+    assert COTININE not in v.labs and v.labs["albumin"].codes == ("LBDSALSI",)
+    assert v.labs["urea"].aliases != v.labs["urea nitrogen (bun)"].aliases
+    assert v.labs["urea"].codes == v.labs["urea nitrogen (bun)"].codes == ("LBDSBUSI",)
+    assert v.labs["lymphocytes"].codes == ("LBXLYPCT", "LBDLYMNO")
+    assert "%" in v.labs["lymphocytes"].units and "10⁹/L" in v.labs["lymphocytes"].units
+    assert v.labs["fasting glucose"].fasting and not v.labs["glucose"].fasting
+
+
+def test_drift_catches_a_description_in_the_wrong_unit(tmp_path, monkeypatch):
+    """The model file as extracted from upstream gave urine creatinine in mmol/L, CRP in
+    mg/L and cotinine as 0-2; the model would have been told the wrong unit."""
+    import json
+
+    import core.patient_vocabulary as pv
+
+    raw = json.loads(pv.LINAGE2_MODEL_FILE.read_text(encoding="utf-8"))
+    raw["descriptions"]["URXUCRSI"] = "Urine creatinine, SI units (mmol/L)."
+    raw["descriptions"]["LBXCRP"] = "C-reactive protein (mg/L)."
+    raw["descriptions"]["LBXCOT"] = "Smoking status: 0 - Non-smoker, 1 - Light/Recent, 2 - Heavy/Current"
+    bad = tmp_path / "model.json"
+    bad.write_text(json.dumps(raw), encoding="utf-8")
+    monkeypatch.setattr(pv, "LINAGE2_MODEL_FILE", bad)
+    pv.vocabulary.cache_clear()
+    try:
+        found = drift()
+    finally:
+        pv.vocabulary.cache_clear()
+    assert any("URXUCRSI in mmol/L" in d for d in found), found
+    assert any("LBXCRP in mg/L" in d for d in found), found
+    assert any("cotinine as the levels 0-3" in d for d in found), found

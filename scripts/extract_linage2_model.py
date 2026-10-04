@@ -74,6 +74,15 @@ QUESTIONNAIRE_ITEMS = (
 #: "Good", health "about the same" as a year ago, no healthcare visits.
 QUESTIONNAIRE_DEFAULTS = {**{q: 2 for q in QUESTIONNAIRE_ITEMS}, "HUQ010": 3, "HUQ020": 3, "HUQ050": 0}
 AGE_TABLE = range(20, 91)
+#: Upstream's ui_sliders.nhanes_desc gets three units wrong against the values the
+#: model is fitted on (NHANES 1999-2002 and digiCot); the reader and
+#: linage2_core.metta use these, and core.patient_vocabulary.drift() checks them.
+DESCRIPTION_FIXES = {
+    "URXUCRSI": "Urine creatinine, SI units (µmol/L).",
+    "LBXCRP": "C-reactive protein (mg/dL).",
+    "LBXCOT": "Serum cotinine, digitized as trained: 0 (<10 ng/mL, non-smoker), 1 (10-100), "
+              "2 (100-200), 3 (>=200 ng/mL)",
+}
 
 
 def _sha256(path: Path) -> str:
@@ -247,7 +256,7 @@ def extract(lin: Path) -> tuple[dict, object]:
             c: [_f(adults[c].quantile(q)) for q in (0.005, 0.5, 0.995)]
             for c in lab_inputs if c != "LBXCOT"
         },
-        "descriptions": {c: nhanes_desc.get(c, "") for c in lab_inputs},
+        "descriptions": {c: DESCRIPTION_FIXES.get(c, nhanes_desc.get(c, "")) for c in lab_inputs},
     }
     return model, svc
 

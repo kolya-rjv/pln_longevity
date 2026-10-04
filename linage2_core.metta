@@ -168,7 +168,7 @@
 (ModelInput BodyMassIndex LinAge2)           (Inheritance BodyMassIndex ClinicalLabMeasurement)   ;; BMXBMI — Body mass index (kg/m2).
 ;; kidney (urine)
 (ModelInput UrineAlbumin LinAge2)            (Inheritance UrineAlbumin ClinicalLabMeasurement)   ;; URXUMASI — Urine albumin (microalbumin), SI units (mg/L).
-(ModelInput UrineCreatinine LinAge2)         (Inheritance UrineCreatinine ClinicalLabMeasurement)   ;; URXUCRSI — Urine creatinine, SI units (mmol/L).
+(ModelInput UrineCreatinine LinAge2)         (Inheritance UrineCreatinine ClinicalLabMeasurement)   ;; URXUCRSI — Urine creatinine, SI units (µmol/L).
 ;; iron panel
 (ModelInput SerumIron LinAge2)               (Inheritance SerumIron ClinicalLabMeasurement)   ;; LBDIRNSI — Serum iron (umol/L).
 (ModelInput TotalIronBindingCapacity LinAge2) (Inheritance TotalIronBindingCapacity ClinicalLabMeasurement)   ;; LBDTIBSI — Total iron binding capacity, TIBC (umol/L).
