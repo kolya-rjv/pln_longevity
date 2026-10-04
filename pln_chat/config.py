@@ -183,7 +183,12 @@ PLN_CORS_ORIGINS: list[str] = [
 # for. The same release adds the discovery endpoints (/drugage/top,
 # /interventions, /hallmarks, /kb/schema, /patients/markers), caller-supplied
 # patients, and the optional auth + rate limiting below.
-PLN_API_VERSION: str = "2.0.0"
+#
+# 2.1.0 is additive: POST /patients/from-text takes `reader: "rules" | "model"`
+# (default "rules", so every 2.0 body means what it meant) and answers with
+# `reader_used`, `read_as_text`, `model_error`, `suggestions` and a per-statement
+# `source`.
+PLN_API_VERSION: str = "2.1.0"
 
 # ── HTTP API: optional access control ────────────────────────────────────────
 # BOTH CONTROLS ARE OFF BY DEFAULT. Unset, the service behaves exactly as it

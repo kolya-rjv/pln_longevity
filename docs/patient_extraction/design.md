@@ -1,10 +1,14 @@
 # Reading the My Patient text with a model — design (v3)
 
-Status: **designed, not built.** Committed so far: `pln_chat/core/patient_vocabulary.py`
-(the vocabulary, generated from the KB, with `drift()`, tested in
-`tests/test_patient_vocabulary.py`). Everything else below is the plan. Two earlier
-versions were critiqued adversarially before any extractor code was written
-(`design_critique.json`); §10 says what each critique changed.
+Status: **built** (2026-10-05). `core/patient_vocabulary.py` (vocabulary, `drift()`),
+`core/patient_canonical.py` (render; round trip in `tests/test_patient_canonical.py`),
+`core/patient_extract.py` (schema, prompt, client, cache), `core/patient_read.py`
+(verify, substitute, suggest; `tests/test_patient_read.py`, with the hostile-model
+property tests), the tab and `POST /patients/from-text` (`reader`), and
+`scripts/eval_patient_extraction.py` (live evaluation: `eval_gpt-6-luna.md`). Where the
+build departs from this text it says so in §12. Two earlier versions were critiqued
+adversarially before any extractor code was written (`design_critique.json`); §11 says
+what each critique changed.
 
 ## 0. Why
 
@@ -215,3 +219,28 @@ failures included, LRU ~128 — a cost saver only, never the Read/Build guarante
   into the rules' grammar; the rules are the single reader; judgement refusals and
   model-only smoking become suggestions; Build reads the stored "read as" text. All of v2's
   per-field checks survive as the verification rules of §4.
+
+## 12. Where the build departs from this text
+
+- **The model reads every statement, without the rules' reading.** §2.2 has the model see
+  the rules' reading of each statement; it does not, so a confidently wrong rules reading
+  cannot anchor it — that independence is what turns a disagreement into a block. Items
+  carry no `statement_id`: a quote must occur exactly once in the text, and code maps it
+  to the statements it overlaps (a phrase like "smoker, quit 2010" spans two).
+- **Model: `gpt-6-luna`** (cheaper and stronger than the gpt-5.4-mini the chat uses; it
+  accepts the strict schema with `reasoning_effort` and refuses `temperature: 0`, so the
+  gpt-6 family is a reasoning model to the client).
+- **The cache keeps deterministic failures** (refusal, truncation, bad output), not
+  timeouts or connection errors, so pressing Read again retries those.
+- **Lost conditions are refusals.** Rules hardening (§5) made an unread line naming one of
+  the 23 conditions — including a reviewed synonym — a `lost_condition` refusal, so the
+  model's reading of it is a wording to click, not a rewrite.
+- **Disagreement on intensity blocks too**: "occasional smoker" (level 1) against the rules'
+  level 3, or the reverse, is a smoking disagreement; a rules "moderate" (level 2) against
+  a model "current" is not.
+- **Secondhand smoke is a note**, not a smoking problem (it rarely moves cotinine past 10
+  ng/mL); vaping, nicotine replacement and smokeless tobacco block unless cotinine is
+  measured, and a negated mention ("never smoked or vaped") is none.
+- **A text refused only for a missing age or sex** ("58F") may be completed by a checked
+  age/sex rewrite; every other refusal stands (the property tests hold exactly that).
+

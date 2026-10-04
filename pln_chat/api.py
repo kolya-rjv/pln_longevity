@@ -134,7 +134,8 @@ from core.pln_runner import (
     run_query_parts,
 )
 from core.linage2_builder import feature_listing as linage2_feature_listing
-from core.patient_text import read_patient_text
+from core.patient_extract import OpenAIExtractor
+from core.patient_read import read_patient
 from core.patient_context import (
     build_caller_patient,
     names_a_patient,
@@ -2966,10 +2967,19 @@ class PatientTextIn(BaseModel):
         ..., max_length=20_000,
         description="Age, sex, smoking, lab values with units, diagnoses — one per line "
                     "(e.g. '58 year old male, current smoker', 'albumin 4.1 g/dL', "
-                    "'diagnoses: hypertension'). Read by fixed rules, no LLM.",
+                    "'diagnoses: hypertension'). Read by fixed rules; see `reader`.",
     )
     id: str = Field(default="Me", max_length=48, pattern=r"^[A-Za-z][A-Za-z0-9_]*$",
                     description="Letters, digits and underscores; becomes `Caller_<id>`.")
+    reader: Literal["rules", "model"] = Field(
+        default="rules",
+        description="'rules' (default): fixed rules only, no LLM. 'model': the rules, then a "
+                    "language model (PLN_EXTRACT_MODEL) rewrites the statements the rules did not "
+                    "understand into the rules' own wording, which the rules then read — it never "
+                    "supplies a value (numbers and units are copied from the text), never replaces "
+                    "a refusal (that becomes a `suggestion`), and never sets a smoking status on its "
+                    "own. Needs the server's OPENAI_API_KEY (503 if not configured) and text of at "
+                    "most PLN_EXTRACT_MAX_CHARS characters (413). The text is sent to OpenAI.")
 
 
 class PatientTextResponse(BaseModel):
@@ -2979,6 +2989,24 @@ class PatientTextResponse(BaseModel):
                                    "unit / out of range / duplicate), plus the questionnaire "
                                    "answers and whatever was not understood.")
     problems: list[str] = Field(description="Why `ok` is false — fix the text and resend.")
+    reader_used: str = Field(default="rules", description="'rules', or 'rules+model' when the model "
+                                                         "read the text.")
+    read_as_text: Optional[str] = Field(
+        default=None, description="What the rules read: the text with the model's rewrites in. Equal "
+                                  "to `text` for reader='rules'. Sending it with reader='rules' gives "
+                                  "the same patient, without the model.")
+    model_error: Optional[dict] = Field(
+        default=None, description="reader='model' only: why the text was read by the rules alone "
+                                  "({code, message, configuration}); null when the model read it.")
+    suggestions: list[dict] = Field(
+        default_factory=list,
+        description="Wordings the model offers for statements the rules refused, or that the two "
+                    "read differently: {line, start, end, original, wordings, reason, blocking}. "
+                    "Replace `original` (at line/start/end of `text`) with a wording and resend.")
+    statements: list[dict] = Field(
+        default_factory=list,
+        description="Every statement as read: {index, line, start, end, text, outcome, source, "
+                    "typed}; source 'model' marks a rewrite, `typed` what the person wrote there.")
     patient: Optional[dict] = Field(
         default=None,
         description="The patient, LinAge2 scored in-process: send it as `patient` to /query "
@@ -2989,16 +3017,38 @@ class PatientTextResponse(BaseModel):
 
 @app.post("/patients/from-text", response_model=PatientTextResponse)
 def patients_from_text(req: PatientTextIn) -> PatientTextResponse:
-    """Plain text -> a patient, as the UI's "My Patient" tab does it — no LLM.
+    """Plain text -> a patient, as the UI's "My Patient" tab does it.
 
-    A value whose unit cannot be pinned down is not guessed: `ok` is false and
-    `read` says which value and why (core/patient_text.py). Otherwise LinAge2 is
-    scored in-process (core/linage2_model.py) and the result is an ordinary
-    caller-supplied patient, previewed exactly as POST /patients/preview would.
+    reader='rules' (the default) uses fixed rules only — no LLM. reader='model' adds
+    the tab's model reader (core/patient_read.py): it may rewrite statements the
+    rules did not understand, never a value, never a refusal. A value whose unit
+    cannot be pinned down is not guessed: `ok` is false and `read` says which value
+    and why (core/patient_text.py). Otherwise LinAge2 is scored in-process
+    (core/linage2_model.py) and the result is an ordinary caller-supplied patient,
+    previewed exactly as POST /patients/preview would.
     """
-    parsed = read_patient_text(req.text)
+    extractor = None
+    if req.reader == "model":
+        extractor = OpenAIExtractor()
+        if extractor.error is not None:
+            raise HTTPException(status_code=503, detail={
+                "code": "model_reader_not_configured", "message": extractor.error.message})
+        from config import PLN_EXTRACT_MAX_CHARS
+        if len(req.text) > PLN_EXTRACT_MAX_CHARS:
+            raise HTTPException(status_code=413, detail={
+                "code": "text_too_long_for_model_reader",
+                "message": f"reader='model' takes at most {PLN_EXTRACT_MAX_CHARS} characters; "
+                           f"send reader='rules' or shorten the text"})
+    result = read_patient(req.text, extractor)
+    parsed = result.parsed
+    extra = dict(reader_used=result.reader, read_as_text=result.read_as,
+                 model_error=None if result.model_error is None else
+                 {"code": result.model_error.code, "message": result.model_error.message,
+                  "configuration": result.model_error.is_config},
+                 suggestions=[s.as_dict() for s in result.suggestions],
+                 statements=result.as_dict()["statements"])
     if not parsed.ok:
-        return PatientTextResponse(ok=False, read=parsed.as_dict(), problems=parsed.all_problems())
+        return PatientTextResponse(ok=False, read=parsed.as_dict(), problems=parsed.all_problems(), **extra)
     try:
         payload, _ = parsed.to_patient(req.id)
     except PatientSpecError as exc:
@@ -3006,7 +3056,7 @@ def patients_from_text(req: PatientTextIn) -> PatientTextResponse:
                                                       **exc.extra})
     preview = patients_preview(PatientIn.model_validate(payload))
     return PatientTextResponse(ok=True, read=parsed.as_dict(), problems=[], patient=payload,
-                               preview=preview)
+                               preview=preview, **extra)
 
 
 # ── LinAge2: the clinical clock ─────────────────────────────────────────────

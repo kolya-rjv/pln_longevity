@@ -279,7 +279,7 @@ to `pln_chat/logs/session_*.jsonl`. For browser clients, set
 | GET    | `/patients`        | List the built-in patient profiles                            |
 | GET    | `/patients/markers`| Which biomarkers a caller-supplied patient may carry, and in what units |
 | POST   | `/patients/preview`| Validate your own patient and see the atoms it becomes — no inference |
-| POST   | `/patients/from-text`| A few lines of plain text (age, sex, smoking, labs with units, diagnoses) -> what was read, and a patient with LinAge2 scored in-process — the UI's "My Patient" tab, no LLM |
+| POST   | `/patients/from-text`| A few lines of plain text (age, sex, smoking, labs with units, diagnoses) -> what was read, and a patient with LinAge2 scored in-process — the UI's "My Patient" tab; fixed rules, no LLM, unless `reader: "model"` |
 | GET    | `/linage2/features`| The LinAge2 clinical clock's 59 inputs (NHANES codes, KB symbols, which read out a KB biomarker), the forms, the scoped stack, whether an all-cause baseline is loaded |
 | POST   | `/linage2/analyze` | A patient's LinAge2 result, analysed without an LLM: per-lab years with causes credited under evidence, mortality hazard, absolute risk when a baseline exists, counterfactuals in years |
 | POST   | `/query`           | Ask a natural-language question of the KB (goes through the LLM translator) |
@@ -505,6 +505,23 @@ value doubles as the knowledge base's witness (CRP in mg/L, HbA1c, a *fasting*
 glucose, the stated smoking status), so causes can be credited without typing
 anything twice. This is what the Gradio UI's **My Patient** tab does; the patient
 then lives in that browser session only.
+
+`reader` (since API 2.1.0) is `"rules"` by default — fixed rules, no LLM, exactly as
+before. `"model"` also sends the text to OpenAI (`PLN_EXTRACT_MODEL`): the model may
+**rewrite** statements the rules did not understand into the rules' own wording, which
+the rules then read; it never supplies a value (numbers and units are copied from your
+text), never overrides a refusal, and never sets a smoking status on its own. The
+response says what happened: `reader_used` (`"rules"` or `"rules+model"`),
+`read_as_text` (what the rules read — send it back with `reader: "rules"` to get the
+same patient without the model), `model_error` (`{code, message, configuration}` when
+the model could not be used and the rules read alone: `timeout`, `refused`,
+`truncated`, `bad_output`, ...), `suggestions` (for a refused statement, or one the
+rules and the model read differently: `{line, start, end, original, wordings, reason,
+blocking}` — put a wording in place of `original` and resend) and `statements` (each
+with `source: "rules" | "model"` and what was `typed` there). `reader: "model"` answers
+503 `model_reader_not_configured` without the server's `OPENAI_API_KEY` (or with a
+`PLN_EXTRACT_MODEL` that lacks strict structured outputs) and 413
+`text_too_long_for_model_reader` over `PLN_EXTRACT_MAX_CHARS` (4,000).
 
 **No LLM needed.** `POST /linage2/analyze` takes the same patient at the top level
 (the `linage2` block required, plus optional `levers`) and returns the whole

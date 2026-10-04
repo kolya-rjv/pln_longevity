@@ -72,6 +72,9 @@ class ExtractError(Exception):
     def is_config(self) -> bool:
         return self.code in CONFIG_ERRORS
 
+    def __reduce__(self):                        # copy and pickle (a gr.State holds it)
+        return (ExtractError, (self.code, self.message))
+
 
 @dataclass
 class Extraction:

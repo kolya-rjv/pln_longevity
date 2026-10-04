@@ -1458,6 +1458,11 @@ def read_patient_text(text: str) -> ParsedPatient:
                     f"smoking in one phrase ('current smoker', 'former smoker, quit 2010', 'never smoked') "
                     f"and put anything else on its own line", "ambiguous", "smoking")
             cur.leftover = stmt
+            if last_smoking["origin"] == idx and last_smoking["set_here"]:
+                p.smoking = None                # not a status anyone should see as read
+                if not p.cotinine_measured:
+                    p.cotinine_level, p.cotinine_note = None, ""
+                last_smoking["kind"] = None
         elif "cotinine" in low:
             problem(f"'{stmt}' mentions cotinine but was not read; write it as 'cotinine 250 ng/mL' or "
                     f"'cotinine level 0-3', on its own line", "unit", "cotinine")

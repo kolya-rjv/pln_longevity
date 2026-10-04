@@ -847,6 +847,7 @@ def main() -> None:
     ap.add_argument("--date", required=True, help="the run date printed on the cover")
     ap.add_argument("--no-pdf", action="store_true")
     args = ap.parse_args()
+    print("reader: rules (the battery never calls the model reader)")
     run_all()
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "results.json").write_text(json.dumps({

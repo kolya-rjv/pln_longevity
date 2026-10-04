@@ -369,7 +369,7 @@ code is `core/patient_context.py`, and the LinAge2 atoms still go only to the Li
 The *Download .metta* copy is written to the system temp directory, never to a folder the
 KB loaders scan. `POST /patients/from-text` is the same reader over HTTP.
 
-**Reading text without guessing** (`core/patient_text.py`, fixed rules, no LLM). A lab value
+**Reading text without guessing** (`core/patient_text.py`, fixed rules). A lab value
 in the wrong unit is the commonest way to get a confident, wrong biological age (albumin 4.2
 read as g/L is −30 g/L from the median), so the reader refuses rather than guesses:
 an unknown name is listed as not understood; an unknown unit is refused with the accepted
@@ -411,6 +411,36 @@ the outcome it must get):
   "GrimAge 46" is a clock age, not an acceleration); an abnormal value typed in the usual
   unit is never re-read as a normal value in another one (hemoglobin 9.5 asks); urea and
   urea nitrogen have their own mg/dL factors.
+
+A fourth round (61 confirmed findings, `docs/patient_extraction/review_round4.json`) showed
+the tail does not end, so the rules were made **stricter, not cleverer**: whatever a smoking
+clause leaves unread blocks ("I never quit smoking", "tried to quit smoking", "Smoker:
+Nil"); cannabis, zero cigarettes, past tense and occasional words are not a level-3 smoker;
+vaping or patches next to a status block; someone else is set aside only as the subject of
+a statement; a negation heading a list covers it, a bare "no X, Y" is refused; sentences
+are statements; synonyms the rules do not read ("MI", "T2D", "hypertensive"), a form's
+empty answer, a dated hospital stay (HUQ070 is the past 12 months) and a negation of
+treatment or time are refused, never answered. Each finding is pinned in the corpus.
+
+**Reading with a model** (`core/patient_read.py`, `core/patient_extract.py`; design in
+`docs/patient_extraction/design.md`). Only the **Read** button, and `POST
+/patients/from-text` with `reader: "model"`, also send the text to OpenAI
+(`PLN_EXTRACT_MODEL`, default `gpt-6-luna`); the page's first reading, the examples and
+Build never do, and without `OPENAI_API_KEY` Read is the rules alone and says so. The
+model **rewrites, the rules read**: it returns enum choices from
+`core.patient_vocabulary` (generated from the KB, drift-checked) and a quote; code checks
+the quote against the text, copies numbers and units out of it, and writes a canonical
+line in the rules' own grammar (`core.patient_canonical`, every line round-trip tested).
+A statement the rules did not understand is replaced by its line in a "read as" text,
+which the rules read — the row says "· model" and shows what was typed. What the rules
+**refused** is never replaced: the model's wording is a button. A smoking status from the
+model alone, or a smoking, age or sex reading that differs from the rules', blocks with
+both wordings; labs and conditions that differ give a note. A rewrite that would change
+anything else the rules read is withdrawn. Build uses the reading stored at Read, refuses
+if the text changed since, and the download carries the "read as" text, which the rules
+alone rebuild into the same patient. A property test holds this against a hostile model
+over every corpus entry and round-4 reproduction; the live evaluation is
+`docs/patient_extraction/eval_gpt-6-luna.md`.
 
 **One value, two consumers.** CRP typed once is LinAge2's `LBXCRP` (mg/dL) *and* the KB's
 `CRP` witness (mg/L); HbA1c likewise; a glucose is the `FastingGlucose` witness only when the
