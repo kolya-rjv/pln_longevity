@@ -219,7 +219,10 @@ lozenges), "smokeless" (chewing tobacco, snus, nicotine pouches), "cannabis" \
 (marijuana, weed — not tobacco), "secondhand" (other people's smoke), or "none".
 - condition: one of the conditions below, judged by its NHANES question. answer "yes", \
 "no", or "borderline" (only for prediabetes / borderline diabetes). Respect the \
-question's exclusions and time window.
+question's exclusions and time window. A condition the person says they have or had \
+counts as one a doctor told them about (do not answer "unclear" because no doctor is \
+named); "hospitalized" or "admitted" means an overnight stay; the common names listed \
+with each condition count as that condition.
 - no_other_conditions: the person says they have no (other) conditions or diagnoses.
 - sex: only when stated (male/female, man/woman, "M"/"F" in "58M" or "Sex: F"); never \
 inferred from a partner, an organ, a test or a pregnancy.
@@ -250,7 +253,8 @@ def _lab_lines() -> list[str]:
 
 
 def _condition_lines() -> list[str]:
-    return [f"- {c.key}: {c.question}" for c in vocabulary().condition_info.values()]
+    return [f"- {c.key}: {c.question}" + (f" Also: {c.aka}." if c.aka else "")
+            for c in vocabulary().condition_info.values()]
 
 
 @lru_cache(maxsize=1)

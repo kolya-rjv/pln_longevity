@@ -380,8 +380,13 @@ def _check_smoking(it: Item, measured_cotinine: bool) -> str:
             and re.search(r"\b(?:never|no|not|nor|without|don'?t|doesn'?t|didn'?t)\b|n't\b|\bor\s*$",
                           re.split(r"[,;.]|\bbut\b", low[:nicotine.start()])[-1]):
         other = "none"                           # "never smoked or vaped", "doesn't vape"
-    if status == "unclear" and other == "none" and not _TOBACCO_WORD.search(low) and not re.search(r"smok", low):
-        return "says nothing about smoking"      # "never vaped", "20 pack years" alone
+    tobacco = _TOBACCO_WORD.search(low.replace("smokeless tobacco", "")) or re.search(
+        r"smok(?!eless)", low)
+    if status == "unclear" and other == "none" and not tobacco:
+        return "says nothing about smoking"      # "never vaped", "20 pack years", "smokeless: never"
+    if re.search(r"\bsmokeless\b", low) and not re.search(r"smok(?!eless)", low) and status != "unclear" \
+            and other == "none":
+        return "smokeless tobacco says nothing about smoking"
     if other == "cannabis" and not _TOBACCO_WORD.search(low):
         it.problem = (f"'{it.quote}': cannabis is not tobacco, and LinAge2 reads tobacco exposure "
                       f"(cotinine); say your tobacco smoking on its own ('never smoked', 'former "
@@ -701,7 +706,8 @@ def _check_unclear(it: Item) -> str:
     topic = it.raw["topic"]
     why = re.sub(r"[`*_\[\]<>]", "", str(it.raw.get("why", "")))[:160]
     v = vocabulary()
-    if topic == "smoking" and _SMOKE_WORD.search(low):
+    if topic == "smoking" and (_TOBACCO_WORD.search(low.replace("smokeless tobacco", ""))
+                               or re.search(r"smok(?!eless)", low)):
         it.problem = (f"'{it.quote}': the model cannot tell what this says about your smoking"
                       f"{f' ({why})' if why else ''}; write 'current smoker', 'former smoker' or "
                       f"'never smoked'", "ambiguous", "smoking", [])

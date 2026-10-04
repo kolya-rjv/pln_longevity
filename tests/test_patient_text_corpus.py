@@ -153,6 +153,21 @@ SMOKING = [
     ("can\u2019t quit smoking", "C3"), ("don\u2019t smoke", "N"), ("I\u2019ve never smoked", "N"),    # crit1
     ("smoker who was hospitalized", "X"),                                                             # crit3
     ("former smoker cotinine 300 ng/mL", "X"),                                                        # conf46
+    # ── caught by the model in the live evaluation (run 2) while the rules still read
+    #    them confidently wrong; refused by the rules too now
+    ("smoker, quit approximately 2010", "X"), ("smoker, kicked the habit in 2010", "X"),
+    ("smoker, gave it up in 2010", "X"), ("smoker, not now", "X"), ("smoker, none since 2010", "X"),
+    ("smoker, heavy, quit 2015", "X"), ("smoker, quit long ago", "X"), ("smoker, until I was 40", "X"),
+    ("smoker, past", "X"), ("smoker: yes, in the past", "X"), ("Smoking: yes\nQuit date: 2015", "X"),
+    ("smoker until 2015, then again from 2019", "X"), ("former smoker, but fell off the wagon", "X"),
+    ("former smoker; slipped back in 2022", "X"), ("used to smoke, now only at parties", "X"),
+    ("gave up cigarettes for cigars", "X"), ("quit smoking but have the occasional cigarette", "X"),
+    ("quit smoking, mostly", "X"), ("about to quit smoking", "X"), ("had 20 cigarettes a day", "X"),
+    ("Light tobacco smoker", "X"), ("current smoker (light)", "X"), ("one-time smoker", "X"),
+    ("smoker age 18-45", "X"), ("smoker 85-05", "X"), ("smoke free 10 yrs", "X"),
+    ("no cigarettes in 5 years", "X"), ("Smoker: no, ex", "X"), ("Smoker: no, previously yes", "X"),
+    ("smoker (-)", "X"), ("current smoker: -", "X"), ("Current smoker: 0", "X"), ("marijuana", "X"),
+    ("smoker: reformed", "F"),
 ]
 
 

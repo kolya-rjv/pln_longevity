@@ -66,6 +66,7 @@ class Condition:
     #: the question asks about a recent period, not "ever": "12 months" | "3 months"
     window: str = ""
     counted: bool = True                       # in fs1Score (MCQ160B is read, not counted)
+    aka: str = ""                              # common names, as the prompt lists them
 
 
 #: Per item: the NHANES wording, canonical phrases, synonyms the rules do not know,
@@ -153,6 +154,8 @@ _PHRASES = {
     "HUQ070": ("overnight hospital stay in the past 12 months",
                "no overnight hospital stay in the past 12 months"),
 }
+#: common names of each condition, for the model's prompt (the checks use `terms`)
+_AKA = {'BPQ020': 'high blood pressure, HTN, hypertensive', 'DIQ010': 'type 1 or 2 diabetes, T2D, DM2, diabetic', 'KIQ020': 'CKD, kidney failure, ESRD, on dialysis', 'MCQ010': 'asthmatic', 'MCQ053': 'anaemia, iron-deficiency anemia', 'MCQ160A': 'osteoarthritis, rheumatoid arthritis, RA, OA', 'MCQ160B': 'CHF, congestive heart failure', 'MCQ160C': 'CAD, CHD, ischemic heart disease, coronary stents or bypass', 'MCQ160D': 'angina pectoris', 'MCQ160E': 'MI, myocardial infarction, STEMI', 'MCQ160F': 'CVA', 'MCQ160G': 'COPD', 'MCQ160I': "hypothyroidism, hyperthyroidism, Hashimoto's, Graves'", 'MCQ160J': 'obese, overweight', 'MCQ160K': '', 'MCQ160L': 'fatty liver, NAFLD, hepatitis, cirrhosis', 'MCQ220': 'any cancer, tumour that is malignant, carcinoma, lymphoma, leukemia, melanoma', 'OSQ010A': 'broken hip', 'OSQ010B': 'broken wrist', 'OSQ010C': 'vertebral or compression fracture', 'OSQ060': '', 'PFQ056': "memory loss, dementia, Alzheimer's, cognitive impairment", 'HUQ070': 'hospitalized, admitted to hospital (overnight)'}
 BORDERLINE = "prediabetes"                     # DIQ010 = 3, the only borderline answer
 
 
@@ -216,7 +219,7 @@ def _conditions(items: list[str]) -> dict:
         out[q] = Condition(item=q, key=label, question=info.get("question", ""), yes=yes, no=no,
                            terms="|".join(rules + ([info["synonyms"]] if info.get("synonyms") else [])),
                            exclusions=info.get("exclusions", ""), window=info.get("window", ""),
-                           counted=info.get("counted", True))
+                           counted=info.get("counted", True), aka=_AKA.get(q, ""))
     return out
 
 

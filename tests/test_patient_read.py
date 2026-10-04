@@ -589,3 +589,60 @@ def test_no_grounded_output_flips_a_value_on_the_round4_texts(chunk):
             for code, val in before["labs"].items():
                 assert after["labs"].get(code) == pytest.approx(val), (text, code, items)
     assert rewrites > 0
+
+
+# ═══════════════════════════ replaying the live model ══════════════════════════
+# scripts/eval_patient_extraction.py --record keeps what the live model returned for
+# every corpus entry and round-4 reproduction. Replayed here, offline, through the
+# current code: the same safety properties, and the corpus still mostly usable.
+
+FIXTURE = REPO / "tests" / "fixtures" / "patient_extractions.json.gz"
+
+
+def _recorded():
+    import gzip
+    import json
+
+    with gzip.open(FIXTURE, "rt", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+@pytest.mark.skipif(not FIXTURE.exists(), reason="no recorded live extractions")
+def test_replayed_live_extractions_keep_refusals_and_values():
+    data = _recorded()
+    assert len(data["extractions"]) > 1000
+    for rec in data["extractions"].values():
+        text = rec["text"]
+        rules = read_patient_text(text)
+        before = _values(rules)
+        r = read_patient(text, Recorded(*rec["items"]))
+        kept = {str(x) for x in rules.all_problems() if x.kind != "missing"}
+        assert kept <= {str(x) for x in r.parsed.all_problems()}, text
+        if any(x.kind != "missing" for x in rules.all_problems()):
+            assert not r.parsed.ok, (text, r.read_as)
+            continue
+        if not r.parsed.ok:
+            continue
+        after = _values(r.parsed)
+        for key in ("smoking", "cotinine", "age", "sex"):
+            if before[key] is not None:
+                assert after[key] == before[key], (text, key)
+        for item, val in before["q"].items():
+            assert after["q"].get(item) == val, (text, item)
+
+
+@pytest.mark.skipif(not FIXTURE.exists(), reason="no recorded live extractions")
+def test_replayed_live_extractions_leave_the_corpus_usable():
+    """A check that over-blocks clear text shows up here before it reaches anyone."""
+    by_text = {rec["text"]: rec["items"] for rec in _recorded()["extractions"].values()}
+    usable = [(t, e) for t, refused, e in CORPUS if not refused and t in by_text]
+    agree = 0
+    for text, (what, expect) in usable:
+        p = read_patient(text, Recorded(*by_text[text])).parsed
+        if not p.ok:
+            continue
+        if what == "smoking":
+            agree += (p.smoking, p.cotinine_level) == tuple(expect)
+        else:
+            agree += all(p.questionnaire.get(k) == v for k, v in expect.items())
+    assert len(usable) > 150 and agree >= 0.95 * len(usable), (agree, len(usable))

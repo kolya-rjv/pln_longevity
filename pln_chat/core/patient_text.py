@@ -456,7 +456,8 @@ _OTHER_SUBJECT = re.compile(rf"^(?:(?:but|and|also|though|although|while|whereas
 #: snacking" is not a smoker). Cotinine level 0 vs 3 is about 8.8 years on the clock.
 _SMOKING_TOPIC = re.compile(r"\bsmok\w*|\b(?:non|ex|chain)-?smok\w*|\bcigs?\b|\bcigar\w*|\btobacco\b|\bnicotin\w*"
                             r"|\bvap(?:e|es|ed|ing|er|ers)\b|\be-?cig\w*|\bpack[- ]?years?\b|\bpacks?\b"
-                            r"|\bsnus\b|\bzyn\b|\bchewing tobacco\b|\bnicotine (?:patch\w*|gum|pouch\w*)")
+                            r"|\bsnus\b|\bzyn\b|\bchewing tobacco\b|\bnicotine (?:patch\w*|gum|pouch\w*)"
+                            r"|\b(?:weed|cannabis|marijuana|marihuana)\b")
 _VAPING = re.compile(r"\bvap(?:e|es|ed|ing|er|ers)\b|\be-?cig\w*")
 #: nicotine that is not smoked: raises cotinine, is not smoking to the knowledge base
 _OTHER_NICOTINE = re.compile(r"\bvap\w*|\be-?cig\w*|\bjuul\w*|\bsnus\b|\bchew\w*|\bdip\b|\bzyn\b|\bpouch(?:es)?\b"
@@ -465,7 +466,7 @@ _OTHER_NICOTINE = re.compile(r"\bvap\w*|\be-?cig\w*|\bjuul\w*|\bsnus\b|\bchew\w*
 _CANNABIS = re.compile(r"\b(?:weed|cannabis|marijuana|marihuana|pot|joints?|cbd|thc|hash(?:ish)?|ganja|"
                        r"blunts?|spliffs?)\b")
 #: how often, when it is not every day
-_OCCASIONAL_WORDS = re.compile(r"\b(?:occasional(?:ly)?|rarely|seldom|sometimes|social(?:ly)?|weekends?|"
+_OCCASIONAL_WORDS = re.compile(r"\b(?:occasional(?:ly)?|rarely|seldom|sometimes|social(?:ly)?|weekends?|light|"
                                r"part(?:y|ies)|now and then|once in a while|a little|some ?days?|lightly|"
                                r"few|(?:a|per|each|every|/)\s*(?:week|month))\b")
 #: (pattern, status, cotinine level, kind). Order matters: negated and past before
@@ -506,10 +507,10 @@ _SMOKING = (
 )
 #: What the rest of a smoking clause, or the clause after it, says about time.
 _STRONG_PAST = re.compile(r"\b(?:quit|quitted|stopped|gave up|given up|until|till|no longer|any ?more|used to|"
-                          r"former|ex|previous(?:ly)?|formerly|prior)\b"
+                          r"former|ex|previous(?:ly)?|formerly|prior|reformed)\b"
                           r"|\b(?:19|20)\d{2}\s*(?:-|–|to)\s*(?:19|20)\d{2}\b")
-_PAST_CUE = re.compile(_STRONG_PAST.pattern + r"|\b(?:was|were|ago|past|before|smoked|once|youth|college|"
-                       r"university|school|ever|teens?|army|military|navy)\b")
+_PAST_CUE = re.compile(_STRONG_PAST.pattern + r"|\b(?:was|were|had|ago|past|before|smoked|once|one[- ]?time|"
+                       r"youth|college|university|school|ever|teens?|army|military|navy)\b")
 _PRESENT_CUE = re.compile(r"\b(?:still|again|restarted|relaps\w*|back on|back to|now|current(?:ly)?|daily|"
                           r"every day|a day|per day|each day|a week|per week|as much|as often|as many|heavily|"
                           r"down to|cut(?:ting)? down|less|trying|want\w*|plans?|planning|hoping|going to|"
@@ -538,21 +539,24 @@ _TEMPORARY_QUIT = re.compile(r"\b(?:quit\w*|stopped|gave up)\s+(?:smoking\s+)?fo
 _STILL_KINDS = ("still", "light", "moderate", "current")
 #: "stopped drinking", "gave up alcohol": a quit that is about something else
 _OTHER_HABIT = re.compile(
-    r"\b(?:quit\w*|stopped|gave up|given up|used to|relaps\w*)\s+(?!(?:smok|cig|tobacco|it\b|in\b|at\b|on\b|"
-    r"when|after|before|for\b|since|cold|complet|entire|recent|again|last|this|years?\b|months?\b|ago\b|the\b|"
-    r"a\b|an\b|about|around|over|almost|nearly|\d|one|two|three|four|five|six|seven|eight|nine|ten|twenty|"
-    r"thirty|forty|fifty|several|many|few|some|yet|now|then|but|and|too|already|recently|last|just|"
-    r"\W|$))[a-z]+")
+    r"\b(?:quit\w*|stopped|gave up|given up|used to|relaps\w*)\s+(?:(?!smoking\b)[a-z]+ing\b|alcohol|"
+    r"drinks?|booze|beer|wine|spirits|coffee|caffeine|sugar|sodas?|meat|dairy|gluten|carbs|junk food|"
+    r"gambling|drugs?|my job|work|school|the gym|exercise|running|sports?)")
 #: a clause that only says the one before is uncertain
 _UNSURE_ALONE = re.compile(r"^(?:but\s+|though\s+)?(?:(?:i'?m|i am)\s+)?(?:not sure|unsure|uncertain|maybe|"
                            r"possibly|probably|i think|can'?t remember|don'?t remember)\b")
+#: a form's answer slot after a smoking field left empty, dashed, 0 or 'no'-like
+_EMPTY_SMOKING_ANSWER = re.compile(r"[:=?(-]\s*(?:0|nil|none|false|neg(?:ative)?|denie[sd]|absent|-+)?\s*\)?\s*$")
 _WHO_SMOKING = {("NeverSmoker", 0): "never smoked", ("FormerSmoker", 0): "former smoker",
                 ("CurrentSmoker", 3): "current smoker", ("CurrentSmoker", 1): "occasional smoker",
                 ("CurrentSmoker", 2): "moderate smoker"}
 #: words in the clause (or line) after a smoking clause that change when or how much
-_AFTER_SMOKING = re.compile(r"\b(?:quit|quitted|stopped|gave up|given up|relaps\w*|started again|restarted|back on|"
-                            r"used to|no longer|any ?more|unknown|unsure|not sure|occasional(?:ly)?|rarely|"
-                            r"socially|weekends?|now and then)\b|\bn/?a\b|\?")
+_AFTER_SMOKING = re.compile(r"\b(?:quit|quitted|stopped|gave up|given up|gave it up|relaps\w*|started again|restarted|"
+                            r"back on|again|used to|no longer|any ?more|no more|not now|not currently|not since|"
+                            r"none since|last one|haven'?t had|kicked|abstinent|fell off|slipped|mostly|except|"
+                            r"odd|unknown|unsure|not sure|occasional(?:ly)?|rarely|socially|weekends?|part(?:y|ies)|"
+                            r"now and then|in the past|long ago|decades ago|until|till|past|former|formerly|"
+                            r"previously|ex|reformed)\b|\bn/?a\b|\?")
 #: Everything a read smoking clause may say besides its status; what is left after
 #: removing it is read like any other statement ("58 year old male smoker no diabetes").
 _SMOKING_DETAIL = re.compile(
@@ -1047,23 +1051,29 @@ def read_patient_text(text: str) -> ParsedPatient:
                 doubt = (_PRESENT_CUE.search(timed) or _PAST_CUE.search(timed) or _YEAR.search(timed)
                          or re.search(r"\b(?:since|until|ago)\b", reduced)
                          or re.search(r"^\s*[:=?-]\s*(?:no|n|false|0)\b", reduced)       # "never smoker: no"
-                         or re.search(r"\bfor\s+(?:the\s+)?(?:past\s+|last\s+)?(?:about\s+|over\s+)?\d+\s*"
-                                      r"(?:years?|yrs?|months?|weeks?|days?)\b", reduced))  # "smoke-free for 10 years"
+                         or re.search(r"\d+\s*(?:years?|yrs?|months?|weeks?|days?)\b", reduced))  # "smoke-free 10 yrs"
             elif kind == "former":
                 doubt = (_PRESENT_CUE.search(timed) or re.search(r"\b(?:smoke|smokes|smoking)\b", timed)
-                         or _TEMPORARY_QUIT.search(rest))
+                         or _TEMPORARY_QUIT.search(rest)
+                         or re.search(r"\b(?:cigars?|cigarillos?|pipes?|odd|except)\b", timed)  # "gave up cigarettes for cigars"
+                         or _OCCASIONAL_WORDS.search(timed)
+                         or re.search(r"\b(?:about|going|want(?:s|ing)?|plan(?:s|ning)?|hop(?:e|es|ing)|tr(?:y|ying|ied)|"
+                                      r"need(?:s)?|should|must|will|would|soon|tomorrow|next)\b", rest))
             elif kind == "generic":
                 doubt = _NEGATION_CUE.search(timed) or (
                     _YEAR.search(timed) and not _PAST_CUE.search(timed)) or (
                     _PAST_CUE.search(timed) and _PRESENT_CUE.search(timed)) or (
-                    re.search(r"[:=?-]\s*(?:0|nil|none|false|neg(?:ative)?|denie[sd]|absent|-+)?\s*$", rest))
+                    _EMPTY_SMOKING_ANSWER.search(rest)) or any(   # "smoker age 18-45", "smoker '85-'05"
+                    not re.fullmatch(r"(?:19|20)\d{2}", a) or not re.fullmatch(r"(?:19|20)\d{2}", b)
+                    for a, b in re.findall(r"(\d+)\s*[-–]\s*'?(\d+)", rest))
                 if not doubt and _PAST_CUE.search(timed):
                     if not _STRONG_PAST.search(timed):
                         doubt = True    # "smoker in my youth", "was hospitalized": said, not when
                     else:
                         status, level, kind = "FormerSmoker", 0, "former"   # "smoker (1990-2015)"
             else:                       # explicitly smoking now
-                doubt = _NEGATION_CUE.search(timed) or _PAST_CUE.search(timed) or _YEAR.search(timed)
+                doubt = (_NEGATION_CUE.search(timed) or _PAST_CUE.search(timed) or _YEAR.search(timed)
+                         or _EMPTY_SMOKING_ANSWER.search(rest))
             if not doubt and status == "CurrentSmoker":
                 count = re.search(r"\b(\d+)\s*(?:-\s*\d+\s*)?(?:cigarettes?|cigs?)\s*(?:a|per|each|/)\s*day\b", rest)
                 if level == 3 and (_OCCASIONAL_WORDS.search(rest) or (count and int(count.group(1)) < 10)):
@@ -1205,7 +1215,8 @@ def read_patient_text(text: str) -> ParsedPatient:
         orig_stmt = stmt
 
         # ── the clause right after a smoking clause, saying when ───────────────
-        right_after = last_smoking["idx"] == idx - 1 and last_smoking["kind"] is not None
+        right_after = last_smoking["kind"] is not None and (
+            last_smoking["idx"] == idx - 1 or last_smoking["line"] == line_no)
         if last_smoking["line"] == line_no and last_smoking["idx"] == idx - 1:
             m = _MODIFIER.match(low)
             if m and _MODIFIER_REST.match(m.group("rest")):
