@@ -1020,4 +1020,7 @@ def test_the_weaker_evidence_tier_sets_the_confidence_of_the_new_edges():
     for node in ("RDW", "LowSerumAlbumin"):
         assert re.search(rf"\(Effect ChronicInflammation {node} Pos\s+\(stv 0\.\d+ \(evidence-confidence Epidemiological\)\)\)", text), node
     assert "(Inheritance RDW Biomarker)" in text and "(Inheritance LowSerumAlbumin Biomarker)" in text
+    assert re.search(r"\(Effect InsulinResistance Triglycerides Pos\s+\(stv 0\.50 \(evidence-confidence Epidemiological\)\)\)", text)
+    assert re.search(r"\(Effect ChronicInflammation RDW Pos\s+\(stv 0\.50 ", text)
+    assert "(Inheritance Triglycerides Biomarker)" in text
     assert "Hypoalbuminemia" not in text.replace(";; The albumin node is the DEFICIT, named LowSerumAlbumin and never \"Hypoalbuminemia\"", "")

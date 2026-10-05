@@ -12,8 +12,8 @@ from functools import lru_cache
 from typing import Iterable, Optional
 
 from config import ONTOLOGY_DIR
-from core.patient_builder import (BuiltPatient, build_patient, chd_observation_note, kb_effect_markers,
-                                  prevalent_chd_note)
+from core.patient_builder import (CHD_REACHING_CAUSES, BuiltPatient, build_patient, chd_observation_note,
+                                  kb_effect_markers, prevalent_chd_note)
 from ontology.inventory import merged_inventory
 from ontology.loader import parse_metta_text
 from ontology.registry import OntologyRegistry
@@ -191,9 +191,6 @@ def _prevalent_chd_warnings(metta_query: str, patient: BuiltPatient) -> list[str
 
 
 _DIAGNOSE_RE = re.compile(r"\(\s*diagnose-patient\s+&self\s+([A-Za-z][A-Za-z0-9_]*)(?:\s+\(([^()]*)\))?")
-#: The candidate causes with a positive Effect chain to CoronaryHeartDisease (probed: tests/test_patient_stack.py); a
-#: diagnosis over a list with none of them has nothing to explain the reported heart disease with.
-CHD_REACHING_CAUSES = frozenset({"InsulinResistance", "DeregulatedNutrientSensing", "CellularSenescence"})
 
 
 def _diagnoses_of(metta_query: str, patient: BuiltPatient) -> list[Optional[set]]:
@@ -277,8 +274,8 @@ def no_grimage_prompt_hint(patient: BuiltPatient) -> str:
             f"the two clocks:\n  (predict-risk-patient &self {pid})\n"
             f"  (linage-hazard-patient &self {pid})\n"
             f"A what-if about a lever (\"if my inflammation were normal\", \"if I quit smoking\") is the LinAge2 form "
-            f"(linage-counterfactual-patient &self {pid} <Lever>): counterfactual-patient needs a GrimAge "
-            f"value and returns a zero result for this patient.\n")
+            f"(linage-counterfactual-patient &self {pid} <Lever>): counterfactual-patient reads the DNAm "
+            f"components, not a GrimAge value, and returns a zero result for a patient without them.\n")
 
 
 def chd_observation_prompt_hint(patient: BuiltPatient) -> str:

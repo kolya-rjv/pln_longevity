@@ -100,11 +100,12 @@ job). It is *not* the NHANES patient stack plus LinAge2 — see §5.
   (`ClinicalLabMeasurement` or `DerivedClinicalScore`) and a **structured comment**
   `;; <NHANES code> — <description>` that `linage2_builder.py` parses. The codes are
   comments, not `(NHANESCode …)` facts, for the budget reason in §5.
-* **Four readouts**, `(MeasuresBiomarker <Input> <Biomarker>)`: `CRP → CRP`,
+* **Six readouts**, `(MeasuresBiomarker <Input> <Biomarker>)`: `CRP → CRP`,
   `HbA1c → HbA1c`, `SerumGlucose → FastingGlucose` (with the caveat that the biochemistry
   glucose is fasting only if the draw was), `SerumCotinine → CurrentTobaccoExposure` (a
   new exposure node: cotinine is current exposure, not the cumulative pack-years
-  `DNAmPACKYRS` surrogates).
+  `DNAmPACKYRS` surrogates), and, since item #7, `RedCellDistributionWidth → RDW` and
+  `SerumAlbumin → LowSerumAlbumin` (the albumin DEFICIT; §7 item 3).
 * **One Effect edge**: `SmokingCessation ⊣ CurrentTobaccoExposure`, strength 0.95
   (cotinine's ~17 h half-life, Dempsey 2013; SRNT 2002 on cotinine as the verification
   biomarker), tier `MultipleHumanTrials`. It lands on a node no GrimAge component reads,
@@ -277,7 +278,7 @@ of 0. Send the patient's own `CRP` / `HbA1c` / `FastingGlucose` (z or value) and
    19391664), and albumin is a negative acute-phase protein that low protein intake also lowers (Soeters 2018,
    PMID 30288759; Don & Kaysen 2004, PMID 15660573). The albumin node is the DEFICIT, `LowSerumAlbumin`, and the
    patient's z for it is the negated albumin z. The witness is a z above 1 against **LinAge2's reference for people
-   up to 50** (sex-specific, not age-adjusted): RDW above 13.09 % (men) / 13.27 % (women), albumin below 43 g/L /
+   up to 50** (sex-specific, not age-adjusted): RDW above 13.09 % (men) / 13.27 % (women) (z = 1 falls at 13.093 and 13.265, so 13.1 % and 13.3 % are the first values that count), albumin at or below 43 g/L /
    41 g/L. That reference is stricter than a laboratory range, so **a value inside the usual range counts** (a man
    with albumin 4.3 g/dL), and it overcalls older people. The tab says so next to the patient (`witness_notes`);
    the alternative was clinical limits (RDW > 15 %, albumin < 3.5 g/dL), which change nothing for the three tab

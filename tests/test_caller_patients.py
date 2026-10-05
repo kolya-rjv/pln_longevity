@@ -864,3 +864,26 @@ def test_the_reported_heart_disease_notes_follow_the_cause_list_the_diagnosis_wa
     assert any("adds nothing to this diagnosis" in w for w in listed)
     assert any("returns ()" in w for w in listed) and not any("answers from the reported heart disease alone" in w for w in listed)
     assert CHD_REACHING_CAUSES == {"InsulinResistance", "DeregulatedNutrientSensing", "CellularSenescence"}
+
+
+def test_the_reported_heart_disease_note_is_generated_from_the_causes_the_engine_reaches_and_says_what_it_claims():
+    from core.patient_builder import CHD_REACHING_CAUSES, _words, chd_observation_note
+    note = chd_observation_note(["angina"])
+    for cause in CHD_REACHING_CAUSES:
+        assert _words(cause) in note
+    assert "chronic inflammation" not in note and "mitochondrial" not in note
+    assert "smoking has no curated edge to heart disease" in note and "population-level associations" in note
+    assert "supplement plan and the intervention ranking do not see it" in note
+    assert "prevalence item" in note and "not a measured value" in note
+
+
+def test_two_diagnose_forms_for_one_patient_get_the_observation_note_if_either_reaches_the_report():
+    from core.patient_context import patient_form_warnings
+    built = build_patient({**NOTHING_USABLE, "prevalent_chd": ["angina"]})
+    pid = built.patient_id
+    both = (f"(diagnose-patient &self {pid} (ChronicInflammation))\n"
+            f"(diagnose-patient &self {pid} (InsulinResistance))")
+    assert any("read by the diagnosis as one observation" in w for w in patient_form_warnings(both, built))
+    neither = (f"(diagnose-patient &self {pid} (ChronicInflammation))\n"
+               f"(diagnose-patient &self {pid} (MitochondrialDysfunction))")
+    assert any("adds nothing to this diagnosis" in w for w in patient_form_warnings(neither, built))

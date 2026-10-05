@@ -504,3 +504,27 @@ def test_the_causes_that_reach_a_reported_chd_are_the_ones_the_notes_name(cause)
     out = _run("patient", f"!(diagnose-patient &self Caller_Me ({cause}))", atoms)
     assert out["rc"] == 0
     assert (out["atoms"] != ["()"]) is (cause in CHD_REACHING_CAUSES), (cause, out["atoms"])
+
+
+@pytest.mark.slow
+def test_a_reported_condition_is_only_ever_one_patients():
+    """patient-conditions matches the patient it is asked about: Caller_A's report never reaches Caller_B's diagnosis,
+    nor a built-in patient's (the caller's atoms are injected into any program that names a patient)."""
+    a = ("(InstanceOf Caller_A PatientProfile)\n(PatientAge Caller_A 58)\n(PatientSex Caller_A Male)\n"
+         "(PatientCondition Caller_A CoronaryHeartDisease)\n")
+    b = "(InstanceOf Caller_B PatientProfile)\n(PatientAge Caller_B 58)\n(PatientSex Caller_B Male)"
+    assert _run("patient", "!(diagnose-patient &self Caller_B)", a + b)["atoms"] == ["()"]
+    mine = _run("patient", "!(diagnose-patient &self Patient002)", a)
+    alone = _run("patient", "!(diagnose-patient &self Patient002)")
+    assert mine["atoms"] == alone["atoms"] and "CoronaryHeartDisease" not in mine["atoms"][0]
+
+
+@pytest.mark.slow
+def test_a_single_new_marker_gives_exactly_the_weak_prior_and_tier_of_its_edge():
+    """Epidemiological tier (confidence 0.6), strength 0.5: a diagnosis from one witness alone is stv 0.5 0.6,
+    mass 0.3. A stronger tier or a different strength changes these numbers."""
+    base = "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n"
+    for line, cause in (("(MeasuredZ Caller_Me Triglycerides 1.58)", "InsulinResistance"),
+                        ("(MeasuredZ Caller_Me RDW 2.7)", "ChronicInflammation")):
+        out = _run("patient", "!(diagnose-patient &self Caller_Me)", base + line)["atoms"][0]
+        assert out.startswith(f"((Hypothesis {cause} (stv 0.5 0.6) 1.0 0.3"), (cause, out)

@@ -2,7 +2,7 @@
 
 Round 1 (`REVIEW_ROUND1.md`) led to a redesign of the medication reader (commit `5b10b91`). Round 2 reviewed the redesign and that commit: eight lenses (wrong reads, structure and lines, regression against the pre-medication reader, hygiene and performance, downstream and the non-reader fixes, mutation testing of the tests, honesty of every sentence, the model-assisted Read), each finding re-run by an independent skeptic. About 2.3 million reader inputs were tried (the regression lens alone ran 1.29 million differentially against the pre-medication reader).
 
-**Result: the seven reader and commit lenses reported 67 findings; 66 were confirmed by a skeptic when this was written (1 high, 26 medium, 39 low) in the families below**, all closed in the commit that follows this document except where a row says otherwise. Every confirmed input is pinned in `tests/fixtures/medication_never_current.json` (753 inputs from both rounds) and in `tests/test_patient_medications.py`.
+**Result: the seven reader and commit lenses reported 67 findings; 66 were confirmed by a skeptic when this was written (1 high, 26 medium, 39 low) in the families below**, all closed in the commit that follows this document except where a row says otherwise. Every confirmed input is pinned in `tests/fixtures/medication_never_current.json` (795 inputs from the rounds and their closures) and in `tests/test_patient_medications.py`.
 
 | family | disposition |
 |---|---|
@@ -108,4 +108,4 @@ re-run by hand before it was fixed:
 | 7 | z rounding, header memory and `read` keys without medication-aware tests | low | z 1.0000006 and 1.0000014 pinned (they tell 6 from 7 significant digits). The header-memory and `read`-key pins, and a medication crossing the model-route property tests, are **left open** |
 
 Five of the pinned fixture entries carried a stray trailing backslash (a shell-escape artefact), so they passed
-whether the reader was right or not; they are stripped. 61 of the new tests fail on the 7cb7f27 reader.
+whether the reader was right or not; they are stripped. 61 of the new tests in `tests/test_patient_medications.py` fail on the 7cb7f27 reader (63 with the two in `tests/test_patient_read.py`).

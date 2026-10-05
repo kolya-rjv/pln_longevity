@@ -457,7 +457,7 @@ class ParsedPatient:
             payload["smoking"] = self.smoking
         chd = [_ITEM_LABEL[i] for i in _CHD_ITEMS if self.questionnaire.get(i) == 1]
         if chd:
-            payload["prevalent_chd"] = chd     # a flag for the 10-year CHD risk, not an atom
+            payload["prevalent_chd"] = chd     # the 10-year CHD risk does not read it; the builder emits ONE shared PatientCondition atom, for diagnose-patient only
         if self.medications:
             payload["medications"] = list(self.medications)    # KB symbols; shared atoms only
         return payload, result

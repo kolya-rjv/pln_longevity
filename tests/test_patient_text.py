@@ -630,3 +630,33 @@ def test_the_not_fasting_note_does_not_claim_linage2_uses_a_triglyceride_it_does
     with_ldl = read_patient_text("58 year old male\ntriglycerides 190 mg/dL\nLDL 130 mg/dL")
     note = next(n for n in with_ldl.notes if "not marked fasting" in n)
     assert "in the calculated LDL" not in note and "does not use them (you gave an LDL)" in note
+
+
+@pytest.mark.parametrize("sex, rdw, capped", [("male", 20, True), ("male", 25, True), ("female", 25, True), ("female", 30, True),
+                                              ("female", 22, False)])
+def test_an_rdw_beyond_the_references_range_is_passed_on_as_the_largest_z_the_kb_accepts(sex, rdw, capped):
+    from core.patient_builder import Z_LIMIT
+    from core.patient_context import build_caller_patient
+    p = read_patient_text(f"58 year old {sex}\nRDW {rdw} %")
+    z = p.kb_markers()["RDW"]["z"]
+    assert (z == Z_LIMIT) is capped, (sex, rdw, z)
+    built = build_caller_patient(p.to_patient("Me")[0], ())          # the build does not refuse it
+    assert built.witnesses == ["RDW"]
+    assert any("passed on as z 12" in n for n in p.witness_notes) is capped
+
+
+@pytest.mark.parametrize("sex, lab, below, at_or_above", [
+    ("male", "hemoglobin {} g/dL", 12.9, 13.0), ("female", "hemoglobin {} g/dL", 11.9, 12.0),
+    ("male", "ferritin {} ug/L", 29, 30), ("female", "ferritin {} ug/L", 29, 30),
+    ("male", "vitamin b12 {} pmol/L", 147, 148), ("female", "vitamin b12 {} pmol/L", 147, 148),
+    ("male", "folate {} nmol/L", 9.5, 10), ("female", "folate {} nmol/L", 9.5, 10),
+])
+def test_each_rdw_gate_limit_withholds_just_below_it_and_not_at_it(sex, lab, below, at_or_above):
+    def kept(value):
+        return "RDW" in read_patient_text(f"58 year old {sex}\nRDW 14.5 %\n{lab.format(value)}").kb_markers()
+    assert not kept(below) and kept(at_or_above), (sex, lab)
+
+
+def test_an_rdw_just_above_the_z_one_cut_point_is_a_witness_and_just_below_is_not():
+    assert "RDW" in read_patient_text("58 year old male\nRDW 13.12 %").kb_markers()
+    assert "RDW" not in read_patient_text("58 year old male\nRDW 13.07 %").kb_markers()

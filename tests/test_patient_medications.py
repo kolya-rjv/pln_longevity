@@ -641,3 +641,15 @@ def test_the_note_for_an_unread_neighbour_does_not_say_it_came_after_the_drug():
     p = read_patient_text(BASE + "Sporadically, I take metformin")
     assert p.medications == [] and any("something else on the same line" in n for n in p.notes)
     assert not any("something after it" in n for n in p.notes)
+
+
+@pytest.mark.parametrize("nxt", ["I went off it", "I'm off it", "My doctor took me off it", "I have given it up", "I am off it now"])
+def test_a_next_line_that_says_the_person_went_off_the_drug_is_a_retraction(nxt):
+    assert read_patient_text(BASE + "I take metformin 500 mg twice daily\n" + nxt).medications == [], nxt
+
+
+@pytest.mark.parametrize("text", ["I take metformin and Jardiance", "I take metformin and Januvia", "I take metformin and Eliquis",
+                                  "I take metformin and a blood thinner", "I take metformin and a water pill",
+                                  "I take metformin and insulin"])
+def test_common_diabetes_and_cardiac_co_medications_do_not_withdraw_the_drug(text):
+    assert read_patient_text(BASE + text).medications == ["Metformin"], text

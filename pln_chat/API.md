@@ -544,7 +544,7 @@ with `source: "rules" | "model"` and what was `typed` there). `reader: "model"` 
 (the `linage2` block required, plus optional `levers`) and returns the whole
 picture as JSON: decomposition, hazard, risk (or the reason there is none),
 counterfactuals. `GET /linage2/features` publishes the 59 input codes and which
-four can be explained. The refusals, each a 422 with a code:
+six can be explained. The refusals, each a 422 with a code:
 `unknown_linage2_feature`, `duplicate_linage2_feature`, `linage2_inconsistent`
 (delta ≠ BA − CA), `linage2_age_mismatch` (a result computed for another age),
 `implausible_linage2_delta`, `implausible_linage2_contribution`,

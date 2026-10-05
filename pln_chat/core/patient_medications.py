@@ -155,6 +155,7 @@ previous former switched changed dropped gave swapped ran reason active
 _RETRACT_ANY = frozenset("""
 no not never nor dont doesnt didnt havent hasnt hadnt isnt arent wasnt werent cant wont wouldnt couldnt
 stopped stop stops quit quits discontinued ceased ended finished tapered dropped gave swapped recently
+off given giving abandoned abandon took
 """.split())
 
 _HEADING_VOCABULARY = (_HEADING_ONLY_WORDS | _HEADING_OTHER | _STOP_START | _CURRENT_HEADING
@@ -299,7 +300,9 @@ dapagliflozin canagliflozin liraglutide semaglutide tirzepatide pioglitazone vit
 multivitamin magnesium zinc calcium iron potassium fish oil omega 3 supplement supplements probiotic coq10 creatine
 statin statins ppi ppis ace inhibitor inhibitors blocker blockers lipitor zocor crestor norvasc zestril ozempic wegovy
 mounjaro melatonin berberine resveratrol nmn nad nicotinamide quercetin curcumin turmeric glucosamine collagen d3 k2 b2
-antihistamine antacid
+antihistamine antacid jardiance farxiga invokana januvia tradjenta janumet trulicity victoza glucotrol amaryl actos
+eliquis xarelto plavix coumadin lasix hctz diuretic diuretics thinner pill pills water thyroid beta injection injections
+insulin blood pressure
 """.split())
 _DRUG_STEM = re.compile(r"[a-z]{3,}(?:pril|sartan|statin|olol|dipine|prazole|thiazide|tidine|formin|gliptin|"
                         r"gliflozin|glutide|glitazone|semide|cillin|mycin|floxacin|oxetine|pram|triptyline|"

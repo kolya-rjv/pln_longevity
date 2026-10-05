@@ -36,6 +36,7 @@ from typing import Callable, Optional
 
 from core.patient_canonical import Fact, is_canonical, render
 from core.patient_extract import SEX, STATUS, ExtractError, Extraction
+from core.patient_medications import mentioned_symbols
 from core.patient_text import (
     _ALIAS_INDEX,
     _DIAG_QUALIFIERS,
@@ -1230,9 +1231,13 @@ def _with_model(text: str, rules: ParsedPatient, ex: Extraction) -> PatientRead:
     meds = (rules.medications, rules.medications_stopped)
     no_button: set = set()
     kept: list = []
+    # no drug the reader knows anywhere in the text, and none read: a wording cannot change a medication reading,
+    # and re-reading the whole text once per wording of every suggestion is the cost of this check
+    drug_in_play = bool(rules.medications or rules.medications_stopped or mentioned_symbols(text))
     for s_ in suggestions:
         good = [w for w in s_.wordings
-                if (lambda q: (q.medications, q.medications_stopped))(read_patient_text(s_.apply(text, w))) == meds]
+                if not drug_in_play
+                or (lambda q: (q.medications, q.medications_stopped))(read_patient_text(s_.apply(text, w))) == meds]
         if len(good) < len(s_.wordings):
             out.notes.append(f"a wording for '{s_.original}' is not offered: putting it in place would change "
                              f"whether a medication counts as one you take now")

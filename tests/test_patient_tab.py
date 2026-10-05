@@ -770,6 +770,11 @@ GATE_PATIENTS = {
     "six_labs": EXAMPLES["six labs only"],
     "healthy": HEALTHY,
     "female_crp": "58 year old female, never smoked\nalbumin 4.5 g/dL\nRDW 12.3 %\nCRP 12 mg/L",
+    # branches the first gate tests missed (review round 3, mutation lens)
+    "never_smoked_cotinine": "58 year old male, never smoked\nalbumin 4.8 g/dL\nRDW 12.3 %\nCRP 0.4 mg/L\nHbA1c 5.0 %\ncotinine 150 ng/mL",
+    "smoker_zero_cotinine_but_crp": "52 year old female, current smoker\nalbumin 4.5 g/dL\nCRP 12 mg/L\ncotinine 2 ng/mL\nHbA1c 5.0 %",
+    "old_witnessless_a": "75 year old male, never smoked\nalbumin 4.8 g/dL\nRDW 12.3 %\nCRP 0.4 mg/L\nHbA1c 5.0 %",
+    "old_witnessless_b": "85 year old female, never smoked\nalbumin 4.8 g/dL\nRDW 12.0 %\nCRP 0.3 mg/L\nHbA1c 5.0 %",
 }
 
 
@@ -807,3 +812,35 @@ def test_the_drivers_threshold_the_gate_uses_is_the_one_in_the_rules():
     import re
     text = (REPO / "pln_linage2.metta").read_text(encoding="utf-8")
     assert float(re.search(r"\(linage-driver-threshold-years\) ([\d.]+)\)", text).group(1)) == patient_tab.DRIVER_THRESHOLD_YEARS
+
+
+def test_the_hidden_note_says_only_what_the_person_did_and_did_not_say_about_smoking():
+    from core.patient_context import build_caller_patient
+    from core.patient_text import read_patient_text
+    def note(text):
+        return patient_tab.hidden_note(build_caller_patient(read_patient_text(text).to_patient("Me")[0], ()))
+    base = "\nalbumin 4.8 g/dL\nRDW 12.3 %\nCRP 0.4 mg/L\nHbA1c 5.0 %"
+    unsaid = note("52 year old male" + base)
+    assert "your text does not say you currently smoke" in unsaid and "not a current smoker" not in unsaid
+    cotinine_only = note("52 year old male" + base + "\ncotinine 250 ng/mL")
+    assert "your text does not say you currently smoke" in cotinine_only
+    assert "you are not a current smoker" in note("52 year old male, never smoked" + base)
+    low = note("52 year old male, current smoker" + base + "\ncotinine 5 ng/mL")
+    assert "your cotinine gives it nothing to remove" in low and "not a current smoker" not in low
+    assert "the drivers of your biological age" in note("45 year old female, never smoked" + base)    # no measured input >= 0.5 y
+
+
+def test_the_hand_written_marker_lists_in_the_tab_wording_name_every_marker_the_kb_has_a_cause_for():
+    """A bridge added to mechanistic_bridges.metta fails here until the tab's words say it too."""
+    from core.patient_builder import LINAGE2_JOIN_MARKERS, NO_WITNESS_CHD_PREFIX, NO_WITNESS_PREFIX, kb_effect_markers
+    phrase = {"CRP": "CRP", "HbA1c": "HbA1c", "FastingGlucose": "fasting glucose", "Triglycerides": "fasting triglyceride",
+              "RDW": "RDW", "LowSerumAlbumin": "low albumin", "DNAmPAI1": "PAI-1", "DNAmGDF15": "GDF-15",
+              "DNAmPACKYRS": "pack-years"}
+    assert set(phrase) == set(kb_effect_markers()), "name the new marker in the tab wording, then in this map"
+    wording = dict(patient_tab._TAB_WORDING)
+    for prefix in (NO_WITNESS_PREFIX, NO_WITNESS_CHD_PREFIX):
+        for marker, words in phrase.items():
+            assert words in wording[prefix], (prefix[:40], marker)
+    join = next(w for k, w in patient_tab._TAB_WORDING if k.startswith("The LinAge2 block was sent without"))
+    for marker in LINAGE2_JOIN_MARKERS:
+        assert {"CRP": "CRP", "HbA1c": "HbA1c", "FastingGlucose": "glucose", "RDW": "RDW", "LowSerumAlbumin": "low albumin"}[marker] in join

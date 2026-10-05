@@ -129,8 +129,10 @@ def hidden_note(built: Optional[BuiltPatient]) -> str:
     smoker = built.smoking == "CurrentSmoker"
     parts = []
     if not _quit_helps(built):
-        parts.append("quitting smoking (" + ("you are not a current smoker" if not smoker
-                                             else "your cotinine gives it nothing to remove") + ")")
+        why = ("your cotinine gives it nothing to remove" if smoker
+               else "you are not a current smoker" if built.smoking in ("NeverSmoker", "FormerSmoker")
+               else "your text does not say you currently smoke")
+        parts.append(f"quitting smoking ({why})")
     if not built.witnesses:
         parts.append(("the supplement plan" if built.prevalent_chd else "the diagnosis and the supplement plan")
                      + " (none of your labs is elevated with a cause the knowledge base has curated)")

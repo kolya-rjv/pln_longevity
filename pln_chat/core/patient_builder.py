@@ -316,13 +316,22 @@ def prevalent_chd_note(conditions: Iterable[str]) -> str:
 NO_WITNESS_CHD_PREFIX = "No elevated marker the knowledge base can use, apart from your reported heart disease:"
 
 
+#: The candidate causes with a positive Effect chain to CoronaryHeartDisease (probed against the engine in
+#: tests/test_patient_stack.py): the only ones a diagnosis can explain a reported heart disease with.
+CHD_REACHING_CAUSES = frozenset({"InsulinResistance", "DeregulatedNutrientSensing", "CellularSenescence"})
+
+
+def _words(symbol: str) -> str:
+    return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", symbol).lower()
+
+
 def chd_observation_note(conditions: Iterable[str]) -> str:
     """What a reported CHD does to the diagnosis (and what it does not do to anything else)."""
     return (
         f"Reported {', '.join(conditions)} is read by the diagnosis as one observation to explain, and by nothing "
         f"else: the supplement plan and the intervention ranking do not see it. It is a prevalence item (the "
         f"survey question is 'ever told you had'), not a measured value, and the causes the diagnosis offers for "
-        f"it (insulin resistance, deregulated nutrient sensing, cellular senescence) are population-level "
+        f"it ({', '.join(_words(c) for c in sorted(CHD_REACHING_CAUSES))}) are population-level "
         f"associations, not the reason this person has it: smoking has no curated edge to heart disease in this "
         f"knowledge base."
     )
