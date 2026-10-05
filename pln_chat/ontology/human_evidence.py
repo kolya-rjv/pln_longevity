@@ -149,9 +149,27 @@ class HumanEvidenceIndex:
     studies: dict[str, HumanStudy] = field(default_factory=dict)
     cross_references: list[CrossReference] = field(default_factory=list)
     publications: dict[str, Publication] = field(default_factory=dict)
+    #: Built on first use from this table's own vocabulary, not at import.
+    _resolver: object = field(default=None, repr=False, compare=False)
 
     def records(self) -> list[HumanStudy]:
         return [s for s in self.studies.values() if s.intervention]
+
+    def resolve_intervention(self, intervention: str):
+        """Map a caller's spelling onto a curated intervention name.
+
+        The same `CompoundResolver` `/drugage/rank` uses, over this table's own
+        vocabulary. Without it the lookup was a case-insensitive string equality,
+        so `omega-3` and `dasatinib+quercetin` returned "no curated human study"
+        while `Omega3` and `DasatinibPlusQuercetin` were both covered — the
+        endpoint denying evidence it holds, which is the one answer this layer
+        exists to get right.
+        """
+        from ontology.compound_names import CompoundResolver
+
+        if self._resolver is None:
+            self._resolver = CompoundResolver(self.interventions())
+        return self._resolver.resolve(_combination_normalised(intervention))
 
     def for_intervention(self, intervention: str) -> list[HumanStudy]:
         key = intervention.lower()
@@ -168,6 +186,16 @@ class HumanEvidenceIndex:
 
     def covered_outcomes(self) -> list[str]:
         return sorted({s.outcome for s in self.records() if s.outcome})
+
+
+#: `+`, `&` and `and` between two compounds all name the combination that this
+#: table spells `DasatinibPlusQuercetin`.
+_COMBINATION_RE = re.compile(r"\s*(?:\+|&|\band\b)\s*", re.IGNORECASE)
+
+
+def _combination_normalised(name: str) -> str:
+    """`dasatinib+quercetin` / `dasatinib and quercetin` -> `dasatinib plus quercetin`."""
+    return _COMBINATION_RE.sub(" plus ", (name or "").strip())
 
 
 def _unquote(value: str) -> str:

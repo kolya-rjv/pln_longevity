@@ -56,6 +56,20 @@ class MarkerSpec:
         return self.reference is not None
 
 
+def _normalise_unit(unit: str) -> str:
+    """Fold spelling differences that do not change what a unit means.
+
+    Case, internal spaces and the micro sign are noise: `mg/dL`, `mg/dl` and
+    `MG / DL` are one unit, and a caller who types `ug/mL` means `µg/mL`.
+    """
+    folded = re.sub(r"\s+", "", (unit or "").strip().lower())
+    return folded.replace("µ", "u").replace("μ", "u")
+
+
+#: Unit spellings accepted for a marker expressed in YEARS of age acceleration.
+YEARS_UNITS = {"years", "year", "yrs", "yr", "y"}
+
+
 @dataclass(frozen=True)
 class Reference:
     """A curated reference distribution for converting a raw value to a z.
@@ -76,6 +90,56 @@ class Reference:
     #: standardised on the log scale, which is how they are analysed clinically.
     log_scale: bool = False
     source: str = ""
+    #: (alias, scale, offset) triples mapping a raw value expressed in `alias`
+    #: onto `unit`:  value_in_unit = value * scale + offset. A tuple rather than
+    #: a dict so the dataclass stays frozen AND hashable. The reference unit
+    #: itself is always accepted and needs no entry.
+    #:
+    #: Every entry is an exact or published clinical conversion, never a guess:
+    #: an approximate unit conversion would reintroduce the silent error this
+    #: table exists to remove.
+    conversions: tuple[tuple[str, float, float], ...] = ()
+
+    def accepted_units(self) -> list[str]:
+        return [self.unit] + [alias for alias, _scale, _offset in self.conversions]
+
+    def to_reference_unit(
+        self, value: float, unit: Optional[str]
+    ) -> tuple[float, Optional[str]]:
+        """Express `value` in this reference's own unit.
+
+        Returns `(converted_value, note)`; `note` is None when nothing was
+        converted. A caller who sends no unit is read as already using the
+        reference unit, which is what GET /patients/markers publishes as
+        `raw_unit`.
+
+        Raises ValueError for a unit this reference cannot convert. That is
+        deliberate: until this method existed the caller's `unit` was read and
+        then ignored, so `CRP {value: 0.4, unit: "mg/dL"}` — 4 mg/L, an ordinary
+        result — was standardised as 0.4 mg/L and came back z = -1.61 "Low"
+        instead of z = +0.69. A 422 naming the accepted units is recoverable;
+        a confidently wrong patient is not.
+        """
+        if unit is None or not str(unit).strip():
+            return value, None
+        key = _normalise_unit(unit)
+        if key == _normalise_unit(self.unit):
+            return value, None
+        for alias, scale, offset in self.conversions:
+            if key == _normalise_unit(alias):
+                converted = value * scale + offset
+                operation = f"x {scale:g}"
+                if offset:
+                    operation += f" + {offset:g}"
+                note = (
+                    f"{value:g} {unit} = {converted:g} {self.unit}   [{operation}]"
+                )
+                return converted, note
+        raise ValueError(
+            f"unit '{unit}' cannot be standardised for this marker. Accepted: "
+            f"{', '.join(self.accepted_units())}. Send `z` instead if you "
+            f"already have standard deviations."
+        )
 
     def to_z(self, value: float) -> tuple[float, str]:
         if self.log_scale:
@@ -144,6 +208,9 @@ MARKERS: dict[str, MarkerSpec] = {
             source="coarse prior: adult hs-CRP is strongly right-skewed with a "
                    "geometric mean around 2 mg/L; standardised on the log scale. "
                    "Replace with an age/sex-stratified cohort table.",
+            # Exact rescalings: 1 mg/dL = 10 mg/L, and 1 ug/mL = 1 mg/L.
+            conversions=(("mg/dL", 10.0, 0.0), ("ug/mL", 1.0, 0.0),
+                         ("mcg/mL", 1.0, 0.0)),
         ),
     ),
     "FastingGlucose": MarkerSpec(
@@ -154,6 +221,8 @@ MARKERS: dict[str, MarkerSpec] = {
             unit="mg/dL", mean=95.0, sd=12.0,
             source="coarse prior for non-diabetic adults. Replace with an "
                    "age/sex-stratified cohort table.",
+            # 1 mmol/L glucose = 18.0182 mg/dL (molar mass 180.156 g/mol).
+            conversions=(("mmol/L", 18.0182, 0.0),),
         ),
     ),
     "HbA1c": MarkerSpec(
@@ -163,6 +232,9 @@ MARKERS: dict[str, MarkerSpec] = {
             unit="%", mean=5.5, sd=0.5,
             source="coarse prior for non-diabetic adults. Replace with an "
                    "age/sex-stratified cohort table.",
+            # NGSP % = 0.09148 x IFCC mmol/mol + 2.152 — the NGSP/IFCC master
+            # equation, not an approximation of it.
+            conversions=(("mmol/mol", 0.09148, 2.152),),
         ),
     ),
     "Triglycerides": MarkerSpec(
@@ -547,10 +619,22 @@ def _resolve_marker(
 
     if z is None:
         if name in YEARS_PER_SD_MARKERS:
-            z = _as_number(
+            numeric = _as_number(
                 value, code="invalid_marker_value",
                 what=f"Marker '{name}' value", marker=name,
-            ) / sd_to_years
+            )
+            if unit is not None and str(unit).strip() and (
+                _normalise_unit(unit) not in YEARS_UNITS
+            ):
+                raise PatientSpecError(
+                    "unsupported_unit",
+                    f"Marker '{name}' is an age ACCELERATION: a raw value is "
+                    f"read as years, and '{unit}' is not a spelling of years. "
+                    f"Send `z` instead if you already have standard deviations.",
+                    marker=name,
+                    accepted_units=sorted(YEARS_UNITS),
+                )
+            z = numeric / sd_to_years
             derived = True
             unit = unit or "years"
             formula = f"z = years / {sd_to_years:g}   [grimaccel-sd-to-years]"
@@ -570,11 +654,22 @@ def _resolve_marker(
                 what=f"Marker '{name}' value", marker=name,
             )
             try:
-                z, formula = spec.reference.to_z(numeric)
+                numeric_in_unit, conversion = spec.reference.to_reference_unit(
+                    numeric, unit
+                )
+            except ValueError as exc:
+                raise PatientSpecError(
+                    "unsupported_unit", f"Marker '{name}': {exc}", marker=name,
+                    accepted_units=spec.reference.accepted_units(),
+                ) from None
+            try:
+                z, formula = spec.reference.to_z(numeric_in_unit)
             except ValueError as exc:
                 raise PatientSpecError(
                     "invalid_marker_value", f"Marker '{name}': {exc}", marker=name
                 ) from None
+            if conversion:
+                formula = f"{conversion};   {formula}"
             derived = True
             unit = unit or spec.reference.unit
         else:
@@ -953,6 +1048,7 @@ def marker_catalog() -> list[dict]:
         }
         if spec.name in YEARS_PER_SD_MARKERS:
             entry["raw_unit"] = "years of age acceleration"
+            entry["accepted_units"] = sorted(YEARS_UNITS)
             entry["conversion"] = "z = years / grimaccel-sd-to-years"
         elif spec.name in LINAGE_YEARS_MARKERS:
             entry["raw_unit"] = "years of LinAge2 BA - CA delta"
@@ -963,6 +1059,7 @@ def marker_catalog() -> list[dict]:
             )
         elif spec.reference is not None:
             entry["raw_unit"] = spec.reference.unit
+            entry["accepted_units"] = spec.reference.accepted_units()
             entry["reference_mean"] = spec.reference.mean
             entry["reference_sd"] = spec.reference.sd
             entry["log_scale"] = spec.reference.log_scale

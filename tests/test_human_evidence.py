@@ -428,3 +428,41 @@ def test_the_runtime_kb_still_answers_the_query_that_aborted_the_interpreter():
         f"(exit {proc.returncode}). Tail:\n{proc.stderr[-2000:]}"
     )
     assert proc.stdout.strip().endswith("ok")
+
+
+# ── The resolver this endpoint was missing ───────────────────────────────────
+# The 2026-09-28 re-test, finding 6: `omega-3` and `dasatinib+quercetin`
+# returned "no curated human study" while `Omega3` and `DasatinibPlusQuercetin`
+# were both covered. The lookup was a case-insensitive string equality, so the
+# endpoint denied evidence it holds — the one answer this layer exists to get
+# right, since its whole job is keeping "no record" apart from "no effect".
+
+@pytest.mark.parametrize(
+    "query, expected",
+    [
+        ("omega-3", "Omega3"),
+        ("Omega 3", "Omega3"),
+        ("omega3", "Omega3"),
+        ("dasatinib+quercetin", "DasatinibPlusQuercetin"),
+        ("dasatinib + quercetin", "DasatinibPlusQuercetin"),
+        ("dasatinib and quercetin", "DasatinibPlusQuercetin"),
+        ("metformin", "Metformin"),
+    ],
+)
+def test_a_caller_spelling_resolves_to_the_curated_name(index, query, expected):
+    assert index.resolve_intervention(query).matched == expected
+
+
+def test_the_resolved_name_is_what_gets_looked_up(index):
+    """Resolution is not cosmetic: the records must actually come back."""
+    assert index.for_intervention(
+        index.resolve_intervention("dasatinib+quercetin").matched
+    )
+    assert index.cross_references_for(
+        index.resolve_intervention("omega-3").matched
+    )
+
+
+def test_an_uncurated_intervention_is_still_unmatched(index):
+    """Resolving more names must not start inventing matches."""
+    assert index.resolve_intervention("foobarium").matched is None

@@ -163,12 +163,29 @@ _SALT_TOKENS = (
 
 
 def loose_key(name: str) -> str:
-    """Secondary key: canonical key minus stereo descriptors and salt suffixes."""
+    """Secondary key: canonical key minus stereo descriptors and salt suffixes.
+
+    A stereo descriptor is stripped in LEADING or MEDIAL position only, never in
+    FINAL position. In chemical nomenclature a stereo descriptor prefixes the
+    thing it qualifies — `D-glucosamine`, `trans-resveratrol`,
+    `N-acetyl-L-cysteine` — whereas a trailing single letter is a SERIES
+    DESIGNATOR naming a distinct substance: `Urolithin D`, `Vitamin E`.
+
+    Treating the two alike is what made `urolithin` resolve to `Urolithin_D` and
+    `vitamin` to `Vitamin_E`, both at score 1.0 and both labelled "same active
+    moiety". Worse, it hid the ambiguity: `Urolithin_D` lost its `d` and landed
+    under `urolithin` while `Urolithin_A` kept its `a` and landed under
+    `urolithina`, so the two never shared a bucket and the collision check below
+    could not see them. Salt and hydrate suffixes DO trail the moiety they
+    qualify (`metformin hydrochloride`), so those still strip anywhere.
+    """
     text = transliterate(name).lower()
     tokens = [t for t in re.split(r"[^a-z0-9]+", text) if t]
+    last = len(tokens) - 1
     kept = [
-        t for t in tokens
-        if t not in _STEREO_TOKENS and t not in _SALT_TOKENS
+        t for i, t in enumerate(tokens)
+        if t not in _SALT_TOKENS
+        and not (t in _STEREO_TOKENS and i != last)
     ]
     return "".join(kept) or canonical_key(name)
 
@@ -355,6 +372,22 @@ class CompoundResolver:
                     break
         return out[:limit]
 
+    #: Longest series designator treated as one: `a`, `d`, `k2`, `q10`, `b12`.
+    FAMILY_SUFFIX_MAX = 3
+
+    def _family_candidates(self, key: str) -> list[str]:
+        """Vocabulary names that are `key` plus a short series designator."""
+        out: list[str] = []
+        if len(key) < 4:
+            return out
+        for candidate_key, names in self._by_key.items():
+            suffix = candidate_key[len(key):]
+            if not candidate_key.startswith(key) or not suffix:
+                continue
+            if len(suffix) <= self.FAMILY_SUFFIX_MAX and suffix.isalnum():
+                out.extend(names)
+        return out
+
     def _best_fuzzy(self, key: str) -> tuple[Optional[str], float]:
         """Accept a near-miss only when it is both close AND clearly ahead."""
         matches = difflib.get_close_matches(
@@ -441,12 +474,26 @@ class CompoundResolver:
                 query=raw, method="ambiguous", suggestions=sorted(hits)[:MAX_SUGGESTIONS]
             )
 
-        # 6. accepted typo correction
+        # 6. family stem — `urolithin` when the build holds Urolithin_A and
+        #    Urolithin_D. The query is a complete name PLUS a series designator
+        #    short enough to be one (`a`, `d`, `q10`, `b12`), for two or more
+        #    substances. That is a question, not a compound, so decline it with
+        #    the candidates rather than letting the fuzzy rung pick a winner.
+        family = self._family_candidates(key)
+        if len(family) > 1:
+            return Resolution(
+                query=raw, method="ambiguous",
+                suggestions=sorted(family)[:MAX_SUGGESTIONS],
+                note=f"'{raw}' names a family of compounds in DrugAge, not one "
+                     f"compound. Ask for one of the suggestions by name.",
+            )
+
+        # 7. accepted typo correction
         best, score = self._best_fuzzy(key)
         if best is not None:
             return Resolution(query=raw, matched=best, method="fuzzy", score=score)
 
-        # 7. give up, with directions
+        # 8. give up, with directions
         return Resolution(query=raw, method="unmatched", suggestions=self._suggest(key))
 
     def resolve_all(self, queries: Iterable[str]) -> list[Resolution]:
