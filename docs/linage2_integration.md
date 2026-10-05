@@ -270,6 +270,13 @@ of 0. Send the patient's own `CRP` / `HbA1c` / `FastingGlucose` (z or value) and
    `mechanistic_bridges.metta` kind, and each new head symbol spends budget.
 4. **No cause-specific risk.** The paper reports none per year; `CoronaryHeartDisease`
    through LinAge2 yields nothing rather than borrowing the all-cause hazard.
+   "What's my heart risk?" for a patient with a LinAge2 result and **no GrimAge value** (the tab's
+   default) maps to the pair `(predict-risk-patient …)` + `(linage-hazard-patient …)`: the CHD model
+   has no input and returns nothing, the hazard answers, and a deterministic note
+   (`core.patient_context.patient_form_warnings`, on `/query`, `/metta/run` and the chat) says there
+   is no heart-specific risk for the patient and that the hazard beside it is the ALL-CAUSE
+   multiplier, never a heart risk and never multiplied or added to a GrimAge result. With a GrimAge
+   value the CHD model answers and the note does not fire; a hazard-only question is not relabelled.
 5. **Two clocks are not combined.** A patient with both GrimAge and LinAge2 gets a CHD
    risk from one and a mortality hazard from the other; multiplying them would double-count
    (`docs/risk_prediction.md §3`).

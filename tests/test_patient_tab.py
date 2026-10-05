@@ -465,3 +465,44 @@ def test_the_chat_explains_an_empty_diagnosis_for_a_patient_with_nothing_to_work
     assert "the diagnosis returns ()" in answer
     _, _, history = _chat_with(monkeypatch, "(diagnose-patient &self Caller_Me)", _build(SMOKER)["state"])
     assert "has no elevated value" not in history[-1]["content"]
+
+
+# ═══════════════ "what's my heart risk?" without a GrimAge value ═════════════════
+
+PAIR = "(predict-risk-patient &self Caller_Me)\n(linage-hazard-patient &self Caller_Me)"
+
+
+def test_the_translator_is_told_the_pair_to_emit_for_a_patient_with_no_grimage(monkeypatch):
+    """The tab's default patient has no GrimAge line: "my heart risk" maps to the empty CHD
+    model plus the LinAge2 hazard, to be called all-cause. With a GrimAge line it is the plain
+    CHD risk and the hint is absent."""
+    state = _build(SMOKER)["state"]
+    _, seen, _ = _chat_with(monkeypatch, PAIR, state)
+    assert "This patient has NO AgeAccelGrim value" in seen["prompt"]
+    assert "  (predict-risk-patient &self Caller_Me)\n  (linage-hazard-patient &self Caller_Me)" in seen["prompt"]
+    assert "ALL-CAUSE LinAge2 mortality hazard, not a heart risk" in seen["prompt"]
+    assert "This model reads AgeAccelGrim ONLY" in seen["prompt"]                      # rule 12
+    assert "a patient with no AgeAccelGrim value gets nothing from these forms" in seen["prompt"]   # rule 16
+    clock = _build(SMOKER + "\nGrimAge acceleration +3 years")["state"]
+    assert clock["markers"]["AgeAccelGrim"]
+    _, seen, _ = _chat_with(monkeypatch, "(predict-risk-patient &self Caller_Me)", clock)
+    assert "NO AgeAccelGrim value" not in seen["prompt"]
+
+
+def test_the_chat_labels_the_hazard_beside_an_empty_heart_risk_and_stays_silent_otherwise(monkeypatch):
+    state = _build(SMOKER)["state"]
+    _, _, history = _chat_with(monkeypatch, PAIR, state)
+    answer = history[-1]["content"]
+    assert "> **Note.** Caller_Me has no AgeAccelGrim value" in answer
+    assert "ALL-CAUSE mortality multiplier" in answer and "never multiplied or added" in answer
+    # a hazard-only question (battery C1) and a patient with a GrimAge value (battery C2) get no such note
+    _, _, history = _chat_with(monkeypatch, "(linage-hazard-patient &self Caller_Me)", state)
+    assert "no AgeAccelGrim value" not in history[-1]["content"]
+    clock = _build(SMOKER + "\nGrimAge acceleration +3 years")["state"]
+    _, _, history = _chat_with(monkeypatch, "(predict-risk-patient &self Caller_Me)", clock)
+    assert "no AgeAccelGrim value" not in history[-1]["content"]
+
+
+def test_the_tab_says_what_a_heart_risk_question_will_return_without_a_grimage_line():
+    summary = _build(SMOKER)["summary"]
+    assert "labelled all-cause mortality — it is not a heart risk" in summary

@@ -345,3 +345,15 @@ def test_the_default_causes_reach_every_marker_the_kb_has_an_edge_into(marker):
              f"(PatientSex Caller_Me Male)\n(MeasuredZ Caller_Me {marker} 2.0)")
     out = _run("patient", "!(diagnose-patient &self Caller_Me)", atoms)
     assert out["rc"] == 0 and out["atoms"] != ["()"], f"the default causes do not reach {marker}"
+
+
+@pytest.mark.slow
+def test_the_heart_risk_model_has_no_input_without_a_grimage_value():
+    """What the no-GrimAge note claims: predict-risk-patient returns nothing for the tab's
+    default patient, and answers the moment a GrimAge acceleration is added (z 1.07143 =
+    4.5 years / 4.2)."""
+    without = _run("patient", RISK.format(P="Caller_Me"), TAB_SMOKER)
+    assert without["rc"] == 0 and without["status"] == "empty" and without["atoms"] == []
+    clock = _run("patient", RISK.format(P="Caller_Me"), TAB_SMOKER + "\n(MeasuredZ Caller_Me AgeAccelGrim 1.07143)")
+    assert clock["status"] == "ok"
+    assert re.match(r"\(RiskPrediction Caller_Me CoronaryHeartDisease \(point 0\.108", clock["atoms"][0])

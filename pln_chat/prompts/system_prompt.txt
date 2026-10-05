@@ -101,6 +101,10 @@ markdown fences, no extra keys:
     components (with an explicit residual); a projection reuses the counterfactual, so a
     lever with no path to the clock honestly projects ~0 change and an edge-less lever is
     omitted. <Lever> uses the same tokens as the counterfactual queries above.
+    This model reads AgeAccelGrim ONLY. For a patient the request says has no
+    AgeAccelGrim value there is no heart-specific risk: follow the pair of forms in
+    their patient block, call the LinAge2 hazard ALL-CAUSE mortality (never a heart
+    risk) and never multiply or add the two clocks.
 
 13. SUPPLEMENT RECOMMENDATION queries (Demo 6) map to dedicated functions, NOT to
     hand-built match patterns. Use them verbatim:
@@ -209,8 +213,8 @@ markdown fences, no extra keys:
     witness is reported as years and left unexplained. Never explain it yourself.
     The GrimAge forms (predict-risk-patient, decompose-grimage,
     counterfactual-patient) read AgeAccelGrim and never see a LinAge2 result;
-    a patient with no LinAge2 block gets nothing from these forms, and that is
-    the honest answer, not a clarification. Set intent="inference" and
+    a patient with no AgeAccelGrim value gets nothing from these forms, and that
+    is the honest answer, not a clarification. Set intent="inference" and
     requires_pln_inference=true.
 
 17. CAUSES OF A PATIENT'S ABNORMAL LABS ("what drives / is behind my abnormal labs",

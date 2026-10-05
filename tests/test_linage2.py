@@ -943,3 +943,28 @@ def test_the_never_smoker_is_told_the_cessation_number_is_not_theirs():
     cf = body["counterfactuals"][0]
     assert cf["expected_delta_years"] == 0.0 and cf["via"] == []
     assert any("LeverRequiresSmoking" in w for w in body["warnings"])
+
+
+@pytest.mark.slow
+def test_a_heart_risk_pair_for_a_patient_with_no_grimage_is_labelled_all_cause(monkeypatch):
+    """"What's my heart risk?" for a patient with a LinAge2 result and no GrimAge value: the CHD
+    model has no input (its part of the program returns nothing), the hazard answers, and the
+    response says the hazard is the ALL-CAUSE multiplier — never a heart risk, never combined."""
+    monkeypatch.setattr(executor_module, "PLN_WORKER_POOL_SIZE", 2)
+    program = "!(predict-risk-patient &self Caller_W58)\n!(linage-hazard-patient &self Caller_W58)"
+    body = _request("POST", "/metta/run", json={"metta_query": program, "patient": _patient()}).json()
+    assert body["routed"] == "linage2+generic" and body["pln_status"] == "ok"
+    atoms = [x["atom"] for x in body["pln_results"]]
+    assert len(atoms) == 1 and atoms[0].startswith("(LinAgeHazard Caller_W58 AllCauseMortality")
+    (note,) = [w for w in body["warnings"] if "no AgeAccelGrim value" in w]
+    assert "ALL-CAUSE mortality multiplier" in note and "never multiplied or added" in note
+    # a hazard-only question is the all-cause question it says it is: no heart note
+    body = _request("POST", "/metta/run", json={"metta_query": "!(linage-hazard-patient &self Caller_W58)",
+                                                "patient": _patient()}).json()
+    assert not [w for w in body["warnings"] if "no AgeAccelGrim value" in w]
+    # with a GrimAge value the CHD model answers, in program order, and nothing is labelled
+    clock = _patient(markers={"HbA1c": 1.6, "CRP": 0.3, "AgeAccelGrim": 1.07143})
+    body = _request("POST", "/metta/run", json={"metta_query": program, "patient": clock}).json()
+    atoms = [x["atom"] for x in body["pln_results"]]
+    assert atoms[0].startswith("(RiskPrediction Caller_W58 CoronaryHeartDisease") and atoms[1].startswith("(LinAgeHazard")
+    assert not [w for w in body["warnings"] if "no AgeAccelGrim value" in w]

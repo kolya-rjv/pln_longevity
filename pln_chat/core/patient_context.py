@@ -125,14 +125,38 @@ _PERSONALISED_FORM_RE = re.compile(
     r")\s+&self\s+([A-Za-z][A-Za-z0-9_]*)")
 
 
-def patient_form_warnings(metta_query: str, patient: Optional[BuiltPatient]) -> list[str]:
-    """Say why a personalised form is about to come back empty or unpersonalised, before it
-    does — the same note on /query, /metta/run and the chat (the chat never shows the
-    builder's own notes, and an empty `()` reads as "no cause", which it is not).
+#: The forms that read AgeAccelGrim and nothing else of the patient's clocks.
+_GRIM_RISK_RE = re.compile(
+    r"\(\s*(predict-risk-patient|risk-decomposition-patient|project-risk-patient)\s+&self\s+"
+    r"([A-Za-z][A-Za-z0-9_]*)")
+_LINAGE_HAZARD_RE = re.compile(r"\(\s*linage-hazard-patient\s+&self\s+([A-Za-z][A-Za-z0-9_]*)")
 
-    Fires only for a form NAMING this patient while none of the patient's values is
-    elevated and has a curated edge (BuiltPatient.witnesses)."""
-    if patient is None or patient.witnesses:
+
+def _no_grimage_risk_warnings(metta_query: str, patient: BuiltPatient) -> list[str]:
+    """A heart-risk form for a patient with no GrimAge value. The CHD model reads AgeAccelGrim
+    alone, so it returns nothing; if the same program also asks for the LinAge2 hazard (the
+    pair the translator is told to emit for "my heart risk"), say that number is ALL-CAUSE
+    mortality and is never a heart risk, and never combined with a GrimAge result."""
+    if patient.has_grimage:
+        return []
+    forms = sorted({f for f, who in _GRIM_RISK_RE.findall(metta_query or "") if who == patient.patient_id})
+    if not forms:
+        return []
+    note = (f"{patient.patient_id} has no AgeAccelGrim value, and the 10-year heart-disease (CHD) risk "
+            f"model reads that clock alone, so there is no heart-specific risk for them: "
+            f"{', '.join(forms)} returns nothing.")
+    if patient.patient_id in _LINAGE_HAZARD_RE.findall(metta_query):
+        note += (" The LinAge2 hazard beside it is the ALL-CAUSE mortality multiplier for their "
+                 "biological-age delta (outcome AllCauseMortality), not a heart risk, and it is never "
+                 "multiplied or added to a GrimAge result. A GrimAge acceleration value is the only "
+                 "way to get a heart risk.")
+    return [note]
+
+
+def _no_witness_warnings(metta_query: str, patient: BuiltPatient) -> list[str]:
+    """A diagnosis / supplement / ranking form for a patient none of whose values is elevated
+    and has a curated edge: () / empty tiers / the population ranking, which reads as "no cause"."""
+    if patient.witnesses:
         return []
     results = []
     for form, who in _PERSONALISED_FORM_RE.findall(metta_query or ""):
@@ -146,6 +170,19 @@ def patient_form_warnings(metta_query: str, patient: Optional[BuiltPatient]) -> 
         f"fasting; a typed diagnosis, a low value and any other lab count for none of them): "
         f"{'; '.join(results)}. Read that as 'nothing to work from', not 'no cause' or 'no benefit'."
     ]
+
+
+def patient_form_warnings(metta_query: str, patient: Optional[BuiltPatient]) -> list[str]:
+    """Say why a personalised form is about to come back empty or unpersonalised, before it
+    does — the same note on /query, /metta/run and the chat (the chat never shows the
+    builder's own notes, and an empty `()` reads as "no cause", which it is not).
+
+    Two cases, each for a form NAMING this patient: a heart-risk form for a patient with no
+    GrimAge value; and a diagnosis / supplement / ranking form for a patient none of whose
+    values is elevated and has a curated edge (BuiltPatient.witnesses)."""
+    if patient is None:
+        return []
+    return _no_grimage_risk_warnings(metta_query, patient) + _no_witness_warnings(metta_query, patient)
 
 
 def linage2_prompt_hint(patient: BuiltPatient) -> str:
@@ -169,6 +206,24 @@ def linage2_prompt_hint(patient: BuiltPatient) -> str:
     )
 
 
+def no_grimage_prompt_hint(patient: BuiltPatient) -> str:
+    """For a patient with no GrimAge value, what "my heart risk" maps to. The static prompt
+    cannot say it: whether the patient has AgeAccelGrim is a fact about this request."""
+    if patient.has_grimage:
+        return ""
+    pid = patient.patient_id
+    if not patient.has_linage2:
+        return (f"This patient has NO AgeAccelGrim value, so there is no heart-specific (10-year "
+                f"CHD) risk model for them: a heart-risk question is (predict-risk-patient &self "
+                f"{pid}), which returns nothing, and the answer says why.\n")
+    return (f"This patient has NO AgeAccelGrim value, so there is no heart-specific (10-year CHD) "
+            f"risk model for them. For a question about their heart / cardiovascular / CHD risk "
+            f"emit these two forms, each on its own line, and say in `explanation` that the second "
+            f"is the ALL-CAUSE LinAge2 mortality hazard, not a heart risk; never multiply or add "
+            f"the two clocks:\n  (predict-risk-patient &self {pid})\n"
+            f"  (linage-hazard-patient &self {pid})\n")
+
+
 def patient_prompt_section(patient: BuiltPatient) -> str:
     """Appended AFTER the static system prompt (so the static prefix stays cacheable).
 
@@ -186,5 +241,6 @@ def patient_prompt_section(patient: BuiltPatient) -> str:
         f"What causes or drives this patient's abnormal LABS (not their biological age) "
         f"is (diagnose-patient &self {patient.patient_id}) over the knowledge base's "
         f"default candidate causes — never a hand-typed hallmark list (rule 17).\n"
+        + no_grimage_prompt_hint(patient)
         + (linage2_prompt_hint(patient) if patient.has_linage2 else "")
     )

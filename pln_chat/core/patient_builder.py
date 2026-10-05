@@ -301,9 +301,14 @@ class BuiltPatient:
     shared_atoms: str = ""
 
     @property
+    def has_grimage(self) -> bool:
+        """A GrimAge acceleration value was given — the one input the 10-year CHD risk model
+        reads. Without it there is no heart-specific risk for this patient."""
+        return any(m.name == "AgeAccelGrim" for m in self.markers)
+
+    @property
     def can_predict_risk(self) -> bool:
-        has_clock = any(m.name == "AgeAccelGrim" for m in self.markers)
-        return has_clock and self.age is not None and self.sex is not None
+        return self.has_grimage and self.age is not None and self.sex is not None
 
     @property
     def has_linage2(self) -> bool:

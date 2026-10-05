@@ -480,3 +480,38 @@ def test_query_and_metta_run_attach_the_same_form_warning(monkeypatch):
     witnessed = {"id": "N", "age": 58, "sex": "Male", "markers": {"HbA1c": 1.8}}
     body = _request("POST", "/query", json={"message": "q", "patient": witnessed}).json()
     assert not [w for w in body["warnings"] if "has no elevated value" in w]
+
+
+# ═══════════════ "what's my heart risk?" without a GrimAge value ═════════════════
+#
+# The 10-year CHD model reads AgeAccelGrim and nothing else, so a patient with a LinAge2 result
+# and no GrimAge value gets (predict-risk-patient …) = nothing — and in a mixed program the CHD
+# part silently dropped out, leaving only the all-cause LinAge2 hazard under a heart question.
+# The note says there is no heart-specific risk, labels the hazard as all-cause mortality, and
+# the two clocks are never combined (docs/risk_prediction.md §3).
+
+NO_GRIM = {"age": 58, "sex": "Male", "markers": {"HbA1c": 1.8}}
+WITH_GRIM = {"age": 58, "sex": "Male", "markers": {"HbA1c": 1.8, "AgeAccelGrim": {"value": 4.5, "unit": "years"}}}
+
+
+def test_a_heart_risk_form_for_a_patient_with_no_grimage_says_there_is_no_heart_risk():
+    from core.patient_context import patient_form_warnings
+    built = build_patient(NO_GRIM)
+    pid = built.patient_id
+    assert not built.has_grimage and not built.can_predict_risk
+    (alone,) = patient_form_warnings(f"(predict-risk-patient &self {pid})", built)
+    assert "no AgeAccelGrim value" in alone and "predict-risk-patient returns nothing" in alone
+    assert "ALL-CAUSE" not in alone                       # no hazard in the program: nothing to label
+    (pair,) = patient_form_warnings(f"(predict-risk-patient &self {pid})\n(linage-hazard-patient &self {pid})", built)
+    assert "ALL-CAUSE mortality multiplier" in pair and "not a heart risk" in pair
+    assert "never multiplied or added to a GrimAge result" in pair
+    for form in ("risk-decomposition-patient", "project-risk-patient"):
+        assert patient_form_warnings(f"({form} &self {pid} Metformin)", built)
+    # the battery's C2 shapes must stay silent: a patient WITH a GrimAge value asking for the CHD
+    # risk, a hazard-only question, another patient, a form that is not a heart-risk form
+    with_clock = build_patient(WITH_GRIM)
+    assert with_clock.has_grimage and with_clock.can_predict_risk
+    assert patient_form_warnings(f"(predict-risk-patient &self {with_clock.patient_id})", with_clock) == []
+    assert patient_form_warnings(f"(linage-hazard-patient &self {pid})", built) == []
+    assert patient_form_warnings("(predict-risk-patient &self Patient001)", built) == []
+    assert patient_form_warnings(f"(decompose-grimage &self {pid})", built) == []

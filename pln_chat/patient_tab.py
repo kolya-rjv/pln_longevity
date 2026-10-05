@@ -305,7 +305,8 @@ _TAB_WORDING = (
 
 _NO_GRIM_TAB = ("No GrimAge acceleration given: the 10-year heart-disease risk model reads that "
                 "clock and returns nothing for you (add a line such as 'GrimAge acceleration "
-                "+3 years' if you have one).")
+                "+3 years' if you have one). Ask about your heart risk anyway and you get the "
+                "LinAge2 hazard, labelled all-cause mortality — it is not a heart risk.")
 
 
 def _in_tab_words(note: str) -> str:
