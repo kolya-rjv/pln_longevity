@@ -1005,13 +1005,19 @@ under `excluded_from_runtime`. It's still queryable in stub mode (no
 There is a second, sharper limit on the same space, and it is not about file
 size — nor, as this document said until the 2026-09-28 re-test, about how many
 expressions or rows the KB holds. **It is the number of DISTINCT HEAD SYMBOLS
-in the space.** Measured against the shipped KB and asserted by
-`tests/test_kb_head_symbol_budget.py`:
+in the space** — distinct predicates. Measured on this build with
+`predict-risk-patient` for Patient001:
 
-| Added to the runtime space | Result |
+| Added to the space the query runs in | Result |
 | --- | --- |
-| 400 atoms under ONE new head symbol | loads and queries fine |
-| 4 atoms under FOUR new head symbols | non-unwinding panic, process dies |
+| patient stack + 400 atoms under ONE new head symbol | answers |
+| patient stack + 86 new head symbols | answers |
+| patient stack + 87 new head symbols | non-unwinding panic, process dies |
+| full shared stack + 1 new head symbol | non-unwinding panic, process dies |
+
+`tests/test_kb_head_symbol_budget.py` asserts the mechanism in the stack the app
+actually runs each query in: 400 atoms under one new head symbol answer, 256 new
+head symbols abort.
 
 The panic is in `hyperon-space/src/index/trie.rs` and no `except` can catch it.
 In the API it surfaces as a 500 and a replaced worker (`core/executor.py`
@@ -1021,16 +1027,24 @@ Python error: Aborted" and no failing test to point at.
 **Why this matters more than the atom count.** Trimming rows buys nothing:
 reshaping the human-evidence records to one atom per study rather than one per
 field helped because it removed *predicates*, not because it removed
-expressions. And the margin is small — on the order of a handful of new head
-symbols — so the realistic way to cross it is not curation but a **generated
-ETL file left in the repository root**, which `_runtime_kb_paths()` auto-loads
-and which introduces a head symbol per field predicate. That takes every
+expressions. The full shared stack has no margin left for the patient forms,
+which is why a program that names a patient runs in the patient stack (see
+"Where a patient question runs" above), a program made only of human-evidence
+forms in its own four files, and the LinAge2 forms in theirs
+(`core.pln_runner`). A program that mixes a human-evidence form with other
+layers' forms still runs in the full stack and can abort there.
+
+**Why a generated file in the root no longer crashes it.** Execution loads only
+the curated stack (`_INFERENCE_STACK`), never every `.metta` in the root. The
+deployment the 2026-09-28 re-test ran against loaded the whole root, so a
+generated ETL file left there — a head symbol per field predicate — took every
 inference query to a 500 at once, while the endpoints that do not go through
 the shared space (`/drugage/*`, `/genes*`, `/evidence/human`, `/hallmarks`)
-keep working — which is exactly the shape the 2026-09-28 re-test observed.
-`scripts/run_etl.sh` now refuses to write to the repo root, and
-`tests/test_kb_head_symbol_budget.py` fails if an untracked `.metta` appears
-there.
+kept working. `scripts/run_etl.sh` still refuses to write to the repo root, for
+this build's own reasons: the NHANES reference ETL's output would overwrite the
+committed rules in `nhanes_reference.metta`, and the code reads generated
+records from `./build`. `tests/test_kb_head_symbol_budget.py` checks the
+refusal.
 
 `tests/test_human_evidence.py` also carries the query that died, re-run in a
 **subprocess**, so the next regression is a red test rather than a dead process.

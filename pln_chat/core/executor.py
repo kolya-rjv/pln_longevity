@@ -29,12 +29,16 @@ Three things follow, and all three need a separate PROCESS:
 3. **Crash containment.** hyperon 0.2.10 aborts the whole interpreter with a
    NON-UNWINDING Rust panic ("called `Option::unwrap()` on a `None` value" in
    hyperon-space's trie) once a space holds too many DISTINCT HEAD SYMBOLS.
-   Measured, and asserted by `tests/test_kb_head_symbol_budget.py`: 400 atoms
-   under ONE new head symbol load and query fine, while 4 atoms under 4 NEW head
-   symbols abort. Atom count is not the axis; the number of distinct predicates
-   is. `except Exception` cannot catch that — in-process it kills the uvicorn
-   worker. In a child process it surfaces as `BrokenProcessPool`, which is an
-   ordinary exception the API can answer with a 500.
+   Atom count is not the axis; the number of distinct predicates is. Measured
+   with `predict-risk-patient`: the patient stack answers with 400 atoms under
+   ONE new head symbol, and with 86 new head symbols, but aborts at 87; the full
+   shared stack has no margin left for the patient forms at all, which is why
+   `core.pln_runner` runs them, human-evidence-only programs and the LinAge2
+   layers in smaller scoped stacks (`tests/test_kb_head_symbol_budget.py`
+   asserts the mechanism). `except Exception` cannot catch the abort —
+   in-process it kills the uvicorn worker. In a child process it surfaces as
+   `BrokenProcessPool`, which is an ordinary exception the API can answer with
+   a 500.
 
 Inline mode
 -----------
@@ -80,12 +84,17 @@ class PLNWorkerCrashed(Exception):
         super().__init__(
             "The PLN worker process terminated while running this query. hyperon "
             "0.2.10 aborts the interpreter (a non-unwinding Rust panic) once the "
-            "loaded space holds too many DISTINCT HEAD SYMBOLS -- NOT too many "
-            "rows: 400 atoms under one new head symbol are fine, 4 atoms under 4 "
-            "new head symbols are not. The usual cause is a generated ETL file "
-            "left in the repository root, which the runtime auto-loads; check "
-            "GET /ontology/files against what the build should contain. The "
-            "worker has been replaced and the service is still up. "
+            "loaded space holds too many DISTINCT HEAD SYMBOLS -- distinct "
+            "predicates, NOT rows. The full shared stack has no margin left for "
+            "the patient forms, so a question that names a patient, a "
+            "human-evidence-only program and the LinAge2 forms each run in a "
+            "smaller scoped stack; a program that mixes a human-evidence form "
+            "with other layers' forms still runs in the shared stack and can "
+            "abort there, so ask those separately. If every inference query "
+            "fails, a KB change has added predicates to a stack: "
+            "tests/test_kb_head_symbol_budget.py and tests/test_patient_stack.py "
+            "measure the margin. The worker has been replaced and the service is "
+            "still up. "
             + detail
         )
 

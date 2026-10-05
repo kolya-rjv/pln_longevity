@@ -2,31 +2,30 @@
 #
 # Meta-ETL: unpack the raw HAGR data archives and regenerate every MeTTa KB
 # file from them. Runs the per-dataset ETL scripts (DrugAge, GenAge human,
-# GenAge models, CellAge) against the zips committed under data/.
+# GenAge models, CellAge) against the zips committed under data/, and the NHANES
+# ETLs when their microdata is present (it is not redistributed with the repo).
 #
-# Outputs are written to OUT_DIR (default: ./build), and MUST NOT be written to
-# the repo root. The app auto-discovers every *.metta at the root and loads it
-# into one hyperon space, and hyperon 0.2.10 aborts the interpreter (a
-# non-unwinding Rust panic, uncatchable) once that space holds too many DISTINCT
-# HEAD SYMBOLS. Measured on the shipped KB: 400 atoms under ONE new head symbol
-# are fine, while 4 atoms under 4 NEW head symbols abort it. Every generated
-# file here introduces a head symbol per field predicate, so dropping one into
-# the root takes every inference query to HTTP 500 — a whole-space failure that
-# the per-file byte cap (PLN_MAX_KB_FILE_BYTES) does not bound.
+# Outputs are written to OUT_DIR (default: ./build, gitignored), and MUST NOT be
+# written to the repo root, which this script refuses:
 #
-# Staging in ./build (gitignored) keeps generated data off the auto-load path.
-# It stays queryable: ./build is what the DrugAge selector reads.
+#   - the root holds the committed, curated layers, and the NHANES reference
+#     ETL's output has the same name as one of them: OUT_DIR=. would overwrite
+#     the rules in nhanes_reference.metta with generated records;
+#   - the code reads generated records from ./build (the DrugAge and CellAge
+#     selectors, and the LinAge2 baseline in core.pln_runner), so in the root
+#     they would sit where nothing that needs them looks.
+#
+# A stray file in the root no longer reaches inference: execution loads only the
+# curated stack named in api._INFERENCE_STACK, plus the query-scoped stacks in
+# core.pln_runner. When execution loaded every root .metta into one space, a
+# generated file there was what the 2026-09-28 re-test crashed on: hyperon 0.2.10
+# aborts (a non-unwinding panic, uncatchable) once a space holds too many DISTINCT
+# HEAD SYMBOLS, and a generated file adds one per field predicate -- the NHANES
+# files 12-21 each. See core/executor.py and tests/test_kb_head_symbol_budget.py.
 #
 #   scripts/run_etl.sh                 # regenerate into ./build
 #   OUT_DIR=/tmp/kb scripts/run_etl.sh # anywhere OUTSIDE the repo root
 #   PYTHON=python3.11 scripts/run_etl.sh
-#
-# DO NOT set OUT_DIR=. to write into the repo root. hyperon 0.2.10 aborts the process
-# (SIGABRT, uncatchable) on a match query once one space carries too many DISTINCT HEAD
-# SYMBOLS, and the generated NHANES files introduce 12-21 each. The NHANES layers are run
-# in their own query-scoped space for exactly this reason (core.pln_runner
-# .NHANES_PATIENT_STACK, and docs/nhanes_integration.md section 8); dropping generated
-# records into the repo root puts them somewhere that scoping cannot protect.
 #
 set -euo pipefail
 
@@ -38,12 +37,11 @@ cd "$ROOT"
 OUT_DIR="${OUT_DIR:-$ROOT/build}"
 PYTHON="${PYTHON:-python3}"
 
-# Refuse the repo root outright. This was a documented invocation until it was
-# found to be the one that takes the running app down (see the header).
+# Refuse the repo root outright, before anything is written (see the header).
 if [ "$(cd "$OUT_DIR" 2>/dev/null && pwd || echo "$OUT_DIR")" = "$ROOT" ]; then
-  echo "run_etl.sh: OUT_DIR must not be the repo root -- the app auto-loads" >&2
-  echo "  every *.metta there into one hyperon space, and a generated file's" >&2
-  echo "  new head symbols abort the interpreter on the next inference query." >&2
+  echo "run_etl.sh: OUT_DIR must not be the repo root -- it holds the curated" >&2
+  echo "  layers (nhanes_reference.metta would be overwritten with generated" >&2
+  echo "  records), and the code reads generated output from ./build." >&2
   echo "  Use the default ./build, or any path outside the repo root." >&2
   exit 2
 fi
@@ -97,11 +95,11 @@ log "CellAge → cellage_genes.metta / cellage_expression.metta / cellage_metada
 # docs/nhanes_integration.md and data/nhanes/README.md for how to obtain them —
 # the download needs network access to wwwn.cdc.gov and ftp.cdc.gov.
 #
-# Unlike the HAGR outputs above, staging these under $OUT_DIR is not merely
-# tidiness: pln_chat drops a root-level .metta file over PLN_MAX_KB_FILE_BYTES
-# from execution with only a print(), so an oversized KB file at the root fails
-# silently rather than loudly. The ETLs refuse to write one, but build/ keeps
-# them out of the app's auto-load path regardless.
+# Where these land matters more than for the HAGR outputs above: the reference
+# ETL's output has the name of the committed rules file in the root (see the
+# header), and the LinAge2 projections read the mortality baseline from build/
+# only (core.pln_runner.LINAGE2_GENERATED_BASELINE). The ETLs also refuse to
+# write a file over PLN_MAX_KB_FILE_BYTES, which pln_chat would drop silently.
 NHANES_DIR="${NHANES_DIR:-$ROOT/data/nhanes}"
 # NHANES_CYCLES has NO default, deliberately. It selects the survey weight and is written
 # into the emitted provenance, so an unstated cycle would become an unverifiable claim
