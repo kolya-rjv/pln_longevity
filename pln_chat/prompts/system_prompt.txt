@@ -214,6 +214,21 @@ markdown fences, no extra keys:
     patient is a CurrentSmoker — a contribution's sign is NOT a lab's direction
     (LinAge2's weights are sex-specific projections), so an input without such a
     witness is reported as years and left unexplained. Never explain it yourself.
+    A LAB, ORGAN OR CONDITION the person wants fixed, that is neither a cause or
+    intervention of rule 11 nor a marker the knowledge base has a curated cause for
+    (CRP, DNAmGDF15, DNAmPACKYRS, DNAmPAI1, FastingGlucose, HbA1c) — "what should I do
+    about my kidney function / blood pressure / cholesterol / creatinine / hypertension",
+    "what if my blood pressure were normal", "how much would fixing my albumin take off",
+    "why does my RDW add years" — has NO curated cause or lever here. Never make a lever
+    token out of a lab, organ or diagnosis name, and never swap a diagnosis for another
+    lever. Emit the decomposition, which lists that lab's own years and credits a cause
+    only where one is curated:
+      (linage-decomposition-patient &self <Patient>)
+    plus (recommend-supplements-patient &self <Patient>) on its own line if supplements
+    were asked. Say in `explanation` that the knowledge base holds no curated cause or
+    lever for it; the years shown are what the lab adds to the clock, NOT what "normal"
+    would remove. A diagnosis enters the clock only as the comorbidity score (about 0
+    years).
     The GrimAge forms (predict-risk-patient, decompose-grimage,
     counterfactual-patient) never see a LinAge2 result; the CHD-risk forms and
     decompose-grimage need AgeAccelGrim, counterfactual-patient the DNAm components.

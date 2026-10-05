@@ -214,6 +214,9 @@ def linage2_prompt_hint(patient: BuiltPatient) -> str:
         f"  (linage-counterfactual-patient &self {patient.patient_id} <Lever>)\n"
         f"  (linage-project-risk-patient &self {patient.patient_id} <Lever>)\n"
         f"  (linage-scenarios-patient &self {patient.patient_id})\n"
+        "A lab, organ or condition with no lever and no curated cause (kidney function, blood "
+        "pressure, cholesterol, creatinine, albumin, RDW) is the decomposition plus an "
+        "`explanation` saying so — never a lever token made from its name (rule 16).\n"
         "They run in their own space; a query may combine them with forms of other "
         "layers, each as its own top-level expression on its own line (never nested "
         "inside another form) — each part runs where it can and the answers come back "
@@ -237,7 +240,10 @@ def no_grimage_prompt_hint(patient: BuiltPatient) -> str:
             f"emit these two forms, each on its own line, and say in `explanation` that the second "
             f"is the ALL-CAUSE LinAge2 mortality hazard, not a heart risk; never multiply or add "
             f"the two clocks:\n  (predict-risk-patient &self {pid})\n"
-            f"  (linage-hazard-patient &self {pid})\n")
+            f"  (linage-hazard-patient &self {pid})\n"
+            f"A what-if about a lever (\"if my inflammation were normal\", \"if I quit smoking\") is the LinAge2 form "
+            f"(linage-counterfactual-patient &self {pid} <Lever>): counterfactual-patient needs a GrimAge "
+            f"value and returns nothing for this patient.\n")
 
 
 def prevalent_chd_prompt_hint(patient: BuiltPatient) -> str:

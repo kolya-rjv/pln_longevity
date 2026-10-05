@@ -685,3 +685,37 @@ def test_the_tab_lays_out_with_the_gated_buttons_wired():
                 patient_tab.build_tab(state, banner, box, tabs, "query")
             with gr.Tab("Query", id="query"):
                 pass
+
+
+# ═══════════ a lab or condition with no curated relation (#10) ═══════════════
+
+def test_rule_16_names_exactly_the_markers_the_knowledge_base_has_a_cause_for():
+    """The rule tells the translator which markers HAVE a curated cause; every other lab or condition gets the
+    decomposition plus a plain 'no lever'. The list is read from the KB, so a bridge added to
+    mechanistic_bridges.metta fails here until the rule says so."""
+    import re
+    from core.patient_builder import kb_effect_markers
+    rule = (PLN_CHAT / "prompts" / "system_prompt.txt").read_text(encoding="utf-8")
+    m = re.search(r"nor a marker the knowledge base has a curated cause for\s*\(([^)]*)\)", rule)
+    assert m, "rule 16 lost its list of markers with a curated cause"
+    assert set(re.findall(r"[A-Za-z0-9]+", m.group(1))) == set(kb_effect_markers())
+
+
+def test_the_translator_is_told_what_to_emit_for_a_lab_with_no_lever(monkeypatch):
+    state = _build(SMOKER)["state"]
+    _, seen, _ = _chat_with(monkeypatch, "(linage-decomposition-patient &self Caller_Me)", state)
+    prompt = seen["prompt"]
+    assert "has NO curated cause or lever here" in prompt
+    assert "Never make a lever\n    token out of a lab, organ or diagnosis name" in prompt
+    assert "NOT what \"normal\"\n    would remove" in prompt                    # never a counterfactual to normal
+    assert "never a lever token made from its name (rule 16)" in prompt          # the per-patient hint
+    assert "A what-if about a lever" in prompt                                    # no GrimAge: the LinAge2 form
+
+
+def test_the_kidney_few_shot_is_the_decomposition_and_invents_no_lever():
+    import json
+    few = json.loads((PLN_CHAT / "prompts" / "few_shot_examples.json").read_text(encoding="utf-8"))
+    (ex,) = [e for e in few if e["nl"] == "What should I do about my kidney function?"]
+    assert ex["metta_query"] == "(linage-decomposition-patient &self Caller_W58)"
+    assert "no curated cause or lever" in ex["explanation"] and ex["warnings"]
+    assert "counterfactual" not in ex["metta_query"]

@@ -433,6 +433,17 @@
     "warnings": []
   },
   {
+    "nl": "What should I do about my kidney function?",
+    "metta_query": "(linage-decomposition-patient &self Caller_W58)",
+    "explanation": "The knowledge base holds no curated cause or lever for kidney function (creatinine, BUN): no counterfactual lever exists for it, so none is invented. The LinAge2 decomposition shows what each kidney-related lab adds to the clock, in years, and credits a cause only where one is curated — these years are what the lab adds, not what normal kidney function would remove.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "No curated cause or lever for kidney function in the knowledge base; the decomposition reports the lab's years only."
+    ]
+  },
+  {
     "nl": "What is the likely driver of my abnormal labs?",
     "metta_query": "(diagnose-patient &self Caller_W58)",
     "explanation": "The causes of abnormal LABS are the abductive diagnosis, not the LinAge2 drivers of biological age: it runs the causal graph backward from the caller's elevated markers over the default candidate causes and returns (Hypothesis <cause> (stv s c) <coverage> <mass> (SupportedBy <markers>)) most-explanatory first. () means no elevated marker has a curated cause here.",

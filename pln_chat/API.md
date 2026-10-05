@@ -158,7 +158,7 @@ checkout, `drugage_etl_short.metta` is ~26,900 estimated tokens verbatim and
 ~340 as a card), and anything still too large is refused with **413
 `prompt_too_large`** before a call is billed.
 
-The default selection measures **301,903 characters, about 75,475 estimated
+The default selection measures **303,795 characters, about 75,948 estimated
 tokens** (26 files; `tests/test_prompt_size.py` pins that figure against the
 real `build_system_prompt`, so this sentence cannot drift from the code again).
 It came down from 301,035 (to 297,671) when execution was scoped to the curated stack:

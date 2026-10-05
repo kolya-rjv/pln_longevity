@@ -268,6 +268,20 @@ of 0. Send the patient's own `CRP` / `HbA1c` / `FastingGlucose` (z or value) and
 3. **Four of 59 inputs can be explained.** Albumin, RDW, blood pressure, NT-proBNP and the
    rest are carried as years. Bridges for them are curation work of the
    `mechanistic_bridges.metta` kind, and each new head symbol spends budget.
+   Asking what to DO about one of them ("what should I do about my kidney function", "what if my blood
+   pressure were normal", "how much would fixing my albumin take off", "why does my RDW add years") used
+   to give an empty clarification, an invented lever token (`BloodPressure`, `SerumAlbumin`) or, for a
+   diagnosis, another lever. Rule 16 now maps it to `(linage-decomposition-patient …)` (plus
+   `(recommend-supplements-patient …)` when supplements were asked) and tells the translator to say in
+   `explanation` that the knowledge base holds no curated cause or lever for it, and that the years shown are
+   what the lab adds to the clock, never what "normal" would remove. The rule lists the markers the KB does
+   have a curated cause for; `test_rule_16_names_exactly_the_markers_the_knowledge_base_has_a_cause_for`
+   reads that list from `mechanistic_bridges.metta`, so a new bridge fails it until the rule is updated.
+   Checked against the live translator (13 questions before and after, plus 3 repeats of the one control that
+   changed): the 8 no-relation questions map as above, and the controls (scenarios, quitting smoking,
+   decomposition, drivers + plan, diagnosis, the HbA1c / insulin-resistance / metformin levers) do not change.
+   "What if my inflammation were normal?" used to go to the GrimAge `counterfactual-patient` for a patient
+   with no GrimAge value; the per-patient hint now sends it to the LinAge2 form.
 4. **No cause-specific risk.** The paper reports none per year; `CoronaryHeartDisease`
    through LinAge2 yields nothing rather than borrowing the all-cause hazard.
    "What's my heart risk?" for a patient with a LinAge2 result and **no GrimAge value** (the tab's
