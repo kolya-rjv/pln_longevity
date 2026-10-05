@@ -988,3 +988,55 @@ def test_the_marker_catalogue_publishes_what_it_accepts():
     assert catalogue["CRP"]["raw_unit"] == "mg/L"
     assert "mmol/mol" in catalogue["HbA1c"]["accepted_units"]
     assert "years" in catalogue["AgeAccelGrim"]["accepted_units"]
+
+
+# ── The same rule for the markers only this branch has ───────────────────────
+# Triglycerides and LinAgeAccel arrived after the re-test, so the units fix above
+# did not cover them: a fasting triglyceride sent in mmol/L was read as mg/dL,
+# and a LinAge2 delta was read as years whatever unit came with it.
+
+def test_triglycerides_take_mmol_per_litre_with_the_factor_the_text_reader_uses():
+    """2.3 mmol/L is about 204 mg/dL: elevated, not the z -9.3 "Low" of 2.3 mg/dL.
+
+    That misreading sat inside the +/-12 that flags a unit mistake, so nothing caught
+    it. The factor is the one core.patient_text reads a typed value with, so the
+    form and the API give one z for one measurement.
+    """
+    from core.patient_text import LABS
+
+    mg_dl_to_mmol_l = next(spec for spec in LABS if spec.code == "LBDSTRSI").units["mg/dl"][0]
+    molar = build_patient({
+        "age": 45, "sex": "Female",
+        "markers": {"Triglycerides": {"value": 2.3, "unit": "mmol/L"}},
+    }).markers[0]
+    as_mgdl = build_patient({
+        "age": 45, "sex": "Female",
+        "markers": {"Triglycerides": {"value": 2.3 / mg_dl_to_mmol_l, "unit": "mg/dL"}},
+    }).markers[0]
+    assert molar.z == pytest.approx(as_mgdl.z)
+    assert molar.status == "Elevated"
+    assert "mmol/L" in molar.formula and "mg/dL" in molar.formula
+    assert molar.raw_value == 2.3 and molar.unit == "mmol/L"
+
+
+def test_a_linage2_delta_is_read_as_years_and_any_other_unit_is_refused():
+    """The same check as the GrimAge and Horvath accelerations, on the LinAge2 spread."""
+    with pytest.raises(PatientSpecError) as excinfo:
+        build_patient({"age": 58, "sex": "Male",
+                       "markers": {"LinAgeAccel": {"value": 3, "unit": "mg/dL"}}})
+    assert excinfo.value.code == "unsupported_unit"
+    assert "years" in excinfo.value.extra["accepted_units"]
+
+    for payload in ({"value": 3, "unit": "years"}, {"value": 3, "unit": "Y"}, {"value": 3}):
+        built = build_patient({"age": 58, "sex": "Male", "markers": {"LinAgeAccel": payload}})
+        delta = next(m for m in built.markers if m.name == "LinAgeAccel")
+        assert delta.z == pytest.approx(3 / 8.66, rel=1e-3), payload
+
+
+def test_the_catalogue_publishes_the_units_of_this_branchs_markers():
+    from core.patient_builder import marker_catalog
+
+    catalogue = {entry["marker"]: entry for entry in marker_catalog()}
+    assert catalogue["Triglycerides"]["accepted_units"] == ["mg/dL", "mmol/L"]
+    assert catalogue["LinAgeAccel"]["accepts_raw_value"] is True
+    assert "years" in catalogue["LinAgeAccel"]["accepted_units"]

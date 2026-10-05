@@ -381,7 +381,10 @@ accepted. Omitting `unit` still means the reference unit. `GET
 /patients/markers` publishes `accepted_units` per marker, so a caller never
 needs a 422 to find out: CRP takes mg/L, mg/dL and µg/mL; FastingGlucose mg/dL
 and mmol/L; HbA1c % (NGSP) and mmol/mol (IFCC, via the published master
-equation); the age-acceleration markers take years. `GET /patients/markers` lists what is supported; `POST
+equation); fasting Triglycerides mg/dL and mmol/L (NHANES's factor, the one the
+My Patient tab reads with); the age-acceleration markers, the LinAge2 delta
+`LinAgeAccel` included, take years; RDW and LowSerumAlbumin take a z only.
+`GET /patients/markers` lists what is supported; `POST
 /patients/preview` shows the atoms and each marker's Elevated/Normal/Low status
 without running anything.
 

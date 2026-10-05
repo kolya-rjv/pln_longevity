@@ -248,6 +248,9 @@ MARKERS: dict[str, MarkerSpec] = {
             source="curated threshold, not a cohort: geometric mean 100 mg/dL and a log-scale sd of 0.4054 "
                    "put z = 1 at 150 mg/dL (the usual 'borderline high' limit, a laboratory convention). "
                    "Send fasting values only: the knowledge base cannot tell a fasting one.",
+            # mg/dL x 0.01129 = mmol/L: the factor NHANES's laboratory files use (LBDSTRSI) and that
+            # core.patient_text reads a typed value with, so the two routes give one z for one value.
+            conversions=(("mmol/L", 1 / 0.01129, 0.0),),
         ),
     ),
     "RDW": MarkerSpec(
@@ -585,6 +588,25 @@ def _as_number(
     return number
 
 
+def _require_years(name: str, unit: Optional[str]) -> None:
+    """Refuse a unit that is not a spelling of years for an age-acceleration marker.
+
+    Its raw value is read as years whatever the caller says, so `{value: 6, unit:
+    "months"}` would otherwise be read as six years. No unit still means years.
+    """
+    if unit is not None and str(unit).strip() and (
+        _normalise_unit(unit) not in YEARS_UNITS
+    ):
+        raise PatientSpecError(
+            "unsupported_unit",
+            f"Marker '{name}' is an age ACCELERATION: a raw value is "
+            f"read as years, and '{unit}' is not a spelling of years. "
+            f"Send `z` instead if you already have standard deviations.",
+            marker=name,
+            accepted_units=sorted(YEARS_UNITS),
+        )
+
+
 def _resolve_marker(
     name: str,
     payload: dict,
@@ -623,26 +645,18 @@ def _resolve_marker(
                 value, code="invalid_marker_value",
                 what=f"Marker '{name}' value", marker=name,
             )
-            if unit is not None and str(unit).strip() and (
-                _normalise_unit(unit) not in YEARS_UNITS
-            ):
-                raise PatientSpecError(
-                    "unsupported_unit",
-                    f"Marker '{name}' is an age ACCELERATION: a raw value is "
-                    f"read as years, and '{unit}' is not a spelling of years. "
-                    f"Send `z` instead if you already have standard deviations.",
-                    marker=name,
-                    accepted_units=sorted(YEARS_UNITS),
-                )
+            _require_years(name, unit)
             z = numeric / sd_to_years
             derived = True
             unit = unit or "years"
             formula = f"z = years / {sd_to_years:g}   [grimaccel-sd-to-years]"
         elif name in LINAGE_YEARS_MARKERS:
-            z = _as_number(
+            numeric = _as_number(
                 value, code="invalid_marker_value",
                 what=f"Marker '{name}' value", marker=name,
-            ) / linage_sd_to_years
+            )
+            _require_years(name, unit)
+            z = numeric / linage_sd_to_years
             derived = True
             unit = unit or "years"
             formula = f"z = years / {linage_sd_to_years:g}   [linage-sd-to-years]"
@@ -1044,7 +1058,8 @@ def marker_catalog() -> list[dict]:
             "marker": spec.name,
             "role": spec.role,
             "reaches": spec.reaches,
-            "accepts_raw_value": spec.accepts_raw or spec.name in YEARS_PER_SD_MARKERS,
+            "accepts_raw_value": (spec.accepts_raw or spec.name in YEARS_PER_SD_MARKERS
+                                  or spec.name in LINAGE_YEARS_MARKERS),
         }
         if spec.name in YEARS_PER_SD_MARKERS:
             entry["raw_unit"] = "years of age acceleration"
@@ -1052,6 +1067,7 @@ def marker_catalog() -> list[dict]:
             entry["conversion"] = "z = years / grimaccel-sd-to-years"
         elif spec.name in LINAGE_YEARS_MARKERS:
             entry["raw_unit"] = "years of LinAge2 BA - CA delta"
+            entry["accepted_units"] = sorted(YEARS_UNITS)
             entry["conversion"] = "z = years / linage-sd-to-years"
             entry["scoped"] = (
                 "read in the LinAge2 query-scoped space only; prefer the `linage2` "
