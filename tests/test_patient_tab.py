@@ -605,3 +605,83 @@ def test_the_download_of_a_built_patient_passes_the_validator_it_is_meant_to_be_
     registry, inventory = with_injected(api_module._runtime_registry(), api_module._runtime_inventory(), text)
     result = validate(validation_text(text, "!(supplement-for-patient &self Caller_Me Berberine)"), registry, inventory)
     assert result.valid, result.issues
+
+
+# ═══════════════ the suggested questions depend on the patient (#8) ═══════════════
+
+#: measured: for each patient, which button forms answered (scratch probe, 8 patients x 7 forms)
+SMOKER_NORMAL_LABS = ("52 year old female, current smoker\nalbumin 4.5 g/dL\nHbA1c 5.2 %\n"
+                      "CRP 0.6 mg/L\nfasting glucose 88 mg/dL\ncreatinine 0.8 mg/dL")
+FORMER_CRP_ONLY = "60 year old female, former smoker\nalbumin 4.2 g/dL\nCRP 8 mg/L\ncreatinine 0.9 mg/dL"
+HEALTHY = EXAMPLES["healthy 45-year-old woman"]
+Q1, Q2, Q3, Q4, Q5, Q6 = patient_tab.SUGGESTED_QUESTIONS
+
+
+def _offered(text: str) -> list[str]:
+    state = _build(text)["state"]
+    buttons = patient_tab.on_show_questions(state)[:-1]
+    return [b["value"] for b in buttons if b["visible"]]
+
+
+def test_a_smoker_with_an_elevated_lab_is_offered_every_question():
+    assert _offered(SMOKER) == list(patient_tab.SUGGESTED_QUESTIONS)
+    assert not patient_tab.on_show_questions(_build(SMOKER)["state"])[-1]["visible"]     # nothing to say
+
+
+def test_a_patient_with_no_witness_and_no_smoking_is_offered_only_what_answers():
+    for text in (HEALTHY, NO_WITNESS):
+        offered = _offered(text)
+        assert offered == [Q1, Q2, patient_tab.DRIVERS_ONLY_QUESTION], text
+        note = patient_tab.on_show_questions(_build(text)["state"])[-1]
+        assert note["visible"] and "quitting smoking" in note["value"]
+        assert "the diagnosis and the supplement plan" in note["value"] and "what could I do" in note["value"]
+
+
+def test_a_smoker_with_normal_labs_keeps_quitting_and_scenarios_but_loses_the_diagnosis():
+    assert _offered(SMOKER_NORMAL_LABS) == [Q1, Q2, Q3, Q4, patient_tab.DRIVERS_ONLY_QUESTION]
+    note = patient_tab.on_show_questions(_build(SMOKER_NORMAL_LABS)["state"])[-1]["value"]
+    assert "the diagnosis and the supplement plan" in note and "quitting smoking" not in note
+    assert "what could I do" not in note                      # a smoker's lever moves: the -8 y
+
+
+def test_a_non_smoker_with_a_witness_loses_only_the_quitting_question():
+    assert _offered(FORMER_CRP_ONLY) == [Q1, Q2, Q4, Q5, Q6]
+    assert _offered(EXAMPLES["six labs only"]) == [Q1, Q2, Q4, Q5, Q6]    # a former smoker
+
+
+def test_with_no_patient_only_the_always_answering_questions_are_offered():
+    out = patient_tab.on_show_questions(None)
+    assert [b["visible"] for b in out[:-1]] == [True, True, False, False, False, False]
+    assert not out[-1]["visible"]
+
+
+def test_each_gate_matches_what_the_forms_return():
+    """The gate is a claim about the knowledge base, so check it against the knowledge base: the
+    diagnosis and the plan are offered exactly when they answer."""
+    from core.patient_context import build_caller_patient
+    from core.patient_text import read_patient_text
+    import test_patient_stack as ps                                   # the subprocess runner
+    for text in (HEALTHY, SMOKER_NORMAL_LABS, FORMER_CRP_ONLY, NO_WITNESS, SMOKER):
+        payload, _ = read_patient_text(text).to_patient("Me")
+        built = build_caller_patient(payload, ())
+        shown = set(_offered(text))
+        diag = ps._run("patient", "!(diagnose-patient &self Caller_Me)", built.shared_atoms)
+        plan = ps._run("patient", "!(recommend-supplements-patient &self Caller_Me)", built.shared_atoms)
+        assert diag["rc"] == 0 and plan["rc"] == 0, text
+        diagnoses = any(a.strip() not in ("()", "") for a in diag["atoms"])
+        recommends = any("(SuppRec" in a for a in plan["atoms"])
+        assert (Q6 in shown) == diagnoses, text
+        assert (Q5 in shown) == recommends, text
+
+
+def test_the_tab_lays_out_with_the_gated_buttons_wired():
+    import gradio as gr
+    with gr.Blocks():
+        state = gr.State(None)
+        banner = gr.Markdown()
+        box = gr.Textbox()
+        with gr.Tabs() as tabs:
+            with gr.Tab("My Patient"):
+                patient_tab.build_tab(state, banner, box, tabs, "query")
+            with gr.Tab("Query", id="query"):
+                pass

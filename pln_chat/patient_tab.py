@@ -64,6 +64,57 @@ SUGGESTED_QUESTIONS = (
     "What is the likely driver of my abnormal labs?",
 )
 
+#: What in the patient makes each button's form answer rather than come back empty or at
+#: zero. Measured per patient (8 patients, every form), not guessed:
+#:   always             the LinAge2 forms (decomposition, hazard): every built patient has a result
+#:   smoker             quitting smoking is 0.0 for anyone who is not a current smoker
+#:   witness_or_smoker  "what could I do": a lever moves only for an elevated witness or a smoker
+#:   witness            the supplement plan and the diagnosis read witnesses only
+_NEEDS = ("always", "always", "smoker", "witness_or_smoker", "witness", "witness")
+
+#: The fifth button without a witness: the plan half would be empty, the drivers half still answers.
+DRIVERS_ONLY_QUESTION = "What are the main drivers of my biological age?"
+
+
+def _offered(need: str, built: BuiltPatient) -> bool:
+    smoker = built.smoking == "CurrentSmoker"
+    return {"always": True, "smoker": smoker, "witness": bool(built.witnesses),
+            "witness_or_smoker": bool(built.witnesses) or smoker}[need]
+
+
+def question_buttons(built: Optional[BuiltPatient]) -> list[tuple[str, bool]]:
+    """(label, offered) for each suggested-question slot, for this patient. A question whose
+    form would come back empty or at zero for them is not offered (`hidden_note` says so);
+    with no patient yet, only the always-answering ones are."""
+    out = []
+    for q, need in zip(SUGGESTED_QUESTIONS, _NEEDS):
+        offered = _offered(need, built) if built is not None else need == "always"
+        if q == SUGGESTED_QUESTIONS[4] and built is not None and not built.witnesses:
+            out.append((DRIVERS_ONLY_QUESTION, True))
+        else:
+            out.append((q, offered))
+    return out
+
+
+def hidden_note(built: Optional[BuiltPatient]) -> str:
+    """One line on what was left out of the buttons and why ("" when nothing was)."""
+    if built is None:
+        return ""
+    smoker = built.smoking == "CurrentSmoker"
+    parts = []
+    if not smoker:
+        parts.append("quitting smoking (you are not a current smoker)")
+    if not built.witnesses:
+        parts.append("the diagnosis and the supplement plan (none of your labs is elevated with "
+                     "a cause the knowledge base has curated)")
+        if not smoker:
+            parts.append("\"what could I do\" (nothing it can move)")
+    if not parts:
+        return ""
+    return ("_Not offered for you, because they would come back empty: " + "; ".join(parts)
+            + ". You can still type them in **PLN Query**._")
+
+
 _STATUS_ICON = {OK: "✓", ASSUMED_UNIT: "⚠ assumed"}
 
 #: How many "Use this wording" buttons the tab has room for (the rest are listed).
@@ -435,6 +486,21 @@ def on_clear():
             render_banner(None), None, gr.update(visible=False))
 
 
+def on_show_questions(state: Optional[dict]):
+    """-> (*the suggested-question buttons, the note on what is not offered), for the patient in
+    `state`. Runs after Build; the patient is rebuilt from its payload (pure Python, no MeTTa)."""
+    built = None
+    if state:
+        try:
+            built = build_caller_patient(state, ())
+        except PatientSpecError:
+            built = None
+    buttons = question_buttons(built)
+    note = hidden_note(built)
+    return (*[gr.update(value=q, visible=v) for q, v in buttons],
+            gr.update(value=note, visible=bool(note)))
+
+
 def build_tab(patient_state: gr.State, banner: gr.Markdown, question_box: gr.Textbox,
               tabs: gr.Tabs, query_tab_id: str) -> None:
     """Lay out the tab inside the caller's `gr.Tabs()` context and wire it."""
@@ -468,6 +534,7 @@ def build_tab(patient_state: gr.State, banner: gr.Markdown, question_box: gr.Tex
     with gr.Column(visible=False) as suggestions:
         with gr.Row():
             ask_btns = [gr.Button(q, size="sm") for q in SUGGESTED_QUESTIONS]
+        not_offered = gr.Markdown(visible=False)
     with gr.Accordion("This patient as MeTTa atoms (this session only)", open=False):
         atoms = gr.Code(value="", language=None, interactive=False, visible=False,
                         label="Injected into each query's space; the LinAge2 atoms only into "
@@ -483,8 +550,9 @@ def build_tab(patient_state: gr.State, banner: gr.Markdown, question_box: gr.Tex
                   outputs=text).then(on_read_model, inputs=text, outputs=[reading, read_state, *use_btns],
                                      concurrency_limit=4)
     build_btn.click(on_build, inputs=[text, patient_state, read_state],
-                    outputs=[reading, summary, atoms, download, banner, patient_state, suggestions])
+                    outputs=[reading, summary, atoms, download, banner, patient_state, suggestions]
+                    ).then(on_show_questions, inputs=patient_state, outputs=[*ask_btns, not_offered])
     clear_btn.click(on_clear, outputs=[summary, atoms, download, banner, patient_state, suggestions])
-    for btn, question in zip(ask_btns, SUGGESTED_QUESTIONS):
-        btn.click(lambda q=question: (q, gr.Tabs(selected=query_tab_id)),
+    for btn in ask_btns:              # the label is the question: it changes with the patient
+        btn.click(lambda q: (q, gr.Tabs(selected=query_tab_id)), inputs=btn,
                   outputs=[question_box, tabs])
