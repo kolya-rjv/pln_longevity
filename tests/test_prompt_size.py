@@ -169,3 +169,17 @@ def test_every_metta_example_in_api_md_behaves_as_documented():
         elif response.json()["pln_status"] != "ok":
             broken.append(f"{query}: pln_status={response.json()['pln_status']}")
     assert not broken, "API.md examples that do not work as printed: " + "; ".join(broken)
+
+
+def test_no_new_default_prompt_file_goes_over_the_per_file_limit_and_is_replaced_by_a_schema_card():
+    """A file over PLN_PROMPT_FILE_MAX_BYTES is not pasted into the prompt: the translator gets a schema card of it.
+    patient_profile.metta crossed 25,000 bytes with a 1.4 KB addition once, and the prompt silently lost 23,000
+    characters of it; only the +-2 % size check noticed. Today exactly one default-selected file is over (it was
+    before): a second one fails here, with the file named. Shorten its comments rather than raise the limit."""
+    from config import PLN_PROMPT_FILE_MAX_BYTES
+    import api as api_module
+    files = api_module._discover_metta_files()
+    selected = api_module._default_selection(list(files))
+    over = {name for name in selected if name in files and files[name].stat().st_size > PLN_PROMPT_FILE_MAX_BYTES}
+    assert over == {"pln_risk_prediction.metta"}, (
+        f"files over {PLN_PROMPT_FILE_MAX_BYTES} bytes are shown to the translator as a card, not as written: {sorted(over)}")

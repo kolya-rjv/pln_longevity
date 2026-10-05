@@ -312,9 +312,33 @@ def prevalent_chd_note(conditions: Iterable[str]) -> str:
     )
 
 
-def no_witness_note() -> str:
+#: The no-witness note for a patient who reports heart disease: the diagnosis then has that one observation.
+NO_WITNESS_CHD_PREFIX = "No elevated marker the knowledge base can use, apart from your reported heart disease:"
+
+
+def chd_observation_note(conditions: Iterable[str]) -> str:
+    """What a reported CHD does to the diagnosis (and what it does not do to anything else)."""
+    return (
+        f"Reported {', '.join(conditions)} is read by the diagnosis as one observation to explain, and by nothing "
+        f"else: the supplement plan and the intervention ranking do not see it. It is a prevalence item (the "
+        f"survey question is 'ever told you had'), not a measured value, and the causes the diagnosis offers for "
+        f"it (insulin resistance, senescence) are population-level associations, not the reason this person has "
+        f"it: smoking has no curated edge to heart disease in this knowledge base."
+    )
+
+
+def no_witness_note(chd: bool = False) -> str:
     """Said when none of a patient's values is elevated AND has a curated edge: the
-    diagnosis, the supplement plan and the intervention ranking have nothing to read."""
+    diagnosis, the supplement plan and the intervention ranking have nothing to read
+    (with a reported heart disease the diagnosis has that one observation)."""
+    if chd:
+        return (
+            f"{NO_WITNESS_CHD_PREFIX} none of the values given is elevated and has a curated cause or effect "
+            f"(the knowledge base has them for {', '.join(sorted(kb_effect_markers()))}). Every supplement tier is "
+            f"empty and the intervention ranking is the population ranking, the same as for an unknown patient; "
+            f"the diagnosis answers from the reported heart disease alone, which is a prevalence item, not a "
+            f"measurement. That is 'nothing to work from' for the plan and the ranking, not 'no cause'."
+        )
     return (
         f"{NO_WITNESS_PREFIX} none of the values given is elevated and has a curated cause or "
         f"effect (the knowledge base has them for {', '.join(sorted(kb_effect_markers()))}). For "
@@ -775,7 +799,9 @@ def build_patient(
             + (f" {STILL_WORK}" if witnesses else "")
         )
     if not witnesses:
-        warnings.append(no_witness_note())
+        warnings.append(no_witness_note(bool(prevalent_chd)))
+    if prevalent_chd:
+        warnings.append(chd_observation_note(prevalent_chd))
     if any(m.name == "Triglycerides" for m in resolved):
         warnings.append(
             "Triglycerides are read as a FASTING value (z = 1 at 150 mg/dL, a curated threshold, not a population "
@@ -878,6 +904,10 @@ def build_patient(
     # a medication goes to the SHARED space only (BuiltPatient.medications): not into `atoms`,
     # which also feeds the LinAge2 space, where a new head symbol has no room
     shared_lines.extend(f"(CurrentMedication {patient_id} {drug})" for drug in medications)
+    # a reported coronary heart disease / angina / heart attack is ONE observation for the diagnosis alone
+    # (patient_profile.metta: PatientCondition); SHARED space only, for the same reason as the medication
+    if prevalent_chd:
+        shared_lines.append(f"(PatientCondition {patient_id} CoronaryHeartDisease)")
     if built_linage2 is not None:
         lines.append(built_linage2.atoms)
 

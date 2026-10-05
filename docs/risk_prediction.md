@@ -189,9 +189,21 @@ no clock surrogate, so it honestly projects **~0** change; an edge-less lever
    (the hazard ratio is for incident CHD; NHANES's own CHD items are prevalence, usable only as an
    exclusion from the at-risk set). A person who already has coronary heart disease, angina or a
    heart attack is outside it, and the history is not an input: the number is the same with or
-   without it. The My Patient tab and `POST /patients/from-text` carry it as `prevalent_chd` (a flag,
-   not an atom) and `/query`, `/metta/run` and the chat attach a note next to the risk answer saying
+   without it. The My Patient tab and `POST /patients/from-text` carry it as `prevalent_chd` (a flag for
+   the risk model, which does not read it) and `/query`, `/metta/run` and the chat attach a note next to the risk answer saying
    so (`core.patient_context.patient_form_warnings`). A recurrence model is not in this KB.
+   The same report is also ONE observation for the abductive diagnosis (item #11 of
+   `docs/kb_quick_wins/REPORT.md`, the narrow form): the shared space gets
+   `(PatientCondition <P> CoronaryHeartDisease)` (never the LinAge2 space, never the full stack), and
+   `diagnose-patient` alone explains it, through the same Effect chains it uses for a marker (insulin resistance
+   through fasting glucose; senescence through PAI-1). The supplement plan, the single-supplement form and the
+   intervention ranking read the marker stream, which does not include it, so they are byte-identical with and
+   without it (`tests/test_patient_stack.py`). It stays a prevalence item, not a measured value: no `MeasuredZ` is
+   made for it, the notes say so, and the hypotheses are population-level associations, not the reason this person
+   has the disease (smoking has no curated edge to heart disease). The wider form in the report, where the report also
+   feeds the supplement tiers and the ranking, was not built: it reverses the policy above (items usable only as an
+   exclusion) in the two layers that recommend something. Angina and heart attack map to the same observation;
+   `DIQ010` (diabetes) is not mapped.
 
 ## 7. Non-goals
 

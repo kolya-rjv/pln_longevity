@@ -216,6 +216,9 @@ NHANES + the public-use Linked Mortality File identifies **death**, and nothing 
   exposure and outcome contemporaneous and invite reverse causation — prevalent CHD raises
   GrimAge, not only the converse. They are usable **only as an exclusion**, to remove
   prevalent cases from the at-risk set.
+  (One narrow exception, by decision: a CHD, angina or heart attack the *person reports* is ONE
+  observation for `diagnose-patient` alone, never for the supplement plan or the ranking, never a
+  `MeasuredZ`: `docs/risk_prediction.md` §6 item 7.)
 - The linkage's finest cardiac resolution on the public file is `UCOD_LEADING = "001"`,
   **"Diseases of heart" (I00-I09, I11, I13, I20-I51)**. That is fatal-only, and broader
   than CHD: it swallows hypertensive and rheumatic heart disease, cardiomyopathy,

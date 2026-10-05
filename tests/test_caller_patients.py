@@ -535,19 +535,24 @@ def test_reported_chd_qualifies_the_risk_only_where_the_risk_model_answers():
     from core.patient_context import patient_form_warnings
     built = build_patient({**WITH_GRIM, "prevalent_chd": ["heart attack", "coronary heart disease", "heart attack"]})
     assert built.prevalent_chd == ["coronary heart disease", "heart attack"]       # canonical order, once each
-    (note,) = [w for w in built.warnings if w.startswith("Reported ")]
+    (note,) = [w for w in built.warnings if "FIRST coronary event" in w]
     assert "FIRST coronary event" in note and "same number with or without that history" in note
-    # a flag, not an atom: the patient the KB sees is the same patient without it
-    assert built.shared_atoms == build_patient(WITH_GRIM).shared_atoms
-    assert built.atoms == build_patient(WITH_GRIM).atoms
+    # not an atom for the RISK model, the LinAge2 space or any marker: only one PatientCondition line, in the SHARED
+    # space, which `diagnose-patient` alone reads (item #11); everything else is the patient without it
+    base = build_patient(WITH_GRIM)
+    assert built.atoms == base.atoms
+    assert built.shared_atoms == base.shared_atoms + f"\n(PatientCondition {built.patient_id} CoronaryHeartDisease)"
     pid = built.patient_id
     assert patient_form_warnings(f"(predict-risk-patient &self {pid})", built) == [note]
     assert patient_form_warnings(f"(project-risk-patient &self {pid} Metformin)", built) == [note]
-    assert patient_form_warnings(f"(diagnose-patient &self {pid})", built) == []
+    # a diagnosis carries the OTHER note (item #11): the report is one observation it explains, not a first event
+    (observed,) = [w for w in patient_form_warnings(f"(diagnose-patient &self {pid})", built)
+                   if "read by the diagnosis as one observation" in w]
+    assert "FIRST coronary event" not in observed and "prevalence item" in observed
     assert patient_form_warnings("(predict-risk-patient &self Patient001)", built) == []
     # where the model returns nothing anyway there is nothing to qualify
     no_clock = build_patient({**NO_GRIM, "prevalent_chd": ["angina"]})
-    assert not [w for w in no_clock.warnings if w.startswith("Reported ")]
+    assert not [w for w in no_clock.warnings if "FIRST coronary event" in w]
     assert not any("first" in w.lower() and "coronary" in w for w in
                    patient_form_warnings(f"(predict-risk-patient &self {no_clock.patient_id})", no_clock))
     assert build_patient({**WITH_GRIM, "prevalent_chd": ["angina", "angina"]}).prevalent_chd == ["angina"]
@@ -717,7 +722,7 @@ def test_a_note_that_two_checks_both_make_is_in_the_response_once(monkeypatch):
     for path, body in (("/query", {"message": "my heart risk?", "patient": patient}),
                        ("/metta/run", {"metta_query": "(predict-risk-patient &self Caller_C2)", "patient": patient})):
         warnings = _request("POST", path, json=body).json()["warnings"]
-        assert len([w for w in warnings if w.startswith("Reported angina")]) == 1, (path, warnings)
+        assert len([w for w in warnings if "FIRST coronary event" in w]) == 1, (path, warnings)
         assert len(warnings) == len(set(warnings))
 
 
@@ -737,7 +742,7 @@ def test_the_form_notes_say_what_they_claim_and_only_for_the_forms_they_name():
 def test_a_grimage_value_with_no_age_or_sex_means_no_risk_model_input_and_no_first_event_note():
     built = build_patient({"markers": {"AgeAccelGrim": 1.2}, "prevalent_chd": ["angina"]})
     assert built.has_grimage and not built.can_predict_risk
-    assert not [w for w in built.warnings if w.startswith("Reported angina")]
+    assert not [w for w in built.warnings if "FIRST coronary event" in w]
     from core.patient_context import medication_prompt_hint, prevalent_chd_prompt_hint
     assert prevalent_chd_prompt_hint(built) == "" and medication_prompt_hint(built) == ""
 
@@ -791,3 +796,48 @@ def test_the_triglyceride_reference_puts_z_one_at_150_mg_dl_and_says_it_is_not_a
     assert built.witnesses == ["Triglycerides"]
     assert any("FASTING value" in w and "cannot tell" in w for w in built.warnings)
     assert any("Standardised server-side" in w and "Triglycerides" in w for w in built.warnings)
+
+
+# ═══════════ a reported CHD as an observation for the diagnosis (#11) ═══════════
+
+def test_a_reported_chd_is_one_shared_atom_that_never_reaches_the_linage2_space_or_a_generic_query(monkeypatch):
+    from core.pln_runner import PLNRunResult
+    built = build_patient({**WITH_GRIM, "id": "H", "prevalent_chd": ["angina", "heart attack"]})
+    assert built.shared_atoms.count("(PatientCondition Caller_H CoronaryHeartDisease)") == 1     # one, whatever the items
+    assert "PatientCondition" not in built.atoms                  # LinAge2 and the preview: no room for a new head
+    assert "PatientCondition" not in build_patient({**WITH_GRIM, "id": "H"}).shared_atoms
+    seen = {}
+
+    def run(**kw):
+        seen["extra_atoms"] = kw["extra_atoms"]
+        return PLNRunResult(status="empty", mode="runtime")
+
+    monkeypatch.setattr(api_module, "run_query", run)
+    monkeypatch.setattr(api_module, "translate", lambda **kw: _translation("(diagnose-patient &self Caller_H)"))
+    monkeypatch.setattr(api_module, "log_turn", Mock())
+    patient = {**WITH_GRIM, "id": "H", "prevalent_chd": ["angina"]}
+    answer = _request("POST", "/query", json={"message": "why are my labs off?", "patient": patient}).json()
+    assert "(PatientCondition Caller_H CoronaryHeartDisease)" in seen["extra_atoms"]
+    assert any("read by the diagnosis as one observation" in w for w in answer["warnings"])
+    seen.clear()
+    monkeypatch.setattr(api_module, "translate", lambda **kw: _translation("(infer &self Metformin CoronaryHeartDisease)"))
+    _request("POST", "/query", json={"message": "q", "patient": patient})
+    assert not seen.get("extra_atoms")           # a question that reads no patient fact never gets the patient
+
+
+def test_the_no_witness_note_for_a_patient_who_reports_heart_disease_does_not_say_the_diagnosis_is_empty():
+    from core.patient_builder import NO_WITNESS_CHD_PREFIX, NO_WITNESS_PREFIX
+    from core.patient_context import patient_form_warnings
+    built = build_patient({**NOTHING_USABLE, "prevalent_chd": ["angina"]})
+    assert built.witnesses == []
+    (note,) = _notes(built, NO_WITNESS_CHD_PREFIX)
+    assert not _notes(built, NO_WITNESS_PREFIX)
+    assert "every supplement tier is empty" in note.lower() and "population ranking" in note
+    assert "diagnosis answers from the reported heart disease alone" in note and "returns ()" not in note
+    (diag,) = [w for w in patient_form_warnings(f"(diagnose-patient &self {built.patient_id})", built) if "no elevated value" in w]
+    assert "answers from the reported heart disease alone" in diag and "returns ()" not in diag
+    (plan,) = [w for w in patient_form_warnings(f"(recommend-supplements-patient &self {built.patient_id})", built)
+               if "no elevated value" in w]
+    assert "every supplement tier is empty" in plan
+    # without the report the old note stands
+    assert _notes(build_patient(NOTHING_USABLE), NO_WITNESS_PREFIX)

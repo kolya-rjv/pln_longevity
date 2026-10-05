@@ -37,7 +37,8 @@ from typing import Optional
 import gradio as gr
 
 from core.linage2_model import load_model
-from core.patient_builder import NO_WITNESS_PREFIX, STILL_WORK, BuiltPatient, PatientSpecError
+from core.patient_builder import (NO_WITNESS_CHD_PREFIX, NO_WITNESS_PREFIX, STILL_WORK, BuiltPatient,
+                                  PatientSpecError)
 from core.patient_context import build_caller_patient
 from core.patient_extract import OpenAIExtractor, configured_model
 from core.patient_read import PatientRead, read_patient
@@ -308,10 +309,11 @@ atexit.register(shutil.rmtree, _DOWNLOAD_DIR, True)
 
 
 def _atoms_text(built: BuiltPatient) -> str:
-    """Every atom of this patient: `atoms` (what the LinAge2 space gets) plus the medication, which
-    goes only to the shared space — so the box, and the file to download, rebuild the patient fully."""
-    meds = [ln for ln in built.shared_atoms.splitlines() if ln.startswith("(CurrentMedication ")]
-    return built.atoms + ("\n" + "\n".join(meds) if meds else "")
+    """Every atom of this patient: `atoms` (what the LinAge2 space gets) plus the medication and the reported
+    condition, which go only to the shared space — so the box, and the file to download, rebuild the patient fully."""
+    extra = [ln for ln in built.shared_atoms.splitlines()
+             if ln.startswith(("(CurrentMedication ", "(PatientCondition "))]
+    return built.atoms + ("\n" + "\n".join(extra) if extra else "")
 
 
 def _write_download(built: BuiltPatient, read_as: Optional[str] = None) -> str:
@@ -351,6 +353,13 @@ _TAB_WORDING = (
     ("Standardised server-side from a raw value:",
      None),     # rewritten below with its marker list
     ("No AgeAccelGrim measurement:", None),    # two variants, chosen below
+    (NO_WITNESS_CHD_PREFIX,
+     "Nothing you typed gives the supplement plan or the ranking a witness: none of your values is elevated and has "
+     "a curated cause or effect (it has them for CRP, HbA1c, a fasting glucose, a fasting triglyceride, RDW, a low "
+     "albumin and three DNA-methylation markers: PAI-1, GDF-15 and pack-years). The plan will have no tiers and the "
+     "ranking will be the same as for anyone. The diagnosis answers from your reported heart disease alone, a "
+     "prevalence item (\"ever told you had\"), not a measurement. That is \"nothing to work from\" for the plan "
+     "and the ranking, not \"no cause\"."),
     (NO_WITNESS_PREFIX,
      "Nothing you typed gives the knowledge base a witness: none of your values is elevated "
      "and has a curated cause or effect (it has them for CRP, HbA1c, a fasting glucose, a fasting triglyceride, RDW, a low albumin "

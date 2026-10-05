@@ -92,6 +92,11 @@
 (: PatientSex     (-> PatientProfile Sex Atom))
 (: PatientSmoking (-> PatientProfile SmokingStatus Atom))
 
+;; A condition the person REPORTS: today (PatientCondition <P> CoronaryHeartDisease), from a reported CHD, angina or heart
+;; attack. A PREVALENCE item ("ever told"), never a measured value or a MeasuredZ. Read by `diagnose-patient` ONLY
+;; (§4); the supplement plan and the ranking read `patient-observations`, which excludes it. Shared space only.
+(: PatientCondition (-> PatientProfile Outcome Atom))
+
 ;; Minimal typing for a marker node introduced here (the first-generation clock's
 ;; age acceleration). AgeAccelGrim already lives in grim_age_core; the Horvath
 ;; accel is its first-gen counterpart, added so the discordance is representable.
@@ -306,7 +311,18 @@
 ;; (diagnose-patient <space> <patient> <candidate-hypotheses>)
 ;;   -> ((Hypothesis <best> (stv s c) <cov> <mass> (SupportedBy ...)) ...)
 (= (diagnose-patient $space $patient $hyps)
-   (diagnose $space $hyps (patient-observations $space $patient)))
+   (let $obs (diagnosis-observations $space $patient)
+      (diagnose $space $hyps $obs)))
+
+;; The diagnosis explains the elevated markers AND a reported condition, deduped (a condition counted twice would double
+;; its weight in the coverage). With none, this is exactly `patient-observations`.
+(= (patient-conditions $space $patient)
+   (let $cs (collapse (match $space (PatientCondition $patient $c) $c))
+      (unique-atom $cs)))
+(= (diagnosis-observations $space $patient)
+   (let* (($obs (patient-observations $space $patient))
+          ($cs  (patient-conditions $space $patient)))
+      (append-tuple $obs $cs)))
 
 ;; (diagnose-patient <space> <patient>) — over the DEFAULT candidate causes: the six
 ;; hallmark and lifestyle nodes whose Effect chains reach a marker a patient can witness (SASP,

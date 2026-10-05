@@ -454,3 +454,42 @@ def test_an_elevated_fasting_triglyceride_is_explained_by_insulin_resistance():
     assert "(SupportedBy (Triglycerides))" in diag["atoms"][0] and "DeregulatedNutrientSensing" in diag["atoms"][0]
     plan = _run("patient", SUPPLEMENTS.format(P="Caller_Me"), atoms)["atoms"][0]
     assert "(SuppRec Berberine" in plan or "(SuppRec Metformin" in plan
+
+
+# ═══════════ a reported CHD is an observation for the diagnosis ONLY (#11, the narrow form) ═══════════
+
+CHD_LINE = "\n(PatientCondition Caller_Me CoronaryHeartDisease)"
+
+
+@pytest.mark.slow
+def test_a_reported_chd_changes_the_diagnosis_and_nothing_else():
+    """The supplement plan, the single-supplement form and the intervention ranking read `patient-observations`,
+    which does not include a PatientCondition: they are byte-identical with and without it."""
+    plain = _run("patient", "!(diagnose-patient &self Caller_Me)", TAB_SMOKER)
+    chd = _run("patient", "!(diagnose-patient &self Caller_Me)", TAB_SMOKER + CHD_LINE)
+    assert plain["rc"] == chd["rc"] == 0 and plain["atoms"] != chd["atoms"]
+    assert "CoronaryHeartDisease" in chd["atoms"][0] and "CoronaryHeartDisease" not in plain["atoms"][0]
+    for query in (SUPPLEMENTS.format(P="Caller_Me"), "!(supplement-for-patient &self Caller_Me Berberine)",
+                  f"!(rank-interventions-for-patient &self Caller_Me {POOL} CoronaryHeartDisease)"):
+        assert _run("patient", query, TAB_SMOKER)["atoms"] == _run("patient", query, TAB_SMOKER + CHD_LINE)["atoms"], query
+
+
+@pytest.mark.slow
+def test_a_reported_chd_alone_gives_the_diagnosis_something_to_explain_and_the_plan_nothing():
+    """A patient whose only finding is the report: the diagnosis answers (a population-level association with
+    insulin resistance and senescence); the plan stays empty, as for an unknown patient."""
+    atoms = "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)"
+    assert _run("patient", "!(diagnose-patient &self Caller_Me)", atoms)["atoms"] == ["()"]
+    diag = _run("patient", "!(diagnose-patient &self Caller_Me)", atoms + CHD_LINE)
+    assert diag["rc"] == 0 and diag["atoms"][0].startswith("((Hypothesis InsulinResistance")
+    assert "(SupportedBy (CoronaryHeartDisease))" in diag["atoms"][0]
+    plan = _run("patient", SUPPLEMENTS.format(P="Caller_Me"), atoms + CHD_LINE)["atoms"]
+    assert plan == ["(SupplementRecommendation Caller_Me (Tier1HighConfidence ()) (Tier2Promising ()) "
+                    "(NotRecommended ()) (Interactions ()))"]
+
+
+@pytest.mark.slow
+def test_the_condition_is_counted_once_however_often_the_atom_is_repeated():
+    once = _run("patient", "!(diagnose-patient &self Caller_Me)", TAB_SMOKER + CHD_LINE)
+    twice = _run("patient", "!(diagnose-patient &self Caller_Me)", TAB_SMOKER + CHD_LINE + CHD_LINE)
+    assert once["atoms"] == twice["atoms"]

@@ -547,7 +547,8 @@ def test_the_tab_the_api_and_the_chat_carry_reported_chd_to_the_risk_answer(monk
     # no GrimAge line: the CHD model has no input, so nothing to qualify
     no_clock = _build(SMOKER + "\ndiagnoses: hypertension, heart attack")["state"]
     _, seen, _ = _chat_with(monkeypatch, "(predict-risk-patient &self Caller_Me)", no_clock)
-    assert "This patient reports" not in seen["prompt"]
+    assert "estimates a FIRST coronary event" not in seen["prompt"]       # no first-event hint (no risk model input)
+    assert "reads that as one more observation to explain" in seen["prompt"]      # the diagnosis hint is another matter
 
 
 # ═══════════════ "takes metformin": read, shown, carried to the supplement forms ══════
@@ -720,3 +721,29 @@ def test_the_kidney_few_shot_is_the_decomposition_and_invents_no_lever():
     assert ex["metta_query"] == "(linage-decomposition-patient &self Caller_W58)"
     assert "no curated cause or lever" in ex["explanation"] and ex["warnings"]
     assert "counterfactual" not in ex["metta_query"]
+
+
+# ═══════════ a reported CHD is an observation for the diagnosis only (#11) ═══════════
+
+def test_the_atoms_box_and_the_download_carry_the_reported_condition_and_the_tab_words_the_notes():
+    out = _build(SMOKER + "\ndiagnoses: heart attack")
+    assert "(PatientCondition Caller_Me CoronaryHeartDisease)" in out["atoms"]["value"]
+    assert "(PatientCondition Caller_Me CoronaryHeartDisease)" in Path(out["download"]["value"]).read_text(encoding="utf-8")
+    assert "Reported heart attack is read by the diagnosis as one observation" in out["summary"]
+    assert "(PatientCondition" not in _build(SMOKER)["atoms"]["value"]
+    # a patient whose only finding is the report: the tab words the no-witness note for the plan, not the diagnosis
+    only = _build("58 year old male\ncreatinine 1.8 mg/dL\nblood pressure 150/90\ndiagnoses: heart attack")["summary"]
+    assert "The diagnosis answers from your reported heart disease alone" in only and "will come back empty" not in only
+    assert "Nothing you typed gives the supplement plan or the ranking a witness" in only
+
+
+def test_the_translator_is_told_a_reported_chd_is_one_more_observation_not_a_measurement(monkeypatch):
+    state = _build(SMOKER + "\ndiagnoses: heart attack")["state"]
+    _, seen, history = _chat_with(monkeypatch, "(diagnose-patient &self Caller_Me)", state)
+    prompt = " ".join(seen["prompt"].split())
+    assert "reads that as one more observation to explain" in prompt and "not a measured value" in prompt
+    assert "do not read it" in prompt                                    # the plan and the ranking
+    assert "> **Note.** Reported heart attack is read by the diagnosis as one observation" in history[-1]["content"]
+    plain = _build(SMOKER)["state"]
+    _, seen, history = _chat_with(monkeypatch, "(diagnose-patient &self Caller_Me)", plain)
+    assert "one more observation to explain" not in seen["prompt"] and "Reported" not in history[-1]["content"]

@@ -12,7 +12,8 @@ from functools import lru_cache
 from typing import Iterable, Optional
 
 from config import ONTOLOGY_DIR
-from core.patient_builder import BuiltPatient, build_patient, kb_effect_markers, prevalent_chd_note
+from core.patient_builder import (BuiltPatient, build_patient, chd_observation_note, kb_effect_markers,
+                                  prevalent_chd_note)
 from ontology.inventory import merged_inventory
 from ontology.loader import parse_metta_text
 from ontology.registry import OntologyRegistry
@@ -71,7 +72,7 @@ def names_a_patient(metta_query: str) -> bool:
 #: elevated CRP?" -> (match &self (MeasuredZ $p CRP $z) ...)).
 _PATIENT_FACT_RE = re.compile(
     r"(?<![\w-])(?:MeasuredZ|MeasuredRaw|MeasuredUnit|PatientAge|PatientSex|PatientSmoking|"
-    r"CurrentMedication|PatientProfile)(?![\w-])|[\w-]+-patient(?![\w-])")
+    r"CurrentMedication|PatientCondition|PatientProfile)(?![\w-])|[\w-]+-patient(?![\w-])")
 
 
 def reads_patients(metta_query: str) -> bool:
@@ -163,8 +164,11 @@ def _no_witness_warnings(metta_query: str, patient: BuiltPatient) -> list[str]:
         return []
     results = []
     for form, who in _PERSONALISED_FORM_RE.findall(metta_query or ""):
-        if who == patient.patient_id and _NO_WITNESS_RESULT[form] not in results:
-            results.append(_NO_WITNESS_RESULT[form])
+        text = _NO_WITNESS_RESULT[form]
+        if form == "diagnose-patient" and patient.prevalent_chd:
+            text = "the diagnosis answers from the reported heart disease alone (a prevalence item, not a measurement)"
+        if who == patient.patient_id and text not in results:
+            results.append(text)
     if not results:
         return []
     return [
@@ -185,19 +189,31 @@ def _prevalent_chd_warnings(metta_query: str, patient: BuiltPatient) -> list[str
     return [prevalent_chd_note(patient.prevalent_chd)]
 
 
+_DIAGNOSE_RE = re.compile(r"\(\s*diagnose-patient\s+&self\s+([A-Za-z][A-Za-z0-9_]*)")
+
+
+def _chd_observation_warnings(metta_query: str, patient: BuiltPatient) -> list[str]:
+    """A diagnosis for a person who reports CHD: the report is one of the observations it explains."""
+    if patient.prevalent_chd and patient.patient_id in _DIAGNOSE_RE.findall(metta_query or ""):
+        return [chd_observation_note(patient.prevalent_chd)]
+    return []
+
+
 def patient_form_warnings(metta_query: str, patient: Optional[BuiltPatient]) -> list[str]:
     """Say why a personalised form is about to come back empty or unpersonalised, before it
     does — the same note on /query, /metta/run and the chat (the chat never shows the
     builder's own notes, and an empty `()` reads as "no cause", which it is not).
 
-    Three cases, each for a form NAMING this patient: a heart-risk form for a patient with no
-    GrimAge value; a heart-risk form for a patient who reports CHD (a first-event model); and
+    Four cases, each for a form NAMING this patient: a heart-risk form for a patient with no
+    GrimAge value; a heart-risk form for a patient who reports CHD (a first-event model); a
+    diagnosis for a patient who reports CHD (it explains that report as an observation); and
     a diagnosis / supplement / ranking form for a patient none of whose values is elevated and
     has a curated edge (BuiltPatient.witnesses)."""
     if patient is None:
         return []
     return (_no_grimage_risk_warnings(metta_query, patient)
             + _prevalent_chd_warnings(metta_query, patient)
+            + _chd_observation_warnings(metta_query, patient)
             + _no_witness_warnings(metta_query, patient))
 
 
@@ -247,6 +263,16 @@ def no_grimage_prompt_hint(patient: BuiltPatient) -> str:
             f"value and returns nothing for this patient.\n")
 
 
+def chd_observation_prompt_hint(patient: BuiltPatient) -> str:
+    """For a patient who reports CHD: what (diagnose-patient &self <P>) then explains besides their labs."""
+    if not patient.prevalent_chd:
+        return ""
+    return (f"This patient reports {', '.join(patient.prevalent_chd)}. (diagnose-patient &self {patient.patient_id}) reads "
+            f"that as one more observation to explain, labelled in the answer as a prevalence item (\"ever told\"), "
+            f"not a measured value; say so in `explanation`. The supplement plan and the intervention ranking do "
+            f"not read it.\n")
+
+
 def prevalent_chd_prompt_hint(patient: BuiltPatient) -> str:
     """For a patient who reports CHD and has a GrimAge value (so the CHD model answers)."""
     if not (patient.prevalent_chd and patient.can_predict_risk):
@@ -287,6 +313,7 @@ def patient_prompt_section(patient: BuiltPatient) -> str:
         f"default candidate causes — never a hand-typed hallmark list (rule 17).\n"
         + no_grimage_prompt_hint(patient)
         + prevalent_chd_prompt_hint(patient)
+        + chd_observation_prompt_hint(patient)
         + medication_prompt_hint(patient)
         + (linage2_prompt_hint(patient) if patient.linage2 is not None else "")
     )
