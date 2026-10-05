@@ -242,14 +242,22 @@
 ;; biomarker, so the patient's own standardized value for the biomarker (patient-z)
 ;; is the honest witness for the direction of the input, and the biomarker's
 ;; incoming Effect edges (mechanistic_bridges.metta) are the causes a positive
-;; contribution may be credited to. Only FOUR of the 59 inputs have one; the
-;; other 55 are carried as years and left unexplained until a bridge exists.
+;; contribution may be credited to. Only SIX of the 59 inputs have one; the
+;; other 53 are carried as years and left unexplained until a bridge exists.
 ;;
-;; Two of the four are the same symbol on both sides: LinAge2's CRP and HbA1c ARE
-;; the KB's CRP and HbA1c. The identity fact is what lets one rule serve all four.
+;; Two of the six are the same symbol on both sides: LinAge2's CRP and HbA1c ARE
+;; the KB's CRP and HbA1c. The identity fact is what lets one rule serve all six.
 (: MeasuresBiomarker (-> Atom Biomarker Atom))
 (MeasuresBiomarker CRP   CRP)
 (MeasuresBiomarker HbA1c HbA1c)
+
+;; Red cell distribution width and serum albumin read out the two inflammation markers
+;; mechanistic_bridges.metta added (ChronicInflammation -> RDW, -> LowSerumAlbumin). Albumin is
+;; the one input whose KB node is the OPPOSITE direction: LowSerumAlbumin is the DEFICIT, so
+;; its patient-z is the negated albumin z. A positive contribution of either input is credited to
+;; a cause only when that z is Elevated (a witness), exactly like CRP.
+(MeasuresBiomarker RedCellDistributionWidth RDW)
+(MeasuresBiomarker SerumAlbumin LowSerumAlbumin)
 
 ;; The biochemistry-profile glucose stands in for the KB's FastingGlucose. It is
 ;; the same analyte, but it is fasting only if the draw was — NHANES has a

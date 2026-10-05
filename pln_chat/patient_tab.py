@@ -353,11 +353,11 @@ _TAB_WORDING = (
     ("No AgeAccelGrim measurement:", None),    # two variants, chosen below
     (NO_WITNESS_PREFIX,
      "Nothing you typed gives the knowledge base a witness: none of your values is elevated "
-     "and has a curated cause or effect (it has them for CRP, HbA1c, a fasting glucose and three "
-     "DNA-methylation markers: PAI-1, GDF-15 and pack-years). So the diagnosis will come back empty, the supplement plan "
-     "will have no tiers and the intervention ranking will be the same as for anyone. That is "
-     "\"nothing to work from\", not \"no cause\". Diagnoses you listed, labs such as albumin, "
-     "creatinine or blood pressure, low values and a glucose not marked fasting do not count "
+     "and has a curated cause or effect (it has them for CRP, HbA1c, a fasting glucose, RDW, a low albumin "
+     "and three DNA-methylation markers: PAI-1, GDF-15 and pack-years). So the diagnosis will come back empty, the "
+     "supplement plan will have no tiers and the intervention ranking will be the same as for anyone. That is "
+     "\"nothing to work from\", not \"no cause\". Diagnoses you listed, labs such as creatinine, blood "
+     "pressure or cholesterol, values below normal and a glucose not marked fasting do not count "
      "there — LinAge2 still uses them."),
 )
 

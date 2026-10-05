@@ -83,7 +83,7 @@
 (= (linage-delta $space $patient)
    (match $space (LinAgeDelta $patient $d) $d))
 
-;; The KB biomarker an input reads out, or nothing (55 of 59 inputs).
+;; The KB biomarker an input reads out, or nothing (53 of 59 inputs).
 (= (linage-readout $space $f)
    (match $space (MeasuresBiomarker $f $b) $b))
 

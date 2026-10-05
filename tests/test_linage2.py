@@ -103,7 +103,8 @@ def test_the_catalog_is_read_off_the_ontology_and_has_every_input():
     assert catalog["LBXGH"].symbol == "HbA1c" and catalog["LBXGH"].reads_out == "HbA1c"
     assert catalog["LBDSGLSI"].reads_out == "FastingGlucose"
     assert catalog["LBXCOT"].reads_out == "CurrentTobaccoExposure"
-    assert sum(1 for f in catalog.values() if f.reads_out) == 4
+    assert catalog["LBXRDW"].reads_out == "RDW" and catalog["LBDSALSI"].reads_out == "LowSerumAlbumin"
+    assert sum(1 for f in catalog.values() if f.reads_out) == 6
     assert catalog["fs1Score"].symbol == "ComorbidityScore"
     assert all(f.description for f in catalog.values())
     # every symbol is a (ModelInput <F> LinAge2) fact in the file, and no code is a fact
@@ -486,8 +487,11 @@ def test_a_cause_is_credited_only_under_a_witness(smoker):
     # an imputed input is never credited, whatever its readout: all 26 imputed records have empty causes
     imputed_block = out.split("(Imputed (")[1]
     assert "(DrivenBy (" in imputed_block and not re.search(r"\(DrivenBy \([A-Za-z]", imputed_block)
+    # albumin reads out the LowSerumAlbumin deficit, but this patient sent no z for it: no witness, no cause
+    assert re.search(r"\(Contribution SerumAlbumin \(years 2\.26\d*\) Measured \(ReadsOut LowSerumAlbumin \(witnessed False\)\) "
+                     r"\(DrivenBy \(\)\)\)", out)
     # an input with no readout is carried, unexplained
-    assert re.search(r"\(Contribution SerumAlbumin \(years 2\.26\d*\) Measured \(ReadsOut None\) \(DrivenBy \(\)\)\)", out)
+    assert re.search(r"\(Contribution SerumCreatinine \(years [-\d.]+\) Measured \(ReadsOut None\) \(DrivenBy \(\)\)\)", out)
 
 
 def test_the_witness_reads_the_patients_own_values(smoker):
@@ -712,8 +716,9 @@ def _request(method: str, path: str, **kwargs):
 def test_features_endpoint_publishes_the_vocabulary():
     body = _request("GET", "/linage2/features").json()
     assert len(body["features"]) == 59
-    assert {f["symbol"] for f in body["features"] if f["reads_out"]} == {"CRP", "HbA1c", "SerumGlucose", "SerumCotinine"}
-    assert all(f["reads_out"] for f in body["features"][:4])       # explainable inputs listed first
+    assert {f["symbol"] for f in body["features"] if f["reads_out"]} == {
+        "CRP", "HbA1c", "SerumGlucose", "SerumCotinine", "RedCellDistributionWidth", "SerumAlbumin"}
+    assert all(f["reads_out"] for f in body["features"][:6])       # explainable inputs listed first
     assert body["clock"]["outcome"] == "AllCauseMortality"
     assert "pln_linage2.metta" in body["stack"] and body["forms"][0] == "linage-decomposition-patient"
     markers = _request("GET", "/patients/markers").json()
@@ -968,3 +973,51 @@ def test_a_heart_risk_pair_for_a_patient_with_no_grimage_is_labelled_all_cause(m
     atoms = [x["atom"] for x in body["pln_results"]]
     assert atoms[0].startswith("(RiskPrediction Caller_W58 CoronaryHeartDisease") and atoms[1].startswith("(LinAgeHazard")
     assert not [w for w in body["warnings"] if "no AgeAccelGrim value" in w]
+
+
+# ═══════════ RDW and low albumin: two more readouts of chronic inflammation (#7) ═══════════
+
+@pytest.fixture(scope="module")
+def inflamed() -> MeTTa:
+    """The fixture patient with an RDW z of 2.7 and an albumin DEFICIT z of 1.7 (the tab smoker's), CRP normal."""
+    built = build_patient(_patient(id="R58", markers={"HbA1c": 1.6, "CRP": 0.3, "RDW": 2.7, "LowSerumAlbumin": 1.7}))
+    assert built.witnesses == ["HbA1c", "LowSerumAlbumin", "RDW"]
+    return _space(built.atoms)
+
+
+def test_an_elevated_rdw_and_a_low_albumin_are_credited_to_inflammation_and_senescence(inflamed):
+    out = _one(inflamed, "!(linage-decomposition-patient &self Caller_R58)")
+    for symbol, readout in (("RedCellDistributionWidth", "RDW"), ("SerumAlbumin", "LowSerumAlbumin")):
+        assert re.search(rf"\(Contribution {symbol} \(years [-\d.]+\) Measured \(ReadsOut {readout} \(witnessed True\)\) "
+                         rf"\(DrivenBy \(ChronicInflammation CellularSenescence\)\)\)", out), (symbol, out)
+    assert _one(inflamed, "!(linage-biomarker-causes &self RDW)") == "(ChronicInflammation CellularSenescence)"
+    assert _one(inflamed, "!(linage-biomarker-causes &self LowSerumAlbumin)") == "(ChronicInflammation CellularSenescence)"
+
+
+def test_a_positive_contribution_is_not_credited_without_the_patients_own_z(smoker):
+    """The fixture patient sent no RDW or albumin z: the years are reported, no cause is credited, however large."""
+    m, _ = smoker
+    out = _one(m, "!(linage-decomposition-patient &self Caller_W58)")
+    assert re.search(r"\(Contribution RedCellDistributionWidth \(years [-\d.]+\) \w+ \(ReadsOut RDW \(witnessed False\)\) "
+                     r"\(DrivenBy \(\)\)\)", out)
+
+
+def test_the_rdw_and_albumin_levers_are_chronic_inflammations_and_share_its_years(inflamed):
+    inflammation = _one(inflamed, "!(linage-counterfactual-patient &self Caller_R58 ChronicInflammation)")
+    years = _num(inflammation, "expected-delta-years")
+    assert years < -1.0 and "(Via (RedCellDistributionWidth SerumAlbumin))" in inflammation
+    for lever in ("RDW", "LowSerumAlbumin"):
+        got = _one(inflamed, f"!(linage-counterfactual-patient &self Caller_R58 {lever})")
+        assert _num(got, "expected-delta-years") == pytest.approx(years)             # one cause, one set of years
+        assert "(Via (RedCellDistributionWidth SerumAlbumin))" in got
+    # the LinAge2 INPUT's name is not a KB marker: no lever, nothing invented
+    assert _empty(inflamed, "!(linage-counterfactual-patient &self Caller_R58 SerumAlbumin)")
+
+
+def test_the_weaker_evidence_tier_sets_the_confidence_of_the_new_edges():
+    """Human observational evidence: Epidemiological (0.60), not the animal-replicated tier of the CRP edge."""
+    text = (REPO / "mechanistic_bridges.metta").read_text(encoding="utf-8")
+    for node in ("RDW", "LowSerumAlbumin"):
+        assert re.search(rf"\(Effect ChronicInflammation {node} Pos\s+\(stv 0\.\d+ \(evidence-confidence Epidemiological\)\)\)", text), node
+    assert "(Inheritance RDW Biomarker)" in text and "(Inheritance LowSerumAlbumin Biomarker)" in text
+    assert "Hypoalbuminemia" not in text.replace(";; The albumin node is the DEFICIT, named LowSerumAlbumin and never \"Hypoalbuminemia\"", "")

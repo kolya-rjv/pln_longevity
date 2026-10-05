@@ -216,19 +216,27 @@ markdown fences, no extra keys:
     witness is reported as years and left unexplained. Never explain it yourself.
     A LAB, ORGAN OR CONDITION the person wants fixed, that is neither a cause or
     intervention of rule 11 nor a marker the knowledge base has a curated cause for
-    (CRP, DNAmGDF15, DNAmPACKYRS, DNAmPAI1, FastingGlucose, HbA1c) — "what should I do
-    about my kidney function / blood pressure / cholesterol / creatinine / hypertension",
-    "what if my blood pressure were normal", "how much would fixing my albumin take off",
-    "why does my RDW add years" — has NO curated cause or lever here. Never make a lever
-    token out of a lab, organ or diagnosis name, and never swap a diagnosis for another
-    lever. Emit the decomposition, which lists that lab's own years and credits a cause
-    only where one is curated:
+    (CRP, DNAmGDF15, DNAmPACKYRS, DNAmPAI1, FastingGlucose, HbA1c, LowSerumAlbumin,
+    RDW) — "what should I do about my kidney function / blood pressure /
+    cholesterol / creatinine / hypertension", "what if my blood pressure were normal" —
+    has NO curated cause or lever here. Never make a lever token out of a lab, organ or
+    diagnosis name, and never swap a diagnosis for another lever. Emit the
+    decomposition, which lists that lab's own years and credits a cause only where one
+    is curated:
       (linage-decomposition-patient &self <Patient>)
     plus (recommend-supplements-patient &self <Patient>) on its own line if supplements
     were asked. Say in `explanation` that the knowledge base holds no curated cause or
     lever for it; the years shown are what the lab adds to the clock, NOT what "normal"
     would remove. A diagnosis enters the clock only as the comorbidity score (about 0
     years).
+    The markers in that list ARE levers, by the marker's own name (rule 11): "what if my
+    RDW were normal", "how much would fixing my albumin take off" ->
+      (linage-counterfactual-patient &self <Patient> RDW)
+      (linage-counterfactual-patient &self <Patient> LowSerumAlbumin)   ; the albumin DEFICIT
+    Both act through chronic inflammation, so they return the SAME years (the inputs that
+    read them out are listed under Via); say that, and that a low albumin is also what low
+    protein intake looks like. LowSerumAlbumin and RDW are measured against LinAge2's
+    reference for people up to 50: a value inside the usual laboratory range can count.
     The GrimAge forms (predict-risk-patient, decompose-grimage,
     counterfactual-patient) never see a LinAge2 result; the CHD-risk forms and
     decompose-grimage need AgeAccelGrim, counterfactual-patient the DNAm components.

@@ -165,7 +165,26 @@ MARKERS: dict[str, MarkerSpec] = {
                    "age/sex-stratified cohort table.",
         ),
     ),
+    "RDW": MarkerSpec(
+        "RDW", "blood_marker",
+        "red cell distribution width: a chronic-inflammation readout (it also tracks iron, B12, folate, "
+        "nutrition and kidney function); drives the abductive diagnosis and the omega-3 recommendation "
+        "like CRP. z only: against LinAge2's reference for people up to 50 "
+        "(core.linage2_model.young_reference_z), sex-specific and NOT age-adjusted, so a value inside the "
+        "usual laboratory range can count as elevated",
+    ),
+    "LowSerumAlbumin": MarkerSpec(
+        "LowSerumAlbumin", "blood_marker",
+        "serum albumin DEFICIT, a chronic-inflammation readout (low protein intake lowers albumin too). "
+        "z only, and the z is the NEGATED albumin z against LinAge2's reference for people up to 50: "
+        "positive = lower than a young adult's, sex-specific and NOT age-adjusted, so a value inside the "
+        "usual laboratory range can count as elevated. Never a diagnosis of hypoalbuminaemia",
+    ),
 }
+
+#: The markers a LinAge2 block can be joined to for a cause: the LinAge2 inputs that read out one of them
+#: (linage2_core.metta §5: MeasuresBiomarker), plus the fasting-glucose stand-in.
+LINAGE2_JOIN_MARKERS = frozenset({"CRP", "HbA1c", "FastingGlucose", "RDW", "LowSerumAlbumin"})
 
 #: Markers whose raw value is naturally expressed in YEARS of age acceleration.
 #: Converted with the risk layer's own `grimaccel-sd-to-years` knob so the two
@@ -204,10 +223,10 @@ def kb_effect_markers() -> frozenset[str]:
     """The markers a patient can carry that the knowledge base has a curated Effect edge
     INTO — the only ones a cause can be credited to (diagnose-patient), an intervention
     can be said to act on (the personalised ranking) or a supplement can target. A value
-    outside this set (an albumin, a creatinine, a typed diagnosis), or a LOW one, changes
+    outside this set (a creatinine, a blood pressure, a typed diagnosis), or a LOW one, changes
     none of those forms. Read off the KB's own files, as core.patient_context reads the
     thresholds, so a new bridge widens it with no edit here (today: CRP, DNAmGDF15,
-    DNAmPACKYRS, DNAmPAI1, FastingGlucose, HbA1c)."""
+    DNAmPACKYRS, DNAmPAI1, FastingGlucose, HbA1c, LowSerumAlbumin, RDW)."""
     from config import ONTOLOGY_DIR, PLN_MAX_KB_FILE_BYTES   # lazily: nothing else here needs config
     found: set[str] = set()
     for path in sorted(ONTOLOGY_DIR.glob("*.metta")):
@@ -289,7 +308,7 @@ def no_witness_note() -> str:
         f"this patient the diagnosis returns (), every supplement tier is empty and the "
         f"intervention ranking is the population ranking, the same as for an unknown patient. "
         f"That is 'nothing to work from', not 'no cause'. A typed diagnosis, a lab with no edge "
-        f"(albumin, creatinine, blood pressure, RDW), a low value, and a glucose not marked "
+        f"(creatinine, blood pressure, cholesterol), a low value, and a glucose not marked "
         f"fasting count for none of them."
     )
 
@@ -716,11 +735,10 @@ def build_patient(
         # the patient's own z for CRP / HbA1c / FastingGlucose, or a current-smoker
         # status. Say so up front, or the decomposition comes back with every
         # DrivenBy empty and reads as "the KB knows no causes".
-        witnesses = {"CRP", "HbA1c", "FastingGlucose"}
-        if not (witnesses & {m.name for m in resolved}) and smoking != "CurrentSmoker":
+        if not (LINAGE2_JOIN_MARKERS & {m.name for m in resolved}) and smoking != "CurrentSmoker":
             warnings.append(
                 "The LinAge2 block was sent without any of the markers the knowledge "
-                "base can join it to (CRP, HbA1c, FastingGlucose as z or value) and "
+                "base can join it to (CRP, HbA1c, FastingGlucose, RDW, LowSerumAlbumin as z or value) and "
                 "without smoking = CurrentSmoker — the witnesses a cause needs. The "
                 "per-lab years will be reported, "
                 "but no contribution can be credited to a cause and every "

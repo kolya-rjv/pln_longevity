@@ -525,3 +525,68 @@ def test_reported_chd_a_heart_attack_and_angina_are_flagged_and_heart_failure_is
         payload, _ = read_patient_text(base + text).to_patient("X")
         assert "prevalent_chd" not in payload, text
     assert "prevalent_chd" not in read_patient_text(base).to_patient("X")[0]
+
+
+# ═══════════ RDW and albumin as a z against LinAge2's young reference (#7) ═══════════
+
+def test_young_reference_z_puts_the_cut_points_where_the_report_said():
+    """z = 1 at RDW 13.09 % (men) / 13.27 % (women) and at albumin 43 g/L (men) / 41 g/L (women)."""
+    from core.linage2_model import young_reference_z
+    assert young_reference_z("LBXRDW", 13.09, "Male") == pytest.approx(1.0, abs=0.01)
+    assert young_reference_z("LBXRDW", 13.27, "Female") == pytest.approx(1.0, abs=0.01)
+    assert -young_reference_z("LBDSALSI", 43.0, "Male") == pytest.approx(1.0, abs=0.02)
+    assert -young_reference_z("LBDSALSI", 41.0, "Female") == pytest.approx(1.0, abs=0.02)
+    assert young_reference_z("LBXRDW", 13.0, "Male") < 1.0 < young_reference_z("LBXRDW", 13.2, "Male")
+    with pytest.raises(KeyError):
+        young_reference_z("LBXCRP_NOT_A_CODE", 1.0, "Male")
+
+
+def test_an_elevated_rdw_and_a_low_albumin_are_passed_as_z_with_the_note_that_says_what_that_means():
+    p = read_patient_text(EXAMPLES["58-year-old smoker"])
+    m = p.kb_markers()
+    assert m["RDW"]["z"] == pytest.approx(2.70, abs=0.01) and m["LowSerumAlbumin"]["z"] == pytest.approx(1.69, abs=0.01)
+    assert set(m["RDW"]) == {"z"}                                    # z only: the KB has no raw reference for them
+    notes = " ".join(p.witness_notes)
+    assert "'RDW 14.1 %' counts as high here" in notes and "'albumin 4.1 g/dL' counts as low here" in notes
+    assert "stricter than a laboratory range" in notes and "not age-adjusted" in notes
+    assert "not a finding" in notes and "Low protein intake and a recent meal also lower albumin" in notes
+
+
+def test_a_value_that_is_not_beyond_the_reference_is_no_witness_and_says_nothing():
+    p = read_patient_text(EXAMPLES["healthy 45-year-old woman"])
+    assert "RDW" not in p.kb_markers() and "LowSerumAlbumin" not in p.kb_markers() and p.witness_notes == []
+
+
+@pytest.mark.parametrize("sex, rdw, expected", [("male", 13.0, False), ("male", 13.2, True), ("female", 13.2, False),
+                                                ("female", 13.4, True)])
+def test_rdw_is_a_witness_just_above_the_sex_specific_reference(sex, rdw, expected):
+    p = read_patient_text(f"58 year old {sex}\nRDW {rdw} %")
+    assert ("RDW" in p.kb_markers()) is expected
+
+
+@pytest.mark.parametrize("sex, g_per_dl, expected", [("male", 4.4, False), ("male", 4.2, True), ("female", 4.2, False),
+                                                     ("female", 4.0, True)])
+def test_albumin_is_a_witness_just_below_the_sex_specific_reference(sex, g_per_dl, expected):
+    p = read_patient_text(f"58 year old {sex}\nalbumin {g_per_dl} g/dL")
+    assert ("LowSerumAlbumin" in p.kb_markers()) is expected
+
+
+@pytest.mark.parametrize("extra, withheld", [
+    ("hemoglobin 11.5 g/dL", True), ("hemoglobin 14.5 g/dL", False), ("ferritin 20 ug/L", True), ("ferritin 80 ug/L", False),
+    ("vitamin b12 120 pmol/L", True), ("vitamin b12 300 pmol/L", False), ("folate 8 nmol/L", True), ("folate 25 nmol/L", False),
+])
+def test_a_raised_rdw_is_withheld_when_an_anaemia_or_a_deficiency_explains_it(extra, withheld):
+    p = read_patient_text(f"58 year old male\nRDW 14.5 %\n{extra}")
+    m = p.kb_markers()
+    assert ("RDW" not in m) is withheld
+    assert any("was not passed on as a sign of inflammation" in n for n in p.witness_notes) is withheld
+    assert p.labs()["LBXRDW"] == 14.5                                # LinAge2 still has it as typed
+
+
+def test_the_hemoglobin_limit_is_sex_specific():
+    assert "RDW" not in read_patient_text("58 year old male\nRDW 14.5 %\nhemoglobin 12.5 g/dL").kb_markers()
+    assert "RDW" in read_patient_text("58 year old female\nRDW 14.5 %\nhemoglobin 12.5 g/dL").kb_markers()
+
+
+def test_albumin_is_never_gated_on_a_deficiency():
+    assert "LowSerumAlbumin" in read_patient_text("58 year old male\nalbumin 4.0 g/dL\nferritin 20 ug/L").kb_markers()

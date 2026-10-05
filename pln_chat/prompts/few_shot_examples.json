@@ -444,6 +444,17 @@
     ]
   },
   {
+    "nl": "How much would fixing my albumin take off?",
+    "metta_query": "(linage-counterfactual-patient &self Caller_W58 LowSerumAlbumin)",
+    "explanation": "Albumin is a negative acute-phase protein, so the knowledge base reads a LOW albumin as a sign of chronic inflammation (LowSerumAlbumin, the deficit) and the lever acts through that cause. It returns the expected years removed, with confidence, and the LinAge2 inputs credited under Via — RDW is credited to the same cause, so the years are shared with it. It is measured against LinAge2's reference for people up to 50, a value inside the usual laboratory range can count, and low protein intake lowers albumin too.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": [
+      "The albumin lever is chronic inflammation's: the years are shared with RDW, and nutrition is a second cause of a low albumin that is not modelled."
+    ]
+  },
+  {
     "nl": "What is the likely driver of my abnormal labs?",
     "metta_query": "(diagnose-patient &self Caller_W58)",
     "explanation": "The causes of abnormal LABS are the abductive diagnosis, not the LinAge2 drivers of biological age: it runs the causal graph backward from the caller's elevated markers over the default candidate causes and returns (Hypothesis <cause> (stv s c) <coverage> <mass> (SupportedBy <markers>)) most-explanatory first. () means no elevated marker has a curated cause here.",

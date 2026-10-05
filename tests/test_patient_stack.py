@@ -348,6 +348,23 @@ def test_the_default_causes_reach_every_marker_the_kb_has_an_edge_into(marker):
 
 
 @pytest.mark.slow
+def test_an_elevated_rdw_and_a_low_albumin_are_witnesses_for_chronic_inflammation():
+    """#7: two readouts of one cause are coverage 2, and the supplement plan reads them like a raised CRP. Nothing
+    else is elevated here, so everything below comes from these two."""
+    atoms = ("(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n"
+             "(MeasuredZ Caller_Me RDW 2.7)\n(MeasuredZ Caller_Me LowSerumAlbumin 1.7)")
+    diag = _run("patient", "!(diagnose-patient &self Caller_Me)", atoms)
+    assert diag["rc"] == 0 and diag["atoms"][0].startswith("((Hypothesis ChronicInflammation (stv 0.5")
+    first = diag["atoms"][0].split("(Hypothesis CellularSenescence")[0]
+    assert " 2.0 " in first                                          # coverage 2
+    assert set(re.search(r"\(SupportedBy \(([^)]*)\)\)", first).group(1).split()) == {"RDW", "LowSerumAlbumin"}
+    plan = _run("patient", SUPPLEMENTS.format(P="Caller_Me"), atoms)["atoms"][0]
+    assert "(SuppRec Omega3" in plan
+    low = _run("patient", "!(diagnose-patient &self Caller_Me)", atoms.replace("RDW 2.7", "RDW 0.9").replace("LowSerumAlbumin 1.7", "LowSerumAlbumin 0.9"))
+    assert low["atoms"] == ["()"]                                   # not above the threshold: nothing to explain
+
+
+@pytest.mark.slow
 def test_the_heart_risk_model_has_no_input_without_a_grimage_value():
     """What the no-GrimAge note claims: predict-risk-patient returns nothing for the tab's
     default patient, and answers the moment a GrimAge acceleration is added (z 1.07143 =

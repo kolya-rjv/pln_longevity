@@ -143,6 +143,29 @@
 (Effect MitochondrialDysfunction DNAmGDF15 Pos
    (stv 0.75 (evidence-confidence AnimalStudies_Replicated)))
 
+;; Two more readouts of chronic inflammation, both LinAge2 inputs (linage2_core.metta §5):
+;; red cell distribution width and serum albumin. HUMAN, observational evidence, so the
+;; tier is Epidemiological (0.60), not the animal-replicated tier of the edges above, and
+;; the strengths are the weakest priors in this file:
+;;   RDW      hsCRP and ESR predict RDW independently of age, sex, MCV, haemoglobin and ferritin
+;;            (Lippi 2009, PMID 19391664; cross-sectional, n = 3,845; the authors say the
+;;            mechanism is unknown). RDW also tracks iron-metabolism, nutrition and renal markers
+;;            (Förhécz 2009, PMID 19781428), so the patient builder withholds it as a witness when
+;;            haemoglobin, ferritin, B12 or folate is typed low.
+;;   albumin  a negative acute-phase protein: inflammation lowers it (capillary leak, a larger
+;;            distribution volume, a shorter half-life: Soeters 2018, PMID 30288759) — but so does
+;;            low protein / calorie intake (Don & Kaysen 2004, PMID 15660573), so nutrition is a
+;;            co-driver this edge does not model.
+;; The albumin node is the DEFICIT, named LowSerumAlbumin and never "Hypoalbuminemia": a patient's z for it
+;; is the NEGATED albumin z against LinAge2's young reference, so it fires well inside the
+;; normal range. Its z is "lower than a young adult's", not a diagnosis.
+(Inheritance RDW Biomarker)
+(Inheritance LowSerumAlbumin Biomarker)
+(Effect ChronicInflammation RDW Pos
+   (stv 0.50 (evidence-confidence Epidemiological)))
+(Effect ChronicInflammation LowSerumAlbumin Pos
+   (stv 0.55 (evidence-confidence Epidemiological)))
+
 ;; ============================================================
 ;; METABOLIC / NUTRIENT-SENSING AXIS  (the second bridged axis)
 ;; ============================================================

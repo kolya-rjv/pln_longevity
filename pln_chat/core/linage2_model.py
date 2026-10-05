@@ -111,6 +111,20 @@ def load_model() -> LinAge2Model:
     return LinAge2Model(json.loads(MODEL_PATH.read_text(encoding="utf-8")))
 
 
+def young_reference_z(code: str, value: float, sex: str) -> float:
+    """`value` of the lab `code` (in the model's own unit) as a z against LinAge2's reference for `sex`:
+    (Box-Cox(value) - the sex's median) / its MAD, the reference being the model's training cohort of
+    people up to 50. NOT age-adjusted: a lab that drifts with age (RDW up, albumin down) reads higher
+    in an older person for that reason alone. The one place the KB's z for a LinAge2 input is made."""
+    model = load_model()
+    feats = model.raw["features"]
+    idx = next((i for i, f in enumerate(feats) if f["code"] == code), None)
+    if idx is None:
+        raise KeyError(f"{code} is not a LinAge2 input")
+    side = model.raw["sex"][_check_sex(sex).lower()]
+    return (_box_cox(float(value), feats[idx]["boxcox_lambda"]) - side["median"][idx]) / side["mad"][idx]
+
+
 @dataclass
 class LinAge2Result:
     """The service-shaped response plus what the service does not say."""

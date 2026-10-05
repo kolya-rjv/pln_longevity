@@ -35,7 +35,7 @@ from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from typing import Optional
 
-from core.linage2_model import compute_linage2, load_model
+from core.linage2_model import compute_linage2, load_model, young_reference_z
 from core.patient_builder import MARKERS, Z_LIMIT, PatientSpecError
 from core.patient_medications import (MedContext, benign_sibling, context_for, may_name_a_medication,
                                       mentioned_symbols, read_medication, starts_current_header)
@@ -297,6 +297,20 @@ class Reading:
         }
 
 
+#: RDW and albumin reach the KB as a z against LinAge2's reference for people up to 50 (sex-specific, NOT
+#: age-adjusted): name, LinAge2 code, and the sign that makes a positive z the harmful direction (a LOW albumin).
+_YOUNG_REFERENCE_MARKERS = (("RDW", "LBXRDW", 1.0, "RDW"), ("LowSerumAlbumin", "LBDSALSI", -1.0, "albumin"))
+#: Below one of these a raised RDW is what anaemia or a deficiency looks like (Bessman 1983, PMID 6881096; Förhécz
+#: 2009, PMID 19781428), so it is not passed as a witness for inflammation. The usual laboratory lower limits: a
+#: CONVENTION, not a result of a paper, chosen on the sensitive side (more values withheld, never fewer).
+_RDW_WITHHELD_BELOW = (
+    ("LBXHGB", "hemoglobin", "g/dL", {"Male": 13.0, "Female": 12.0}),
+    ("LBDFERSI", "ferritin", "µg/L", {"Male": 30.0, "Female": 30.0}),
+    ("LBDB12SI", "vitamin B12", "pmol/L", {"Male": 148.0, "Female": 148.0}),
+    ("LBDFOLSI", "folate", "nmol/L", {"Male": 10.0, "Female": 10.0}),
+)
+
+
 @dataclass
 class ParsedPatient:
     age: Optional[float] = None
@@ -380,8 +394,41 @@ class ParsedPatient:
                     f"(Elevated). LinAge2 uses the value as typed.")
             else:
                 markers[name] = {"value": value, "unit": unit}
+        if self.sex in ("Male", "Female"):
+            self._young_reference_markers(by_code, markers)
         markers.update(self.extra_markers)
         return markers
+
+    def _young_reference_markers(self, by_code: dict, markers: dict) -> None:
+        """RDW and albumin as z against LinAge2's reference (see _YOUNG_REFERENCE_MARKERS), with the notes
+        that say what that means: it is stricter than a laboratory range, not age-adjusted, and a raised RDW
+        is withheld when an anaemia or a deficiency explains it."""
+        for name, code, sign, label in _YOUNG_REFERENCE_MARKERS:
+            reading = by_code.get(code)
+            if reading is None:
+                continue
+            z = sign * young_reference_z(code, reading.value, self.sex)
+            if z <= 1.0:
+                continue                       # not a witness either way; LinAge2 still has the value
+            if name == "RDW":
+                low = [f"{lab} {by_code[c].value:g} {unit}" for c, lab, unit, limits in _RDW_WITHHELD_BELOW
+                       if c in by_code and by_code[c].value < limits[self.sex]]
+                if low:
+                    self.witness_notes.append(
+                        f"RDW {reading.value:g} % was not passed on as a sign of inflammation: {', '.join(low)} "
+                        f"{'is' if len(low) == 1 else 'are'} below the usual lower limit, and anaemia or an iron, B12 or folate deficiency "
+                        f"raises RDW by itself. LinAge2 still uses the value as typed.")
+                    continue
+            capped = abs(z) > Z_LIMIT
+            markers[name] = {"z": math.copysign(Z_LIMIT, z) if capped else z}
+            sex = "men" if self.sex == "Male" else "women"
+            self.witness_notes.append(
+                f"'{reading.typed}' counts as {'low' if name == 'LowSerumAlbumin' else 'high'} here: it is z {z:.1f} "
+                f"against LinAge2's reference for {sex} up to 50. That is stricter than a laboratory range, so a "
+                f"value inside the usual range can still count, and it is not age-adjusted ({label} drifts with "
+                f"age, so this overcalls older people). It is a hint of inflammation, not a finding."
+                + (f" Beyond the reference's useful range; passed on as z {Z_LIMIT:g}." if capped else "")
+                + (" Low protein intake and a recent meal also lower albumin." if name == "LowSerumAlbumin" else ""))
 
     def to_patient(self, patient_id: str = "Me", extra_markers: Optional[dict] = None) -> tuple[dict, object]:
         """The caller-patient payload (with its LinAge2 block) and the LinAge2 result.

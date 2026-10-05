@@ -209,7 +209,7 @@ def test_the_models_caveats_reach_the_tab():
 
 
 def test_the_notes_speak_to_someone_who_typed_text():
-    summary = _build("60 year old female\nalbumin 4.0 g/dL")["summary"]
+    summary = _build("60 year old female\ncreatinine 0.9 mg/dL")["summary"]
     assert "None of your values can be a knowledge-base witness" in summary
     assert "block was sent" not in summary and "Send `z`" not in summary
     assert "GrimAge acceleration +3 years" in summary
@@ -441,8 +441,8 @@ def test_the_translator_is_told_that_the_causes_of_abnormal_labs_are_the_diagnos
 # ═══════════════ "nothing to work from": the tab and the chat say it ═════════════
 
 #: diagnoses and labs with no curated edge: LinAge2 uses all of it, the shared layers none
-NO_WITNESS = ("58 year old male\nalbumin 4.0 g/dL\ncreatinine 1.8 mg/dL\nblood pressure 150/90\n"
-              "RDW 15.2 %\ndiagnoses: diabetes, hypertension, kidney disease")
+NO_WITNESS = ("58 year old male\ncreatinine 1.8 mg/dL\nblood pressure 150/90\n"
+              "total cholesterol 240 mg/dL\ndiagnoses: diabetes, hypertension, kidney disease")
 
 
 def test_the_tab_says_when_nothing_typed_gives_the_shared_layers_a_witness():
@@ -704,11 +704,12 @@ def test_rule_16_names_exactly_the_markers_the_knowledge_base_has_a_cause_for():
 def test_the_translator_is_told_what_to_emit_for_a_lab_with_no_lever(monkeypatch):
     state = _build(SMOKER)["state"]
     _, seen, _ = _chat_with(monkeypatch, "(linage-decomposition-patient &self Caller_Me)", state)
-    prompt = seen["prompt"]
+    prompt = " ".join(seen["prompt"].split())            # the rule wraps lines; the sentences are what is pinned
     assert "has NO curated cause or lever here" in prompt
-    assert "Never make a lever\n    token out of a lab, organ or diagnosis name" in prompt
-    assert "NOT what \"normal\"\n    would remove" in prompt                    # never a counterfactual to normal
+    assert "Never make a lever token out of a lab, organ or diagnosis name" in prompt
+    assert 'NOT what "normal" would remove' in prompt                            # never a counterfactual to normal
     assert "never a lever token made from its name (rule 16)" in prompt          # the per-patient hint
+    assert "(linage-counterfactual-patient &self <Patient> LowSerumAlbumin)" in prompt   # the albumin deficit IS a lever
     assert "A what-if about a lever" in prompt                                    # no GrimAge: the LinAge2 form
 
 

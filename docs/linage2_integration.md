@@ -127,12 +127,15 @@ smoker, HbA1c z 1.6, CRP z 0.3):
 (Contribution HbA1c         (years 0.86) Measured (ReadsOut HbA1c (witnessed True)) (DrivenBy (DeregulatedNutrientSensing)))
 (Contribution CRP           (years -0.02) Measured (ReadsOut CRP (witnessed False)) (DrivenBy ()))
 (Contribution SerumGlucose  (years 0.11) Measured (ReadsOut FastingGlucose (witnessed False)) (DrivenBy ()))   ; no glucose z sent
-(Contribution SerumAlbumin  (years 2.26) Measured (ReadsOut None) (DrivenBy ()))
+(Contribution SerumAlbumin  (years 2.26) Measured (ReadsOut LowSerumAlbumin (witnessed False)) (DrivenBy ()))   ; no albumin z sent
 …  (attributed-measured 7.67) (attributed-imputed 0.12) (age-term-residual 0.50)   ; = delta 8.28
 ```
 
-Albumin's 2.26 years are the second-largest driver and are **left unexplained**: no bridge
-reaches it. That is the honest state of the KB, not a gap the layer papers over.
+Albumin's 2.26 years are the second-largest driver and are **left unexplained** here: the KB has a
+bridge for it (chronic inflammation lowers albumin, `ChronicInflammation -> LowSerumAlbumin`), but this
+patient sent no albumin z, so there is no witness. With one (the tab computes it, see §10) the same record reads
+`(ReadsOut LowSerumAlbumin (witnessed True)) (DrivenBy (ChronicInflammation CellularSenescence))`. That is the
+honest state of the KB, not a gap the layer papers over.
 
 **Hazard.** `(linage-hazard-patient &self <P>)` = `1.093^delta`, confidence `0.60 × 0.9`
 = 0.54. Always available. **Risk.** `(linage-risk-patient &self <P>)` multiplies the
@@ -265,20 +268,35 @@ of 0. Send the patient's own `CRP` / `HbA1c` / `FastingGlucose` (z or value) and
 2. **`linage-sd-to-years` = 8.66** is the SD of BA − CA across the model's training cohort
    (2,079 NHANES 1999–2000 participants, computed from the shipped training matrices). It
    affects the clock's Elevated/Normal/Low label and nothing numeric.
-3. **Four of 59 inputs can be explained.** Albumin, RDW, blood pressure, NT-proBNP and the
-   rest are carried as years. Bridges for them are curation work of the
-   `mechanistic_bridges.metta` kind, and each new head symbol spends budget.
-   Asking what to DO about one of them ("what should I do about my kidney function", "what if my blood
-   pressure were normal", "how much would fixing my albumin take off", "why does my RDW add years") used
-   to give an empty clarification, an invented lever token (`BloodPressure`, `SerumAlbumin`) or, for a
-   diagnosis, another lever. Rule 16 now maps it to `(linage-decomposition-patient …)` (plus
+3. **Six of 59 inputs can be explained.** CRP, HbA1c, glucose, cotinine, and, since item #7 of
+   `docs/kb_quick_wins/REPORT.md`, **RDW and albumin**. Blood pressure, NT-proBNP and the rest are carried as
+   years. Bridges for them are curation work of the `mechanistic_bridges.metta` kind.
+   **RDW and albumin are weak, and their witness is a choice.** Both edges come from chronic inflammation
+   (`Epidemiological` tier, strengths 0.50 and 0.55, the weakest priors in the file): hsCRP and ESR predict RDW
+   independently of age, sex, MCV, haemoglobin and ferritin, in a cross-sectional study (Lippi 2009, PMID
+   19391664), and albumin is a negative acute-phase protein that low protein intake also lowers (Soeters 2018,
+   PMID 30288759; Don & Kaysen 2004, PMID 15660573). The albumin node is the DEFICIT, `LowSerumAlbumin`, and the
+   patient's z for it is the negated albumin z. The witness is a z above 1 against **LinAge2's reference for people
+   up to 50** (sex-specific, not age-adjusted): RDW above 13.09 % (men) / 13.27 % (women), albumin below 43 g/L /
+   41 g/L. That reference is stricter than a laboratory range, so **a value inside the usual range counts** (a man
+   with albumin 4.3 g/dL), and it overcalls older people. The tab says so next to the patient (`witness_notes`);
+   the alternative was clinical limits (RDW > 15 %, albumin < 3.5 g/dL), which change nothing for the three tab
+   examples. A raised RDW is **withheld** as a witness when the person typed a haemoglobin below 13 (men) / 12
+   (women) g/dL, a ferritin below 30 µg/L, a B12 below 148 pmol/L or a folate below 10 nmol/L (anaemia and
+   deficiency raise RDW by themselves: Bessman 1983, PMID 6881096; Förhécz 2009, PMID 19781428); those limits are
+   usual laboratory limits chosen on the sensitive side, not a result of a paper. Albumin has no such gate: nutrition
+   and a recent meal are named in the note.
+   Asking what to DO about one of them without a bridge ("what should I do about my kidney function", "what
+   if my blood pressure were normal") used to give an empty clarification, an invented lever token
+   (`BloodPressure`) or, for a diagnosis, another lever. Rule 16 now maps it to `(linage-decomposition-patient …)` (plus
    `(recommend-supplements-patient …)` when supplements were asked) and tells the translator to say in
    `explanation` that the knowledge base holds no curated cause or lever for it, and that the years shown are
    what the lab adds to the clock, never what "normal" would remove. The rule lists the markers the KB does
    have a curated cause for; `test_rule_16_names_exactly_the_markers_the_knowledge_base_has_a_cause_for`
    reads that list from `mechanistic_bridges.metta`, so a new bridge fails it until the rule is updated.
-   Checked against the live translator (13 questions before and after, plus 3 repeats of the one control that
-   changed): the 8 no-relation questions map as above, and the controls (scenarios, quitting smoking,
+   RDW and the albumin deficit ARE levers now, by their own names (`RDW`, `LowSerumAlbumin`); both act through
+   chronic inflammation, so they return the same years. Checked against the live translator (13 questions before
+   and after, plus 3 repeats of the one control that changed): the no-relation questions map as above, and the controls (scenarios, quitting smoking,
    decomposition, drivers + plan, diagnosis, the HbA1c / insulin-resistance / metformin levers) do not change.
    "What if my inflammation were normal?" used to go to the GrimAge `counterfactual-patient` for a patient
    with no GrimAge value; the per-patient hint now sends it to the LinAge2 form.
@@ -503,7 +521,7 @@ labs adding and removing years, the count and total of filled-in inputs, LinAge2
 questionnaire is said to be assumed), the builder's notes reworded for someone who typed text
 rather than sent z-scores, the atoms, and suggested questions that jump to *PLN Query* with the question filled in.
 A patient none of whose values is both elevated and reached by a curated edge (CRP, HbA1c, a
-glucose marked fasting; typed diagnoses and every other lab count for none) is told that the
+glucose marked fasting, RDW and a low albumin against LinAge2's reference; typed diagnoses and every other lab count for none) is told that the
 diagnosis will come back empty, the supplement plan will have no tiers and the ranking will be
 the population's — in the build notes, and again in the chat next to any such answer, since the
 chat never shows the builder's notes and an empty `()` reads as "no cause"

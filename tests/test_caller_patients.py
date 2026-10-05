@@ -403,7 +403,7 @@ def test_the_markers_the_kb_has_edges_into_are_read_off_the_kb():
     (tests/test_patient_stack.py checks that)."""
     from core.patient_builder import kb_effect_markers
     assert kb_effect_markers() == frozenset(
-        {"CRP", "DNAmGDF15", "DNAmPACKYRS", "DNAmPAI1", "FastingGlucose", "HbA1c"})
+        {"CRP", "DNAmGDF15", "DNAmPACKYRS", "DNAmPAI1", "FastingGlucose", "HbA1c", "LowSerumAlbumin", "RDW"})
 
 
 def test_a_patient_with_nothing_the_kb_can_use_is_told_the_shared_layers_have_nothing_to_work_from():
@@ -753,3 +753,27 @@ def test_the_linage2_block_marker_is_elevated_only_if_the_atom_the_engine_reads_
     built = build_patient({"id": "L", "age": 58, "sex": "Male", "markers": {"CRP": 2.0}, "linage2": d}, linage_sd_to_years=8.66)
     clock = next(m for m in built.markers if m.name == "LinAgeAccel")
     assert "(MeasuredZ Caller_L LinAgeAccel 1)" in built.atoms and clock.status == "Normal"
+
+
+# ═══════════ RDW and the albumin deficit are z-only markers (#7) ═══════════
+
+@pytest.mark.parametrize("name", ["RDW", "LowSerumAlbumin"])
+def test_rdw_and_the_albumin_deficit_take_a_z_and_refuse_a_raw_value(name):
+    built = build_patient({"age": 58, "sex": "Male", "markers": {name: {"z": 1.5}}})
+    assert built.witnesses == [name] and f"(MeasuredZ Caller_Patient {name} 1.5)" in built.atoms
+    with pytest.raises(PatientSpecError) as exc:
+        build_patient({"age": 58, "sex": "Male", "markers": {name: {"value": 14.1, "unit": "%"}}})
+    assert exc.value.code == "raw_value_unsupported"
+    assert build_patient({"age": 58, "sex": "Male", "markers": {name: 0.4}}).witnesses == []      # not above the threshold
+
+
+def test_a_linage2_block_is_joinable_through_rdw_or_the_albumin_deficit():
+    """The 'no witness a cause can be credited to' warning is about the markers a LinAge2 input reads out."""
+    import json
+    fx = json.loads((REPO / "tests" / "fixtures" / "linage2_response.json").read_text(encoding="utf-8"))
+    base = {"id": "J", "age": 58, "sex": "Male", "linage2": fx}
+    nothing = build_patient({**base, "markers": {"DNAmADM": 1.0}})
+    assert any("RDW, LowSerumAlbumin as z or value" in w for w in nothing.warnings)
+    for name in ("RDW", "LowSerumAlbumin"):
+        joined = build_patient({**base, "markers": {name: 0.5}})
+        assert not any("without any of the markers the knowledge base can join it to" in w for w in joined.warnings), name
