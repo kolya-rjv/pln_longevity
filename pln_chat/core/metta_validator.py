@@ -110,6 +110,32 @@ def merge_validation_results(
     )
 
 
+def strip_metta_comments(text: str) -> str:
+    """Blank out `;` comments (a quoted `;` is data) so no tokenizer reads them.
+
+    MeTTa treats everything after an unquoted `;` as a comment: it is not evaluated, so it is
+    not a symbol and not a parenthesis. A patient file starts with `;;` header lines (the My
+    Patient tab's download does), and `/metta/run` validated every word of them as a symbol:
+    the tab's own file failed the validator it is meant to be loaded through."""
+    out: list[str] = []
+    in_string = False
+    in_comment = False
+    for ch in text:
+        if in_comment:
+            out.append("\n" if ch == "\n" else " ")
+            if ch == "\n":
+                in_comment = False
+            continue
+        if ch == '"':
+            in_string = not in_string
+        elif ch == ";" and not in_string:
+            in_comment = True
+            out.append(" ")
+            continue
+        out.append(ch)
+    return "".join(out)
+
+
 def _balanced_parens(expr: str) -> bool:
     depth = 0
     for ch in expr:
@@ -147,6 +173,7 @@ def validate(
     atoms, and using a declared-but-empty predicate becomes an explicit warning
     instead of a silent empty result.
     """
+    metta_query = strip_metta_comments(metta_query)
     if not metta_query.strip():
         return ValidationResult(valid=True)
 

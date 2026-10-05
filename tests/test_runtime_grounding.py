@@ -142,6 +142,21 @@ def test_a_real_symbol_is_no_longer_rejected(inventory):
     assert result.valid, result.issues
 
 
+def test_a_comment_is_not_validated_as_if_it_were_a_symbol_or_a_parenthesis(inventory):
+    """A patient file starts with `;;` header lines (the My Patient tab's download does). Validated word
+    by word they were "Symbol(s) not found", so /metta/run answered 422 to the tab's own file."""
+    registry = api_module._runtime_registry()
+    program = (";; Caller_Me — built in the PLN 'My Patient' tab for one browser (session). Not part of the KB;\n"
+               ";; load it as extra_atoms or send the same text again to rebuild it. (unbalanced\n"
+               "!(match &self (HallmarkComponent MTORC1 $h) $h) ;; trailing words qwertyuiop zxcvbnm\n")
+    result = validate(program, registry, inventory)
+    assert result.valid, result.issues
+    # what is NOT a comment is still checked: a quoted ';' is data, an unquoted one starts a comment
+    assert validate('!(match &self (PublicationTitle $p "a; b") $p)', registry, inventory).valid
+    assert not validate("!(match &self (Nonexistent_Thing_Zzz $x) $x)", registry, inventory).valid
+    assert not validate("!(match &self (HallmarkComponent MTORC1 $h) $h", registry, inventory).valid   # unbalanced for real
+
+
 def test_an_empty_predicate_is_flagged_rather_than_silently_returning_nothing(inventory):
     registry = api_module._runtime_registry()
     result = validate("!(match &self (Predicts $b $o) $o)", registry, inventory)

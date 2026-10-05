@@ -591,3 +591,17 @@ def test_the_tab_the_api_and_the_chat_carry_a_medication_to_the_supplement_forms
     plain = _build(SMOKER)["state"]
     _, seen, _ = _chat_with(monkeypatch, "(recommend-supplements-patient &self Caller_Me)", plain)
     assert "currently takes" not in seen["prompt"] and "CurrentMedication" not in seen["calls"][0][1]["extra_atoms"]
+
+
+def test_the_download_of_a_built_patient_passes_the_validator_it_is_meant_to_be_loaded_through():
+    """The file starts with `;;` header lines; validate() used to tokenize them, so loading the tab's own
+    download as extra_atoms of /metta/run answered 422."""
+    import api as api_module
+    from core.metta_validator import validate
+    from core.patient_context import validation_text, with_injected
+    out = _build(MET_TEXT)
+    text = Path(out["download"]["value"]).read_text(encoding="utf-8")
+    assert text.startswith(";; Caller_Me") and "(CurrentMedication Caller_Me Metformin)" in text
+    registry, inventory = with_injected(api_module._runtime_registry(), api_module._runtime_inventory(), text)
+    result = validate(validation_text(text, "!(supplement-for-patient &self Caller_Me Berberine)"), registry, inventory)
+    assert result.valid, result.issues
