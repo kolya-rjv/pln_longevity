@@ -158,13 +158,15 @@ checkout, `drugage_etl_short.metta` is ~26,900 estimated tokens verbatim and
 ~340 as a card), and anything still too large is refused with **413
 `prompt_too_large`** before a call is billed.
 
-The default selection measures **297,671 characters, about 74,417 estimated
+The default selection measures **301,903 characters, about 75,475 estimated
 tokens** (26 files; `tests/test_prompt_size.py` pins that figure against the
 real `build_system_prompt`, so this sentence cannot drift from the code again).
-It came down from 301,035 when execution was scoped to the curated stack:
+It came down from 301,035 (to 297,671) when execution was scoped to the curated stack:
 `cellage_calibration.metta` left the runtime inventory the prompt reports, since
 the CellAge feature builds its own query-scoped space and the translator was
-never shown that file anyway.
+never shown that file anyway. It has grown again since, to the figure above, with
+the patient layers' rules and few-shots (rules 12-17: the default diagnosis, the
+heart-risk and first-event rules, the single-supplement flag).
 Every `/query` response also reports its own `prompt_tokens_estimate`, which is
 the number to size `PLN_MAX_PROMPT_TOKENS` against — it must be comfortably
 ABOVE this figure or every default query is refused with a 413 before the LLM
