@@ -462,3 +462,66 @@ HOSTILE.update({
 def test_a_fullwidth_spelling_of_the_drug_is_the_drug_and_a_denial_of_it_is_a_contradiction():
     p = read_patient_text(BASE + "takes metformin\nHbA1c 6.1 %\nCRP 3 mg/L\nalbumin 4.1 g/dL\nI do not take ｍｅｔｆｏｒｍｉｎ")
     assert not p.ok and any("keep one" in str(x) for x in p.all_problems())
+
+
+# ═══════════════ what the mutation testing of these tests found unpinned ═══════════
+
+@pytest.mark.parametrize("text", [
+    "takes metformin\n\nstopped 2021", "takes metformin since 2015, HbA1c 6.1 % in 2019", "takes metformin 1999",
+    "takes metformin since 2015 until 2019", "Medications I stopped\nmetformin 500 mg", "Stopped medications -\nmetformin 500 mg",
+    "Allergies\nmetformin 500 mg", "My wife\n\nmetformin 500 mg", "takes metformin\nthinking of stopping ｍｅｔｆｏｒｍｉｎ",
+])
+def test_blank_lines_years_and_short_headings_do_not_hide_a_retraction_or_a_heading(text):
+    assert read_patient_text(BASE + text).medications == [], text
+
+
+def test_the_two_orders_of_a_set_aside_mention_are_each_pinned():
+    other_first = read_patient_text(BASE + "my mother takes metformin\nI take metformin")
+    assert other_first.medications == ["Metformin"]               # a set-aside mention is not a conflict
+    assert [s_.text for s_ in other_first.statements if s_.outcome == "set_aside"] == ["my mother takes metformin"]
+    own_first = read_patient_text(BASE + "I take metformin\nmy mother takes metformin")
+    assert own_first.medications == ["Metformin"]
+
+
+@pytest.mark.parametrize("text, kind", [
+    ("Medications", "current"), ("Medications:", "current"), ("My medications -", "current"), ("Current meds –", "current"),
+    ("Medications I stopped", "other"), ("Past meds", "other"), ("Allergies", "other"), ("Family history:", "other"),
+    ("Notes:", "other"), ("Stopped medications -", "other"), ("Wife", "other"), ("Mom's meds", "other"),
+    ("No known allergies", None), ("albumin 4.1 g/dL", None), ("58 year old male", None), ("takes metformin", None),
+    ("stopped metformin", None), ("", None), ("-----", None), ("1. lisinopril", None),
+    ("Medications for 2019", None), ("Past medications taken between 2015 and 2019 in the clinic", None),
+])
+def test_heading_kind_rules(text, kind):
+    assert heading_kind(text) == kind, text
+
+
+def test_the_length_caps_are_pinned_at_their_literal_values():
+    assert MAX_STATEMENT_CHARS == 240
+    at, over = "takes metformin" + " " * (240 - len("takes metformin")), "takes metformin" + " " * (241 - len("takes metformin"))
+    assert len(at) == 240 and len(over) == 241
+    assert read_medication(at) is not None and read_medication(over) is None
+    from core.patient_medications import MAX_LINE_CHARS
+    assert MAX_LINE_CHARS == 600
+    assert not line_blocked("takes metformin" + " " * (600 - 15)) and line_blocked("takes metformin" + " " * (601 - 15))
+
+
+@pytest.mark.parametrize("text", [
+    "metformin twice a day", "metformin 2 times a day", "metformin two times a day", "metformin 2 x day", "metformin thrice daily",
+    "metformin once daily", "metformin every morning", "metformin every night", "metformin in the morning", "metformin at bedtime",
+    "metformin at night", "metformin with meals", "metformin with dinner", "takes metformin nightly", "takes metformin bid",
+    "takes metformin qhs", "takes metformin weekly", "we take metformin", "we are taking metformin", "I am on metformin",
+    "am on metformin", "are on metformin", "been on metformin", "I have been using metformin", "using metformin", "uses metformin",
+    "diabetes managed with metformin", "diabetes controlled on metformin", "diabetes controlled with metformin",
+    "on the metformin", "takes the metformin", "takes metformin since 2015", "takes metformin for years", "takes metformin for 3 months",
+    "takes metformin 500 mg/day", "takes metformin 0.5 g", "takes 500 mg of metformin", "takes my metformin",
+    "metformin sr 500 mg", "metformin ir 500 mg", "metformin slow release 500 mg", "metformin immediate-release 500 mg",
+    "riomet 500 mg", "fortamet 500 mg", "glumetza 500 mg", "glucophage xr 500 mg", "metformin hydrochloride 500 mg",
+])
+def test_each_dose_timing_subject_and_tail_phrase_the_grammar_reads_is_pinned(text):
+    assert read_patient_text(BASE + text).medications == ["Metformin"], text
+
+
+def test_a_z_a_whisker_over_the_threshold_is_elevated_only_if_the_atom_still_says_so():
+    from core.patient_builder import build_patient
+    assert build_patient({"age": 58, "sex": "Male", "markers": {"CRP": 1.0000006}}).witnesses == []      # written `1`
+    assert build_patient({"age": 58, "sex": "Male", "markers": {"CRP": 1.00001}}).witnesses == ["CRP"]       # written 1.00001
