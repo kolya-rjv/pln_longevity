@@ -206,10 +206,17 @@
 ;; exactly once. The dedupe is the point: a marker recorded both as a MeasuredZ and
 ;; as a MeasuredRaw is ONE marker, and enumerating it twice would double-count it in
 ;; `patient-observations` -> `diagnose` coverage and in `patient-relevance`.
+;; The dedupe is the grounded `unique-atom`, let-forced: it does not reduce its
+;; argument, so a bare `(unique-atom (append-tuple …))` silently empties every
+;; observation. It runs once per candidate in the ranking and supplement forms, where
+;; the interpreted, quadratic `unique-tuple` cost 50 s at 16 markers against 5 s here
+;; (docs/kb_quick_wins/REPORT.md S2). Only the ORDER of the tuple differs, and only for
+;; a marker recorded as both a MeasuredZ and a MeasuredRaw (first kept, not last).
 (= (patient-markers $space $patient)
    (let* (($zs (collapse (match $space (MeasuredZ   $patient $m $v) $m)))
-          ($rs (collapse (match $space (MeasuredRaw $patient $m $v) $m))))
-      (unique-tuple (append-tuple $zs $rs))))
+          ($rs (collapse (match $space (MeasuredRaw $patient $m $v) $m)))
+          ($all (append-tuple $zs $rs)))
+      (unique-atom $all)))
 
 ;; --- the derived z -------------------------------------------------------------
 ;; Standardize the patient's raw value for $marker against the reference cell for

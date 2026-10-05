@@ -18,6 +18,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -54,11 +55,13 @@ def _run(stack: str, query: str, extra: str = "") -> dict:
         "r = run_query(sys.argv[2], kb_files=kb, extra_atoms=sys.argv[3] or None)",
         "print('RESULT ' + json.dumps({'status': r.status, 'atoms': [x.atom for x in r.results]}))",
     ])
+    started = time.monotonic()
     done = subprocess.run([sys.executable, "-c", probe, stack, query, extra],
                           capture_output=True, text=True, timeout=600, cwd=str(REPO))
     line = [ln for ln in done.stdout.splitlines() if ln.startswith("RESULT ")]
     out = json.loads(line[0][7:]) if line else {"status": "abort", "atoms": []}
     out["rc"] = done.returncode
+    out["secs"] = time.monotonic() - started      # wall clock of the whole process
     return out
 
 
@@ -197,3 +200,61 @@ def test_listing_patient_facts_with_a_session_patient_loaded_does_not_abort():
     generic = "!(infer &self Metformin CoronaryHeartDisease)"
     assert patient_atoms_for(generic, caller) is None and api_module._generic_kb(generic) == api_module._runtime_kb_paths()
 
+
+
+# ═══════════════════════════ the marker set: one dedupe, no latency wall ══════
+#
+# patient_profile.metta's `patient-markers` runs once per candidate in the ranking and
+# supplement forms. Its dedupe used to be the interpreted, quadratic `unique-tuple`:
+# a supplement plan cost 1.4 s with no extra lab, 13 s with 8 and 50 s with 16 (104 s on
+# the cloud box, past the 60 s query timeout). The grounded `unique-atom` costs 5 s at
+# 16 — if it is let-forced (the bare call dedupes the unevaluated expression and every
+# observation silently disappears). docs/kb_quick_wins/REPORT.md S2.
+
+GOLDEN = json.loads(
+    (REPO / "tests" / "fixtures" / "patient_stack_builtin_golden.json").read_text(encoding="utf-8"))["cases"]
+
+TAB_SMOKER = ("(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n"
+              "(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me CRP 0.438255)\n"
+              "(MeasuredZ Caller_Me FastingGlucose 1.41667)\n(MeasuredZ Caller_Me HbA1c 1.8)")
+#: labs no curated edge reaches, under names no future bridge can claim
+INERT_LABS = "\n".join(f"(MeasuredZ Caller_Me InertLab{i:02d} 0.3)" for i in range(1, 17))
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("name", sorted(GOLDEN))
+def test_a_built_in_patient_is_answered_to_the_digit_as_it_was_recorded(name):
+    """Patient001-003 through diagnosis, observations, marker set, ranking, supplements and
+    risk, against outputs recorded before the dedupe changed (and to be moved only with an
+    intended change to a built-in patient or to what a form says)."""
+    case = GOLDEN[name]
+    out = _run("patient", case["query"])
+    assert out["rc"] == 0 and out["status"] == "ok"
+    assert out["atoms"] == case["atoms"]
+
+
+@pytest.mark.slow
+def test_a_marker_recorded_twice_is_one_marker_and_its_observations_survive():
+    """A MeasuredZ and a MeasuredRaw for one marker are ONE marker (counting it twice
+    would double its weight in diagnose and in patient-relevance), the explicit z wins,
+    and the observations are the elevated ones — an un-forced unique-atom returns ()."""
+    atoms = ("(InstanceOf Caller_X PatientProfile)\n(PatientAge Caller_X 58)\n(PatientSex Caller_X Male)\n"
+             "(MeasuredZ Caller_X HbA1c 1.0)\n(MeasuredZ Caller_X CRP 0.5)\n(MeasuredRaw Caller_X HbA1c 6.0)\n"
+             "(MeasuredZ Caller_X FastingGlucose 1.5)\n(MeasuredRaw Caller_X CRP 3.0)")
+    markers = _run("patient", "!(patient-markers &self Caller_X)", atoms)
+    assert markers["rc"] == 0 and sorted(re.findall(r"\w+", markers["atoms"][0])) == [
+        "CRP", "FastingGlucose", "HbA1c"]
+    obs = _run("patient", "!(patient-observations &self Caller_X)", atoms)
+    assert obs["atoms"] == ["(FastingGlucose)"]
+
+
+@pytest.mark.slow
+def test_sixteen_more_markers_make_the_supplement_plan_neither_slow_nor_different():
+    base = _run("patient", SUPPLEMENTS.format(P="Caller_Me"), TAB_SMOKER)
+    wide = _run("patient", SUPPLEMENTS.format(P="Caller_Me"), TAB_SMOKER + "\n" + INERT_LABS)
+    assert base["status"] == wide["status"] == "ok"
+    assert wide["atoms"] == base["atoms"], "labs no edge reaches must not change the plan"
+    # before the fix: 50 s here, 104 s on the cloud box, 35x the no-extra-lab run
+    assert wide["secs"] < 30, f"{wide['secs']:.1f} s for 16 extra markers (limit 30; the query timeout is 60)"
+    assert wide["secs"] < 15 * base["secs"], (
+        f"16 extra markers cost {wide['secs'] / base['secs']:.0f}x the plan without them")
