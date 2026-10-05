@@ -52,6 +52,15 @@ PATIENT_TEXT = {
     "P4": SMOKER + "\nGrimAge acceleration +4.5 years",
     # the smoker's labs with cotinine MEASURED but no smoking status stated
     "P5": SMOKER.replace("58 year old male, current smoker", "58 year old male\ncotinine 250 ng/mL"),
+    # labs and diagnoses the knowledge base has NO curated edge for: nothing for the shared layers to work from
+    "P6": "58 year old male\ncreatinine 1.8 mg/dL\nblood pressure 150/90\ntotal cholesterol 240 mg/dL\n"
+          "diagnoses: diabetes, hypertension, kidney disease",
+    "P7": SMOKER + "\nmedications: metformin",
+    "P8": SMOKER.replace("triglycerides 190 mg/dL", "fasting triglycerides 190 mg/dL"),
+    "P9": SMOKER.replace("diagnoses: hypertension", "diagnoses: hypertension, heart attack"),
+    "P10": (SMOKER + "\nGrimAge acceleration +4.5 years").replace("diagnoses: hypertension",
+                                                               "diagnoses: hypertension, heart attack"),
+    "P11": SMOKER.replace("diagnoses: hypertension\n", ""),
 }
 PATIENT_LABEL = {
     "P1": "the 58-year-old smoker example",
@@ -59,6 +68,12 @@ PATIENT_LABEL = {
     "P3": "the six-labs example (66, male, former smoker)",
     "P4": "P1 plus a line 'GrimAge acceleration +4.5 years'",
     "P5": "P1 with 'current smoker' replaced by 'cotinine 250 ng/mL'",
+    "P6": "a 58-year-old man whose labs and diagnoses (creatinine, blood pressure, cholesterol, kidney disease) have no curated edge",
+    "P7": "P1 plus a line 'medications: metformin'",
+    "P8": "P1 with the triglycerides marked fasting ('fasting triglycerides 190 mg/dL')",
+    "P9": "P1 with 'heart attack' added to its diagnoses",
+    "P10": "P4 (P1 plus a GrimAge line) with 'heart attack' added to its diagnoses",
+    "P11": "P1 without its 'diagnoses: hypertension' line",
 }
 
 
@@ -120,7 +135,8 @@ class Entry:
     where: str = "In PLN Query"
     patient: Optional[str] = "P1"
     run: Optional[str] = None             # defaults to `emits`
-    check: Optional[Check] = None         # for a run: response -> (ok, observed)
+    versus: Optional[str] = None          # also run for this patient; `check` then takes (response, other response)
+    check: Optional[Callable] = None      # for a run: response -> (ok, observed)
     tab_check: Optional[Callable[[], tuple[bool, str]]] = None
     n: int = 0
     result: dict = field(default_factory=dict)
@@ -249,12 +265,15 @@ def t_bmi():
 
 def t_build_session():
     import patient_tab
-    before = sorted(str(x) for x in REPO.rglob("*.metta"))
+    def repo_metta():            # the knowledge base's own files: not a virtualenv's or a checkout's
+        return sorted(str(x) for x in REPO.rglob("*.metta") if not {".venv", ".git", "node_modules"} & set(x.parts))
+    before = repo_metta()
     out = patient_tab.on_build(SMOKER, None)
-    after = sorted(str(x) for x in REPO.rglob("*.metta"))
+    after = repo_metta()
     dl = Path(out[3]["value"])
     ok = ("Active patient: Caller_Me" in out[4] and before == after and REPO not in dl.parents)
-    where = re.sub(r"(?<=pln_patients_)[a-z0-9_]+(?=/)|(?<=_Me_)[a-z0-9_]+(?=\.metta$)", "…", str(dl))
+    where = re.sub(r"^.*?(?=pln_patients_)", "<system temp dir>/", str(dl))
+    where = re.sub(r"(?<=pln_patients_)[a-z0-9_]+(?=/)|(?<=_Me_)[a-z0-9_]+(?=\.metta$)", "…", where)
     return ok, f"banner: {out[4][:60]}…; .metta files in the repo unchanged ({len(after)}); download at {where}"
 
 
@@ -264,15 +283,104 @@ def t_clear():
     return (out[4] is None and "No patient loaded" in out[3], "state cleared; banner says no patient")
 
 
+def t_buttons_healthy():
+    import patient_tab
+    state = patient_tab.on_build(PATIENT_TEXT["P2"], None)[5]
+    out = patient_tab.on_show_questions(state)
+    shown = [b["value"] for b in out[:-1] if b["visible"]]
+    Q = patient_tab.SUGGESTED_QUESTIONS
+    ok = shown == [Q[0], Q[1], patient_tab.DRIVERS_ONLY_QUESTION] and "quitting smoking" in out[-1]["value"]
+    return ok, f"{len(shown)} of 6 offered ({'; '.join(x[:34] for x in shown)}…); note: {out[-1]['value'][:110]}…"
+
+
+def t_buttons_smoker():
+    import patient_tab
+    state = patient_tab.on_build(PATIENT_TEXT["P1"], None)[5]
+    out = patient_tab.on_show_questions(state)
+    shown = [b["value"] for b in out[:-1] if b["visible"]]
+    return (shown == list(patient_tab.SUGGESTED_QUESTIONS) and not out[-1]["visible"],
+            f"{len(shown)} of 6 offered; nothing left out")
+
+
+def t_buttons_reported_chd():
+    import patient_tab
+    state = patient_tab.on_build(PATIENT_TEXT["P6"] + ", heart attack", None)[5]
+    shown = [b["value"] for b in patient_tab.on_show_questions(state)[:-1] if b["visible"]]
+    return (patient_tab.SUGGESTED_QUESTIONS[5] in shown and patient_tab.SUGGESTED_QUESTIONS[4] not in shown,
+            f"{len(shown)} of 6 offered: the diagnosis (it explains the report) but not the supplement plan")
+
+
+def t_young_reference_note():
+    import patient_tab
+    summary = patient_tab.on_build(PATIENT_TEXT["P1"], None)[1]
+    ok = ("'RDW 14.1 %' counts as high here" in summary and "'albumin 4.1 g/dL' counts as low here" in summary
+          and "not age-adjusted" in summary and "stricter than a laboratory range" in summary)
+    return ok, "the build notes say RDW 14.1 % and albumin 4.1 g/dL count against LinAge2's reference for men up to 50, are stricter than a laboratory range, and are not age-adjusted"
+
+
+def t_rdw_gate():
+    p = _read("58 year old male\nRDW 14.5 %\nhemoglobin 11.5 g/dL")
+    m = p.kb_markers()
+    ok = ("RDW" not in m and any("was not passed on as a sign of inflammation" in n for n in p.witness_notes)
+          and abs(p.labs()["LBXRDW"] - 14.5) < 1e-9)
+    return ok, "RDW 14.5 % withheld as a witness (hemoglobin 11.5 g/dL is below the usual limit); LinAge2 still uses 14.5 %"
+
+
+def t_trig_not_fasting():
+    p = _read("58 year old male\ntriglycerides 190 mg/dL")
+    ok = "Triglycerides" not in p.kb_markers() and any("triglycerides were not marked fasting" in n for n in p.notes)
+    return ok, "no witness from a triglyceride not marked fasting; the note says to write 'fasting triglycerides …'"
+
+
+def t_trig_boundary():
+    from core.patient_builder import build_patient
+    def elevated(mg):
+        m = _read(f"58 year old male\nfasting triglycerides {mg} mg/dL").kb_markers()["Triglycerides"]
+        return build_patient({"age": 58, "sex": "Male", "markers": {"Triglycerides": m}}).witnesses == ["Triglycerides"]
+    return (elevated(150) and not elevated(149), "fasting 150 mg/dL is elevated, 149 mg/dL is not (a curated threshold, z = 1 at 150)")
+
+
 def c_decomp_top(resp):
     d = decomposition(resp)
-    cot, alb = contribution(d, "SerumCotinine"), contribution(d, "SerumAlbumin")
+    cot, alb, bp = contribution(d, "SerumCotinine"), contribution(d, "SerumAlbumin"), contribution(d, "SystolicBloodPressure")
     ident = d["attributed_measured_years"] + d["attributed_imputed_years"] + d["age_term_residual_years"]
+    causes = ["ChronicInflammation", "CellularSenescence"]
     ok = (d["measured"][0]["symbol"] == "SerumCotinine" and cot["witnessed"] is True
-          and alb["reads_out"] is None and alb["driven_by"] == [] and abs(ident - d["delta_years"]) < 1e-4)
+          and alb["reads_out"] == "LowSerumAlbumin" and alb["witnessed"] is True and alb["driven_by"] == causes
+          and bp["reads_out"] is None and bp["driven_by"] == [] and abs(ident - d["delta_years"]) < 1e-4)
     return ok, (f"Δ {d['delta_years']:+.2f} y; top: SerumCotinine {cot['years']:+.2f} y (witnessed); "
-                f"SerumAlbumin {alb['years']:+.2f} y, no cause; measured {d['attributed_measured_years']:+.2f} + "
+                f"SerumAlbumin {alb['years']:+.2f} y, witnessed, DrivenBy {alb['driven_by']}; "
+                f"SystolicBloodPressure {bp['years']:+.2f} y, no cause; measured {d['attributed_measured_years']:+.2f} + "
                 f"imputed {d['attributed_imputed_years']:+.2f} + age term {d['age_term_residual_years']:+.2f}")
+
+
+def c_rdw_albumin_cause(resp):
+    d = decomposition(resp)
+    rdw, alb = contribution(d, "RedCellDistributionWidth"), contribution(d, "SerumAlbumin")
+    causes = ["ChronicInflammation", "CellularSenescence"]
+    ok = (rdw["reads_out"] == "RDW" and rdw["witnessed"] is True and rdw["driven_by"] == causes
+          and alb["reads_out"] == "LowSerumAlbumin" and alb["witnessed"] is True and alb["driven_by"] == causes)
+    return ok, (f"RDW {rdw['years']:+.2f} y and SerumAlbumin {alb['years']:+.2f} y, both witnessed against LinAge2's young "
+                f"reference, both DrivenBy {causes}")
+
+
+def c_kidney_no_lever(resp):
+    d = decomposition(resp)
+    cr, bp = contribution(d, "SerumCreatinine"), contribution(d, "SystolicBloodPressure")
+    ok = cr["reads_out"] is None and cr["driven_by"] == [] and bp["reads_out"] is None and bp["driven_by"] == []
+    return ok, (f"SerumCreatinine {cr['years']:+.2f} y and SystolicBloodPressure {bp['years']:+.2f} y reported as years: "
+                f"no readout, no cause, no lever")
+
+
+def c_cf_inflammation_via_marks(lever):
+    def check(resp):
+        cf = counterfactual(resp)
+        if cf is None:
+            return False, "no counterfactual atom"
+        ok = cf["expected_delta_years"] < -1.0 and cf["via"] == ["RedCellDistributionWidth", "SerumAlbumin"]
+        return ok, (f"{lever}: {cf['expected_delta_years']:+.2f} y, confidence {cf['confidence']}, Via {cf['via']} "
+                    f"(chronic inflammation's years, the same for every name that reaches it)")
+    return check
 
 
 def c_hba1c_cause(resp):
@@ -424,6 +532,69 @@ def c_builtin_empty(resp):
     return (resp["pln_status"] == "empty" and warned, f"pln_status {resp['pln_status']}; warning: {warned}")
 
 
+def _warned(resp: dict, needle: str) -> bool:
+    return any(needle in w for w in resp.get("warnings", []))
+
+
+def c_heart_pair(resp):
+    heads = [x.split()[0].strip("(") for x in atoms(resp)]
+    ok = (resp["routed"] == "linage2+generic" and "LinAgeHazard" in heads and "RiskPrediction" not in heads
+          and _warned(resp, "ALL-CAUSE") and _warned(resp, "no AgeAccelGrim value"))
+    return ok, f"routed {resp['routed']}; answers: {', '.join(heads)}; notes: no GrimAge value, the hazard is ALL-CAUSE"
+
+
+def c_first_event(resp):
+    a = [x for x in atoms(resp) if x.startswith("(RiskPrediction")]
+    ok = bool(a) and _warned(resp, "FIRST coronary event")
+    point = _num(r"\(point ([-\d.eE]+)\)", a[0]) if a else None
+    return ok, (f"10-year CHD risk {point:.1%}, with the first-event note" if ok and point is not None else "no risk or no note")
+
+
+def c_nothing_diagnosis(resp):
+    ok = atoms(resp) == ["()"] and _warned(resp, "has no elevated value the knowledge base can use") and _warned(resp, "nothing to work from")
+    return ok, f"atoms {atoms(resp)}; the note says 'nothing to work from', not 'no cause'"
+
+
+def c_nothing_plan(resp):
+    a = atoms(resp)
+    ok = (bool(a) and "(Tier1HighConfidence ()) (Tier2Promising ())" in a[0] and "(NotRecommended ())" in a[0]
+          and _warned(resp, "every supplement tier is empty"))
+    return ok, "all four tiers empty; the note says every supplement tier is empty and why"
+
+
+def c_trig_diagnosis(resp):
+    a = atoms(resp)
+    m = re.search(r"\(Hypothesis InsulinResistance \(stv [^)]*\) 3\.0 [-\d.eE]+ \(SupportedBy \(([^)]*)\)\)", a[0] if a else "")
+    ok = bool(m) and "Triglycerides" in m.group(1).split()
+    return ok, f"InsulinResistance at coverage 3, supported by ({m.group(1) if m else '?'})"
+
+
+def c_chd_diagnosis(resp):
+    a = atoms(resp)
+    ok = (bool(a) and "CoronaryHeartDisease" in a[0] and _warned(resp, "read by the diagnosis as one observation")
+          and _warned(resp, "prevalence item"))
+    first_h = re.search(r"\(Hypothesis (\w+)[^()]*(?:\([^()]*\))*[^()]*\(SupportedBy \(([^)]*)\)\)", a[0] if a else "")
+    return ok, (f"top hypothesis {first_h.group(1)} supported by ({first_h.group(2)}); the notes call it a prevalence item"
+                if first_h else "no hypothesis")
+
+
+def c_same_atoms(resp, other):
+    same = resp["_http"] == other["_http"] == 200 and atoms(resp) == atoms(other) and bool(atoms(resp))
+    return same, f"{len(atoms(resp))} atom(s), byte-identical with and without the difference: {same}"
+
+
+def c_metformin_plan_flag(resp):
+    a = atoms(resp)
+    ok = bool(a) and "(InteractionFlag Berberine Metformin" in a[0]
+    return ok, "the plan's Interactions list holds (InteractionFlag Berberine Metformin …); no tier changed"
+
+
+def c_metformin_single_flag(resp):
+    a = atoms(resp)
+    ok = any(x.startswith("(InteractionFlag Berberine Metformin") for x in a) and any(x.startswith("(SuppRec Berberine") for x in a)
+    return ok, f"{len(a)} atoms: the record and (InteractionFlag Berberine Metformin …)"
+
+
 E = Entry
 ENTRIES: list[Entry] = [
     # ── A. the tab ───────────────────────────────────────────────────────────
@@ -465,6 +636,20 @@ ENTRIES: list[Entry] = [
       where="In My Patient → Build", patient=None, tab_check=t_build_session),
     E("A3", "Clear patient", None, "The session forgets the patient; the banner says none is loaded.",
       where="In My Patient", patient=None, tab_check=t_clear),
+    E("A4", "Build the smoker example → the suggested questions", None, "All six buttons are offered: every form answers for this patient.",
+      where="In My Patient → Build", patient=None, tab_check=t_buttons_smoker),
+    E("A4", "Build the healthy example → the suggested questions", None, "Only the three that answer are offered (the clock, the hazard, the drivers of biological age). Quitting smoking, 'what could I do', the supplement plan and the diagnosis would come back empty or at zero, and a line says so.",
+      where="In My Patient → Build", patient=None, tab_check=t_buttons_healthy),
+    E("A4", "A patient with no elevated witness who reports a heart attack → the suggested questions", None, "The diagnosis button stays (it explains the reported heart disease), the supplement plan does not.",
+      where="In My Patient → Build", patient=None, tab_check=t_buttons_reported_chd),
+    E("A4", "Build the smoker example → the notes", None, "RDW 14.1 % and albumin 4.1 g/dL count as inflammation signs because they are z-scores against LinAge2's reference for men up to 50: stricter than a laboratory range, not age-adjusted, and 'a hint, not a finding'.",
+      where="In My Patient → Build", patient=None, tab_check=t_young_reference_note),
+    E("A4", "RDW 14.5 % · hemoglobin 11.5 g/dL", None, "A raised RDW is what anaemia looks like too: it is not passed on as a sign of inflammation, and the note says why. LinAge2 still uses 14.5 %.",
+      where="In My Patient → Build", patient=None, tab_check=t_rdw_gate),
+    E("A4", "triglycerides 190 mg/dL (not marked fasting)", None, "No witness: the knowledge base's triglyceride witness is a fasting value (a meal adds up to 27 mg/dL). The note says to write 'fasting triglycerides …'; LinAge2 still has the value.",
+      where="In My Patient → Read", patient=None, tab_check=t_trig_not_fasting),
+    E("A4", "fasting triglycerides 149 mg/dL · 150 mg/dL", None, "The threshold is a curated 150 mg/dL, the usual limit: 150 is elevated, 149 is not.",
+      where="In My Patient → Build", patient=None, tab_check=t_trig_boundary),
 
     # ── B. decomposition ─────────────────────────────────────────────────────
     E("B1", "which of my labs make me biologically older?", "(linage-decomposition-patient &self Caller_Me)",
@@ -490,6 +675,11 @@ ENTRIES: list[Entry] = [
     E("B2", "what are the main drivers?", "(linage-drivers-patient &self Caller_Me)",
       "Measured inputs above the driver threshold only; imputed inputs never appear.", check=c_drivers),
 
+    # ── B3. the new readouts
+    E("B3", "why does my RDW add years?", "(linage-decomposition-patient &self Caller_Me)",
+      "RDW and albumin, which used to be carried as years with no cause, are now credited to chronic inflammation and cellular senescence — only because the patient's own values are beyond LinAge2's young reference. Weak, human-observational priors, said so in the notes.",
+      check=c_rdw_albumin_cause),
+
     # ── C. hazard and risk ───────────────────────────────────────────────────
     E("C1", "how much does my biological age raise my risk of dying?", "(linage-hazard-patient &self Caller_Me)",
       "Hazard = 1.093^Δ (Fong 2025's null-model doubling time), confidence 0.54 (one observational cohort). A number, not \"may increase\".",
@@ -505,6 +695,12 @@ ENTRIES: list[Entry] = [
       patient="P4", check=c_grim_risk),
     E("C2", "combine my GrimAge and LinAge2 into one risk number", None,
       "Declines: the two clocks are not combined (that would double-count the same mortality signal); each is reported on its own.", patient="P4"),
+    E("C2", "what's my heart risk? (no GrimAge value)", "(predict-risk-patient &self Caller_Me)\n(linage-hazard-patient &self Caller_Me)",
+      "The heart-disease model has no input without a GrimAge value and returns nothing; the answer is the ALL-CAUSE LinAge2 hazard beside it, labelled as such, never relabelled as heart risk and never multiplied with a GrimAge result.",
+      check=c_heart_pair),
+    E("C2", "what's my 10-year heart-disease risk? (reports a heart attack)", "(predict-risk-patient &self Caller_Me)",
+      "The same number as without the history (the model estimates a FIRST coronary event), so the answer carries a note that it does not describe someone who already has the disease.",
+      patient="P10", check=c_first_event),
     E("C2", "does LinAge2 say anything about my heart risk specifically?", None,
       "No cause-specific risk from LinAge2 — the paper reports none per year of Δ; the all-cause hazard is not relabelled as heart risk."),
 
@@ -524,25 +720,42 @@ ENTRIES: list[Entry] = [
       "Through InsulinResistance → HbA1c, with visibly LOWER confidence than the mechanism's own edge — a drug is one hop further from the lab.",
       patient="P3", check=c_metformin),
     E("D2", "would lowering inflammation help?", "(linage-counterfactual-patient &self Caller_Me ChronicInflammation)",
-      "0 with an empty Via: CRP 3.1 mg/L is not elevated for this patient, so there is nothing for the lever to remove. Not a claim that anti-inflammatories are useless.",
-      check=c_cf("ChronicInflammation", zero=True)),
+      "CRP 3.1 mg/L is not elevated for this patient, but their RDW and albumin read as inflammation signs against LinAge2's young reference (weak, Epidemiological-tier priors), so the lever removes years through those two inputs: Via (RedCellDistributionWidth SerumAlbumin).",
+      check=c_cf_inflammation_via_marks("ChronicInflammation")),
+    E("D2", "would lowering inflammation help?", "(linage-counterfactual-patient &self Caller_Me ChronicInflammation)",
+      "For the healthy woman (P2): 0 with an empty Via — nothing she presents is elevated, so there is nothing for the lever to remove. Not a claim that anti-inflammatories are useless.",
+      patient="P2", check=c_cf("ChronicInflammation", zero=True)),
     E("D3", "what could I do about my biological age?", "(linage-scenarios-patient &self Caller_Me)",
       "The four standing levers, each with its own number and route; no joint operator and no summed \"total you could save\".",
       check=c_scenarios),
     E("D3", "and elamipretide?", "(linage-counterfactual-patient &self Caller_Me Elamipretide)",
       "Omitted (no causal chain to any LinAge2 input) — not ranked last at a fake 0.", check=c_omitted),
-    E("D3", "how much would fixing my albumin take off?", "(linage-counterfactual-patient &self Caller_Me SerumAlbumin)",
-      "Nothing: no lever in the knowledge base reaches albumin. The answer says so rather than inventing one.",
+    E("D3", "how much would fixing my albumin take off?", "(linage-counterfactual-patient &self Caller_Me LowSerumAlbumin)",
+      "The albumin DEFICIT is a marker the knowledge base has a cause for (chronic inflammation), so the lever acts through that cause and returns its years, shared with RDW; a low albumin is also what low protein intake looks like, which the prior does not model.",
+      check=c_cf_inflammation_via_marks("LowSerumAlbumin")),
+    E("D3", "what if my RDW were normal?", "(linage-counterfactual-patient &self Caller_Me RDW)",
+      "RDW is the other readout of the same cause: the same years, the same Via. Two names for one lever is the honest answer, not two benefits to add.",
+      check=c_cf_inflammation_via_marks("RDW")),
+    E("D3", "how much would the LinAge2 input SerumAlbumin take off?", "(linage-counterfactual-patient &self Caller_Me SerumAlbumin)",
+      "Nothing: SerumAlbumin is the clock's input, not a knowledge-base marker (the marker is LowSerumAlbumin). The answer is omitted rather than invented.",
       check=c_omitted),
+
+    # ── D4. no lever, no cause
+    E("D4", "what should I do about my kidney function?", "(linage-decomposition-patient &self Caller_Me)",
+      "The knowledge base holds no curated cause or lever for kidney function: the form is the decomposition, which shows what creatinine and the rest add in years and credits no cause. No lever token is made from a lab's name.",
+      patient="P6", check=c_kidney_no_lever),
+    E("D4", "what if my blood pressure were normal?", "(linage-decomposition-patient &self Caller_Me)",
+      "Same: blood pressure has no curated cause or lever. The years it adds are reported as years, never as what 'normal' would remove.",
+      patient="P6", check=c_kidney_no_lever),
 
     # ── E. one message, several layers ───────────────────────────────────────
     E("E1", "give me my LinAge2 drivers and my supplement plan",
       "(linage-drivers-patient &self Caller_Me)\n(recommend-supplements-patient &self Caller_Me)",
-      "Two expressions, two spaces, one request (routed linage2+generic): drivers from the LinAge2 space, the supplement plan from the shared space using the same CRP / HbA1c witnesses; answers in the order asked.",
+      "Two expressions, two spaces, one request (routed linage2+generic): drivers from the LinAge2 space, the supplement plan from the shared space using the same witnesses (HbA1c, glucose, RDW, albumin); answers in the order asked.",
       check=c_mixed),
     E("E1", "what is the likely driver of my abnormal labs?",
-      "(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation InsulinResistance DeregulatedNutrientSensing MitochondrialDysfunction))",
-      "Answered in the shared space for a patient who carries a LinAge2 result (this aborted the interpreter before); insulin resistance leads, supported by the typed HbA1c and fasting glucose.",
+      "(diagnose-patient &self Caller_Me)",
+      "Answered in the shared space for a patient who carries a LinAge2 result (this aborted the interpreter before), over the knowledge base's default candidate causes (it used to be empty with the translator's three-hallmark example): insulin resistance leads, supported by the typed HbA1c and fasting glucose; chronic inflammation follows, supported by the RDW and the low albumin.",
       check=c_diagnose),
     E("E1", "my hazard, my supplements, and whether metformin would help",
       "(linage-hazard-patient &self Caller_Me)\n(recommend-supplements-patient &self Caller_Me)\n(linage-counterfactual-patient &self Caller_Me Metformin)",
@@ -550,6 +763,32 @@ ENTRIES: list[Entry] = [
     E("E1", "decompose my GrimAge", "(decompose-grimage &self Caller_Me)",
       "The DNA-methylation clock's decomposition sees AgeAccelGrim only; nothing from LinAge2 leaks into it.", patient="P4",
       check=c_grim_decomp),
+
+    # ── E2. the shared layers say what they cannot do
+    E("E2", "what is the likely driver of my abnormal labs? (nothing the knowledge base has an edge for)", "(diagnose-patient &self Caller_Me)",
+      "() — and a note says it is 'nothing to work from', not 'no cause': creatinine, blood pressure, cholesterol and typed diagnoses have no curated edge.",
+      patient="P6", check=c_nothing_diagnosis),
+    E("E2", "which supplements for me? (nothing the knowledge base has an edge for)", "(recommend-supplements-patient &self Caller_Me)",
+      "Every tier is empty, and the note says why; the ranking would be the population's, the same as for an unknown patient.",
+      patient="P6", check=c_nothing_plan),
+    E("E2", "what is the likely driver of my abnormal labs? (fasting triglycerides 190)", "(diagnose-patient &self Caller_Me)",
+      "Fasting triglycerides hang on insulin resistance like HbA1c: insulin resistance is supported by three findings, not two.",
+      patient="P8", check=c_trig_diagnosis),
+    E("E2", "what is the likely driver of my abnormal labs? (reports a heart attack)", "(diagnose-patient &self Caller_Me)",
+      "The report is ONE observation the diagnosis explains (a prevalence item, not a measured value), and a note says so; the causes it offers are population-level associations.",
+      patient="P9", check=c_chd_diagnosis),
+    E("E2", "which supplements for me? (reports a heart attack, compared with the smoker)", "(recommend-supplements-patient &self Caller_Me)",
+      "Byte-identical to the plan without the report: the supplement plan does not read it.",
+      patient="P9", versus="P1", check=c_same_atoms),
+    E("E2", "which supplements for me? (with and without 'diagnoses: hypertension')", "(recommend-supplements-patient &self Caller_Me)",
+      "A typed diagnosis with no curated edge leaves the plan byte-identical.",
+      patient="P1", versus="P11", check=c_same_atoms),
+    E("E2", "which supplements for me? (takes metformin)", "(recommend-supplements-patient &self Caller_Me)",
+      "The plan flags Berberine against the metformin the person takes (the knowledge base's one interaction fact); it changes no tier and no ranking.",
+      patient="P7", check=c_metformin_plan_flag),
+    E("E2", "should I take berberine? (takes metformin)", "(supplement-for-patient &self Caller_Me Berberine)",
+      "The single-supplement answer carries the same flag beside the record — it used to return a bare record.",
+      patient="P7", check=c_metformin_single_flag),
 
     # ── F. honesty and robustness ────────────────────────────────────────────
     E("F1", "what's Patient001's LinAge2?", "(linage-hazard-patient &self Patient001)",
@@ -586,10 +825,12 @@ SECTIONS = {
 }
 SUBSECTIONS = {
     "A1": "Units and plausibility", "A2": "Who the person is", "A3": "The session",
-    "B1": "The smoker (P1)", "B2": "Other patients, other gaps",
+    "A4": "What the tab says about the new readouts, and which questions it offers",
+    "B1": "The smoker (P1)", "B2": "Other patients, other gaps", "B3": "RDW and albumin: weak readouts of inflammation",
     "C1": "All-cause", "C2": "Two clocks",
     "D1": "Smoking", "D2": "Metabolic and inflammatory levers", "D3": "Scenarios and the absent",
-    "E1": "Mixed programs",
+    "D4": "No lever, no cause",
+    "E1": "Mixed programs", "E2": "What the shared layers say they cannot do",
     "F1": "No input, no invention", "F2": "Determinism and framing",
 }
 
@@ -640,6 +881,7 @@ def run_all() -> None:
         else:
             patient = payloads[e.patient] if e.patient else None
             resp = ask(e.query, e.run or e.emits, patient)
+            other = ask(e.query, e.run or e.emits, payloads[e.versus]) if e.versus else None
             if e.check is None:                       # the determinism entry
                 again = ask(e.query, e.run or e.emits, patient)
                 untimed = lambda a: re.sub(r" — \d+ ms", "", a)  # noqa: E731  (the run time)
@@ -651,7 +893,7 @@ def run_all() -> None:
                 ok, obs = False, f"HTTP {resp['_http']}: {json.dumps(resp.get('detail'))[:200]}"
             else:
                 try:
-                    ok, obs = e.check(resp)
+                    ok, obs = e.check(resp, other) if e.versus else e.check(resp)
                 except Exception as exc:  # noqa: BLE001
                     ok, obs = False, f"{type(exc).__name__}: {exc}"
             e.result = {"status": "pass" if ok else "fail", "observed": obs,
@@ -774,14 +1016,15 @@ def render(date: str) -> str:
 </section>
 <section class="part">
   <div class="eyebrow">Patients</div><h2>Who the questions are about</h2>
-  <p class="intro">Five patients, each typed into the tab as plain text and built by the tab's own
+  <p class="intro">@@N@@ patients, each typed into the tab as plain text and built by the tab's own
   reader and the in-process LinAge2, always as <code>Caller_Me</code>. P1–P3 are the tab's example
-  buttons, shown below exactly as typed; P4 and P5 are one-line variations of P1.</p>
-  <table class="pt">""")
+  buttons, shown below exactly as typed; P4, P5 and P7–P11 are one-line variations of P1, and P6 is a patient
+  whose labs and diagnoses the knowledge base has no curated edge for.</p>
+  <table class="pt">""".replace("@@N@@", str(len(PATIENT_TEXT))))
     for pid in PATIENT_TEXT:
         out.append(f"<tr><td><b>{pid}</b></td><td>{esc(PATIENT_LABEL[pid])}</td></tr>")
     out.append("</table><div class='texts'>")
-    for pid in ("P1", "P2", "P3"):
+    for pid in ("P1", "P2", "P3", "P6"):
         out.append(f"<div><div class='eyebrow'>{pid} · as typed</div><pre class='pt'>{esc(PATIENT_TEXT[pid])}</pre></div>")
     out.append("</div></section>")
 
@@ -800,7 +1043,7 @@ def render(date: str) -> str:
             current_sub = e.section
         status = e.result.get("status", "live")
         tick = {"pass": "✓ PASS", "fail": "✗ FAIL", "live": "◌ LIVE"}[status]
-        who = f" · patient {e.patient}" if e.patient else ""
+        who = (f" · patient {e.patient}" if e.patient else "") + (f" vs {e.versus}" if e.versus else "")
         emits = (f"<div class='line emits'><span class='lab'>EMITS</span><code>{esc(e.emits)}</code></div>"
                  if e.emits else "<div class='line'><span class='lab'>EMITS</span>∅ (direct answer)</div>")
         if e.tab_check is not None:
@@ -823,7 +1066,13 @@ def render(date: str) -> str:
         ("In-process LinAge2 (exactness, partial panels)", nums(lambda e: e.section in ("B1", "B2"))),
         ("Witness rule: years vs causes", nums(lambda e: e.check in (c_decomp_top, c_hba1c_cause, c_glucose_sign, c_unwitnessed_cotinine, c_younger))),
         ("Imputed inputs totalled apart, never credited", nums(lambda e: e.check in (c_imputed_apart, c_six_labs, c_drivers))),
-        ("Hazard, absolute risk, two clocks kept apart", nums(lambda e: e.section in ("C1", "C2"))),
+        ("Hazard, absolute risk, two clocks kept apart; heart risk without GrimAge; first-event note", nums(lambda e: e.section in ("C1", "C2"))),
+        ("RDW and albumin as weak inflammation readouts (young reference, gated)",
+         nums(lambda e: e.section == "B3" or "c_cf_inflammation_via_marks" in getattr(e.check, "__qualname__", "")
+              or e.tab_check in (t_young_reference_note, t_rdw_gate))),
+        ("No lever, no cause: a lab or condition the knowledge base has no relation for", nums(lambda e: e.section == "D4")),
+        ("The shared layers say 'nothing to work from'; a medication, a heart attack, fasting triglycerides", nums(lambda e: e.section == "E2")),
+        ("Suggested questions that depend on the patient", nums(lambda e: e.tab_check in (t_buttons_smoker, t_buttons_healthy, t_buttons_reported_chd))),
         ("Counterfactuals in years; engine-enforced preconditions", nums(lambda e: e.section in ("D1", "D2", "D3"))),
         ("Shared-space questions for a LinAge2 patient (the crash fix)", nums(lambda e: e.check in (c_grim_risk, c_diagnose, c_mixed, c_interleaved, c_grim_decomp))),
         ("Empty is the pass", nums(lambda e: e.check in (c_empty_with_reason, c_omitted, c_builtin_empty))),
@@ -858,10 +1107,18 @@ def main() -> None:
     page = OUT / "battery.html"
     page.write_text(render(args.date), encoding="utf-8")
     if not args.no_pdf:
-        chrome = shutil.which("chromium") or "/opt/pw-browsers/chromium"
+        chrome = (shutil.which("chromium") or "/opt/pw-browsers/chromium")
+        mac = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        if not Path(chrome).exists() and Path(mac).exists():
+            chrome = mac
         pdf = OUT / "LinAge2QueryBattery.pdf"
-        subprocess.run([chrome, "--headless", "--no-sandbox", "--disable-gpu", "--no-pdf-header-footer",
-                        f"--print-to-pdf={pdf}", page.as_uri()], check=True, capture_output=True)
+        pdf.unlink(missing_ok=True)
+        # Chrome on macOS writes the file and then crashes in teardown (non-zero exit), so the file, not the exit
+        # code, is the proof
+        done = subprocess.run([chrome, "--headless", "--no-sandbox", "--disable-gpu", "--no-pdf-header-footer",
+                               f"--print-to-pdf={pdf}", page.as_uri()], capture_output=True, timeout=300)
+        if not (pdf.exists() and pdf.stat().st_size > 10_000 and pdf.read_bytes()[:5] == b"%PDF-"):
+            raise RuntimeError(f"no PDF was written (exit {done.returncode}): {done.stderr[-400:]!r}")
         print(f"wrote {pdf.relative_to(REPO)}")
     fails = [e for e in ENTRIES if e.result.get("status") == "fail"]
     print(f"{sum(e.result.get('status') == 'pass' for e in ENTRIES)} pass, {len(fails)} fail, "

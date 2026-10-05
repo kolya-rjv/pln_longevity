@@ -28,6 +28,25 @@ settle disagreements and rank them. Full lead-by-lead evidence, probes and verdi
   placement aborts the shared space). The smoker example's two largest unexplained drivers
   then get a cause, and the inflammation levers go from 0 to −2.5 y and −1.8 y.
 
+## Status of the implementation (updated 2026-10-05)
+
+Done on branch `linage2`, one commit per item (`git log --oneline 7cb7f27..HEAD` for the last phases):
+#2, #1, #4, #5, #9, #3 (phase 1, with two adversarial review rounds, `REVIEW_ROUND1.md`, `REVIEW_ROUND2.md`); #6 (decided: status
+quo, nothing implemented); **#8** patient-dependent suggested buttons; **#10** the no-lever rule (checked against the
+live translator); **#7** RDW and low albumin; **#12** reduced to fasting triglycerides; **#11** the narrow form; **#13** battery.
+Decisions of 2026-10-05, with the reasons the proposal gave (`PHASE3_PROPOSAL.md`):
+
+- **#7 witness: LinAge2's young reference** (z above 1, sex-specific, not age-adjusted), not clinical limits. The cost is
+  known and printed in the tab: a value inside the usual laboratory range counts (a man with albumin 4.3 g/dL now gets an
+  inflammation hypothesis and an Omega-3 tier). The one-constant alternative (RDW > 15 %, albumin < 3.5 g/dL) would change
+  nothing for the three tab examples. The node is `LowSerumAlbumin`. A raised RDW is withheld as a witness when a typed
+  hemoglobin, ferritin, B12 or folate is below its usual lower limit (conventions on the sensitive side, not from a paper).
+- **#12: triglycerides only.** The urate edge is not built (it would imply "metformin lowers urate", on which two studies
+  disagree) and neither is white cell count (no primary anchor; smoking confounds it). Triglycerides: a FASTING value of
+  150 mg/dL or more; the builder's reference is a curated threshold (z = 1 at 150 mg/dL), not a cohort.
+- **#11: the narrow form.** A reported CHD, angina or heart attack is one observation for `diagnose-patient` only; the
+  supplement plan, the single-supplement form and the ranking are byte-identical with and without it (tests).
+
 ## Recommended plan
 
 1. **No decision needed, small (S):** #2 latency fix → #1 default cause list → #4 "nothing

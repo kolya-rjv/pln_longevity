@@ -1,5 +1,5 @@
 {
- "date": "2026-10-04",
+ "date": "2026-10-05",
  "entries": [
   {
    "n": 1,
@@ -189,7 +189,7 @@
    "patient": null,
    "pass_criterion": "Banner in PLN Query reads \"Active patient: Caller_Me\"; the atoms are viewable; Download writes to the system temp directory; no .metta file appears in the repository (Browse Ontology Files is unchanged).",
    "status": "pass",
-   "observed": "banner: **Active patient: Caller_Me** · 58-year-old male · CurrentSm…; .metta files in the repo unchanged (35); download at /tmp/pln_patients_…/pln_patient_Caller_Me_….metta"
+   "observed": "banner: **Active patient: Caller_Me** · 58-year-old male · CurrentSm…; .metta files in the repo unchanged (37); download at <system temp dir>/pln_patients_…/pln_patient_Caller_Me_….metta"
   },
   {
    "n": 20,
@@ -203,19 +203,89 @@
   },
   {
    "n": 21,
+   "section": "A4",
+   "query": "Build the smoker example → the suggested questions",
+   "emits": null,
+   "patient": null,
+   "pass_criterion": "All six buttons are offered: every form answers for this patient.",
+   "status": "pass",
+   "observed": "6 of 6 offered; nothing left out"
+  },
+  {
+   "n": 22,
+   "section": "A4",
+   "query": "Build the healthy example → the suggested questions",
+   "emits": null,
+   "patient": null,
+   "pass_criterion": "Only the three that answer are offered (the clock, the hazard, the drivers of biological age). Quitting smoking, 'what could I do', the supplement plan and the diagnosis would come back empty or at zero, and a line says so.",
+   "status": "pass",
+   "observed": "3 of 6 offered (Which of my labs make me biologica; How much does my biological age ra; What are the main drivers of my bi…); note: _Not offered for you, because they would come back empty: quitting smoking (you are not a current smoker); the…"
+  },
+  {
+   "n": 23,
+   "section": "A4",
+   "query": "A patient with no elevated witness who reports a heart attack → the suggested questions",
+   "emits": null,
+   "patient": null,
+   "pass_criterion": "The diagnosis button stays (it explains the reported heart disease), the supplement plan does not.",
+   "status": "pass",
+   "observed": "4 of 6 offered: the diagnosis (it explains the report) but not the supplement plan"
+  },
+  {
+   "n": 24,
+   "section": "A4",
+   "query": "Build the smoker example → the notes",
+   "emits": null,
+   "patient": null,
+   "pass_criterion": "RDW 14.1 % and albumin 4.1 g/dL count as inflammation signs because they are z-scores against LinAge2's reference for men up to 50: stricter than a laboratory range, not age-adjusted, and 'a hint, not a finding'.",
+   "status": "pass",
+   "observed": "the build notes say RDW 14.1 % and albumin 4.1 g/dL count against LinAge2's reference for men up to 50, are stricter than a laboratory range, and are not age-adjusted"
+  },
+  {
+   "n": 25,
+   "section": "A4",
+   "query": "RDW 14.5 % · hemoglobin 11.5 g/dL",
+   "emits": null,
+   "patient": null,
+   "pass_criterion": "A raised RDW is what anaemia looks like too: it is not passed on as a sign of inflammation, and the note says why. LinAge2 still uses 14.5 %.",
+   "status": "pass",
+   "observed": "RDW 14.5 % withheld as a witness (hemoglobin 11.5 g/dL is below the usual limit); LinAge2 still uses 14.5 %"
+  },
+  {
+   "n": 26,
+   "section": "A4",
+   "query": "triglycerides 190 mg/dL (not marked fasting)",
+   "emits": null,
+   "patient": null,
+   "pass_criterion": "No witness: the knowledge base's triglyceride witness is a fasting value (a meal adds up to 27 mg/dL). The note says to write 'fasting triglycerides …'; LinAge2 still has the value.",
+   "status": "pass",
+   "observed": "no witness from a triglyceride not marked fasting; the note says to write 'fasting triglycerides …'"
+  },
+  {
+   "n": 27,
+   "section": "A4",
+   "query": "fasting triglycerides 149 mg/dL · 150 mg/dL",
+   "emits": null,
+   "patient": null,
+   "pass_criterion": "The threshold is a curated 150 mg/dL, the usual limit: 150 is elevated, 149 is not.",
+   "status": "pass",
+   "observed": "fasting 150 mg/dL is elevated, 149 mg/dL is not (a curated threshold, z = 1 at 150)"
+  },
+  {
+   "n": 28,
    "section": "B1",
    "query": "which of my labs make me biologically older?",
    "emits": "(linage-decomposition-patient &self Caller_Me)",
    "patient": "P1",
    "pass_criterion": "Cotinine is the largest measured input and is credited to smoking (witnessed by the stated status); albumin's years are reported with NO cause (no bridge reaches it); measured + imputed + age term = Δ exactly.",
    "status": "pass",
-   "observed": "Δ +13.28 y; top: SerumCotinine +7.53 y (witnessed); SerumAlbumin +2.36 y, no cause; measured +14.42 + imputed -1.63 + age term +0.50",
+   "observed": "Δ +13.28 y; top: SerumCotinine +7.53 y (witnessed); SerumAlbumin +2.36 y, witnessed, DrivenBy ['ChronicInflammation', 'CellularSenescence']; SystolicBloodPressure +0.52 y, no cause; measured +14.42 + imputed -1.63 + age term +0.50",
    "routed": "linage2",
    "pln_status": "ok",
    "validation_issues": []
   },
   {
-   "n": 22,
+   "n": 29,
    "section": "B1",
    "query": "what's behind the HbA1c years?",
    "emits": "(linage-decomposition-patient &self Caller_Me)",
@@ -228,7 +298,7 @@
    "validation_issues": []
   },
   {
-   "n": 23,
+   "n": 30,
    "section": "B1",
    "query": "my fasting glucose is high — is it making me older?",
    "emits": "(linage-decomposition-patient &self Caller_Me)",
@@ -241,7 +311,7 @@
    "validation_issues": []
   },
   {
-   "n": 24,
+   "n": 31,
    "section": "B1",
    "query": "how much of this is actual measurement?",
    "emits": "(linage-decomposition-patient &self Caller_Me)",
@@ -254,7 +324,7 @@
    "validation_issues": []
   },
   {
-   "n": 25,
+   "n": 32,
    "section": "B2",
    "query": "is that cotinine number about smoking?",
    "emits": "(linage-decomposition-patient &self Caller_Me)",
@@ -267,7 +337,7 @@
    "validation_issues": []
   },
   {
-   "n": 26,
+   "n": 33,
    "section": "B2",
    "query": "I only have six labs — can you still say anything?",
    "emits": "(linage-decomposition-patient &self Caller_Me)",
@@ -280,7 +350,7 @@
    "validation_issues": []
   },
   {
-   "n": 27,
+   "n": 34,
    "section": "B2",
    "query": "why is my biological age lower than my real age?",
    "emits": "(linage-decomposition-patient &self Caller_Me)",
@@ -293,7 +363,7 @@
    "validation_issues": []
   },
   {
-   "n": 28,
+   "n": 35,
    "section": "B2",
    "query": "what are the main drivers?",
    "emits": "(linage-drivers-patient &self Caller_Me)",
@@ -306,7 +376,20 @@
    "validation_issues": []
   },
   {
-   "n": 29,
+   "n": 36,
+   "section": "B3",
+   "query": "why does my RDW add years?",
+   "emits": "(linage-decomposition-patient &self Caller_Me)",
+   "patient": "P1",
+   "pass_criterion": "RDW and albumin, which used to be carried as years with no cause, are now credited to chronic inflammation and cellular senescence — only because the patient's own values are beyond LinAge2's young reference. Weak, human-observational priors, said so in the notes.",
+   "status": "pass",
+   "observed": "RDW +2.55 y and SerumAlbumin +2.36 y, both witnessed against LinAge2's young reference, both DrivenBy ['ChronicInflammation', 'CellularSenescence']",
+   "routed": "linage2",
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 37,
    "section": "C1",
    "query": "how much does my biological age raise my risk of dying?",
    "emits": "(linage-hazard-patient &self Caller_Me)",
@@ -319,7 +402,7 @@
    "validation_issues": []
   },
   {
-   "n": 30,
+   "n": 38,
    "section": "C1",
    "query": "and for me?",
    "emits": "(linage-hazard-patient &self Caller_Me)",
@@ -332,7 +415,7 @@
    "validation_issues": []
   },
   {
-   "n": 31,
+   "n": 39,
    "section": "C1",
    "query": "so what's my chance of dying in the next ten years?",
    "emits": "(linage-risk-patient &self Caller_Me)",
@@ -345,7 +428,7 @@
    "validation_issues": []
   },
   {
-   "n": 32,
+   "n": 40,
    "section": "C2",
    "query": "what's my 10-year heart-disease risk?",
    "emits": "(predict-risk-patient &self Caller_Me)",
@@ -358,7 +441,7 @@
    "validation_issues": []
   },
   {
-   "n": 33,
+   "n": 41,
    "section": "C2",
    "query": "combine my GrimAge and LinAge2 into one risk number",
    "emits": null,
@@ -368,7 +451,33 @@
    "observed": "A direct answer with nothing executed — grade live (needs the LLM translator)."
   },
   {
-   "n": 34,
+   "n": 42,
+   "section": "C2",
+   "query": "what's my heart risk? (no GrimAge value)",
+   "emits": "(predict-risk-patient &self Caller_Me)\n(linage-hazard-patient &self Caller_Me)",
+   "patient": "P1",
+   "pass_criterion": "The heart-disease model has no input without a GrimAge value and returns nothing; the answer is the ALL-CAUSE LinAge2 hazard beside it, labelled as such, never relabelled as heart risk and never multiplied with a GrimAge result.",
+   "status": "pass",
+   "observed": "routed linage2+generic; answers: LinAgeHazard; notes: no GrimAge value, the hazard is ALL-CAUSE",
+   "routed": "linage2+generic",
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 43,
+   "section": "C2",
+   "query": "what's my 10-year heart-disease risk? (reports a heart attack)",
+   "emits": "(predict-risk-patient &self Caller_Me)",
+   "patient": "P10",
+   "pass_criterion": "The same number as without the history (the model estimates a FIRST coronary event), so the answer carries a note that it does not describe someone who already has the disease.",
+   "status": "pass",
+   "observed": "10-year CHD risk 10.8%, with the first-event note",
+   "routed": null,
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 44,
    "section": "C2",
    "query": "does LinAge2 say anything about my heart risk specifically?",
    "emits": null,
@@ -378,7 +487,7 @@
    "observed": "A direct answer with nothing executed — grade live (needs the LLM translator)."
   },
   {
-   "n": 35,
+   "n": 45,
    "section": "D1",
    "query": "how many years would quitting smoking take off?",
    "emits": "(linage-counterfactual-patient &self Caller_Me SmokingCessation)",
@@ -391,7 +500,7 @@
    "validation_issues": []
   },
   {
-   "n": 36,
+   "n": 46,
    "section": "D1",
    "query": "how many years would quitting smoking take off?",
    "emits": "(linage-counterfactual-patient &self Caller_Me SmokingCessation)",
@@ -404,7 +513,7 @@
    "validation_issues": []
   },
   {
-   "n": 37,
+   "n": 47,
    "section": "D1",
    "query": "how many years would quitting smoking take off?",
    "emits": "(linage-counterfactual-patient &self Caller_Me SmokingCessation)",
@@ -417,7 +526,7 @@
    "validation_issues": []
   },
   {
-   "n": 38,
+   "n": 48,
    "section": "D2",
    "query": "what if my blood-sugar control were normal?",
    "emits": "(linage-counterfactual-patient &self Caller_Me InsulinResistance)",
@@ -430,7 +539,7 @@
    "validation_issues": []
   },
   {
-   "n": 39,
+   "n": 49,
    "section": "D2",
    "query": "would metformin help my biological age?",
    "emits": "(linage-counterfactual-patient &self Caller_Me Metformin)",
@@ -443,12 +552,25 @@
    "validation_issues": []
   },
   {
-   "n": 40,
+   "n": 50,
    "section": "D2",
    "query": "would lowering inflammation help?",
    "emits": "(linage-counterfactual-patient &self Caller_Me ChronicInflammation)",
    "patient": "P1",
-   "pass_criterion": "0 with an empty Via: CRP 3.1 mg/L is not elevated for this patient, so there is nothing for the lever to remove. Not a claim that anti-inflammatories are useless.",
+   "pass_criterion": "CRP 3.1 mg/L is not elevated for this patient, but their RDW and albumin read as inflammation signs against LinAge2's young reference (weak, Epidemiological-tier priors), so the lever removes years through those two inputs: Via (RedCellDistributionWidth SerumAlbumin).",
+   "status": "pass",
+   "observed": "ChronicInflammation: -2.57 y, confidence 0.6, Via ['RedCellDistributionWidth', 'SerumAlbumin'] (chronic inflammation's years, the same for every name that reaches it)",
+   "routed": "linage2",
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 51,
+   "section": "D2",
+   "query": "would lowering inflammation help?",
+   "emits": "(linage-counterfactual-patient &self Caller_Me ChronicInflammation)",
+   "patient": "P2",
+   "pass_criterion": "For the healthy woman (P2): 0 with an empty Via — nothing she presents is elevated, so there is nothing for the lever to remove. Not a claim that anti-inflammatories are useless.",
    "status": "pass",
    "observed": "ChronicInflammation: +0.00 y, confidence 0.0, Via []",
    "routed": "linage2",
@@ -456,20 +578,20 @@
    "validation_issues": []
   },
   {
-   "n": 41,
+   "n": 52,
    "section": "D3",
    "query": "what could I do about my biological age?",
    "emits": "(linage-scenarios-patient &self Caller_Me)",
    "patient": "P1",
    "pass_criterion": "The four standing levers, each with its own number and route; no joint operator and no summed \"total you could save\".",
    "status": "pass",
-   "observed": "SmokingCessation -7.16 y; InsulinResistance -0.65 y; CellularSenescence +0.00 y; ChronicInflammation +0.00 y — each separately, no joint total",
+   "observed": "SmokingCessation -7.16 y; InsulinResistance -0.65 y; CellularSenescence -1.86 y; ChronicInflammation -2.57 y — each separately, no joint total",
    "routed": "linage2",
    "pln_status": "ok",
    "validation_issues": []
   },
   {
-   "n": 42,
+   "n": 53,
    "section": "D3",
    "query": "and elamipretide?",
    "emits": "(linage-counterfactual-patient &self Caller_Me Elamipretide)",
@@ -484,12 +606,38 @@
    ]
   },
   {
-   "n": 43,
+   "n": 54,
    "section": "D3",
    "query": "how much would fixing my albumin take off?",
+   "emits": "(linage-counterfactual-patient &self Caller_Me LowSerumAlbumin)",
+   "patient": "P1",
+   "pass_criterion": "The albumin DEFICIT is a marker the knowledge base has a cause for (chronic inflammation), so the lever acts through that cause and returns its years, shared with RDW; a low albumin is also what low protein intake looks like, which the prior does not model.",
+   "status": "pass",
+   "observed": "LowSerumAlbumin: -2.57 y, confidence 0.6, Via ['RedCellDistributionWidth', 'SerumAlbumin'] (chronic inflammation's years, the same for every name that reaches it)",
+   "routed": "linage2",
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 55,
+   "section": "D3",
+   "query": "what if my RDW were normal?",
+   "emits": "(linage-counterfactual-patient &self Caller_Me RDW)",
+   "patient": "P1",
+   "pass_criterion": "RDW is the other readout of the same cause: the same years, the same Via. Two names for one lever is the honest answer, not two benefits to add.",
+   "status": "pass",
+   "observed": "RDW: -2.57 y, confidence 0.6, Via ['RedCellDistributionWidth', 'SerumAlbumin'] (chronic inflammation's years, the same for every name that reaches it)",
+   "routed": "linage2",
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 56,
+   "section": "D3",
+   "query": "how much would the LinAge2 input SerumAlbumin take off?",
    "emits": "(linage-counterfactual-patient &self Caller_Me SerumAlbumin)",
    "patient": "P1",
-   "pass_criterion": "Nothing: no lever in the knowledge base reaches albumin. The answer says so rather than inventing one.",
+   "pass_criterion": "Nothing: SerumAlbumin is the clock's input, not a knowledge-base marker (the marker is LowSerumAlbumin). The answer is omitted rather than invented.",
    "status": "pass",
    "observed": "no atom: omitted, not ranked at a fake 0",
    "routed": "linage2",
@@ -497,12 +645,38 @@
    "validation_issues": []
   },
   {
-   "n": 44,
+   "n": 57,
+   "section": "D4",
+   "query": "what should I do about my kidney function?",
+   "emits": "(linage-decomposition-patient &self Caller_Me)",
+   "patient": "P6",
+   "pass_criterion": "The knowledge base holds no curated cause or lever for kidney function: the form is the decomposition, which shows what creatinine and the rest add in years and credits no cause. No lever token is made from a lab's name.",
+   "status": "pass",
+   "observed": "SerumCreatinine +0.49 y and SystolicBloodPressure +0.93 y reported as years: no readout, no cause, no lever",
+   "routed": "linage2",
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 58,
+   "section": "D4",
+   "query": "what if my blood pressure were normal?",
+   "emits": "(linage-decomposition-patient &self Caller_Me)",
+   "patient": "P6",
+   "pass_criterion": "Same: blood pressure has no curated cause or lever. The years it adds are reported as years, never as what 'normal' would remove.",
+   "status": "pass",
+   "observed": "SerumCreatinine +0.49 y and SystolicBloodPressure +0.93 y reported as years: no readout, no cause, no lever",
+   "routed": "linage2",
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 59,
    "section": "E1",
    "query": "give me my LinAge2 drivers and my supplement plan",
    "emits": "(linage-drivers-patient &self Caller_Me)\n(recommend-supplements-patient &self Caller_Me)",
    "patient": "P1",
-   "pass_criterion": "Two expressions, two spaces, one request (routed linage2+generic): drivers from the LinAge2 space, the supplement plan from the shared space using the same CRP / HbA1c witnesses; answers in the order asked.",
+   "pass_criterion": "Two expressions, two spaces, one request (routed linage2+generic): drivers from the LinAge2 space, the supplement plan from the shared space using the same witnesses (HbA1c, glucose, RDW, albumin); answers in the order asked.",
    "status": "pass",
    "observed": "routed linage2+generic; answers in order: Contribution, SupplementRecommendation",
    "routed": "linage2+generic",
@@ -510,20 +684,20 @@
    "validation_issues": []
   },
   {
-   "n": 45,
+   "n": 60,
    "section": "E1",
    "query": "what is the likely driver of my abnormal labs?",
-   "emits": "(diagnose-patient &self Caller_Me (CellularSenescence ChronicInflammation InsulinResistance DeregulatedNutrientSensing MitochondrialDysfunction))",
+   "emits": "(diagnose-patient &self Caller_Me)",
    "patient": "P1",
-   "pass_criterion": "Answered in the shared space for a patient who carries a LinAge2 result (this aborted the interpreter before); insulin resistance leads, supported by the typed HbA1c and fasting glucose.",
+   "pass_criterion": "Answered in the shared space for a patient who carries a LinAge2 result (this aborted the interpreter before), over the knowledge base's default candidate causes (it used to be empty with the translator's three-hallmark example): insulin resistance leads, supported by the typed HbA1c and fasting glucose; chronic inflammation follows, supported by the RDW and the low albumin.",
    "status": "pass",
-   "observed": "hypotheses ranked: InsulinResistance > DeregulatedNutrientSensing; shared space, no crash",
+   "observed": "hypotheses ranked: InsulinResistance > ChronicInflammation > DeregulatedNutrientSensing > CellularSenescence; shared space, no crash",
    "routed": null,
    "pln_status": "ok",
    "validation_issues": []
   },
   {
-   "n": 46,
+   "n": 61,
    "section": "E1",
    "query": "my hazard, my supplements, and whether metformin would help",
    "emits": "(linage-hazard-patient &self Caller_Me)\n(recommend-supplements-patient &self Caller_Me)\n(linage-counterfactual-patient &self Caller_Me Metformin)",
@@ -536,7 +710,7 @@
    "validation_issues": []
   },
   {
-   "n": 47,
+   "n": 62,
    "section": "E1",
    "query": "decompose my GrimAge",
    "emits": "(decompose-grimage &self Caller_Me)",
@@ -549,7 +723,111 @@
    "validation_issues": []
   },
   {
-   "n": 48,
+   "n": 63,
+   "section": "E2",
+   "query": "what is the likely driver of my abnormal labs? (nothing the knowledge base has an edge for)",
+   "emits": "(diagnose-patient &self Caller_Me)",
+   "patient": "P6",
+   "pass_criterion": "() — and a note says it is 'nothing to work from', not 'no cause': creatinine, blood pressure, cholesterol and typed diagnoses have no curated edge.",
+   "status": "pass",
+   "observed": "atoms ['()']; the note says 'nothing to work from', not 'no cause'",
+   "routed": null,
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 64,
+   "section": "E2",
+   "query": "which supplements for me? (nothing the knowledge base has an edge for)",
+   "emits": "(recommend-supplements-patient &self Caller_Me)",
+   "patient": "P6",
+   "pass_criterion": "Every tier is empty, and the note says why; the ranking would be the population's, the same as for an unknown patient.",
+   "status": "pass",
+   "observed": "all four tiers empty; the note says every supplement tier is empty and why",
+   "routed": null,
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 65,
+   "section": "E2",
+   "query": "what is the likely driver of my abnormal labs? (fasting triglycerides 190)",
+   "emits": "(diagnose-patient &self Caller_Me)",
+   "patient": "P8",
+   "pass_criterion": "Fasting triglycerides hang on insulin resistance like HbA1c: insulin resistance is supported by three findings, not two.",
+   "status": "pass",
+   "observed": "InsulinResistance at coverage 3, supported by (Triglycerides HbA1c FastingGlucose)",
+   "routed": null,
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 66,
+   "section": "E2",
+   "query": "what is the likely driver of my abnormal labs? (reports a heart attack)",
+   "emits": "(diagnose-patient &self Caller_Me)",
+   "patient": "P9",
+   "pass_criterion": "The report is ONE observation the diagnosis explains (a prevalence item, not a measured value), and a note says so; the causes it offers are population-level associations.",
+   "status": "pass",
+   "observed": "top hypothesis InsulinResistance supported by (CoronaryHeartDisease HbA1c FastingGlucose); the notes call it a prevalence item",
+   "routed": null,
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 67,
+   "section": "E2",
+   "query": "which supplements for me? (reports a heart attack, compared with the smoker)",
+   "emits": "(recommend-supplements-patient &self Caller_Me)",
+   "patient": "P9",
+   "pass_criterion": "Byte-identical to the plan without the report: the supplement plan does not read it.",
+   "status": "pass",
+   "observed": "1 atom(s), byte-identical with and without the difference: True",
+   "routed": null,
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 68,
+   "section": "E2",
+   "query": "which supplements for me? (with and without 'diagnoses: hypertension')",
+   "emits": "(recommend-supplements-patient &self Caller_Me)",
+   "patient": "P1",
+   "pass_criterion": "A typed diagnosis with no curated edge leaves the plan byte-identical.",
+   "status": "pass",
+   "observed": "1 atom(s), byte-identical with and without the difference: True",
+   "routed": null,
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 69,
+   "section": "E2",
+   "query": "which supplements for me? (takes metformin)",
+   "emits": "(recommend-supplements-patient &self Caller_Me)",
+   "patient": "P7",
+   "pass_criterion": "The plan flags Berberine against the metformin the person takes (the knowledge base's one interaction fact); it changes no tier and no ranking.",
+   "status": "pass",
+   "observed": "the plan's Interactions list holds (InteractionFlag Berberine Metformin …); no tier changed",
+   "routed": null,
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 70,
+   "section": "E2",
+   "query": "should I take berberine? (takes metformin)",
+   "emits": "(supplement-for-patient &self Caller_Me Berberine)",
+   "patient": "P7",
+   "pass_criterion": "The single-supplement answer carries the same flag beside the record — it used to return a bare record.",
+   "status": "pass",
+   "observed": "2 atoms: the record and (InteractionFlag Berberine Metformin …)",
+   "routed": null,
+   "pln_status": "ok",
+   "validation_issues": []
+  },
+  {
+   "n": 71,
    "section": "F1",
    "query": "what's Patient001's LinAge2?",
    "emits": "(linage-hazard-patient &self Patient001)",
@@ -562,7 +840,7 @@
    "validation_issues": []
   },
   {
-   "n": 49,
+   "n": 72,
    "section": "F1",
    "query": "which of my labs make me older? (no patient built)",
    "emits": null,
@@ -572,7 +850,7 @@
    "observed": "A direct answer with nothing executed — grade live (needs the LLM translator)."
   },
   {
-   "n": 50,
+   "n": 73,
    "section": "F1",
    "query": "set my albumin to 45 and recompute",
    "emits": null,
@@ -582,7 +860,7 @@
    "observed": "A direct answer with nothing executed — grade live (needs the LLM translator)."
   },
   {
-   "n": 51,
+   "n": 74,
    "section": "F2",
    "query": "which of my labs make me older? — asked twice",
    "emits": "(linage-decomposition-patient &self Caller_Me)",
@@ -595,7 +873,7 @@
    "validation_issues": []
   },
   {
-   "n": 52,
+   "n": 75,
    "section": "F2",
    "query": "is this a medical diagnosis I can act on?",
    "emits": null,
