@@ -151,6 +151,33 @@ def patient_stack(runtime_paths: list[Path]) -> list[Path]:
     return [p for p in runtime_paths if p.name not in PATIENT_STACK_EXCLUDED]
 
 
+# ── Human-evidence stack ──────────────────────────────────────────────────────
+#
+# `(human-evidence &self Metformin)` aborts hyperon 0.2.10 in the FULL shared space (the same
+# head-symbol edge as the patient forms: rc -6, trie.rs:179 — measured for Metformin, Rapamycin and
+# Berberine), so the chat's rule 14 ("what does the evidence say about X in humans") crashed the worker
+# (500 pln_worker_crashed). The layer needs only the types, the logical predicates and the evidence
+# tiers, and answers all its forms in these four files — including the cross-reference to
+# supplement_evidence for Omega3 (a text pointer, not a lookup). A program made ONLY of these forms runs
+# there (api._generic_kb, app._generic_kb); a program that mixes them with other layers' forms still runs
+# in the full space and still aborts on the human-evidence part (docs/kb_quick_wins/REPORT.md section 3).
+HUMAN_EVIDENCE_FILES: tuple[str, ...] = (
+    "system_types.metta", "logical_predicates.metta", "epistemic_calibration.metta", "human_evidence.metta",
+)
+_HUMAN_EVIDENCE_FORM_RE = re.compile(r"^\s*!?\s*\(\s*human-evidence(?:-interventions|-absent)?[\s)]")
+
+
+def human_evidence_stack(runtime_paths: list[Path]) -> list[Path]:
+    """The runtime stack's human-evidence files, in its order."""
+    return [p for p in runtime_paths if p.name in HUMAN_EVIDENCE_FILES]
+
+
+def is_human_evidence_program(program: str) -> bool:
+    """Is every top-level expression of `program` a human-evidence form?"""
+    exprs = split_top_level_exprs(program)
+    return bool(exprs) and all(_HUMAN_EVIDENCE_FORM_RE.match(e) for e in exprs)
+
+
 # ── LinAge2 clinical-clock stack ──────────────────────────────────────────────
 #
 # A QUERY-SCOPED space for the LinAge2 forms (pln_linage2.metta), routed to by

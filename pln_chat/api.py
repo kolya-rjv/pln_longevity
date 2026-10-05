@@ -128,6 +128,8 @@ from core.pln_runner import (
     PLNRunResult,
     linage2_patient_kb,
     merge_run_results,
+    human_evidence_stack,
+    is_human_evidence_program,
     patient_stack,
     run_cellage_effects,
     run_query,
@@ -3167,6 +3169,8 @@ def _generic_kb(metta_query: str) -> list[Path]:
     patient facts, the patient stack (core.pln_runner.patient_stack): the full space
     aborts on the patient forms at its head-symbol edge, built-in patients included."""
     runtime = _runtime_kb_paths()
+    if is_human_evidence_program(metta_query):
+        return human_evidence_stack(runtime)          # the full space aborts on (human-evidence &self X)
     return patient_stack(runtime) if reads_patients(metta_query) else runtime
 
 
