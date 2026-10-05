@@ -525,3 +525,28 @@ def test_a_z_a_whisker_over_the_threshold_is_elevated_only_if_the_atom_still_say
     from core.patient_builder import build_patient
     assert build_patient({"age": 58, "sex": "Male", "markers": {"CRP": 1.0000006}}).witnesses == []      # written `1`
     assert build_patient({"age": 58, "sex": "Male", "markers": {"CRP": 1.00001}}).witnesses == ["CRP"]       # written 1.00001
+
+
+# ═══════════════ "<condition> on <a drug the KB has nothing on>" no longer blocks the build ═══════
+
+@pytest.mark.parametrize("text, items", [
+    ("hypertension on lisinopril", {"BPQ020": 1}), ("type 2 diabetes on insulin", {"DIQ010": 1}),
+    ("diagnoses: hypertension on lisinopril", {"BPQ020": 1}), ("hypertension on lisinopril 10 mg daily", {"BPQ020": 1}),
+    ("hypertension, on lisinopril", {"BPQ020": 1}),
+])
+def test_a_condition_on_an_unknown_drug_is_read_and_the_drug_stays_visible(text, items):
+    p = read_patient_text(BASE + text)
+    assert p.ok, p.all_problems()
+    assert {k: v for k, v in p.questionnaire.items() if v == 1} == items
+    assert p.medications == [] and p.medications_stopped == []                # nothing the KB can act on
+    assert any("lisinopril" in str(x) or "insulin" in str(x) for x in p.not_understood)
+
+
+@pytest.mark.parametrize("text", [
+    "no hypertension on lisinopril", "hypertension was on lisinopril", "hypertension on medication", "diabetes on a diet",
+    "diabetes on vacation", "hypertension on lisinopril, but stopped", "should I treat hypertension on lisinopril?",
+    "my father's hypertension on lisinopril", "tummy trouble on lisinopril",
+])
+def test_an_unknown_drug_does_not_rescue_a_head_the_reader_does_not_understand_or_a_line_that_says_not_now(text):
+    p = read_patient_text(BASE + text)
+    assert not p.ok or {k for k, v in p.questionnaire.items() if v == 1} == set(), text

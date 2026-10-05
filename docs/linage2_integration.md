@@ -417,7 +417,9 @@ the outcome it must get):
   cholesterol") is dropped with a note. Two different answers for one condition are a
   contradiction to fix (except "no diabetes" with "prediabetes", which is borderline), and
   an unread line that names or suggests a condition blocks the build — it would otherwise
-  be answered No. "Takes lisinopril" or "no alcohol" do not.
+  be answered No. "Takes lisinopril" or "no alcohol" do not. A condition in front of "on <a drug the KB has
+  nothing on>" ("hypertension on lisinopril", "type 2 diabetes on insulin") is read as the condition and the
+  drug stays in "not understood" (it used to refuse the whole statement).
 - *Medications.* The knowledge base has one medication fact that matters to a patient: a supplement
   plan flags a supplement that interacts with a drug the person takes (`(Interaction Berberine
   Metformin …)`). So the reader (`core/patient_medications.py`) reads a drug only from a small table of

@@ -254,6 +254,12 @@ def starts_current_header(statement: str) -> bool:
     return bool(j) and j < len(t) and t[j] in {":", "=", "-", "–", "—"}
 
 
+def may_name_a_medication(text: str) -> bool:
+    """A cheap pre-check for the reader: the text names a drug the KB knows, or has a word a medication
+    clause hangs on ("on", "taking", "takes" …), which an unknown drug ("hypertension on lisinopril") needs."""
+    return bool(mentioned_symbols(text)) or bool(_TAIL_WORD.search(text or ""))
+
+
 def mentioned_symbols(text: str) -> tuple[str, ...]:
     """The KB symbols of the drugs `text` names anywhere (a cheap pre-check, then the tokens). A very long
     text is only scanned as typed: nothing long is normalised."""
@@ -337,6 +343,14 @@ _SUBJECT_PREFIXES = (("i", "have", "been"), ("we", "have", "been"), ("i", "am"),
                      ("have", "been"), ("i",), ("we",), ("am",), ("are",), ("been",))
 _HEAD_STRIP = frozenset({"and", "&", "+", ",", "who", "which", "that"})
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
+_PLAIN_WORD = re.compile(r"[a-z]{4,}")
+_TAIL_WORD = re.compile(r"\b(?:on|taking|takes|take|using|uses)\b", re.I)
+#: a word after "on" that is not the name of a drug: "hypertension on medication", "diabetes on a diet"
+_NOT_A_DRUG = frozenset("""
+medication medications medicine medicines meds pills pill tablets tablet drugs treatment treatments therapy
+diet exercise lifestyle nothing none supplements supplement vitamins vitamin herbs vacation holiday
+leave duty call track board
+""".split())
 
 
 def _num(tok: str) -> Optional[float]:
@@ -431,6 +445,7 @@ class MedRead:
     symbols: tuple[str, ...]
     head: str = ""                   # the text before "on <drug>", as typed, for the rest of the reader
     rest: str = ""                   # the text after the drug ("… and has diabetes"), as typed, likewise
+    tail: str = ""                   # kind "other": "on lisinopril" — a drug the KB has nothing on, left unread
 
 
 def _read_list(norm: str, toks: list[tuple[str, int]], i: int, *, need_extra: bool = False
@@ -501,7 +516,7 @@ def read_medication(statement: str, ctx: MedContext = MedContext(),
     if toks and toks[-1][0] == ")" and any(w == "(" for w, _ in toks):
         toks = toks[:-1]                                       # "diabetes (on metformin)"
     t = [w for w, _ in toks]
-    if not any(w in _DRUGS for w in t):
+    if not any(w in _DRUGS or w in _TAIL_VERBS for w in t):
         return None
     first_person = bool(t) and t[0] in {"i", "we"}
     if not (ctx.other and not first_person):
@@ -578,4 +593,25 @@ def read_medication(statement: str, ctx: MedContext = MedContext(),
         head = re.sub(r"^(?:i|we)\s+(?:have|am|are)\s+", "", head)         # "I have diabetes and take …"
         if head and head_ok(head):
             return MedRead("current", got[0], head=head)
+
+    # <condition or lab> on <a drug the KB has nothing on>: "hypertension on lisinopril". The head is read as it
+    # would have been alone and the drug stays unread; a head the reader does not understand is no head.
+    for k in range(len(t) - 1, 0, -1):
+        if t[k] not in _TAIL_VERBS:
+            continue
+        m = k + 1
+        if m < len(t) and t[m] in {"the", "my"}:
+            m += 1
+        if m >= len(t) or not _PLAIN_WORD.fullmatch(t[m]) or t[m] in _DRUGS or t[m] in _NOT_A_DRUG \
+                or t[m] in _BLOCK or _is_other(t[m]) or t[m] in _CURRENT_HEADING or head_ok(t[m]):
+            continue
+        if _extras(t, m + 1)[0] != len(t):
+            continue
+        head_toks = t[:k]
+        while head_toks and head_toks[-1] in _HEAD_STRIP:
+            head_toks.pop()
+        head = norm[:toks[len(head_toks) - 1][1] + len(head_toks[-1])].strip(" (") if head_toks else ""
+        head = re.sub(r"^(?:i|we)\s+(?:have|am|are)\s+", "", head)
+        if head and head_ok(head):
+            return MedRead("other", (), head=head, tail=norm[toks[k][1]:].strip())
     return None

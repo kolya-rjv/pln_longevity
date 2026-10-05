@@ -219,6 +219,11 @@ DIAGNOSES = [
     ("history of prediabetes, no diabetes", True, {"DIQ010": 3}),
     ("prediabetes; no diabetes", True, {"DIQ010": 3}),
     ("diagnoses: hypertension\ntakes lisinopril", True, {"BPQ020": 1}),
+    # a condition in front of "on <a drug the KB has nothing on>" was refused (it "mentions a condition but was
+    # not understood"); now the condition is read and the drug stays in "not understood" (docs/kb_quick_wins/REPORT.md section 3)
+    ("hypertension on lisinopril", True, {"BPQ020": 1}),
+    ("type 2 diabetes on insulin", True, {"DIQ010": 1}),
+    ("diagnoses: hypertension on lisinopril", True, {"BPQ020": 1}),
     ("diagnoses: hypertension\nno medications", True, {"BPQ020": 1}),
     ("diagnoses: hypertension\nexercises 3 times a week", True, {"BPQ020": 1}),
     ("no known conditions\nallergic to penicillin", True, {"BPQ020": 2}),
@@ -267,7 +272,6 @@ DIAGNOSES = [
     ("diagnoses: hypertension\nno known conditions", False, {}),
     ("no known conditions\ndiagnoses: hypertension", False, {}),
     ("heart disease\nno other conditions", False, {}),
-    ("hypertension on lisinopril", False, {}),
     # ── round 4: a negation heading a list covers it, or the list is refused (conf31, 55)
     ("no diabetes or hypertension", True, {"DIQ010": 2, "BPQ020": 2}),
     ("denies HTN, DM2, CAD", True, {"BPQ020": 2, "DIQ010": 2, "MCQ160C": 2}),

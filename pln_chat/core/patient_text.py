@@ -37,8 +37,8 @@ from typing import Optional
 
 from core.linage2_model import compute_linage2, load_model
 from core.patient_builder import MARKERS, Z_LIMIT, PatientSpecError
-from core.patient_medications import (MedContext, context_for, mentioned_symbols, read_medication,
-                                      starts_current_header)
+from core.patient_medications import (MedContext, context_for, may_name_a_medication, mentioned_symbols,
+                                      read_medication, starts_current_header)
 
 # ═══════════════════════════ units ═════════════════════════════════════════════
 # Each LinAge2 lab input: its canonical (model) unit, and every unit accepted for
@@ -1370,14 +1370,20 @@ def read_patient_text(text: str) -> ParsedPatient:
         # ── a medication: a drug the knowledge base can act on (core.patient_medications) ──
         # Not for a statement that also carried age, sex or smoking: it was rewritten above (a "until
         # 2019" dropped, "isn't" turned into "isn t") before any medication rule could see it.
-        if not had_demo and mentioned_symbols(low):
+        if not had_demo and may_name_a_medication(low):
             if line_no not in line_ctx:
                 line_ctx[line_no] = context_for(raw_lines, line_no, is_lab_line=_line_is_lab,
                                                 about_other=_line_about_someone_else)
             med = read_medication(
                 low, replace(line_ctx[line_no], list_kind="current" if med_header["line"] == line_no else None),
                 _head_understood)
-            if med is not None:
+            if med is not None and med.kind == "other":
+                # "hypertension on lisinopril": the condition is read as it would have been alone; the drug
+                # (one the knowledge base has nothing on) stays visible in "not understood"
+                cur.leftover = med.tail
+                p.not_understood.append(Remark(med.tail, idx))
+                low = stmt = med.head
+            elif med is not None:
                 mine, other = ((p.medications, p.medications_stopped) if med.kind == "current"
                                else (p.medications_stopped, p.medications))
                 for sym in med.symbols:
