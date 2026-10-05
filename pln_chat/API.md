@@ -158,7 +158,7 @@ checkout, `drugage_etl_short.metta` is ~26,900 estimated tokens verbatim and
 ~340 as a card), and anything still too large is refused with **413
 `prompt_too_large`** before a call is billed.
 
-The default selection measures **307,019 characters, about 76,754 estimated
+The default selection measures **307,726 characters, about 76,931 estimated
 tokens** (26 files; `tests/test_prompt_size.py` pins that figure against the
 real `build_system_prompt`, so this sentence cannot drift from the code again).
 It came down from 301,035 (to 297,671) when execution was scoped to the curated stack:
@@ -445,7 +445,7 @@ against the raw `extra_atoms` path:
   in the LinAge2 space — so a supplement plan, and `(supplement-for-patient …)`, flag a supplement that
   interacts with it. It changes no ranking and no LinAge2 number ("already taking" is not modelled).
 * a patient with no **elevated** value the KB has a curated edge into (CRP, DNAmGDF15,
-  DNAmPACKYRS, DNAmPAI1, FastingGlucose, HbA1c, LowSerumAlbumin, RDW) is told so: `patient.warnings` says its
+  DNAmPACKYRS, DNAmPAI1, FastingGlucose, HbA1c, LowSerumAlbumin, RDW, Triglycerides) is told so: `patient.warnings` says its
   diagnosis returns `()`, every supplement tier is empty and its ranking is the population
   one, and a `diagnose-patient`, `recommend-supplements[-patient]`, `supplement-for-patient`
   or `rank-interventions-for-patient` form naming it carries the same note in `warnings`.

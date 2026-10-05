@@ -87,7 +87,8 @@ LABS: tuple[LabSpec, ...] = (
     LabSpec("LBDTCSI", "Total cholesterol", "mmol/L", _CHOL, ("total cholesterol", "cholesterol", "tc")),
     LabSpec("LBDHDLSI", "HDL cholesterol", "mmol/L", _CHOL, ("hdl", "hdl cholesterol", "hdl-c")),
     LabSpec("LBDSTRSI", "Triglycerides", "mmol/L", {"mmol/l": (1, 0), "mg/dl": (0.01129, 0)},
-            ("triglycerides", "triglyceride", "tg", "trigs")),
+            ("triglycerides", "triglyceride", "tg", "trigs", "fasting triglycerides", "fasting triglyceride",
+             "fasting tg")),
     LabSpec("LDLV", "LDL cholesterol", "mmol/L", _CHOL, ("ldl", "ldl cholesterol", "ldl-c")),
     LabSpec("LBXWBCSI", "White blood cells", "10⁹/L", _COUNT,
             ("wbc", "white blood cells", "white blood cell count", "white cells", "leukocytes")),
@@ -154,7 +155,8 @@ LABS: tuple[LabSpec, ...] = (
 SPECS: dict[str, LabSpec] = {}
 for _spec in LABS:
     SPECS.setdefault(_spec.code, _spec)          # urea and BUN share an input; BUN names it
-_FASTING_ALIASES = {"fasting glucose", "fasting blood glucose", "fasting plasma glucose", "fbg", "fpg"}
+_FASTING_ALIASES = {"fasting glucose", "fasting blood glucose", "fasting plasma glucose", "fbg", "fpg",
+                    "fasting triglycerides", "fasting triglyceride", "fasting tg"}
 
 #: LDL is not an NHANES variable (LinAge2 derives it); a plausible clinical range.
 _LDL_RANGE = (0.3, 10.0)
@@ -364,7 +366,7 @@ class ParsedPatient:
 
     def kb_markers(self) -> dict[str, dict]:
         """The same values as the knowledge base's own witnesses, in ITS units:
-        CRP mg/L, HbA1c %, fasting glucose mg/dL (only when the text said fasting).
+        CRP mg/L, HbA1c %, fasting glucose and fasting triglycerides mg/dL (only when the text said fasting).
 
         The KB standardises these against coarse pooled priors, and refuses |z| > 12 as
         a unit mistake — which a real HbA1c of 12 % or a fasting glucose of 250 mg/dL
@@ -380,6 +382,9 @@ class ParsedPatient:
         glucose = by_code.get("LBDSGLSI")
         if glucose is not None and glucose.fasting:
             raw["FastingGlucose"] = (round(glucose.value / 0.0555, 4), "mg/dL")
+        triglycerides = by_code.get("LBDSTRSI")
+        if triglycerides is not None and triglycerides.fasting:
+            raw["Triglycerides"] = (round(triglycerides.value / 0.01129, 1), "mg/dL")
         markers: dict[str, dict] = {}
         self.witness_notes = []
         for name, (value, unit) in raw.items():
@@ -1692,6 +1697,11 @@ def read_patient_text(text: str) -> ParsedPatient:
         p.notes.append("glucose was not marked fasting: LinAge2 uses it as typed, but the "
                        "knowledge base's FastingGlucose witness needs a fasting value — write "
                        "'fasting glucose …' if it was")
+    triglycerides = next((r for r in p.readings if r.code == "LBDSTRSI" and not r.blocking), None)
+    if triglycerides is not None and not triglycerides.fasting:
+        p.notes.append("triglycerides were not marked fasting: LinAge2 uses them as typed (in the calculated LDL), but "
+                       "the knowledge base's Triglycerides witness needs a fasting value, which can run about 27 mg/dL "
+                       "lower — write 'fasting triglycerides …' if it was")
     if p.set_aside:
         p.notes.append("set aside (about someone else, or smoke you did not smoke): "
                        + "; ".join(f"'{s_}'" for s_ in p.set_aside))

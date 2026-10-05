@@ -590,3 +590,27 @@ def test_the_hemoglobin_limit_is_sex_specific():
 
 def test_albumin_is_never_gated_on_a_deficiency():
     assert "LowSerumAlbumin" in read_patient_text("58 year old male\nalbumin 4.0 g/dL\nferritin 20 ug/L").kb_markers()
+
+
+# ═══════════ fasting triglycerides as a witness (#12) ═══════════
+
+@pytest.mark.parametrize("typed, elevated", [
+    ("fasting triglycerides 149 mg/dL", False), ("fasting triglycerides 150 mg/dL", True), ("fasting tg 190 mg/dL", True),
+    ("fasting triglyceride 1.6 mmol/L", False), ("fasting triglycerides 1.7 mmol/L", True),
+])
+def test_a_fasting_triglyceride_of_150_mg_dl_or_more_is_elevated(typed, elevated):
+    from core.patient_builder import build_patient
+    p = read_patient_text(f"58 year old male\n{typed}")
+    m = p.kb_markers()
+    assert set(m["Triglycerides"]) == {"value", "unit"} and m["Triglycerides"]["unit"] == "mg/dL"
+    built = build_patient({"age": 58, "sex": "Male", "markers": {"Triglycerides": m["Triglycerides"]}})
+    assert (built.witnesses == ["Triglycerides"]) is elevated, (typed, m)
+
+
+def test_a_triglyceride_not_marked_fasting_is_no_witness_and_says_why():
+    p = read_patient_text("58 year old male\ntriglycerides 190 mg/dL")
+    assert "Triglycerides" not in p.kb_markers()
+    assert any("triglycerides were not marked fasting" in n and "fasting triglycerides" in n for n in p.notes)
+    assert p.labs()["LBDSTRSI"] == pytest.approx(190 * 0.01129)       # LinAge2 still has it, as typed
+    assert not any("triglycerides were not marked fasting" in n
+                   for n in read_patient_text("58 year old male\nfasting triglycerides 190 mg/dL").notes)

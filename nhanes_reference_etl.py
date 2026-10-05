@@ -408,9 +408,10 @@ REGISTRY: list[MarkerSpec] = [
         unit="mg/dL", scale=SCALE_LOG10, weight_family="WTSAF",
         assay_lots={"1999-2000": "unverified", "2001-2002": "unverified"},
         confidence="low",
-        evidence="Appears only as prose in docs/pipeline.md App. A.3; no Biomarker "
-                 "declaration anywhere in the KB.",
-        emit=False, notes="symbol undeclared, not emitted",
+        evidence="Declared a Biomarker in mechanistic_bridges.metta by item #12 (a fasting value, a curated "
+                 "threshold in the patient builder), but there is still no calibrated NHANES reference for it: "
+                 "the surplus-sera lots are unverified.",
+        emit=False, notes="declared, not emitted: no calibrated reference",
     ),
     MarkerSpec(
         symbol="TotalCholesterol", variable="LBXTC",

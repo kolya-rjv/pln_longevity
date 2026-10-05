@@ -217,7 +217,7 @@ markdown fences, no extra keys:
     A LAB, ORGAN OR CONDITION the person wants fixed, that is neither a cause or
     intervention of rule 11 nor a marker the knowledge base has a curated cause for
     (CRP, DNAmGDF15, DNAmPACKYRS, DNAmPAI1, FastingGlucose, HbA1c, LowSerumAlbumin,
-    RDW) — "what should I do about my kidney function / blood pressure /
+    RDW, Triglycerides) — "what should I do about my kidney function / blood pressure /
     cholesterol / creatinine / hypertension", "what if my blood pressure were normal" —
     has NO curated cause or lever here. Never make a lever token out of a lab, organ or
     diagnosis name, and never swap a diagnosis for another lever. Emit the

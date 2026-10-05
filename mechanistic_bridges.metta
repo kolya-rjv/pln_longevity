@@ -207,6 +207,16 @@
 (Effect InsulinResistance HbA1c Pos
    (stv 0.70 (evidence-confidence AnimalStudies_Replicated)))
 
+;; Triglycerides: insulin resistance raises hepatic VLDL output (more adipose fatty-acid
+;; flux, more de novo lipogenesis), hence plasma triglycerides (Ginsberg 2005, PMID 15925013,
+;; a review; McLaughlin 2003, PMID 14623617, uses triglyceride >= 130 mg/dL only as a MARKER of
+;; insulin resistance). Epidemiological tier, strength a plain prior. A FASTING value is
+;; the witness: non-fasting triglycerides run up to ~0.3 mmol/L higher (Langsted 2008, PMID
+;; 18955664). Not a LinAge2 input, so there is no readout in linage2_core.metta.
+(Inheritance Triglycerides Biomarker)
+(Effect InsulinResistance Triglycerides Pos
+   (stv 0.50 (evidence-confidence Epidemiological)))
+
 ;; Terminal harmful link to the shared outcome — the metabolic-axis counterpart of
 ;; the calibrated Lu 2019 DNAmPAI1 -> CHD link the senescence axis terminates in.
 ;; Curated epidemiological prior (hyperglycaemia raises coronary risk); a dedicated

@@ -403,7 +403,8 @@ def test_the_markers_the_kb_has_edges_into_are_read_off_the_kb():
     (tests/test_patient_stack.py checks that)."""
     from core.patient_builder import kb_effect_markers
     assert kb_effect_markers() == frozenset(
-        {"CRP", "DNAmGDF15", "DNAmPACKYRS", "DNAmPAI1", "FastingGlucose", "HbA1c", "LowSerumAlbumin", "RDW"})
+        {"CRP", "DNAmGDF15", "DNAmPACKYRS", "DNAmPAI1", "FastingGlucose", "HbA1c", "LowSerumAlbumin", "RDW",
+         "Triglycerides"})
 
 
 def test_a_patient_with_nothing_the_kb_can_use_is_told_the_shared_layers_have_nothing_to_work_from():
@@ -777,3 +778,16 @@ def test_a_linage2_block_is_joinable_through_rdw_or_the_albumin_deficit():
     for name in ("RDW", "LowSerumAlbumin"):
         joined = build_patient({**base, "markers": {name: 0.5}})
         assert not any("without any of the markers the knowledge base can join it to" in w for w in joined.warnings), name
+
+
+# ═══════════ triglycerides: a curated threshold on the z scale (#12) ═══════════
+
+def test_the_triglyceride_reference_puts_z_one_at_150_mg_dl_and_says_it_is_not_a_cohort():
+    from core.patient_builder import MARKERS
+    ref = MARKERS["Triglycerides"].reference
+    assert ref.to_z(150.0)[0] > 1.0 > ref.to_z(149.0)[0]
+    assert "not a cohort" in ref.source and "fasting" in ref.source
+    built = build_patient({"age": 58, "sex": "Male", "markers": {"Triglycerides": {"value": 190, "unit": "mg/dL"}}})
+    assert built.witnesses == ["Triglycerides"]
+    assert any("FASTING value" in w and "cannot tell" in w for w in built.warnings)
+    assert any("Standardised server-side" in w and "Triglycerides" in w for w in built.warnings)

@@ -165,6 +165,19 @@ MARKERS: dict[str, MarkerSpec] = {
                    "age/sex-stratified cohort table.",
         ),
     ),
+    "Triglycerides": MarkerSpec(
+        "Triglycerides", "blood_marker",
+        "insulin-resistance readout (a FASTING value: non-fasting triglycerides run up to about 27 mg/dL higher); "
+        "drives the abductive diagnosis and the metabolic axis like HbA1c. The reference below is not a "
+        "population distribution: it is set so that z = 1 at 150 mg/dL, the usual upper limit, which is "
+        "where the knowledge base starts to call a value elevated",
+        Reference(
+            unit="mg/dL", mean=100.0, sd=0.4054, log_scale=True,
+            source="curated threshold, not a cohort: geometric mean 100 mg/dL and a log-scale sd of 0.4054 "
+                   "put z = 1 at 150 mg/dL (the usual 'borderline high' limit, a laboratory convention). "
+                   "Send fasting values only: the knowledge base cannot tell a fasting one.",
+        ),
+    ),
     "RDW": MarkerSpec(
         "RDW", "blood_marker",
         "red cell distribution width: a chronic-inflammation readout (it also tracks iron, B12, folate, "
@@ -226,7 +239,7 @@ def kb_effect_markers() -> frozenset[str]:
     outside this set (a creatinine, a blood pressure, a typed diagnosis), or a LOW one, changes
     none of those forms. Read off the KB's own files, as core.patient_context reads the
     thresholds, so a new bridge widens it with no edit here (today: CRP, DNAmGDF15,
-    DNAmPACKYRS, DNAmPAI1, FastingGlucose, HbA1c, LowSerumAlbumin, RDW)."""
+    DNAmPACKYRS, DNAmPAI1, FastingGlucose, HbA1c, LowSerumAlbumin, RDW, Triglycerides)."""
     from config import ONTOLOGY_DIR, PLN_MAX_KB_FILE_BYTES   # lazily: nothing else here needs config
     found: set[str] = set()
     for path in sorted(ONTOLOGY_DIR.glob("*.metta")):
@@ -763,6 +776,11 @@ def build_patient(
         )
     if not witnesses:
         warnings.append(no_witness_note())
+    if any(m.name == "Triglycerides" for m in resolved):
+        warnings.append(
+            "Triglycerides are read as a FASTING value (z = 1 at 150 mg/dL, a curated threshold, not a population "
+            "distribution); the knowledge base cannot tell whether this one was. A non-fasting value runs up to "
+            "about 27 mg/dL higher.")
     if prevalent_chd and any(m.name == "AgeAccelGrim" for m in resolved) and age is not None and sex is not None:
         warnings.append(prevalent_chd_note(prevalent_chd))
     if medications:

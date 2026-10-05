@@ -442,3 +442,15 @@ def test_the_single_supplement_form_costs_one_evaluation_not_two():
     one = _run("patient", "!(supplement-for-patient &self Caller_Me Berberine)", atoms)
     assert one["status"] == "ok" and len(one["atoms"]) == 1
     assert one["secs"] < 0.7 * plan["secs"], f"one supplement {one['secs']:.1f} s vs the plan {plan['secs']:.1f} s"
+
+
+@pytest.mark.slow
+def test_an_elevated_fasting_triglyceride_is_explained_by_insulin_resistance():
+    """#12: triglycerides hang on insulin resistance, like HbA1c, so alone they give the metabolic hypothesis."""
+    atoms = ("(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n"
+             "(MeasuredZ Caller_Me Triglycerides 1.58)")
+    diag = _run("patient", "!(diagnose-patient &self Caller_Me)", atoms)
+    assert diag["rc"] == 0 and diag["atoms"][0].startswith("((Hypothesis InsulinResistance (stv 0.5")
+    assert "(SupportedBy (Triglycerides))" in diag["atoms"][0] and "DeregulatedNutrientSensing" in diag["atoms"][0]
+    plan = _run("patient", SUPPLEMENTS.format(P="Caller_Me"), atoms)["atoms"][0]
+    assert "(SuppRec Berberine" in plan or "(SuppRec Metformin" in plan

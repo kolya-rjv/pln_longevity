@@ -286,6 +286,15 @@ of 0. Send the patient's own `CRP` / `HbA1c` / `FastingGlucose` (z or value) and
    deficiency raise RDW by themselves: Bessman 1983, PMID 6881096; Förhécz 2009, PMID 19781428); those limits are
    usual laboratory limits chosen on the sensitive side, not a result of a paper. Albumin has no such gate: nutrition
    and a recent meal are named in the note.
+   **Triglycerides** (item #12; urate and white cell count were left out on purpose: the urate edge would imply
+   "metformin lowers urate", on which the two studies found disagree, and white cell count has no primary anchor
+   and is confounded by smoking) hang on insulin resistance: `(Effect InsulinResistance Triglycerides Pos (stv 0.50
+   Epidemiological))` (Ginsberg 2005, PMID 15925013, a mechanism review; McLaughlin 2003, PMID 14623617, uses
+   triglycerides only as a marker). Not a LinAge2 input, so no readout and no change to the decomposition. The
+   witness is a FASTING value of 150 mg/dL or more, the usual limit: the tab reads it only from "fasting
+   triglycerides …" (a plain "triglycerides" gets a note, like glucose), because a non-fasting value runs up to
+   0.3 mmol/L (27 mg/dL) higher (Langsted 2008, PMID 18955664). The builder's reference is not a population
+   distribution: geometric mean 100 mg/dL and a log-scale sd of 0.4054 put z = 1 at 150 mg/dL.
    Asking what to DO about one of them without a bridge ("what should I do about my kidney function", "what
    if my blood pressure were normal") used to give an empty clarification, an invented lever token
    (`BloodPressure`) or, for a diagnosis, another lever. Rule 16 now maps it to `(linage-decomposition-patient …)` (plus
@@ -521,7 +530,7 @@ labs adding and removing years, the count and total of filled-in inputs, LinAge2
 questionnaire is said to be assumed), the builder's notes reworded for someone who typed text
 rather than sent z-scores, the atoms, and suggested questions that jump to *PLN Query* with the question filled in.
 A patient none of whose values is both elevated and reached by a curated edge (CRP, HbA1c, a
-glucose marked fasting, RDW and a low albumin against LinAge2's reference; typed diagnoses and every other lab count for none) is told that the
+glucose or triglycerides marked fasting, RDW and a low albumin against LinAge2's reference; typed diagnoses and every other lab count for none) is told that the
 diagnosis will come back empty, the supplement plan will have no tiers and the ranking will be
 the population's — in the build notes, and again in the chat next to any such answer, since the
 chat never shows the builder's notes and an empty `()` reads as "no cause"
