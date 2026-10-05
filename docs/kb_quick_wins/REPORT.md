@@ -36,6 +36,11 @@ settle disagreements and rank them. Full lead-by-lead evidence, probes and verdi
    after any `.metta` edit (8 must-answer + 3 must-abort controls).
 2. **Your decision, then small:** #6 witness cut-points (status quo / clinical floors /
    LinAge2 references — see S4 and open question 1).
+   **Decided 2026-10-05: status quo (option A).** The coarse pooled prior stays (HbA1c > 6.0 %, fasting glucose
+   > 107 mg/dL, CRP > 5.44 mg/L, both sexes); nothing changes in `patient_builder`. The implied cut points of the
+   alternatives, for the record: clinical floors 5.7 % / 100 mg/dL / 3 mg/L; LinAge2 young reference HbA1c 5.74 (M) /
+   5.64 (F), glucose 101 / 97, CRP 4.6 (M) / 10.2 (F); LinAge2 age-median at 58 HbA1c 5.94, glucose 104 (M) / 100 (F),
+   CRP 7.4 (M) / 14.6 (F). The gap band (HbA1c 5.7-6.0, glucose 100-107, CRP 3-5.4) therefore still reads as normal.
 3. **Curation (M each), after #2:** #7 RDW + albumin bridges (verify anchors, choose
    thresholds and gates, rename the deficit node), then #12 (urate, WBC, triglycerides) and
    #11 (CHD-family diagnoses as an observation, with the ranking double count excluded).
