@@ -129,8 +129,8 @@ _PERSONALISED_FORM_RE = re.compile(
 _GRIM_RISK_RE = re.compile(
     r"\(\s*(predict-risk-patient|risk-decomposition-patient|project-risk-patient|risk-scenarios)\s+&self\s+"
     r"([A-Za-z][A-Za-z0-9_]*)"
-    r"|\(\s*(predict-risk|risk-decomposition|project-risk)\s+&self\s+([A-Za-z][A-Za-z0-9_]*)\s+"
-    r"CoronaryHeartDisease\b")
+    r"|\(\s*(predict-risk|risk-decomposition|project-risk|absolute-risk-at|absolute-risk|risk-ci|"
+    r"risk-confidence)\s+&self\s+([A-Za-z][A-Za-z0-9_]*)\s+CoronaryHeartDisease\b")
 _LINAGE_HAZARD_RE = re.compile(r"\(\s*linage-hazard-patient\s+&self\s+([A-Za-z][A-Za-z0-9_]*)")
 
 
@@ -217,8 +217,8 @@ def linage2_prompt_hint(patient: BuiltPatient) -> str:
         "They run in their own space; a query may combine them with forms of other "
         "layers, each as its own top-level expression on its own line (never nested "
         "inside another form) — each part runs where it can and the answers come back "
-        "in order. The GrimAge forms never see the LinAge2 result: predict-risk-patient "
-        "reads AgeAccelGrim, decompose-grimage and counterfactual-patient the DNAm components.\n"
+        "in order. The GrimAge forms never see the LinAge2 result: the CHD-risk forms and "
+        "decompose-grimage need AgeAccelGrim, counterfactual-patient the DNAm components.\n"
     )
 
 
@@ -281,5 +281,5 @@ def patient_prompt_section(patient: BuiltPatient) -> str:
         + no_grimage_prompt_hint(patient)
         + prevalent_chd_prompt_hint(patient)
         + medication_prompt_hint(patient)
-        + (linage2_prompt_hint(patient) if patient.has_linage2 else "")
+        + (linage2_prompt_hint(patient) if patient.linage2 is not None else "")
     )

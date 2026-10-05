@@ -215,8 +215,8 @@ markdown fences, no extra keys:
     (LinAge2's weights are sex-specific projections), so an input without such a
     witness is reported as years and left unexplained. Never explain it yourself.
     The GrimAge forms (predict-risk-patient, decompose-grimage,
-    counterfactual-patient) never see a LinAge2 result; the CHD-risk forms read
-    AgeAccelGrim, decompose-grimage and counterfactual-patient the DNAm components.
+    counterfactual-patient) never see a LinAge2 result; the CHD-risk forms and
+    decompose-grimage need AgeAccelGrim, counterfactual-patient the DNAm components.
     A patient with no AgeAccelGrim value gets nothing from predict-risk-patient,
     and that is the honest answer, not a clarification. Set intent="inference" and
     requires_pln_inference=true.

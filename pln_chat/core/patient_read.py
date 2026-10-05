@@ -1120,7 +1120,8 @@ def _with_model(text: str, rules: ParsedPatient, ex: Extraction) -> PatientRead:
             rules_way = _rules_wording(rules_facts, rules.questionnaire)
             choices = ([] if dropped else [wording]) + ([rules_way] if rules_way and rules_way != wording else [])
             model_problems.append((
-                f"'{original}': {said}; choose a wording below, or rewrite it",
+                f"'{original}': {said}; "
+                + ("choose a wording below, or rewrite it" if choices else "rewrite it"),
                 "disagreement", blocking[0][0], tuple(sts), choices, span + (original,)))
             if choices:
                 suggestions.append(Suggestion(*span, original, choices, "the rules and the model differ",

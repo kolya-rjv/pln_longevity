@@ -31,15 +31,14 @@ from __future__ import annotations
 
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from typing import Optional
 
 from core.linage2_model import compute_linage2, load_model
 from core.patient_builder import MARKERS, Z_LIMIT, PatientSpecError
-from core.patient_medications import (MedContext, heading_kind, line_about_other, line_blocked,
-                                      mentioned_symbols, read_medication, starts_current_header,
-                                      starts_with_stop)
+from core.patient_medications import (MedContext, context_for, mentioned_symbols, read_medication,
+                                      starts_current_header)
 
 # ═══════════════════════════ units ═════════════════════════════════════════════
 # Each LinAge2 lab input: its canonical (model) unit, and every unit accepted for
@@ -966,28 +965,15 @@ def _read_diagnoses(text: str, context: str = "") -> tuple[list[tuple[str, int]]
     return found, ignored, False
 
 
-def _heading_above(lines: list[str], n: int) -> Optional[str]:
-    """The kind of the heading on the nearest non-empty line above line `n` (core.patient_medications)."""
-    for k in range(n - 1, -1, -1):
-        if lines[k].strip():
-            return heading_kind(lines[k])
-    return None
+def _line_is_lab(line: str) -> bool:
+    """Does this reader understand the whole line as a lab value? Such a line is never a retraction of a
+    medication above it ("my albumin was 4.1 g/dL")."""
+    low = line.translate(_UNIFY).lower().strip()
+    return bool(low) and _read_lab(line.strip(), low) is not None
 
 
-def _other_above(lines: list[str], n: int) -> bool:
-    """Is the nearest non-empty line above line `n` about someone else?"""
-    for k in range(n - 1, -1, -1):
-        if lines[k].strip():
-            return line_about_other(lines[k])
-    return False
-
-
-def _stop_below(lines: list[str], n: int) -> bool:
-    """Does the nearest non-empty line below line `n` start with a word that takes a drug back?"""
-    for k in range(n + 1, len(lines)):
-        if lines[k].strip():
-            return starts_with_stop(lines[k])
-    return False
+def _line_about_someone_else(line: str) -> bool:
+    return bool(_SOMEONE_ELSE.search(line.translate(_UNIFY).lower()))
 
 
 def _head_understood(text: str) -> bool:
@@ -1037,7 +1023,7 @@ def read_patient_text(text: str) -> ParsedPatient:
     #: the last "medications: …" header statement: a bare drug after it, on the same line, is a list item
     med_header: dict = {"idx": -2, "line": -1}
     raw_lines = (text or "").splitlines()
-    line_ctx: dict[int, tuple] = {}
+    line_ctx: dict[int, MedContext] = {}
     cur = Statement(-1, -1, 0, 0, "")           # the statement being read
 
     def set_once(attr: str, value, what: str, stmt: str) -> None:
@@ -1386,12 +1372,10 @@ def read_patient_text(text: str) -> ParsedPatient:
         # 2019" dropped, "isn't" turned into "isn t") before any medication rule could see it.
         if not had_demo and mentioned_symbols(low):
             if line_no not in line_ctx:
-                line_ctx[line_no] = (line_blocked(raw_lines[line_no]), _heading_above(raw_lines, line_no),
-                                     _stop_below(raw_lines, line_no), _other_above(raw_lines, line_no))
-            blocked, heading, stops, other_above = line_ctx[line_no]
+                line_ctx[line_no] = context_for(raw_lines, line_no, is_lab_line=_line_is_lab,
+                                                about_other=_line_about_someone_else)
             med = read_medication(
-                low, MedContext(blocked=blocked, heading=heading, next_stops=stops, after_other=other_above,
-                                list_kind="current" if med_header["line"] == line_no else None),
+                low, replace(line_ctx[line_no], list_kind="current" if med_header["line"] == line_no else None),
                 _head_understood)
             if med is not None:
                 mine, other = ((p.medications, p.medications_stopped) if med.kind == "current"

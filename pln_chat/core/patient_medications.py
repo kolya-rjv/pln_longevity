@@ -7,12 +7,15 @@ drug ONLY from the table below — names that are identities (the same substance
 formulation, brand), never similarity — and leaves every other drug exactly where it was, in "not
 understood".
 
-It is written to be strict, not clever. The first version read a medication from "<anything> on
-metformin" with a deny-list of heads, and an adversarial review (docs/kb_quick_wins/REVIEW_ROUND1.md)
-found 40 ways it read a drug the person does not take: a plan ("I want to be on metformin"), a
-question, a past, a negation spelled "isn't" or "wasnt", someone else ("my grandma takes it"), a
-qualifier cut off by the statement splitter ("I take metformin, but not anymore"), a heading above
-("Past medications:") — the long tail the smoking reader had already taught. So now:
+It is written to be strict, not clever. Round 1 of the adversarial review
+(docs/kb_quick_wins/REVIEW_ROUND1.md) found that the first version, which read "<anything> on
+metformin" with a deny-list of heads, read a drug the person does not take in dozens of ways: a plan
+("I want to be on metformin"), a question, a past, a negation spelled "isn't" or "wasnt", someone else
+("my grandma takes it"), a qualifier cut off by the statement splitter ("I take metformin, but not
+anymore"), a heading above ("Past medications:") — the long tail the smoking reader had already taught.
+Round 2 (docs/kb_quick_wins/REVIEW_ROUND2.md) found the redesign's own tails: a tokenizer that silently
+dropped "❌" and "не", a heading that protected only the line directly below it, a retraction two lines
+down, a relative's possessive ("my husband's diabetes. Takes metformin."). So now:
 
 * a medication is read only from a statement that is, WHOLE, a closed grammar over tokens
       [I | we | I am | I have been] [currently | now | still …] (take | takes | taking | on | using)
@@ -21,19 +24,27 @@ qualifier cut off by the statement splitter ("I take metformin, but not anymore"
   A head in front of "on <drug>" must be fully understood by the rest of the reader as a condition or a
   lab; any other head is not a head. No free-text subject, no imperative ("take metformin"), no question;
 * it is read only if no word of the WHOLE LINE means not-now, not-me or not-sure: negations in every
-  spelling, a past, a plan, a wish, advice, a hedge, a question, a contrast, someone else. The statement
-  splitter cuts "I do not, in fact, take metformin" and "I take metformin, but not anymore" into
-  statements that each look fine alone. Nor is it read if the line above is a heading that is not a
-  current-medication heading ("Allergies:", "Past medications:"), or the next line starts with a stop word;
+  spelling, a past, a plan, a wish, advice, a hedge, a correction, a question, a contrast, a relative or
+  other person (possessives and plurals included), an allergy, a year other than "since YEAR". The
+  statement splitter cuts "I do not, in fact, take metformin" and "I take metformin, but not anymore"
+  into statements that each look fine alone;
+* a statement or a line with a character this grammar cannot account for (an emoji, "[ ]", "~~", a
+  non-Latin word, a zero-width character) is not read. Only ASCII letters, digits, spaces and
+  `.,;:!?()%/+&="-–—°µ` are accounted for;
+* the context is scanned, not sampled: the nearest HEADING above (through the list items under it, up to
+  six lines) decides whether an entry is a current medication; the next two lines are checked for a
+  retraction (a line the reader understands as a lab is never one); someone else on the lines above, a
+  year on a neighbouring line and a blocking word in the line above a bare entry are decided in one place
+  (context_for);
 * a statement that also carries age, sex or smoking is not read: the reader rewrites it (drops "until
   2019", turns "isn't" into "isn t") before a medication rule could see it;
 * "not taking" is read only from a closed set of whole-statement forms (no / not on / stopped /
   discontinued / never took / off / no longer / used to take), and records nothing: a drug said not to be
   taken is not a medication. Saying both is a contradiction to fix;
 * nothing is guessed about other drugs: the rest of a statement ("… and lisinopril", "… and has
-  diabetes") goes on to be read as it would have been alone;
+  diabetes") goes on to be read as it would have been alone, from the text as typed (hyphens intact);
 * no regular expression here can backtrack: the grammar is matched on tokens, in time linear in the
-  statement, and a statement over MAX_STATEMENT_CHARS is not read at all.
+  statement, and nothing longer than MAX_STATEMENT_CHARS / MAX_LINE_CHARS is normalised or read.
 
 The cost of a missed reading is a missing flag, which is what every patient had before; the cost of a
 wrong one is a flag for a drug the person does not take.
@@ -43,11 +54,14 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 #: A medication statement is short; a longer one is not read (no cost, and no work for a hostile one).
 MAX_STATEMENT_CHARS = 240
 MAX_LINE_CHARS = 600
+#: how many non-empty lines above a statement are scanned for its heading, and below for a retraction
+HEADING_LOOKBACK = 6
+RETRACTION_LOOKAHEAD = 2
 
 # ── the drugs ────────────────────────────────────────────────────────────────
 
@@ -83,46 +97,76 @@ _BLOCK = frozenset("""
 no not never none nor neither nothing nobody without cannot nope aint isnt arent wasnt werent hasnt
 havent hadnt dont doesnt didnt cant couldnt wont wouldnt shouldnt mustnt neednt
 stopped stop stops stopping quit quits quitting discontinued discontinue discontinuing ceased cease
-ended end finished completed tapered tapering weaned held hold paused pause dc off ago until till
+ended end finished completed tapered tapering weaned held hold paused pause dc dcd off ago until till
 was were had used previously formerly before after
-will would shall should could can might may must need needs want wants wanted hope hopes hoping wish
-wishes plan plans planning planned going intend intends intended decided decide consider considers
+past previous prior former inactive historical expired withdrawn voided cancelled canceled replaced
+replace replacing switched switch changed
+will would shall should could can might may must need needs want wants wanted hope hopes hoping hopefully
+wish wishes plan plans planning planned going intend intends intended decided decide consider considers
 considering think thinks thinking advised advise advice recommend recommends recommended suggest
 suggests suggested told asked prescribed prescribe start starts started starting begin begins began
-beginning try tries tried trying switch switched
+beginning try tries tried trying
 maybe perhaps possibly probably sometimes occasionally rarely seldom unless when whether unsure
 uncertain unable refuse refuses refused declined hardly barely if or
+tomorrow tonight soon later next eventually supposedly apparently actually correction sorry typo mistake
+wrong kidding joke jk lol
 but however although though except then instead rather anymore again restart restarted resume resumed
 he she they his her their him them hes shes theyre
 what which how why who whom whose
 allergic allergy allergies intolerant intolerance reaction reactions adverse side avoid avoids avoided
 contraindicated contraindication
 """.split())
-#: …and these name someone other than the person. The reader's own set-aside rule knows a closed list of
-#: relatives; "my doctor", "John" and "he" are caught by the grammar, which allows no subject but I / we.
+#: …and these name someone other than the person. A word with a trailing "s" counts too (husband's,
+#: parents, friends). The reader's own set-aside rule (patient_text._SOMEONE_ELSE) is consulted as well.
 _OTHERS = frozenset("""
-wife husband partner spouse mother mom mum father dad son daughter brother sister aunt uncle cousin
-grandmother grandfather grandma grandpa granny nan nana stepmother stepfather stepmom stepdad nephew
-niece friend neighbour neighbor boss colleague doctor nurse patient relatives family someone somebody
-anyone everyone people others
+wife husband partner spouse boyfriend girlfriend mother mom mum father dad parent son daughter child
+children kid brother sister sibling aunt uncle cousin grandmother grandfather grandparent grandma grandpa
+granny nan nana stepmother stepfather stepmom stepdad nephew niece friend neighbour neighbor boss
+colleague coworker roommate roomate flatmate doctor nurse patient relative family someone somebody anyone
+everyone people others twin carer mate ex pet dog cat
+""".split())
+#: words of a heading that makes what is under it NOT a current-medication list
+_HEADING_OTHER = frozenset("""
+allergies allergy allergic intolerance intolerances reactions adverse avoid plan recommendations
+recommendation options treatment treatments history past previous prior former inactive historical
+discontinued stopped family relatives notes note contraindications contraindicated
+""".split())
+#: words of a heading that introduces a CURRENT medication list
+_CURRENT_HEADING = frozenset({
+    "medications", "medication", "meds", "med", "medicines", "medicine", "rx", "drugs", "list",
+    "current", "regular", "daily", "my", "usual",
+})
+_NEGATORS = frozenset("no not never none nothing nobody without denies denied".split())
+_STOP_START = frozenset("""
+stopped stop stops discontinued discontinue ceased ended finished completed tapered weaned held hold paused
+off no not never none until till status quit used previously formerly was were had replaced replace
+cancelled canceled inactive historical past expired withdrawn voided dc dcd entered history prior
+previous former switched changed
 """.split())
 
+_ALLOWED = frozenset("abcdefghijklmnopqrstuvwxyz0123456789 \t.,;:!?()%/+&=\"-–—°µμ")
 _APOSTROPHES = re.compile("[´`’‘′ʼ＇]")
-_TOKEN = re.compile(r"[a-z0-9]+(?:\.[0-9]+)?|[%/+&,:;=()?!]|[-–—]")
+_TOKEN = re.compile(r"[a-z0-9]+(?:\.[0-9]+)?|[%/+&,:;=()?!\"]|[-–—]")
 _NUM_UNIT = re.compile(r"(\d)(mg|g|mcg|µg|μg|ug)\b")
-_YEAR = re.compile(r"(?<![0-9.])(?:19|20)\d\d(?![0-9])")
 _THOUSANDS = re.compile(r"(?<=\d),(?=\d{3}\b)")
+#: a year: 1900-2099 that is not a dose ("2000 mg") and is not preceded by "since"
+_YEAR = re.compile(r"(?<![0-9.])(?:19|20)\d\d(?![0-9])(?!\s*(?:mg|g|mcg|ug|µg|μg)\b)")
+_DC = re.compile(r"\bd\s*/\s*cd?\b|\bdc'?d\b")
 _EXPAND = (
     (re.compile(r"\bi'm\b"), "i am"), (re.compile(r"\bwe're\b"), "we are"),
     (re.compile(r"\bi've\b"), "i have"), (re.compile(r"\bwe've\b"), "we have"),
     (re.compile(r"\b(?:i'll|we'll|i'd|we'd)\b"), "will"),     # a plan or a past: both are blocked
 )
 _CONTRACTION = re.compile(r"\b(\w+)n['\s]t\b")
+_MARKDOWN = re.compile(r"[*_#>~`|\[\]]")
+_BULLET = re.compile(r"^[\s\-•*·]*(?:\d{1,2}[.)]\s+)?")
+_HAS_CONTENT = re.compile(r"[^\W_]")
 
 
 def normalise(text: str) -> str:
     """Lower case, NFKC, one apostrophe, I'm / we're expanded, other contractions glued (isn't, isn t
-    -> isnt), digits and units apart ('500mg' -> '500 mg'), '1,000' -> '1000'."""
+    -> isnt), digits and units apart ('500mg' -> '500 mg'), '1,000' -> '1000'. Callers cap the length
+    first: nothing here is meant for a long text."""
     t = _APOSTROPHES.sub("'", text or "")          # before NFKC: an acute accent becomes a space and a mark
     t = unicodedata.normalize("NFKC", t).lower()
     for rx, repl in _EXPAND:
@@ -133,10 +177,29 @@ def normalise(text: str) -> str:
     return _THOUSANDS.sub("", t)
 
 
-def _tokens(norm: str) -> tuple[list[tuple[str, int]], str]:
-    """([(token, offset in the returned text)], the text): hyphens between letters read as spaces."""
-    norm = re.sub(r"(?<=[a-z])-(?=[a-z])", " ", norm)
-    return [(m.group(0), m.start()) for m in _TOKEN.finditer(norm)], norm
+def _foreign(norm: str) -> bool:
+    """A character the grammar cannot account for: an emoji, a bracket, a non-Latin letter, a zero-width mark."""
+    return any(ch not in _ALLOWED for ch in norm)
+
+
+def _is_other(word: str) -> bool:
+    return word in _OTHERS or (word.endswith("s") and word[:-1] in _OTHERS)
+
+
+def _tokens(norm: str) -> list[tuple[str, int]]:
+    """[(token, offset in `norm`)]; hyphens are tokens of their own, so `norm` slices keep them."""
+    return [(m.group(0), m.start()) for m in _TOKEN.finditer(norm)]
+
+
+def _blocking(norm: str) -> bool:
+    """`norm` (a normalised line) carries a word that means not-now / not-me / not-sure."""
+    if "?" in norm or _foreign(norm) or _DC.search(norm):
+        return True
+    norm = norm.replace("as prescribed", " ")        # "I take metformin as prescribed": not a doctor's order
+    if any(w in _BLOCK or _is_other(w) for w in re.findall(r"[a-z]+", norm)):
+        return True
+    # a year says WHEN ("In 2019, on metformin", "2015-2020"): only "since 2015" keeps it current
+    return any(not re.search(r"\bsince\s*$", norm[:m.start()]) for m in _YEAR.finditer(norm))
 
 
 def line_blocked(line: str) -> bool:
@@ -144,79 +207,123 @@ def line_blocked(line: str) -> bool:
     Judged on the whole LINE, because the statement splitter cuts a qualifier loose."""
     if len(line) > MAX_LINE_CHARS:
         return True
-    norm = normalise(line)
-    if "?" in norm:
-        return True
-    if any(w in _BLOCK or w in _OTHERS for w in re.findall(r"[a-z]+", norm)):
-        return True
-    # a year says WHEN ("In 2019, on metformin", "2015-2020"): only "since 2015" keeps it current
-    return any(not re.search(r"\bsince\s*$", norm[:m.start()]) for m in _YEAR.finditer(norm))
-
-
-#: words of a heading that introduces a CURRENT medication list
-_CURRENT_HEADING = frozenset({
-    "medications", "medication", "meds", "med", "medicines", "medicine", "rx", "drugs", "list",
-    "current", "regular", "daily", "my", "usual",
-})
-
-
-def heading_kind(line: str) -> Optional[str]:
-    """'current' | 'other' when `line` is a heading (it ends in ':' or '-'): 'current' only for the plain
-    medication headings; 'Allergies:', 'Past medications:', 'Plan:' … are 'other'. None for any other line."""
-    norm = normalise(line).strip()
-    words = re.findall(r"[a-z]+", norm)
-    if not words:
-        return None
-    if norm.endswith((":", "-", "–", "—")):
-        return "current" if all(w in _CURRENT_HEADING for w in words) else "other"
-    # a short line with no digits that names a past, a negation, an allergy or a person is a heading too
-    # ("Discontinued medications", "Allergies", "Wife")
-    if len(words) <= 4 and not re.search(r"\d", norm) and any(w in _BLOCK or w in _OTHERS for w in words):
-        return "other"
-    return "current" if len(words) <= 3 and all(w in _CURRENT_HEADING for w in words) else None
+    return _blocking(normalise(line))
 
 
 def line_about_other(line: str) -> bool:
-    """The line names someone other than the person ("My mother has diabetes", "Wife")."""
-    return any(w in _OTHERS for w in re.findall(r"[a-z]+", normalise(line)))
+    """The line names someone other than the person ("My mother has diabetes", "Wife", "Mom's meds")."""
+    if len(line) > MAX_LINE_CHARS:
+        return False
+    return any(_is_other(w) for w in re.findall(r"[a-z]+", normalise(line)))
 
 
-def mentioned_symbols(text: str) -> tuple[str, ...]:
-    """The KB symbols of the drugs `text` names anywhere (a cheap pre-check, then the tokens)."""
-    low = (text or "").lower()
-    if not any(d in low for d in _DRUGS):
-        return ()
-    toks, _ = _tokens(normalise(text))
-    t = [w for w, _ in toks]
-    return tuple(dict.fromkeys(_DRUGS[w][0] for w in t if w in _DRUGS))
+def heading_kind(line: str) -> Optional[str]:
+    """'current' | 'other' when `line` is a heading, None for any other line. A heading ends in ':' or
+    '-', or is a short line with no digits that names a past, a negation, an allergy or a person
+    ("Discontinued medications", "Allergies", "Wife"); markdown and bullets are ignored. 'current' only
+    for the plain medication headings ("Medications:", "Current medications -")."""
+    if len(line) > MAX_LINE_CHARS:
+        return None
+    text = _BULLET.sub("", _MARKDOWN.sub(" ", line)).strip()
+    norm = normalise(text).strip()
+    words = re.findall(r"[a-z]+", norm)
+    ends = norm.endswith((":", "-", "–", "—"))
+    if not words:                                       # no Latin letters at all: unreadable, so not a current list
+        return "other" if ends and _HAS_CONTENT.search(text) else None
+    if _foreign(norm):
+        return "other" if ends else None
+    if ends:
+        return "current" if all(w in _CURRENT_HEADING for w in words) else "other"
+    if len(words) <= 4 and not re.search(r"\d", norm) and words[0] not in _NEGATORS \
+            and not any(w in _DRUGS for w in words):         # "stopped metformin" is a statement, not a heading
+        if any(w in _HEADING_OTHER or w in _STOP_START or _is_other(w) for w in words):
+            return "other"
+        if all(w in _CURRENT_HEADING for w in words):
+            return "current"
+    return None
 
 
 def starts_current_header(statement: str) -> bool:
     """'medications: …' — whatever follows the colon: a list of drugs that starts a medication list."""
-    toks, _ = _tokens(normalise(statement))
-    t = [w for w, _ in toks]
+    if len(statement) > MAX_STATEMENT_CHARS:
+        return False
+    t = [w for w, _ in _tokens(normalise(statement))]
     j = 0
     while j < len(t) and t[j] in _CURRENT_HEADING:
         j += 1
     return bool(j) and j < len(t) and t[j] in {":", "=", "-", "–", "—"}
 
 
-_STOP_START = frozenset("""
-stopped stop discontinued ceased ended finished tapered weaned held paused off no not never none until
-dc status quit used previously formerly was were had
-""".split())
+def mentioned_symbols(text: str) -> tuple[str, ...]:
+    """The KB symbols of the drugs `text` names anywhere (a cheap pre-check, then the tokens). A very long
+    text is only scanned as typed: nothing long is normalised."""
+    text = text or ""
+    low = normalise(text) if len(text) <= 2 * MAX_STATEMENT_CHARS else text.lower()
+    if not any(d in low for d in _DRUGS):
+        return ()
+    return tuple(dict.fromkeys(_DRUGS[w][0] for w in re.findall(r"[a-z]+", low) if w in _DRUGS))
 
 
-def starts_with_stop(line: str) -> bool:
-    """The line begins with a word that takes a medication on the line above back."""
-    words = re.findall(r"[a-z]+", normalise(line))
-    return any(w in _STOP_START for w in words[:3])
+def retracts(line: str) -> bool:
+    """The line takes a medication on the line above back: it starts with a stop / negation / past word
+    ("stopped 2021", "I quit it in June", "Status: stopped", "d/c'd"), is a bare date, or is unreadable."""
+    if len(line) > MAX_LINE_CHARS:
+        return True
+    norm = normalise(_BULLET.sub("", line)).strip()
+    if _foreign(norm) or _DC.search(norm):
+        return True
+    words = re.findall(r"[a-z]+", norm)
+    if any(w in _STOP_START for w in words[:2]):
+        return True
+    return len(words) <= 3 and any(not re.search(r"\bsince\s*$", norm[:m.start()]) for m in _YEAR.finditer(norm))
+
+
+# ── the context of a statement ───────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class MedContext:
+    """What a statement's surroundings say, computed by `context_for` from the raw lines."""
+    blocked: bool = False            # a word of the line means not-now / not-me / not-sure / unreadable
+    heading: Optional[str] = None    # the nearest heading above: 'current' | 'other' | None
+    intro_blocks: bool = False       # the line directly above carries a blocking word (a bare entry is then not read)
+    retracted: bool = False          # a line below takes the drug back
+    other: bool = False              # this line, or one just above, is about someone else
+    list_kind: Optional[str] = None  # a medication header earlier on THIS line: 'current'
+
+
+def _nonempty(lines: Sequence[str], n: int, step: int, limit: int) -> list[str]:
+    out, k = [], n + step
+    while 0 <= k < len(lines) and len(out) < limit:
+        if _HAS_CONTENT.search(lines[k]):                # a '-----' rule, a bullet, a zero-width line is no line
+            out.append(lines[k][:MAX_LINE_CHARS + 1])
+        k += step
+    return out
+
+
+def context_for(lines: Sequence[str], n: int, *, is_lab_line: Callable[[str], bool] = lambda line: False,
+                about_other: Callable[[str], bool] = lambda line: False) -> MedContext:
+    """The context of a statement on line `n` of `lines`. `is_lab_line` says whether the rest of the reader
+    understands a line as a lab (never a retraction); `about_other` is its own someone-else rule."""
+    line = lines[n]
+    above = _nonempty(lines, n, -1, HEADING_LOOKBACK)
+    below = _nonempty(lines, n, +1, RETRACTION_LOOKAHEAD)
+    heading = next((k for k in map(heading_kind, above) if k), None)
+    if above and len(re.findall(r"[a-z]+", normalise(above[0])[:MAX_LINE_CHARS])) <= 4 and _YEAR.search(normalise(above[0])):
+        heading = "other"                                # a date line above: the entry below is dated
+    return MedContext(
+        blocked=line_blocked(line) or about_other(line),
+        heading=heading,
+        intro_blocks=bool(above) and line_blocked(above[0]),
+        retracted=any(retracts(b) and not is_lab_line(b) for b in below),
+        other=line_about_other(line) or about_other(line)
+        or any(line_about_other(a) or about_other(a) for a in above[:3]),
+    )
 
 
 # ── the token grammar ────────────────────────────────────────────────────────
 
 _UNITS = frozenset({"mg", "g", "mcg", "ug", "μg", "µg"})
-_PER = frozenset({"a", "per"})
+_PER = frozenset({"a", "per", "each"})
 _PERIODS = frozenset({"day", "daily", "week", "weekly"})
 _YEARS = frozenset({"year", "years", "yr", "yrs", "month", "months", "week", "weeks"})
 _ADVERBS = frozenset({"currently", "now", "still", "also", "regularly", "presently", "usually", "always"})
@@ -229,13 +336,11 @@ _LIST_JOINERS = frozenset({"and", ",", "&", "+"})
 _SUBJECT_PREFIXES = (("i", "have", "been"), ("we", "have", "been"), ("i", "am"), ("we", "are"),
                      ("have", "been"), ("i",), ("we",), ("am",), ("are",), ("been",))
 _HEAD_STRIP = frozenset({"and", "&", "+", ",", "who", "which", "that"})
+_NUMBER = re.compile(r"\d+(?:\.\d+)?")
 
 
 def _num(tok: str) -> Optional[float]:
-    try:
-        return float(tok)
-    except ValueError:
-        return None
+    return float(tok) if _NUMBER.fullmatch(tok) else None
 
 
 def _per_period(t: list[str], j: int) -> Optional[int]:
@@ -255,6 +360,8 @@ def _extra(t: list[str], i: int) -> Optional[int]:
             j = i + 2
             if j + 1 < n and t[j] == "/" and t[j + 1] in {"day", "d"}:
                 j += 2
+            elif j + 1 < n and t[j] in _PER and t[j + 1] in {"day", "week"}:
+                j += 2                                         # "500 mg a day", "per day", "each day"
             return j
         if i + 1 < n and t[i + 1] in {"times", "x"}:           # "2 times a day"
             return _per_period(t, i + 2)
@@ -298,34 +405,32 @@ def _extras(t: list[str], i: int) -> tuple[int, int]:
 
 
 def _drug(t: list[str], i: int) -> Optional[tuple[str, int]]:
-    """A drug name at t[i]: (symbol, index after it)."""
+    """A drug name at t[i]: (symbol, index after it). Hyphens are tokens: 'metformin-xr' is three."""
     if i >= len(t) or t[i] not in _DRUGS:
         return None
     symbol, suffixes = _DRUGS[t[i]]
     j = i + 1
-    if t[i] == "metformin" and j + 1 < len(t) and (t[j], t[j + 1]) in _FORMULATIONS:
-        j += 2
-    while j < len(t) and t[j] in suffixes:
-        j += 1
+    while j < len(t):
+        k = j + 1 if t[j] == "-" else j                        # an optional hyphen
+        if k >= len(t):
+            break
+        if t[i] == "metformin" and k + 1 < len(t) and (t[k], t[k + 1]) in _FORMULATIONS:
+            j = k + 2                                          # "extended release"
+        elif t[i] == "metformin" and k + 2 < len(t) and t[k + 1] == "-" and (t[k], t[k + 2]) in _FORMULATIONS:
+            j = k + 3                                          # "extended-release"
+        elif t[k] in suffixes:
+            j = k + 1                                          # "hcl", "xr", "er" …
+        else:
+            break
     return symbol, j
-
-
-@dataclass(frozen=True)
-class MedContext:
-    """What a statement's surroundings say, computed by the caller from the raw lines."""
-    blocked: bool = False            # a word of the line means not-now / not-me / not-sure
-    heading: Optional[str] = None    # the line above is a heading: 'current' | 'other' | None
-    next_stops: bool = False         # the next line starts with a stop word
-    list_kind: Optional[str] = None  # a medication header earlier on THIS line, directly before: 'current'
-    after_other: bool = False        # the line above is about someone else: a subject-less statement is theirs
 
 
 @dataclass(frozen=True)
 class MedRead:
     kind: str                        # 'current' | 'stopped' (said not taken, or no longer)
     symbols: tuple[str, ...]
-    head: str = ""                   # the text before "on <drug>", for the rest of the reader
-    rest: str = ""                   # the text after the drug ("… and has diabetes"), likewise
+    head: str = ""                   # the text before "on <drug>", as typed, for the rest of the reader
+    rest: str = ""                   # the text after the drug ("… and has diabetes"), as typed, likewise
 
 
 def _read_list(norm: str, toks: list[tuple[str, int]], i: int, *, need_extra: bool = False
@@ -365,8 +470,7 @@ _STOPPED_FRAMES = tuple(tuple(f.split()) for f in (
 ))
 
 
-def _read_stopped(toks: list[tuple[str, int]]) -> Optional[MedRead]:
-    t = [w for w, _ in toks]
+def _read_stopped(t: list[str]) -> Optional[MedRead]:
     for first in ((), ("i",), ("we",), ("i", "have"), ("i", "am")):
         if tuple(t[:len(first)]) != first:
             continue
@@ -390,19 +494,23 @@ def read_medication(statement: str, ctx: MedContext = MedContext(),
     lab: the only kind of text allowed in front of 'on <drug>'."""
     if not statement or len(statement) > MAX_STATEMENT_CHARS:
         return None
-    toks, norm = _tokens(normalise(statement).strip())
+    norm = normalise(statement).strip()
+    if _foreign(norm):
+        return None
+    toks = _tokens(norm)
     if toks and toks[-1][0] == ")" and any(w == "(" for w, _ in toks):
         toks = toks[:-1]                                       # "diabetes (on metformin)"
     t = [w for w, _ in toks]
     if not any(w in _DRUGS for w in t):
         return None
-    stopped = _read_stopped(toks)
-    if stopped is not None:
-        return stopped
-    if ctx.blocked or ctx.next_stops:
-        return None
     first_person = bool(t) and t[0] in {"i", "we"}
-    if ctx.after_other and not first_person:
+    if not (ctx.other and not first_person):
+        stopped = _read_stopped(t)
+        if stopped is not None:
+            return stopped
+    if ctx.blocked or ctx.retracted or ctx.heading == "other":
+        return None
+    if ctx.other and not first_person:
         return None
 
     # [adverbs] [subject] [adverbs] verb [the|my] [dose of] <drug> …
@@ -438,17 +546,17 @@ def read_medication(statement: str, ctx: MedContext = MedContext(),
         if got is not None:
             return MedRead("current", got[0], rest=got[1])
 
-    # <drug> <dose> …: a dose or a timing says it is a medication entry; the line above must not be a
-    # heading that is not a medication heading
-    if ctx.heading != "other":
+    # <drug> <dose> …: a dose or a timing says it is a medication entry — unless the line above
+    # carries a blocking word, which a bare entry (no verb of its own) cannot answer
+    if not ctx.intro_blocks:
         got = _read_list(norm, toks, 0, need_extra=True)
         if got is not None:
             return MedRead("current", got[0], rest=got[1])
-    # a bare <drug> in a list that a medication header started
-    if ctx.list_kind == "current" or ctx.heading == "current":
-        got = _read_list(norm, toks, 0)
-        if got is not None:
-            return MedRead("current", got[0], rest=got[1])
+        # a bare <drug> in a list that a medication header started
+        if ctx.list_kind == "current" or ctx.heading == "current":
+            got = _read_list(norm, toks, 0)
+            if got is not None:
+                return MedRead("current", got[0], rest=got[1])
 
     # <condition or lab> on <drug>: the head must be understood by the rest of the reader
     for k in range(len(t) - 1, 0, -1):

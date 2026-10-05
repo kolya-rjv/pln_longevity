@@ -664,8 +664,11 @@ def test_a_bare_linageaccel_marker_has_no_hazard_to_pair_and_the_note_does_not_c
     from core.patient_context import no_grimage_prompt_hint, patient_form_warnings
     bare = build_patient({"age": 58, "sex": "Male", "markers": {"LinAgeAccel": {"value": 4.0, "unit": "years"}}})
     assert bare.has_linage2 and bare.linage2 is None                 # a marker, not a LinAgeDelta block
-    assert any("every LinAge2 form" in w and "return nothing" in w for w in bare.warnings)
+    assert any("hazard, the risk, the decomposition and the projections return nothing" in w
+               and "counterfactuals and scenarios return 0 years" in w for w in bare.warnings)
     assert "hazard is computable" not in " ".join(bare.warnings)
+    from core.patient_context import patient_prompt_section
+    assert "linage-hazard-patient" not in patient_prompt_section(bare)      # no LinAge2 hint for a bare marker
     hint = no_grimage_prompt_hint(bare)
     assert "(predict-risk-patient &self" in hint and "linage-hazard-patient" not in hint
     pid = bare.patient_id
@@ -682,6 +685,8 @@ def test_a_bare_linageaccel_marker_has_no_hazard_to_pair_and_the_note_does_not_c
     "(predict-risk-patient &self {p})", "(risk-decomposition-patient &self {p})", "(project-risk-patient &self {p} Metformin)",
     "(risk-scenarios &self {p})", "(predict-risk &self {p} CoronaryHeartDisease)",
     "(risk-decomposition &self {p} CoronaryHeartDisease)", "(project-risk &self {p} CoronaryHeartDisease CellularSenescence)",
+    "(absolute-risk &self {p} CoronaryHeartDisease)", "(absolute-risk-at &self {p} CoronaryHeartDisease 1.0)",
+    "(risk-ci &self {p} CoronaryHeartDisease)", "(risk-confidence &self {p} CoronaryHeartDisease)",
 ])
 def test_every_form_that_prints_the_chd_number_gets_the_heart_risk_notes(form):
     from core.patient_context import patient_form_warnings
@@ -729,3 +734,17 @@ def test_a_grimage_value_with_no_age_or_sex_means_no_risk_model_input_and_no_fir
     assert not [w for w in built.warnings if w.startswith("Reported angina")]
     from core.patient_context import medication_prompt_hint, prevalent_chd_prompt_hint
     assert prevalent_chd_prompt_hint(built) == "" and medication_prompt_hint(built) == ""
+
+
+def test_the_linage2_block_marker_is_elevated_only_if_the_atom_the_engine_reads_is():
+    """z 1.0000004 is written `1`, which the KB (> 1.0) does not call Elevated — for the clock too."""
+    import copy
+    import json
+    fixture = json.loads((REPO / "tests" / "fixtures" / "linage2_response.json").read_text(encoding="utf-8"))
+    d = copy.deepcopy(fixture)
+    delta = 8.66 * 1.0000004
+    d["metadata"]["delta_ba_ca"] = delta
+    d["biological_age"] = d["metadata"]["chronological_age"] + delta
+    built = build_patient({"id": "L", "age": 58, "sex": "Male", "markers": {"CRP": 2.0}, "linage2": d}, linage_sd_to_years=8.66)
+    clock = next(m for m in built.markers if m.name == "LinAgeAccel")
+    assert "(MeasuredZ Caller_L LinAgeAccel 1)" in built.atoms and clock.status == "Normal"

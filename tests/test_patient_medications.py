@@ -7,16 +7,19 @@ taking" from a statement that says so. The cost of a missed reading is a missing
 had before); the cost of a wrong one is a flag for a drug the person does not take.
 
 The first version read "<anything> on metformin" with a deny-list of heads. An adversarial review
-(docs/kb_quick_wins/REVIEW_ROUND1.md) confirmed 40 ways it read a drug the person does not take, three
-of them high (a medication tail swallowed the unread rest of a smoking clause and let "Smoker: 0 takes
-metformin" build; "isn't on metformin" was read as TAKING it; a whitespace run made one regex quadratic:
-19,000 characters stalled the process for 10 s). Every input the review found is pinned below
-(NEVER_CURRENT), so the long tail stays closed.
+(docs/kb_quick_wins/REVIEW_ROUND1.md) confirmed 40 root causes, nearly all of them ways it read a drug the
+person does not take. The worst three: a medication tail swallowed the unread rest of a smoking clause, so
+"Smoker: 0 takes metformin" built; "isn't on metformin" was read as TAKING it; and a whitespace run made one
+regex quadratic (19,000 characters stalled the process for 10 s). The strict redesign was reviewed again
+(round 2, REVIEW_ROUND2.md: a tokenizer that dropped "❌" and "не", a heading that protected one line, a
+retraction two lines down, possessive relatives). Every input either round confirmed is pinned in
+tests/fixtures/medication_never_current.json, so the long tail stays closed.
 
     pytest tests/test_patient_medications.py -q
 """
 from __future__ import annotations
 
+import json
 import sys
 import time
 from pathlib import Path
@@ -30,8 +33,8 @@ if str(PLN_CHAT) not in sys.path:
 
 from core.patient_builder import kb_interaction_drugs  # noqa: E402
 from core.patient_medications import (  # noqa: E402
-    _BLOCK, _OTHERS, MAX_STATEMENT_CHARS, MEDICATIONS, MedContext, MedRead, heading_kind, line_about_other,
-    line_blocked, normalise, read_medication, starts_with_stop)
+    _BLOCK, _OTHERS, MAX_STATEMENT_CHARS, MEDICATIONS, MedContext, MedRead, context_for, heading_kind,
+    line_about_other, line_blocked, normalise, read_medication, retracts)
 from core.patient_text import _head_understood, read_patient_text  # noqa: E402
 
 M = ("Metformin",)
@@ -132,13 +135,16 @@ def test_a_head_that_the_reader_does_not_fully_understand_is_not_a_head():
 
 def test_the_surroundings_of_a_statement_can_withdraw_it():
     assert _read("takes metformin", blocked=True) is None                    # a word of the line says not-now
-    assert _read("takes metformin", next_stops=True) is None                 # the next line takes it back
+    assert _read("takes metformin", retracted=True) is None                  # a line below takes it back
     assert _read("metformin 500 mg", heading="other") is None                # "Allergies:" above
     assert _read("metformin 500 mg", heading="current") == MedRead("current", M)
-    assert _read("takes metformin", after_other=True) is None                # the line above is about someone else
-    assert _read("I take metformin", after_other=True) == MedRead("current", M)     # but "I" is the person
+    assert _read("takes metformin", other=True) is None                      # the line above is about someone else
+    assert _read("I take metformin", other=True) == MedRead("current", M)    # but "I" is the person
+    assert _read("takes metformin", heading="other") is None                 # under "Past medications:" - every form
+    assert _read("metformin 500 mg", intro_blocks=True) is None              # a bare entry under a line with a block word
     assert _read("metformin") is None and _read("metformin", list_kind="current") == MedRead("current", M)
     assert _read("no metformin", blocked=True) == MedRead("stopped", M)      # a stop is still a stop
+    assert _read("no metformin", other=True) is None                         # ... but not when it is someone else's
 
 
 def test_a_long_statement_is_not_read_at_all():
@@ -147,12 +153,51 @@ def test_a_long_statement_is_not_read_at_all():
 
 # ═══════════════════════════ the line decides ═════════════════════════════════════
 
+BLOCK_WORDS = (
+    'actually', 'adverse', 'advice', 'advise', 'advised', 'after', 'again', 'ago', 'aint', 'allergic',
+    'allergies', 'allergy', 'although', 'anymore', 'apparently', 'arent', 'asked', 'avoid', 'avoided',
+    'avoids', 'barely', 'before', 'began', 'begin', 'beginning', 'begins', 'but', 'can', 'canceled',
+    'cancelled', 'cannot', 'cant', 'cease', 'ceased', 'changed', 'completed', 'consider', 'considering',
+    'considers', 'contraindicated', 'contraindication', 'correction', 'could', 'couldnt', 'dc', 'dcd',
+    'decide', 'decided', 'declined', 'didnt', 'discontinue', 'discontinued', 'discontinuing', 'doesnt',
+    'dont', 'end', 'ended', 'eventually', 'except', 'expired', 'finished', 'former', 'formerly', 'going',
+    'had', 'hadnt', 'hardly', 'hasnt', 'havent', 'he', 'held', 'her', 'hes', 'him', 'his', 'historical',
+    'hold', 'hope', 'hopefully', 'hopes', 'hoping', 'how', 'however', 'if', 'inactive', 'instead', 'intend',
+    'intended', 'intends', 'intolerance', 'intolerant', 'isnt', 'jk', 'joke', 'kidding', 'later', 'lol',
+    'may', 'maybe', 'might', 'mistake', 'must', 'mustnt', 'need', 'neednt', 'needs', 'neither', 'never',
+    'next', 'no', 'nobody', 'none', 'nope', 'nor', 'not', 'nothing', 'occasionally', 'off', 'or', 'past',
+    'pause', 'paused', 'perhaps', 'plan', 'planned', 'planning', 'plans', 'possibly', 'prescribe',
+    'prescribed', 'previous', 'previously', 'prior', 'probably', 'quit', 'quits', 'quitting', 'rarely',
+    'rather', 'reaction', 'reactions', 'recommend', 'recommended', 'recommends', 'refuse', 'refused',
+    'refuses', 'replace', 'replaced', 'replacing', 'restart', 'restarted', 'resume', 'resumed', 'seldom',
+    'shall', 'she', 'shes', 'should', 'shouldnt', 'side', 'sometimes', 'soon', 'sorry', 'start', 'started',
+    'starting', 'starts', 'stop', 'stopped', 'stopping', 'stops', 'suggest', 'suggested', 'suggests',
+    'supposedly', 'switch', 'switched', 'tapered', 'tapering', 'their', 'them', 'then', 'they', 'theyre',
+    'think', 'thinking', 'thinks', 'though', 'till', 'told', 'tomorrow', 'tonight', 'tried', 'tries', 'try',
+    'trying', 'typo', 'unable', 'uncertain', 'unless', 'unsure', 'until', 'used', 'voided', 'want', 'wanted',
+    'wants', 'was', 'wasnt', 'weaned', 'were', 'werent', 'what', 'when', 'whether', 'which', 'who', 'whom',
+    'whose', 'why', 'will', 'wish', 'wishes', 'withdrawn', 'without', 'wont', 'would', 'wouldnt', 'wrong',
+)
+OTHER_WORDS = (
+    'anyone', 'aunt', 'boss', 'boyfriend', 'brother', 'carer', 'cat', 'child', 'children', 'colleague',
+    'cousin', 'coworker', 'dad', 'daughter', 'doctor', 'dog', 'everyone', 'ex', 'family', 'father',
+    'flatmate', 'friend', 'girlfriend', 'grandfather', 'grandma', 'grandmother', 'grandpa', 'grandparent',
+    'granny', 'husband', 'kid', 'mate', 'mom', 'mother', 'mum', 'nan', 'nana', 'neighbor', 'neighbour',
+    'nephew', 'niece', 'nurse', 'others', 'parent', 'partner', 'patient', 'people', 'pet', 'relative',
+    'roomate', 'roommate', 'sibling', 'sister', 'somebody', 'someone', 'son', 'spouse', 'stepdad',
+    'stepfather', 'stepmom', 'stepmother', 'twin', 'uncle', 'wife',
+)
+
+
 def test_every_blocking_word_blocks_the_line_and_every_relative_is_someone_else():
-    """Pins each word: delete one from the set and its own case fails."""
-    for word in sorted(_BLOCK | _OTHERS):
+    """Pins each word against a literal copy (not against the sets themselves): delete one from
+    patient_medications.py and its own case fails; add one and the equality asks for it here."""
+    assert set(BLOCK_WORDS) == set(_BLOCK) and set(OTHER_WORDS) == set(_OTHERS)
+    for word in BLOCK_WORDS + OTHER_WORDS:
         assert line_blocked(f"takes metformin, {word}"), word
-        got = read_patient_text(f"{BASE}takes metformin, {word}")
-        assert got.medications == [], word
+        assert read_patient_text(f"{BASE}takes metformin, {word}").medications == [], word
+        if word in OTHER_WORDS:
+            assert line_blocked(f"takes metformin, {word}s") and line_about_other(f"the {word}s"), word   # plural / possessive
 
 
 @pytest.mark.parametrize("line", [
@@ -175,8 +220,8 @@ def test_headings_and_the_lines_around_them():
     for other in ("Allergies:", "Past medications:", "Stopped:", "Not taking:", "Plan:", "Discontinued medications", "Wife"):
         assert heading_kind(other) == "other", other
     assert heading_kind("albumin 4.1 g/dL") is None and heading_kind("takes metformin") is None
-    assert starts_with_stop("stopped 2021") and starts_with_stop("I quit it in June") and starts_with_stop("Status: stopped")
-    assert not starts_with_stop("albumin 4.1 g/dL")
+    assert retracts("stopped 2021") and retracts("I quit it in June") and retracts("Status: stopped") and retracts("2021")
+    assert not retracts("albumin 4.1 g/dL") and not retracts("my albumin was 4.1 g/dL")
     assert line_about_other("My mother has diabetes") and not line_about_other("I have diabetes")
     assert normalise("I wasn\u2019t") == "i wasnt" and normalise("1,000mg") == "1000 mg"
 
@@ -219,233 +264,13 @@ def test_the_condition_in_front_of_a_medication_is_still_read_as_before():
     assert p.questionnaire["MCQ010"] == 1 and p.medications == ["Metformin"]
 
 
-NEVER_CURRENT = [
-    '2015-2020 on metformin',
-    '2019: on metformin',
-    '58 year old male, CurrentSmoker ... + doctor recommends taking metformin',
-    '<condition>: 0 - on metformin',
-    'Allergies:\nmetformin 500 mg',
-    'Am I on metformin',
-    'Current smoker: 0 who takes metformin',
-    'Discontinued medications\nmetformin 500 mg twice daily',
-    'Doctor says, take metformin',
-    'Doctor says: take metformin',
-    'Family history: mother diabetes, takes metformin',
-    'He should take metformin',
-    "I ain't on metformin",
-    'I am seldom on metformin',
-    'I am unable to be on metformin',
-    "I can't be on metformin",
-    "I can't take metformin",
-    'I cannot be on metformin',
-    "I couldn't be on metformin",
-    'I do not take metformin',
-    'I do not, in fact, take metformin',
-    'I do not. Take metformin',
-    "I don't take metformin with meals",
-    'I dont keep taking metformin',
-    'I dont take metformin',
-    'I forgot to take metformin',
-    'I havent been on metformin',
-    'I haven´t been on metformin',
-    'I hope to be on metformin',
-    'I isnt on metformin',
-    'I might be on metformin',
-    'I might, if my doctor agrees, take metformin',
-    "I mustn't be on metformin",
-    'I never quit smoking on metformin',
-    'I never stopped smoking and take metformin',
-    'I never took lisinopril, metformin 500 mg',
-    'I never, ever, take metformin',
-    'I no longer take lisinopril and metformin 500 mg',
-    'I no longer take lisinopril, metformin',
-    'I no longer take lisinopril, metformin 500 mg',
-    'I no longer take metformin twice daily',
-    'I plan to start taking metformin',
-    'I refuse to be on metformin',
-    'I should be on metformin',
-    'I should not, according to my doctor, take metformin',
-    "I shouldn't be on metformin",
-    'I stopped, last year, taking metformin',
-    'I switched to metformin',
-    'I take 500 mg metformin twice daily',
-    'I take lisinopril, atorvastatin and metformin',
-    'I take metformin\nI quit it in June',
-    'I take metformin 500 mg but stopped last week',
-    "I take metformin 500 mg with dinner. I don't take metformin with breakfast.",
-    'I take metformin as prescribed',
-    "I take metformin every evening; I don't take metformin in the morning",
-    'I take metformin!',
-    'I take metformin, but not anymore',
-    'I take metformin; I am no longer on it',
-    'I take walks, metformin',
-    'I use alcohol, metformin',
-    'I used to take metformin 500 mg, I now take metformin 1000 mg',
-    'I used to take metformin 500 mg, now I take metformin 1000 mg',
-    'I used to, years ago, take metformin',
-    'I want to be on metformin',
-    'I want to start metformin',
-    'I wasn`t on metformin',
-    'I wasnt on metformin',
-    'I wasn´t on metformin',
-    'I wasn’t on metformin',
-    'I will start taking metformin',
-    "I won't be taking metformin",
-    "I'll start taking metformin",
-    "I'm not on metformin",
-    "I'm on metformin, but stopped last week",
-    'If ..., I would take metformin',
-    'If HbA1c is above 7, take metformin',
-    'In 2019, on metformin',
-    'John takes metformin',
-    'Medication: metformin 500 mg\nStatus: stopped',
-    'Medications I used to take:\n- metformin 500 mg',
-    'Medications: metformin, stopped last week',
-    'Mr. Smith takes metformin',
-    'My doctor told me, take metformin daily',
-    'My friend, who is on metformin, says I should try it',
-    'My mother has diabetes\ntakes metformin',
-    'My mother, on metformin',
-    'My wife has diabetes, takes metformin',
-    'My wife takes metformin',
-    'No. Metformin',
-    'Not taking:\nmetformin 500 mg',
-    'On metformin; no',
-    'Past medications:\nmetformin 500 mg',
-    'Past medications: metformin 500 mg',
-    'Plan, take metformin',
-    'Should I be on metformin, or not?',
-    'Should I be on metformin?',
-    'Should I take metformin?',
-    'Smoker: - and I take metformin',
-    'Smoker: - takes metformin',
-    'Smoker: 0 takes metformin',
-    'Stopped:\n- metformin 500 mg',
-    'Stopped: lisinopril, metformin 500 mg',
-    'TAKE METFORMIN',
-    'Take Glucophage XR 500 mg',
-    'Take metformin',
-    'Take metformin 500 mg twice daily',
-    'The label says, take metformin 500 mg twice daily',
-    'Tomorrow, take metformin',
-    'Wife\nmetformin 500 mg',
-    'X, take metformin ...',
-    'allergic to penicillin, metformin 500 mg',
-    'allergies: sulfa, metformin 500 mg',
-    'asthma - 0 - on metformin 500 mg',
-    'be on / taking metformin',
-    'cancer: 0 - on metformin',
-    'cancer: 0 -- on metformin',
-    'cancer: 0 – on metformin',
-    'cancer: no - on metformin',
-    'considering berberine, metformin 500 mg daily',
-    'current smoker: - takes metformin',
-    'd like to start taking metformin',
-    "diabetes and I'd been on metformin",
-    'diabetes and discontinued taking metformin',
-    'diabetes, treated with metformin',
-    'diagnoses: diabetes, I take metformin 500 mg twice daily',
-    'diagnoses: diabetes, medications: metformin',
-    'diagnoses: diabetes, metformin 500 mg',
-    'discontinued atorvastatin 20 mg, metformin 500 mg',
-    'doctor recommends taking metformin',
-    'doctor wants me on metformin',
-    'doctor wants me to start taking metformin',
-    'does not take lisinopril, metformin 500 mg',
-    'father is diabetic, on metformin',
-    'glucophage er',
-    'he takes metformin',
-    'hypertension: 0 - 0 - on metformin',
-    'in 2019 on metformin',
-    "isn't on metformin",
-    'isnt on metformin',
-    'looking into taking metformin',
-    'maybe on metformin',
-    'metformin',
-    'metformin ',
-    'metformin 0 mg',
-    'metformin 0.0 mg',
-    'metformin 500 mg (stopped)',
-    'metformin 500 mg - stopped',
-    'metformin 500 mg, discontinued',
-    'metformin 500 mg, never filled',
-    'metformin 500 mg, stopped in 2020',
-    'metformin 500 mg, stopped last month',
-    'metformin 500 mg; stopped',
-    'metformin hcl er',
-    'mom: diabetes; on metformin',
-    'my doctor is taking metformin',
-    'my father takes metformin',
-    'my grandma takes metformin',
-    'my nan takes metformin 500 mg twice daily',
-    'my neighbour takes metformin',
-    'my stepmother is on metformin',
-    'no allergies and metformin',
-    'no allergies, metformin',
-    'no allergies, metformin\ntakes metformin',
-    'no longer takes lisinopril, metformin 500 mg',
-    'no pain and metformin 500 mg',
-    'no pain, metformin',
-    'no problems, metformin',
-    'nobody on metformin',
-    'none on metformin',
-    'not on insulin, metformin',
-    'not on lisinopril, metformin 1000 mg daily',
-    'not sure, metformin',
-    'not taking aspirin, metformin 500 mg',
-    'off lisinopril, metformin 500 mg',
-    'off work, metformin',
-    'on disability, metformin',
-    'on holiday, metformin',
-    'on metformin currently',
-    'on metformin during 2019',
-    'on metformin for diabetes',
-    'on metformin until 2019',
-    'on metformin, no longer',
-    'on vacation, metformin',
-    'possibly on metformin',
-    'rarely takes metformin',
-    'relatives on metformin',
-    'reluctant to start taking metformin',
-    'research on metformin',
-    'she is on metformin',
-    'should I be on metformin',
-    'should be on metformin',
-    'since 2015 on metformin',
-    'smoker (-) takes metformin',
-    'someone on metformin',
-    'sometimes takes metformin',
-    'started/restarted/resumed metformin',
-    'stopped lisinopril, metformin 500 mg',
-    'stopped metformin',
-    'stopped metformin 500 mg twice daily',
-    'stopped metformin, now taking it again',
-    'stopped metformin, restarted',
-    'stroke: - - on metformin',
-    'take metformin',
-    'take metformin daily',
-    'take/use metformin ...',
-    'takes lisinopril, aspirin, metformin',
-    'takes metformin 500 mg ER',
-    'takes metformin 500 mg per day',
-    'takes metformin regularly',
-    'takes metformin sometimes',
-    'takes metformin, sometimes',
-    'takes metformin, stopped in 2020',
-    'thinking of starting metformin',
-    'unless on metformin',
-    'use metformin daily',
-    'was on lisinopril, metformin 500 mg',
-    'was on metformin in 2019',
-    'who is not on metformin',
-    'would it help to be on metformin',
-    'years ago on metformin',
-]
+NEVER_CURRENT = json.loads((REPO / "tests" / "fixtures" / "medication_never_current.json")
+                           .read_text(encoding="utf-8"))["texts"]
 
 
-@pytest.mark.parametrize("text", NEVER_CURRENT, ids=[t.replace("\n", " / ")[:60] for t in NEVER_CURRENT])
+@pytest.mark.parametrize("text", NEVER_CURRENT, ids=[f"{i}" for i in range(len(NEVER_CURRENT))])
 def test_what_the_adversarial_review_found_is_never_read_as_a_current_medication(text):
-    p = read_patient_text(BASE + text)
+    p = read_patient_text(text if text.startswith("58 year old") else BASE + text)
     assert p.medications == [], (text, p.medications, p.notes)
 
 
@@ -485,11 +310,13 @@ def test_a_drug_mentioned_where_it_could_not_be_read_is_not_counted_and_the_text
 
 
 def test_saying_both_that_you_take_it_and_that_you_do_not_is_a_contradiction_to_fix_in_either_order():
-    for text in ("takes metformin\nHbA1c 6.1 %\nstopped metformin", "stopped metformin\nHbA1c 6.1 %\ntakes metformin"):
+    far = "\nHbA1c 6.1 %\nCRP 3 mg/L\nalbumin 4.1 g/dL\n"                  # beyond the two lines a retraction is looked for
+    for text in (f"takes metformin{far}stopped metformin", f"stopped metformin{far}takes metformin"):
         p = read_patient_text(BASE + text)
         assert not p.ok and any("keep one" in str(x) and x.topic == "medication" for x in p.all_problems()), text
-    adjacent = read_patient_text(BASE + "takes metformin\nstopped metformin")        # the next line takes it back
-    assert adjacent.medications == [] and adjacent.medications_stopped == ["Metformin"]
+    for near in ("takes metformin\nstopped metformin", "takes metformin\nHbA1c 6.1 %\nstopped metformin"):
+        adjacent = read_patient_text(BASE + near)                                    # a line below takes it back
+        assert adjacent.medications == [] and adjacent.medications_stopped == ["Metformin"], near
 
 
 def test_a_heading_a_stop_line_or_a_relative_above_or_below_withdraws_the_entry():
@@ -537,3 +364,101 @@ def test_no_text_the_review_threw_at_the_reader_stalls_it(name):
     started = time.perf_counter()
     read_patient_text(HOSTILE[name])
     assert time.perf_counter() - started < 0.5, name
+
+
+# ═══════════════════════════ round 2 of the review ════════════════════════════════
+
+@pytest.mark.parametrize("text", [
+    "takes metformin ❌", "I take metformin 👎", "[ ] metformin 500 mg", "☐ metformin 500 mg", "~~I take metformin~~",
+    "I take ~~metformin~~", "metformin 500 mg 🚫", "takes metformin and [ ] diabetes", "I take metformin не", "I take metformin 否",
+    "Прошлые лекарства:\nmetformin 500 mg", "takes metformin\nнет", "I stop\u200bped metformin\ntakes metformin",
+])
+def test_a_character_the_grammar_cannot_account_for_means_the_line_is_not_read(text):
+    """The tokenizer used to drop "❌" and "не" silently and read the drug anyway."""
+    assert read_patient_text(BASE + text).medications == []
+
+
+@pytest.mark.parametrize("text", [
+    "Past medications:\n- lisinopril 10 mg\n- metformin 500 mg", "Allergies:\n- penicillin\n- metformin 500 mg",
+    "Stopped:\nlisinopril 10 mg\nmetformin 500 mg", "Not taking:\n1. lisinopril\n2. metformin 500 mg",
+    "Not taking:\non metformin", "Past medications:\nI take metformin 500 mg twice daily", "Allergies:\ntakes metformin",
+    "Contraindications:\ndiabetes on metformin", "Previous medications\nmetformin 500 mg", "Inactive medications\nmetformin 500 mg",
+    "**Past medications:**\nmetformin 500 mg", "Past medications:\n\nmetformin 500 mg", "Past medications:\n-----\nmetformin 500 mg",
+    "CRP 3.1 mg/L\nPast medications:\nlisinopril 10 mg\nmetformin 500 mg", "Family history:\n- diabetes\n- on metformin",
+    "Medications I'm allergic to\nmetformin 500 mg", "2019\nmetformin 500 mg", "metformin 500 mg\n2021",
+    "takes metformin\nstopped\nlisinopril", "takes metformin\n-----\nstopped 2021", "takes metformin\nd/c'd",
+    "takes metformin\nreplaced by insulin", "metformin 500 mg, replaced by insulin", "metformin 500 mg, d/c'd", "takes metformin, inactive",
+])
+def test_the_nearest_heading_above_and_a_retraction_below_decide_not_just_the_adjacent_line(text):
+    assert read_patient_text(BASE + text).medications == [], text
+
+
+@pytest.mark.parametrize("text", [
+    "My husband's diabetes. Takes metformin.", "My husband's diabetes\nTakes metformin", "Mom's diabetes\nOn metformin",
+    "My parents have diabetes\ntakes metformin", "My girlfriend has diabetes\ntakes metformin", "Dad's meds\nmetformin 500 mg",
+    "Wife's medications:\nlisinopril\nmetformin", "My mother has diabetes\n\ntakes metformin",
+])
+def test_a_relative_above_or_on_the_line_makes_a_subject_less_medication_theirs(text):
+    assert read_patient_text(BASE + text).medications == [], text
+    assert read_patient_text(BASE + text.replace("Takes metformin", "I take metformin").replace("takes metformin", "I take metformin")
+                             ).medications in ([], ["Metformin"])        # "I" is the person: allowed once the line is the person's own
+
+
+def test_a_line_the_reader_does_not_understand_is_a_retraction_only_if_it_starts_like_one():
+    """"my albumin was 4.1 g/dL" is a lab, not a stop: the first words decide, and a model rewrite of a
+    neighbouring line must not flip a medication reading (patient_read compares what the rules read)."""
+    assert read_patient_text(BASE + "takes metformin\nmy albumin was 4.1 g/dL").medications == ["Metformin"]
+    assert read_patient_text(BASE + "takes metformin\nAlbumin 4.1 g/dL").medications == ["Metformin"]
+    assert read_patient_text(BASE + "takes metformin\nHbA1c was 6.1 %").medications == ["Metformin"]
+    assert read_patient_text(BASE + "takes metformin\nI quit it in June").medications == []
+    assert read_patient_text(BASE + "takes metformin\nStatus: stopped").medications == []
+
+
+def test_text_handed_back_to_the_reader_is_as_typed_with_its_hyphens():
+    p = read_patient_text(BASE + "takes metformin and has pre-diabetes")
+    assert p.ok and p.questionnaire["DIQ010"] == 3 and p.medications == ["Metformin"]       # the head was 'pre diabetes'
+    p = read_patient_text(BASE + "has type 2 diabetes and takes metformin")
+    assert p.questionnaire["DIQ010"] == 1 and p.medications == ["Metformin"]
+
+
+@pytest.mark.parametrize("text", [
+    "metformin 2000 mg", "I take metformin 2000 mg daily", "Metformin 2,000 mg daily", "I take metformin 500 mg a day",
+    "I take metformin 500 mg per day", "I take metformin 500 mg each day", "I take metformin as prescribed",
+    "takes metformin as prescribed", "metformin 500 mg as prescribed", "medications: metformin as prescribed",
+    "on metformin as prescribed", "takes Metformin-XR", "takes metformin-ER", "metformin hcl er 500 mg", "currently I take metformin",
+    "now I take metformin 1000 mg", "medications:\n- lisinopril\n- metformin", "Medications: lisinopril, aspirin, metformin",
+])
+def test_ordinary_present_tense_phrasings_the_review_found_missed_are_read(text):
+    assert read_patient_text(BASE + text).medications == ["Metformin"], text
+
+
+def test_a_dose_is_not_a_year_and_a_year_is_not_a_dose():
+    assert not line_blocked("takes metformin 2000 mg daily") and not line_blocked("takes metformin 1,000 mg")
+    assert line_blocked("takes metformin 2019") and line_blocked("takes metformin until 2020")
+    assert not line_blocked("takes metformin since 2019")
+    assert read_medication("metformin infinity mg", MedContext()) is None and read_medication("metformin inf mg", MedContext()) is None
+
+
+def test_context_for_scans_the_lines_around_a_statement():
+    lines = ["albumin 4.1 g/dL", "Past medications:", "lisinopril 10 mg", "- aspirin", "metformin 500 mg", "stopped 2021"]
+    ctx = context_for(lines, 4)
+    assert ctx.heading == "other" and ctx.retracted is True                   # "stopped 2021" is below it
+    assert context_for(lines, 0).heading is None and context_for(lines, 3).heading == "other"
+    assert context_for(lines[:5], 4).retracted is False
+    assert context_for(["takes metformin", "-----", "stopped"], 0).retracted
+    assert not context_for(["takes metformin", "my albumin was 4.1 g/dL"], 0, is_lab_line=lambda line: True).retracted
+    assert context_for(["Mom's diabetes", "takes metformin"], 1).other
+
+
+HOSTILE.update({
+    "an NFKC sandwich": BASE + "takes metformin\n" + "x metformin " + "\u0344" * 9_850 + "\u0f73\u0f75" * 4_900 + "\ntakes metformin",
+    "a giant line with no drug": BASE + ("\u0f73\u0f75" * 9_800),
+    "twenty thousand blank lines": BASE + "takes metformin" + "\n" * 20_000 + "stopped",
+    "ten thousand headers": BASE + "medications: \n" * 10_000,
+    "many bullets": BASE + "- \n" * 9_000 + "metformin 500 mg",
+})
+
+
+def test_a_fullwidth_spelling_of_the_drug_is_the_drug_and_a_denial_of_it_is_a_contradiction():
+    p = read_patient_text(BASE + "takes metformin\nHbA1c 6.1 %\nCRP 3 mg/L\nalbumin 4.1 g/dL\nI do not take ｍｅｔｆｏｒｍｉｎ")
+    assert not p.ok and any("keep one" in str(x) for x in p.all_problems())

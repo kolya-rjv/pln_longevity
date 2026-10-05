@@ -561,6 +561,11 @@ def _resolve_marker(
     )
 
 
+def _status_of(z: float, threshold: float) -> str:
+    """Elevated | Low | Normal for the z the atom will carry (6 significant digits)."""
+    return "Elevated" if z > threshold else ("Low" if z < -threshold else "Normal")
+
+
 def build_patient(
     payload: dict,
     *,
@@ -698,7 +703,7 @@ def build_patient(
             name="LinAgeAccel", z=built_linage2.z, derived=True,
             raw_value=built_linage2.delta_years, unit="years",
             formula=f"z = years / {linage_sd_to_years:g}   [linage-sd-to-years]",
-            status=built_linage2.status,
+            status=_status_of(float(f"{built_linage2.z:.6g}"), elevated_threshold),
             note=(
                 "From the `linage2` block. Read by the LinAge2 forms "
                 "(linage-hazard-patient, linage-decomposition-patient, "
@@ -725,10 +730,10 @@ def build_patient(
             )
     elif any(m.name == "LinAgeAccel" for m in resolved):
         warnings.append(
-            "LinAgeAccel was sent as a bare marker: it records the clock's z, but every LinAge2 form "
-            "(the hazard, the per-lab decomposition, the counterfactuals) reads the LinAgeDelta atom "
-            "that only the whole /predict response under `linage2` creates, so they return nothing "
-            "for this patient."
+            "LinAgeAccel was sent as a bare marker: it records the clock's z, but the LinAge2 forms read "
+            "the LinAgeDelta atom that only the whole /predict response under `linage2` creates, so the "
+            "hazard, the risk, the decomposition and the projections return nothing for this patient and "
+            "the counterfactuals and scenarios return 0 years."
         )
     edge_markers = kb_effect_markers() if effect_markers is None else frozenset(effect_markers)
     witnesses = sorted(m.name for m in resolved if m.status == "Elevated" and m.name in edge_markers)
