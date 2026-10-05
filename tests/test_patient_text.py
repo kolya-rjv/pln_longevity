@@ -506,3 +506,22 @@ def test_set_aside_statements_say_which_statement():
     p = read_patient_text("58 year old male\nmy husband smokes")
     assert p.set_aside == ["my husband smokes"] and p.set_aside[0].statement == 1
     assert p.statements[1].outcome == "set_aside"
+
+
+# ═══════════════ the 10-year CHD risk is a first-event model ═════════════════════
+#
+# Someone who reports coronary heart disease, a heart attack or angina gets the same incident-CHD
+# number as someone who does not (the history is not an input), so the reader flags it for a note
+# beside that number. Heart failure is a different event and is not flagged.
+
+def test_reported_chd_a_heart_attack_and_angina_are_flagged_and_heart_failure_is_not():
+    from core.patient_builder import PREVALENT_CHD
+    base = "58 year old male\nCRP 3.1 mg/L\n"
+    payload, _ = read_patient_text(base + "diagnoses: heart attack, angina, coronary heart disease").to_patient("X")
+    assert payload["prevalent_chd"] == ["coronary heart disease", "angina", "heart attack"]   # item order, not typed order
+    assert set(payload["prevalent_chd"]) <= set(PREVALENT_CHD)             # the builder's allow-list
+    for text in ("diagnoses: heart failure", "diagnoses: hypertension", "no heart attack",
+                 "diagnoses: hypertension, no angina"):
+        payload, _ = read_patient_text(base + text).to_patient("X")
+        assert "prevalent_chd" not in payload, text
+    assert "prevalent_chd" not in read_patient_text(base).to_patient("X")[0]

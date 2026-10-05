@@ -12,7 +12,7 @@ from functools import lru_cache
 from typing import Iterable, Optional
 
 from config import ONTOLOGY_DIR
-from core.patient_builder import BuiltPatient, build_patient, kb_effect_markers
+from core.patient_builder import BuiltPatient, build_patient, kb_effect_markers, prevalent_chd_note
 from ontology.inventory import merged_inventory
 from ontology.loader import parse_metta_text
 from ontology.registry import OntologyRegistry
@@ -172,17 +172,30 @@ def _no_witness_warnings(metta_query: str, patient: BuiltPatient) -> list[str]:
     ]
 
 
+def _prevalent_chd_warnings(metta_query: str, patient: BuiltPatient) -> list[str]:
+    """A 10-year CHD risk for a person who reports CHD, a heart attack or angina: the model
+    estimates a first event, and returns the same number with or without that history."""
+    if not (patient.prevalent_chd and patient.can_predict_risk):
+        return []
+    if not any(who == patient.patient_id for _, who in _GRIM_RISK_RE.findall(metta_query or "")):
+        return []
+    return [prevalent_chd_note(patient.prevalent_chd)]
+
+
 def patient_form_warnings(metta_query: str, patient: Optional[BuiltPatient]) -> list[str]:
     """Say why a personalised form is about to come back empty or unpersonalised, before it
     does — the same note on /query, /metta/run and the chat (the chat never shows the
     builder's own notes, and an empty `()` reads as "no cause", which it is not).
 
-    Two cases, each for a form NAMING this patient: a heart-risk form for a patient with no
-    GrimAge value; and a diagnosis / supplement / ranking form for a patient none of whose
-    values is elevated and has a curated edge (BuiltPatient.witnesses)."""
+    Three cases, each for a form NAMING this patient: a heart-risk form for a patient with no
+    GrimAge value; a heart-risk form for a patient who reports CHD (a first-event model); and
+    a diagnosis / supplement / ranking form for a patient none of whose values is elevated and
+    has a curated edge (BuiltPatient.witnesses)."""
     if patient is None:
         return []
-    return _no_grimage_risk_warnings(metta_query, patient) + _no_witness_warnings(metta_query, patient)
+    return (_no_grimage_risk_warnings(metta_query, patient)
+            + _prevalent_chd_warnings(metta_query, patient)
+            + _no_witness_warnings(metta_query, patient))
 
 
 def linage2_prompt_hint(patient: BuiltPatient) -> str:
@@ -224,6 +237,16 @@ def no_grimage_prompt_hint(patient: BuiltPatient) -> str:
             f"  (linage-hazard-patient &self {pid})\n")
 
 
+def prevalent_chd_prompt_hint(patient: BuiltPatient) -> str:
+    """For a patient who reports CHD and has a GrimAge value (so the CHD model answers)."""
+    if not (patient.prevalent_chd and patient.can_predict_risk):
+        return ""
+    return (f"This patient reports {', '.join(patient.prevalent_chd)}. The 10-year CHD risk model "
+            f"(predict-risk-patient &self {patient.patient_id}) estimates a FIRST coronary event "
+            f"in someone without CHD, so its number does not apply to them: say so when you "
+            f"present it (the response carries the same note).\n")
+
+
 def patient_prompt_section(patient: BuiltPatient) -> str:
     """Appended AFTER the static system prompt (so the static prefix stays cacheable).
 
@@ -242,5 +265,6 @@ def patient_prompt_section(patient: BuiltPatient) -> str:
         f"is (diagnose-patient &self {patient.patient_id}) over the knowledge base's "
         f"default candidate causes — never a hand-typed hallmark list (rule 17).\n"
         + no_grimage_prompt_hint(patient)
+        + prevalent_chd_prompt_hint(patient)
         + (linage2_prompt_hint(patient) if patient.has_linage2 else "")
     )

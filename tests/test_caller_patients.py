@@ -515,3 +515,57 @@ def test_a_heart_risk_form_for_a_patient_with_no_grimage_says_there_is_no_heart_
     assert patient_form_warnings(f"(linage-hazard-patient &self {pid})", built) == []
     assert patient_form_warnings("(predict-risk-patient &self Patient001)", built) == []
     assert patient_form_warnings(f"(decompose-grimage &self {pid})", built) == []
+
+
+# ═══════════════ the 10-year CHD risk is a first-event model ═════════════════════
+#
+# Lu 2019's hazard ratio is for INCIDENT CHD and NHANES's own CHD items are prevalence, "usable only
+# as an exclusion from the at-risk set" (nhanes_baseline.metta). A person who reports CHD, a heart
+# attack or angina is outside that set, yet gets the same number: the history is not an input.
+
+def test_reported_chd_qualifies_the_risk_only_where_the_risk_model_answers():
+    from core.patient_context import patient_form_warnings
+    built = build_patient({**WITH_GRIM, "prevalent_chd": ["heart attack", "coronary heart disease", "heart attack"]})
+    assert built.prevalent_chd == ["coronary heart disease", "heart attack"]       # canonical order, once each
+    (note,) = [w for w in built.warnings if w.startswith("Reported ")]
+    assert "FIRST coronary event" in note and "same number with or without that history" in note
+    # a flag, not an atom: the patient the KB sees is the same patient without it
+    assert built.shared_atoms == build_patient(WITH_GRIM).shared_atoms
+    assert built.atoms == build_patient(WITH_GRIM).atoms
+    pid = built.patient_id
+    assert patient_form_warnings(f"(predict-risk-patient &self {pid})", built) == [note]
+    assert patient_form_warnings(f"(project-risk-patient &self {pid} Metformin)", built) == [note]
+    assert patient_form_warnings(f"(diagnose-patient &self {pid})", built) == []
+    assert patient_form_warnings("(predict-risk-patient &self Patient001)", built) == []
+    # where the model returns nothing anyway there is nothing to qualify
+    no_clock = build_patient({**NO_GRIM, "prevalent_chd": ["angina"]})
+    assert not [w for w in no_clock.warnings if w.startswith("Reported ")]
+    assert not any("first" in w.lower() and "coronary" in w for w in
+                   patient_form_warnings(f"(predict-risk-patient &self {no_clock.patient_id})", no_clock))
+    assert build_patient({**WITH_GRIM, "prevalent_chd": ["angina", "angina"]}).prevalent_chd == ["angina"]
+
+
+@pytest.mark.parametrize("bad", [["heart failure"], ["x) (= (grimage-weight $m) 9.9) (y"], "angina", ["angina"] * 4, [5]])
+def test_prevalent_chd_is_checked_against_an_allow_list_never_interpolated(bad):
+    with pytest.raises(PatientSpecError) as excinfo:
+        build_patient({**WITH_GRIM, "prevalent_chd": bad})
+    assert excinfo.value.code == "invalid_prevalent_chd"
+
+
+def test_the_api_takes_prevalent_chd_and_the_response_says_so(monkeypatch):
+    from core.pln_runner import PLNRunResult
+    patient = {**WITH_GRIM, "id": "H", "prevalent_chd": ["heart attack"]}
+    body = _request("POST", "/patients/preview", json=patient).json()
+    assert body["prevalent_chd"] == ["heart attack"]
+    assert any(w.startswith("Reported heart attack") for w in body["warnings"])
+    monkeypatch.setattr(api_module, "translate", lambda **kw: _translation("(predict-risk-patient &self Caller_H)"))
+    monkeypatch.setattr(api_module, "run_query", Mock(return_value=PLNRunResult(status="empty", mode="runtime")))
+    monkeypatch.setattr(api_module, "log_turn", Mock())
+    answer = _request("POST", "/query", json={"message": "my heart risk?", "patient": patient}).json()
+    assert answer["patient"]["prevalent_chd"] == ["heart attack"]
+    assert [w for w in answer["warnings"] if w.startswith("Reported heart attack")]
+    run = _request("POST", "/metta/run", json={"metta_query": "(predict-risk-patient &self Caller_H)",
+                                               "patient": patient}).json()
+    assert [w for w in run["warnings"] if w.startswith("Reported heart attack")]
+    # an unknown key is still refused: the field is declared, not `extra="allow"`
+    assert _request("POST", "/patients/preview", json={**WITH_GRIM, "prevalent_cvd": ["x"]}).status_code == 422

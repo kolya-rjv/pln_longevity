@@ -176,6 +176,12 @@ YEARS_PER_SD_MARKERS = {"AgeAccelGrim", "HorvathAgeAccel"}
 #: training cohort), not GrimAge's 4.2. Same rule, different knob.
 LINAGE_YEARS_MARKERS = {"LinAgeAccel"}
 
+#: What a person can say that puts them OUTSIDE the at-risk set of the 10-year CHD model: it
+#: estimates a FIRST coronary event (Lu 2019's hazard ratio is for incident CHD; NHANES's own
+#: MCQ160C/D/E are lifetime "ever told" prevalence, "usable only as an exclusion from the at-risk
+#: set", nhanes_baseline.metta). Heart failure (MCQ160B) is a different event and is not here.
+PREVALENT_CHD = ("coronary heart disease", "angina", "heart attack")
+
 SEXES = {"Male", "Female"}
 SMOKING = {"NeverSmoker", "FormerSmoker", "CurrentSmoker"}
 
@@ -221,6 +227,17 @@ STILL_WORK = ("Diagnosis, supplement ranking and intervention ranking can still 
 #: Starts the builder's note that the shared layers have nothing to work from; the tab
 #: rewords it by this prefix.
 NO_WITNESS_PREFIX = "No elevated marker the knowledge base can use:"
+
+
+def prevalent_chd_note(conditions: Iterable[str]) -> str:
+    """The 10-year CHD risk for someone who reports CHD: the same number with or without that
+    history (probed), so it needs saying that it does not describe them."""
+    return (
+        f"Reported {', '.join(conditions)}: the 10-year heart-disease risk model estimates a FIRST "
+        f"coronary event in someone without CHD, so its number does not describe a person who already "
+        f"has it — it is the same number with or without that history. Do not read it as the risk "
+        f"of another event."
+    )
 
 
 def no_witness_note() -> str:
@@ -289,6 +306,10 @@ class BuiltPatient:
     #: into (kb_effect_markers) — what the diagnosis, the supplement plan and the
     #: intervention ranking can read. Empty: they have nothing to work from.
     witnesses: list[str] = field(default_factory=list)
+
+    #: Coronary heart disease / angina / heart attack the person reports (PREVALENT_CHD). A
+    #: flag, not an atom: nothing in the KB reads it; it qualifies the 10-year CHD risk.
+    prevalent_chd: list[str] = field(default_factory=list)
 
     #: The same patient WITHOUT its LinAge2 atoms — what the SHARED execution space
     #: gets. `atoms` (everything) is for the LinAge2 scoped space, the preview and
@@ -553,6 +574,16 @@ def build_patient(
                 received=payload.get("smoking"),
             )
 
+    prevalent_chd = payload.get("prevalent_chd") or []
+    if (not isinstance(prevalent_chd, (list, tuple)) or len(prevalent_chd) > len(PREVALENT_CHD)
+            or any(c not in PREVALENT_CHD for c in prevalent_chd)):
+        raise PatientSpecError(
+            "invalid_prevalent_chd",
+            f"`prevalent_chd` must be a list drawn from {list(PREVALENT_CHD)}.",
+            received=payload.get("prevalent_chd"),
+        )
+    prevalent_chd = [c for c in PREVALENT_CHD if c in prevalent_chd]     # canonical order, once each
+
     raw_markers = payload.get("markers") or {}
     if not isinstance(raw_markers, dict):
         raise PatientSpecError("invalid_markers", "`markers` must be an object.")
@@ -650,6 +681,8 @@ def build_patient(
         )
     if not witnesses:
         warnings.append(no_witness_note())
+    if prevalent_chd and any(m.name == "AgeAccelGrim" for m in resolved) and age is not None and sex is not None:
+        warnings.append(prevalent_chd_note(prevalent_chd))
     if age is None or sex is None:
         warnings.append(
             "Age and sex are both required for an absolute risk: they select the "
@@ -754,6 +787,7 @@ def build_patient(
         smoking=smoking,
         linage2=built_linage2,
         witnesses=witnesses,
+        prevalent_chd=prevalent_chd,
     )
 
 

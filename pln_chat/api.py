@@ -1102,6 +1102,14 @@ class PatientIn(BaseModel):
     smoking: Optional[str] = Field(
         default=None, description="NeverSmoker | FormerSmoker | CurrentSmoker.",
     )
+    prevalent_chd: list[str] = Field(
+        default_factory=list, max_length=3,
+        description="Coronary heart disease / angina / heart attack the person REPORTS, drawn "
+                    "from ['coronary heart disease', 'angina', 'heart attack']. Not an atom — "
+                    "nothing in the knowledge base reads it — but the 10-year CHD risk model "
+                    "estimates a FIRST coronary event, so for someone who reports one the "
+                    "answer carries a note that its number does not apply to them.",
+    )
     markers: dict[str, object] = Field(
         default_factory=dict,
         description="Biomarker -> a z-score (a bare number), or an object with "
@@ -1425,6 +1433,10 @@ class PatientPreviewResponse(BaseModel):
     age: Optional[float] = None
     sex: Optional[str] = None
     smoking: Optional[str] = None
+    prevalent_chd: list[str] = Field(
+        default_factory=list,
+        description="The CHD / angina / heart attack the patient reports (PatientIn.prevalent_chd).",
+    )
     has_linage2: bool = Field(
         default=False,
         description="True when a LinAge2 delta is present (a `linage2` block or a bare "
@@ -2956,6 +2968,7 @@ def patients_preview(patient: PatientIn) -> PatientPreviewResponse:
         age=built.age,
         sex=built.sex,
         smoking=built.smoking,
+        prevalent_chd=built.prevalent_chd,
         has_linage2=built.has_linage2,
         linage2=built.linage2.as_dict() if built.linage2 is not None else None,
     )
@@ -3505,6 +3518,7 @@ def query(req: QueryRequest) -> QueryResponse:
                 warnings=patient.warnings,
                 can_predict_risk=patient.can_predict_risk,
                 age=patient.age, sex=patient.sex, smoking=patient.smoking,
+                prevalent_chd=patient.prevalent_chd,
             )
             if patient is not None else None
         ),

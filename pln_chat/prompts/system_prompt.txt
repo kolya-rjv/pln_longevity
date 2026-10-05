@@ -104,7 +104,9 @@ markdown fences, no extra keys:
     This model reads AgeAccelGrim ONLY. For a patient the request says has no
     AgeAccelGrim value there is no heart-specific risk: follow the pair of forms in
     their patient block, call the LinAge2 hazard ALL-CAUSE mortality (never a heart
-    risk) and never multiply or add the two clocks.
+    risk) and never multiply or add the two clocks. It estimates a FIRST coronary
+    event: for a patient who reports CHD, a heart attack or angina, say its number
+    does not apply to them.
 
 13. SUPPLEMENT RECOMMENDATION queries (Demo 6) map to dedicated functions, NOT to
     hand-built match patterns. Use them verbatim:

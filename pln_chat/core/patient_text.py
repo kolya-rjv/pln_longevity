@@ -394,6 +394,9 @@ class ParsedPatient:
                          "linage2": result.response}
         if self.smoking:
             payload["smoking"] = self.smoking
+        chd = [_ITEM_LABEL[i] for i in _CHD_ITEMS if self.questionnaire.get(i) == 1]
+        if chd:
+            payload["prevalent_chd"] = chd     # a flag for the 10-year CHD risk, not an atom
         return payload, result
 
     def as_dict(self) -> dict:
@@ -620,6 +623,9 @@ _ITEM_LABEL = {
     "OSQ010A": "hip fracture", "OSQ010B": "wrist fracture", "OSQ010C": "spine fracture",
     "OSQ060": "osteoporosis", "PFQ056": "memory problems", "HUQ070": "overnight hospital stay",
 }
+#: the items that put a person outside the 10-year CHD model's at-risk set (heart failure, MCQ160B, is
+#: a different event); the labels are core.patient_builder.PREVALENT_CHD
+_CHD_ITEMS = ("MCQ160C", "MCQ160D", "MCQ160E")
 _FS1_ITEMS = ("BPQ020", "DIQ010", "KIQ020", "MCQ010", "MCQ053", "MCQ160A", "MCQ160B", "MCQ160C",
               "MCQ160D", "MCQ160E", "MCQ160F", "MCQ160G", "MCQ160I", "MCQ160J", "MCQ160K",
               "MCQ160L", "MCQ220", "OSQ010A", "OSQ010B", "OSQ010C", "OSQ060", "PFQ056", "HUQ070")

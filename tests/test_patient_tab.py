@@ -506,3 +506,45 @@ def test_the_chat_labels_the_hazard_beside_an_empty_heart_risk_and_stays_silent_
 def test_the_tab_says_what_a_heart_risk_question_will_return_without_a_grimage_line():
     summary = _build(SMOKER)["summary"]
     assert "labelled all-cause mortality — it is not a heart risk" in summary
+
+
+# ═══════════════ reported CHD: a first-event model ═══════════════════════════════
+
+CHD_TEXT = (SMOKER + "\nGrimAge acceleration +3 years\n"
+            "diagnoses: hypertension, coronary heart disease, heart attack, angina")
+
+
+def test_the_tab_the_api_and_the_chat_carry_reported_chd_to_the_risk_answer(monkeypatch):
+    import asyncio
+    import httpx
+    import api as api_module
+    import core.executor as executor
+    monkeypatch.setattr(executor, "PLN_WORKER_POOL_SIZE", 0)
+
+    out = _build(CHD_TEXT)
+    state = out["state"]
+    assert state["prevalent_chd"] == ["coronary heart disease", "angina", "heart attack"]
+    assert "FIRST coronary event" in out["summary"]                      # the tab's build notes
+
+    async def post(path, body):
+        transport = httpx.ASGITransport(app=api_module.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t", timeout=300) as c:
+            return await c.post(path, json=body)
+
+    r = asyncio.run(post("/patients/from-text", {"text": CHD_TEXT}))      # no 500: PatientIn has the field
+    assert r.status_code == 200 and r.json()["preview"]["prevalent_chd"] == state["prevalent_chd"]
+    assert r.json()["patient"] == state
+
+    _, seen, history = _chat_with(monkeypatch, "(predict-risk-patient &self Caller_Me)", state)
+    assert "This patient reports coronary heart disease, angina, heart attack" in seen["prompt"]
+    assert "> **Note.** Reported coronary heart disease, angina, heart attack" in history[-1]["content"]
+    # without the history, or for a form that is not a heart-risk form, neither the hint nor the note
+    plain = _build(SMOKER + "\nGrimAge acceleration +3 years\ndiagnoses: hypertension")["state"]
+    _, seen, history = _chat_with(monkeypatch, "(predict-risk-patient &self Caller_Me)", plain)
+    assert "This patient reports" not in seen["prompt"] and "Reported" not in history[-1]["content"]
+    _, _, history = _chat_with(monkeypatch, "(diagnose-patient &self Caller_Me)", state)
+    assert "FIRST coronary event" not in history[-1]["content"]
+    # no GrimAge line: the CHD model has no input, so nothing to qualify
+    no_clock = _build(SMOKER + "\ndiagnoses: hypertension, heart attack")["state"]
+    _, seen, _ = _chat_with(monkeypatch, "(predict-risk-patient &self Caller_Me)", no_clock)
+    assert "This patient reports" not in seen["prompt"]

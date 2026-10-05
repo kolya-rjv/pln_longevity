@@ -185,6 +185,13 @@ no clock surrogate, so it honestly projects **~0** change; an edge-less lever
 6. **Multi-lever projection.** Project risk under a *combination* of interventions,
    which needs the counterfactual layer's own multi-lever follow-up
    (`docs/counterfactual_analysis.md`).
+7. **Prevalent disease.** The estimate is for a *first* coronary event in someone at risk of one
+   (the hazard ratio is for incident CHD; NHANES's own CHD items are prevalence, usable only as an
+   exclusion from the at-risk set). A person who already has coronary heart disease, angina or a
+   heart attack is outside it, and the history is not an input: the number is the same with or
+   without it. The My Patient tab and `POST /patients/from-text` carry it as `prevalent_chd` (a flag,
+   not an atom) and `/query`, `/metta/run` and the chat attach a note next to the risk answer saying
+   so (`core.patient_context.patient_form_warnings`). A recurrence model is not in this KB.
 
 ## 7. Non-goals
 
