@@ -1107,10 +1107,12 @@ class PatientIn(BaseModel):
     prevalent_chd: list[str] = Field(
         default_factory=list, max_length=3,
         description="Coronary heart disease / angina / heart attack the person REPORTS, drawn "
-                    "from ['coronary heart disease', 'angina', 'heart attack']. Not an atom — "
-                    "nothing in the knowledge base reads it — but the 10-year CHD risk model "
-                    "estimates a FIRST coronary event, so for someone who reports one the "
-                    "answer carries a note that its number does not apply to them.",
+                    "from ['coronary heart disease', 'angina', 'heart attack']. The 10-year CHD risk "
+                    "model does not read it and estimates a FIRST coronary event, so for someone who "
+                    "reports one its answer carries a note that the number does not apply to them. "
+                    "It IS one observation for diagnose-patient alone: (PatientCondition <id> "
+                    "CoronaryHeartDisease) goes to the shared space only (never `atoms`, the LinAge2 "
+                    "space or the full stack); the supplement plan and the ranking do not read it.",
     )
     medications: list[str] = Field(
         default_factory=list, max_length=10,
@@ -1133,7 +1135,7 @@ class PatientIn(BaseModel):
                     "one LinAgeContribution atom per model input, for this request "
                     "only, and unlocks the `linage-*` forms (GET /linage2/features, "
                     "POST /linage2/analyze). Send the patient's own CRP / HbA1c / "
-                    "FastingGlucose z (or value) and smoking status alongside: the "
+                    "FastingGlucose (z or value), RDW / LowSerumAlbumin (z only) and smoking status alongside: the "
                     "engine credits a cause to a LinAge2 contribution only when the "
                     "patient's own value witnesses the direction.",
     )
@@ -1479,7 +1481,7 @@ class MarkerCatalogResponse(BaseModel):
 class LinAge2FeaturesResponse(BaseModel):
     features: list[dict] = Field(
         description="Every LinAge2 model input the KB declares: NHANES code, KB symbol, "
-                    "description, the KB biomarker it reads out (4 of 59), and how a "
+                    "description, the KB biomarker it reads out (6 of 59), and how a "
                     "cause gets credited to it.",
     )
     clock: dict
@@ -3122,8 +3124,8 @@ def _linage2_block_description() -> dict:
         "unlocks": [f"({form} &self <Patient> …)" for form in LINAGE2_FORMS[:7]],
         "features": "GET /linage2/features",
         "no_llm": "POST /linage2/analyze",
-        "send_alongside": "the patient's own CRP / HbA1c / FastingGlucose (z or value) "
-                          "and smoking status — a LinAge2 contribution is credited to "
+        "send_alongside": "the patient's own CRP / HbA1c / FastingGlucose (z or value), "
+                          "RDW / LowSerumAlbumin (z only) and smoking status — a LinAge2 contribution is credited to "
                           "a cause only when the patient's own value witnesses the "
                           "direction; a contribution's sign is not a lab's direction",
         "excludes": "markers.LinAgeAccel (one clock, one z)",
@@ -3266,9 +3268,9 @@ def linage2_features() -> LinAge2FeaturesResponse:
     """What a LinAge2 result may contain, and what the knowledge base does with it.
 
     Read this before sending `patient.linage2`. Every NHANES code the LinAge2
-    service emits is declared in linage2_core.metta with its KB symbol; four of
+    service emits is declared in linage2_core.metta with its KB symbol; six of
     the 59 inputs read out a biomarker the causal graph reaches (CRP, HbA1c,
-    glucose, cotinine) and can therefore be credited to a cause — the rest are
+    glucose, cotinine, RDW, albumin) and can therefore be credited to a cause — the rest are
     carried as years and left unexplained, never guessed at.
     """
     return LinAge2FeaturesResponse(

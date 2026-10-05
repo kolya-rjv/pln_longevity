@@ -21,7 +21,7 @@
 ;;
 ;; This file is the STRUCTURAL half: the clock, its residual, its 59 inputs (each
 ;; with its NHANES variable code, so a LinAge2 service response can be mapped to
-;; KB symbols without guessing), and — for the four inputs the KB already reasons
+;; KB symbols without guessing), and — for the six inputs the KB already reasons
 ;; about — which KB biomarker each one reads out. It ships NO patient numbers and
 ;; NO per-feature weights. The per-feature YEARS a patient receives arrive at
 ;; query time from the LinAge2 service, as caller-supplied atoms

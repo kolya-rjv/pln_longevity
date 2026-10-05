@@ -614,3 +614,19 @@ def test_a_triglyceride_not_marked_fasting_is_no_witness_and_says_why():
     assert p.labs()["LBDSTRSI"] == pytest.approx(190 * 0.01129)       # LinAge2 still has it, as typed
     assert not any("triglycerides were not marked fasting" in n
                    for n in read_patient_text("58 year old male\nfasting triglycerides 190 mg/dL").notes)
+
+
+def test_a_triglyceride_typed_twice_is_a_witness_whichever_line_came_first():
+    for text in ("58 year old male\nfasting triglycerides 190 mg/dL\ntriglycerides 190 mg/dL",
+                 "58 year old male\ntriglycerides 190 mg/dL\nfasting triglycerides 190 mg/dL"):
+        p = read_patient_text(text)
+        assert p.kb_markers()["Triglycerides"] == {"value": 190.0, "unit": "mg/dL"}, text
+        assert not any("not marked fasting" in n for n in p.notes), (text, p.notes)
+
+
+def test_the_not_fasting_note_does_not_claim_linage2_uses_a_triglyceride_it_does_not():
+    plain = read_patient_text("58 year old male\ntriglycerides 190 mg/dL")
+    assert any("in the calculated LDL" in n for n in plain.notes)
+    with_ldl = read_patient_text("58 year old male\ntriglycerides 190 mg/dL\nLDL 130 mg/dL")
+    note = next(n for n in with_ldl.notes if "not marked fasting" in n)
+    assert "in the calculated LDL" not in note and "does not use them (you gave an LDL)" in note

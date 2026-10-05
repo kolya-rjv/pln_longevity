@@ -399,7 +399,7 @@
   {
     "nl": "Which of my labs make me biologically older according to LinAge2?",
     "metta_query": "(linage-decomposition-patient &self Caller_W58)",
-    "explanation": "Runs the LinAge2 decomposition for the caller's patient: every model input with its years-contribution, measured and imputed kept apart, the totals, and the explicit age-term residual. An input that reads out a KB biomarker (CRP, HbA1c, glucose, cotinine) carries the hallmark causes credited to it — only when the patient's own z for that biomarker is Elevated, or for cotinine when the patient is a current smoker; the other inputs are reported as years and left unexplained rather than guessed at.",
+    "explanation": "Runs the LinAge2 decomposition for the caller's patient: every model input with its years-contribution, measured and imputed kept apart, the totals, and the explicit age-term residual. An input that reads out a KB biomarker (CRP, HbA1c, glucose, cotinine, RDW, albumin) carries the hallmark causes credited to it — only when the patient's own z for that biomarker is Elevated, or for cotinine when the patient is a current smoker; the other inputs are reported as years and left unexplained rather than guessed at.",
     "intent": "inference",
     "requires_pln_inference": true,
     "confidence_filter": 0.0,

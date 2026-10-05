@@ -755,3 +755,55 @@ def test_a_reported_heart_disease_keeps_the_diagnosis_button_because_the_diagnos
     assert _offered(text) == [Q1, Q2, patient_tab.DRIVERS_ONLY_QUESTION, Q6]
     note = patient_tab.on_show_questions(_build(text)["state"])[-1]["value"]
     assert "the supplement plan" in note and "the diagnosis and the supplement plan" not in note
+
+
+# ═══════ the gate follows the engine's credit rule (review round 3) ═══════
+
+#: patients the review found the first gate wrong for, plus controls: (text, why it matters)
+GATE_PATIENTS = {
+    "tg_only": "58 year old male, never smoked\nalbumin 4.8 g/dL\nRDW 12.3 %\nCRP 0.4 mg/L\nHbA1c 5.0 %\nfasting triglycerides 220 mg/dL",
+    "male_crp_only": "58 year old male, never smoked\nalbumin 4.8 g/dL\nRDW 12.3 %\nHbA1c 5.0 %\nCRP 8 mg/L",
+    "male_glucose_only": "58 year old male, never smoked\nalbumin 4.8 g/dL\nRDW 12.3 %\nCRP 0.4 mg/L\nHbA1c 5.0 %\nfasting glucose 126 mg/dL",
+    "smoker_low_cotinine": "52 year old male, current smoker\nalbumin 4.8 g/dL\nRDW 12.3 %\nCRP 0.4 mg/L\nHbA1c 5.0 %\ncotinine 5 ng/mL",
+    "witnessless_no_drivers": "45 year old female, never smoked\nalbumin 4.8 g/dL\nRDW 12.3 %\nCRP 0.4 mg/L\nHbA1c 5.0 %",
+    "smoker_example": SMOKER,
+    "six_labs": EXAMPLES["six labs only"],
+    "healthy": HEALTHY,
+    "female_crp": "58 year old female, never smoked\nalbumin 4.5 g/dL\nRDW 12.3 %\nCRP 12 mg/L",
+}
+
+
+def _linage2_answers(text: str):
+    """What the three LinAge2 button forms return for this patient, from the real rules (in-process)."""
+    import re
+    import test_linage2 as tl
+    from core.patient_context import build_caller_patient
+    from core.patient_text import read_patient_text
+    built = build_caller_patient(read_patient_text(text).to_patient("Me")[0], ())
+    m = tl._space(built.atoms)
+    scenarios = tl._one(m, "!(linage-scenarios-patient &self Caller_Me)")
+    levers = dict(re.findall(r"\(LinAgeCounterfactual Caller_Me (\w+) \(expected-delta-years ([-\d.eE]+)\)", scenarios))
+    drivers = tl._one(m, "!(linage-drivers-patient &self Caller_Me)")
+    return built, {k: float(v) for k, v in levers.items()}, drivers
+
+
+@pytest.mark.parametrize("name", sorted(GATE_PATIENTS))
+def test_a_linage2_button_is_offered_exactly_when_its_form_moves_or_answers(name):
+    text = GATE_PATIENTS[name]
+    built, levers, drivers = _linage2_answers(text)
+    buttons = dict(patient_tab.question_buttons(built))
+    quit_moves = abs(levers["SmokingCessation"]) > 1e-9
+    anything_moves = any(abs(v) > 1e-9 for v in levers.values())
+    assert buttons[Q3] is quit_moves, (name, levers)
+    assert buttons[Q4] is anything_moves, (name, levers)
+    drivers_answer = drivers.strip() not in ("()", "")
+    if built.witnesses:
+        assert buttons[Q5] is True                                   # the plan half answers; the drivers half may not
+    else:
+        assert buttons[patient_tab.DRIVERS_ONLY_QUESTION] is drivers_answer, (name, drivers[:80])
+
+
+def test_the_drivers_threshold_the_gate_uses_is_the_one_in_the_rules():
+    import re
+    text = (REPO / "pln_linage2.metta").read_text(encoding="utf-8")
+    assert float(re.search(r"\(linage-driver-threshold-years\) ([\d.]+)\)", text).group(1)) == patient_tab.DRIVER_THRESHOLD_YEARS

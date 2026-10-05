@@ -934,3 +934,16 @@ def test_a_rewrite_that_changes_a_neighbours_medication_is_withdrawn_alone():
     assert r.parsed.ok and r.parsed.sex == "Male" and r.parsed.age == 58
     assert r.parsed.medications == ["Metformin"]
     assert any("'healthy otherwise thankfully'" in n and "not used" in n for n in r.notes), r.notes
+
+
+def test_the_model_can_read_and_the_canonical_line_can_render_a_fasting_triglyceride():
+    """The fasting triglyceride aliases are a lab group of their own, named after the analyte (it was only
+    'fasting glucose' before, so the model's quote was discarded and the group was unrenderable)."""
+    assert V.labs["fasting triglycerides"].fasting and not V.labs["triglycerides"].fasting
+    text = "58 year old male, never smoked\nfasting triglycerides at 190 mg/dL"
+    r = read_patient(text, Recorded(lab("fasting triglycerides at 190 mg/dL", "fasting triglycerides")))
+    codes = [x.code for x in r.parsed.readings]
+    assert codes == ["LBDSTRSI"] and r.parsed.kb_markers()["Triglycerides"]["value"] == 190.0, (codes, r.notes)
+    from core.patient_canonical import Fact, render
+    assert render(Fact("lab", "fasting triglycerides", "190", "mg/dL")) == "fasting triglycerides 190 mg/dL"
+    assert render(Fact("lab", "fasting glucose", "112", "mg/dL")) == "fasting glucose 112 mg/dL"

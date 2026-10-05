@@ -65,23 +65,46 @@ SUGGESTED_QUESTIONS = (
     "What is the likely driver of my abnormal labs?",
 )
 
-#: What in the patient makes each button's form answer rather than come back empty or at
-#: zero. Measured per patient (8 patients, every form), not guessed:
-#:   always             the LinAge2 forms (decomposition, hazard): every built patient has a result
-#:   smoker             quitting smoking is 0.0 for anyone who is not a current smoker
-#:   witness_or_smoker  "what could I do": a lever moves only for an elevated witness or a smoker
+#: What in the patient makes each button's form answer rather than come back empty or at zero. Measured per patient
+#: against the real forms (tests/test_patient_tab.py compares them), not guessed; the LinAge2 rules decide:
+#:   always             the decomposition and the hazard: every built patient has a LinAge2 result
+#:   quit_helps         quitting smoking: a current smoker whose measured cotinine input adds years
+#:   scenarios_move     "what could I do": a lever moves only if a MEASURED LinAge2 input that adds years reads out a
+#:                      marker the person is a witness for (or is the smoker's cotinine) — the engine's credit rule
 #:   witness            the supplement plan reads witnesses only
 #:   witness_or_chd     the diagnosis: a witness, or a reported heart disease (one observation, item #11)
-_NEEDS = ("always", "always", "smoker", "witness_or_smoker", "witness", "witness_or_chd")
+_NEEDS = ("always", "always", "quit_helps", "scenarios_move", "witness", "witness_or_chd")
 
-#: The fifth button without a witness: the plan half would be empty, the drivers half still answers.
+#: The fifth button without a witness: the plan half would be empty; the drivers half answers only if some measured
+#: input adds at least `linage-driver-threshold-years` (pln_linage2.metta; a test reads the number from there).
 DRIVERS_ONLY_QUESTION = "What are the main drivers of my biological age?"
+DRIVER_THRESHOLD_YEARS = 0.5
+
+
+def _credited_inputs(built: BuiltPatient) -> list:
+    """The measured LinAge2 inputs that add years and read out a marker the patient witnesses (or whose readout is the
+    smoker's cotinine): the ones a lever can remove years from."""
+    lin = built.linage2
+    if lin is None:
+        return []
+    wit = set(built.witnesses)
+    return [c for c in lin.contributions if not c.imputed and c.years > 0 and c.reads_out
+            and (c.reads_out in wit or (c.reads_out == "CurrentTobaccoExposure" and built.smoking == "CurrentSmoker"))]
+
+
+def _quit_helps(built: BuiltPatient) -> bool:
+    return built.smoking == "CurrentSmoker" and any(c.reads_out == "CurrentTobaccoExposure"
+                                                    for c in _credited_inputs(built))
+
+
+def _has_drivers(built: BuiltPatient) -> bool:
+    lin = built.linage2
+    return lin is not None and any(not c.imputed and c.years >= DRIVER_THRESHOLD_YEARS for c in lin.contributions)
 
 
 def _offered(need: str, built: BuiltPatient) -> bool:
-    smoker = built.smoking == "CurrentSmoker"
-    return {"always": True, "smoker": smoker, "witness": bool(built.witnesses),
-            "witness_or_smoker": bool(built.witnesses) or smoker,
+    return {"always": True, "quit_helps": _quit_helps(built), "witness": bool(built.witnesses),
+            "scenarios_move": bool(_credited_inputs(built)),
             "witness_or_chd": bool(built.witnesses) or bool(built.prevalent_chd)}[need]
 
 
@@ -93,7 +116,7 @@ def question_buttons(built: Optional[BuiltPatient]) -> list[tuple[str, bool]]:
     for q, need in zip(SUGGESTED_QUESTIONS, _NEEDS):
         offered = _offered(need, built) if built is not None else need == "always"
         if q == SUGGESTED_QUESTIONS[4] and built is not None and not built.witnesses:
-            out.append((DRIVERS_ONLY_QUESTION, True))
+            out.append((DRIVERS_ONLY_QUESTION, _has_drivers(built)))
         else:
             out.append((q, offered))
     return out
@@ -105,16 +128,19 @@ def hidden_note(built: Optional[BuiltPatient]) -> str:
         return ""
     smoker = built.smoking == "CurrentSmoker"
     parts = []
-    if not smoker:
-        parts.append("quitting smoking (you are not a current smoker)")
+    if not _quit_helps(built):
+        parts.append("quitting smoking (" + ("you are not a current smoker" if not smoker
+                                             else "your cotinine gives it nothing to remove") + ")")
     if not built.witnesses:
         parts.append(("the supplement plan" if built.prevalent_chd else "the diagnosis and the supplement plan")
                      + " (none of your labs is elevated with a cause the knowledge base has curated)")
-        if not smoker:
-            parts.append("\"what could I do\" (nothing it can move)")
+        if not _has_drivers(built):
+            parts.append("the drivers of your biological age (no measured lab adds half a year or more)")
+    if not _credited_inputs(built):
+        parts.append("\"what could I do\" (no elevated value of yours reaches a lab that adds years)")
     if not parts:
         return ""
-    return ("_Not offered for you, because they would come back empty: " + "; ".join(parts)
+    return ("_Not offered for you, because they would come back empty or at zero: " + "; ".join(parts)
             + ". You can still type them in **PLN Query**._")
 
 
@@ -347,8 +373,8 @@ def _write_download(built: BuiltPatient, read_as: Optional[str] = None) -> str:
 #: whole LinAge2 blocks. The tab's user typed text: the same facts, in their terms.
 _TAB_WORDING = (
     ("The LinAge2 block was sent without any of the markers",
-     "None of your values can be a knowledge-base witness (CRP, HbA1c, or a glucose marked "
-     "fasting) and current smoking was not stated. The per-lab years are reported, but no "
+     "None of your values can be a knowledge-base witness (CRP, HbA1c, RDW, a low albumin, or a glucose "
+     "marked fasting) and current smoking was not stated. The per-lab years are reported, but no "
      "cause can be credited and every counterfactual returns 0: a lab's years carry the sign "
      "of LinAge2's sex-specific weights, so the knowledge base needs your own elevated value "
      "to call a lab high."),
@@ -368,7 +394,7 @@ _TAB_WORDING = (
      "and three DNA-methylation markers: PAI-1, GDF-15 and pack-years). So the diagnosis will come back empty, the "
      "supplement plan will have no tiers and the intervention ranking will be the same as for anyone. That is "
      "\"nothing to work from\", not \"no cause\". Diagnoses you listed, labs such as creatinine, blood "
-     "pressure or cholesterol, values below normal and a glucose not marked fasting do not count "
+     "pressure or cholesterol, values below normal, and a glucose or triglyceride not marked fasting do not count "
      "there — LinAge2 still uses them."),
 )
 

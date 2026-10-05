@@ -113,8 +113,8 @@ def load_model() -> LinAge2Model:
 
 def young_reference_z(code: str, value: float, sex: str) -> float:
     """`value` of the lab `code` (in the model's own unit) as a z against LinAge2's reference for `sex`:
-    (Box-Cox(value) - the sex's median) / its MAD, the reference being the model's training cohort of
-    people up to 50. NOT age-adjusted: a lab that drifts with age (RDW up, albumin down) reads higher
+    (Box-Cox(value) - the sex's median) / its MAD, the reference being the NHANES 1999-2000 participants aged up
+    to 50 in the model's own reference matrix (scripts/extract_linage2_model.py), not its 40-85 training cohort. NOT age-adjusted: a lab that drifts with age (RDW up, albumin down) reads higher
     in an older person for that reason alone. The one place the KB's z for a LinAge2 input is made."""
     model = load_model()
     feats = model.raw["features"]

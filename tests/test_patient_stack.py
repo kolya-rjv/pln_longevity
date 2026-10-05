@@ -493,3 +493,14 @@ def test_the_condition_is_counted_once_however_often_the_atom_is_repeated():
     once = _run("patient", "!(diagnose-patient &self Caller_Me)", TAB_SMOKER + CHD_LINE)
     twice = _run("patient", "!(diagnose-patient &self Caller_Me)", TAB_SMOKER + CHD_LINE + CHD_LINE)
     assert once["atoms"] == twice["atoms"]
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("cause", ["CellularSenescence", "ChronicInflammation", "MitochondrialDysfunction",
+                                   "InsulinResistance", "DeregulatedNutrientSensing", "SmokingPackYears"])
+def test_the_causes_that_reach_a_reported_chd_are_the_ones_the_notes_name(cause):
+    from core.patient_context import CHD_REACHING_CAUSES
+    atoms = ("(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)" + CHD_LINE)
+    out = _run("patient", f"!(diagnose-patient &self Caller_Me ({cause}))", atoms)
+    assert out["rc"] == 0
+    assert (out["atoms"] != ["()"]) is (cause in CHD_REACHING_CAUSES), (cause, out["atoms"])

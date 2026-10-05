@@ -141,6 +141,8 @@ _CURRENT_HEADING = frozenset({
     "current", "regular", "daily", "my", "usual",
 })
 _NEGATORS = frozenset("no not never none nothing nobody without denies denied".split())
+#: words that are headings ONLY on a line of nothing but heading vocabulary (see heading_kind)
+_HEADING_ONLY_WORDS = frozenset("old hx visit discharge pre preop dropped gave swapped ran reason active".split())
 _STOP_START = frozenset("""
 stopped stop stops discontinued discontinue ceased ended finished completed tapered weaned held hold paused
 off no not never none until till status quit used previously formerly was were had replaced replace
@@ -154,6 +156,9 @@ _RETRACT_ANY = frozenset("""
 no not never nor dont doesnt didnt havent hasnt hadnt isnt arent wasnt werent cant wont wouldnt couldnt
 stopped stop stops quit quits discontinued ceased ended finished tapered dropped gave swapped recently
 """.split())
+
+_HEADING_VOCABULARY = (_HEADING_ONLY_WORDS | _HEADING_OTHER | _STOP_START | _CURRENT_HEADING
+                       | frozenset("of the at last op my for".split()))
 
 _ALLOWED = frozenset("abcdefghijklmnopqrstuvwxyz0123456789 \t.,;:!?()%/+&=\"-–—°µμ")
 _APOSTROPHES = re.compile("[´`’‘′ʼ＇]")
@@ -247,7 +252,12 @@ def heading_kind(line: str) -> Optional[str]:
         return "current" if all(w in _CURRENT_HEADING for w in words) else "other"
     if len(words) <= 4 and not re.search(r"\d", norm) and words[0] not in _NEGATORS \
             and not any(w in _DRUGS for w in words):         # "stopped metformin" is a statement, not a heading
-        if any(w in _HEADING_OTHER or w in _STOP_START or _is_other(w) for w in words):
+        if any((w in _HEADING_OTHER or w in _STOP_START) and w not in _HEADING_ONLY_WORDS or _is_other(w) for w in words):
+            return "other"
+        # the words the round-2 closure added ("old", "hx", "visit", "pre", "active", "reason", "gave"…) mean a
+        # heading only on a line made of heading vocabulary ("Old meds", "Last visit", "Pre-op"): "I have
+        # pre-diabetes" and "I am active" are sentences
+        if any(w in _HEADING_ONLY_WORDS for w in words) and all(w in _HEADING_VOCABULARY for w in words):
             return "other"
         if all(w in _CURRENT_HEADING for w in words):
             return "current"
@@ -272,6 +282,7 @@ def starts_current_header(statement: str) -> bool:
 _LIST_FILLER = frozenset("""
 and with also currently now still regularly usually always daily nightly weekly twice once thrice a an the of to my
 plus day week morning evening night bedtime breakfast lunch dinner meal meals food at in per each as needed prn
+yes hi hello hey well so ok okay honestly personally present moment right baby low dose lowdose
 bid tid qd qhs mg mcg ug g iu units unit ml tablet tablets tab tabs pill pills capsule capsules cap caps er xr sr dr
 extended release on taking takes take using uses
 """.split())
@@ -286,6 +297,9 @@ tamsulosin finasteride sildenafil tadalafil montelukast cetirizine loratadine fe
 ezetimibe fenofibrate gemfibrozil glipizide glimepiride gliclazide sitagliptin linagliptin empagliflozin
 dapagliflozin canagliflozin liraglutide semaglutide tirzepatide pioglitazone vitamin vitamins d c e k b b6 b12
 multivitamin magnesium zinc calcium iron potassium fish oil omega 3 supplement supplements probiotic coq10 creatine
+statin statins ppi ppis ace inhibitor inhibitors blocker blockers lipitor zocor crestor norvasc zestril ozempic wegovy
+mounjaro melatonin berberine resveratrol nmn nad nicotinamide quercetin curcumin turmeric glucosamine collagen d3 k2 b2
+antihistamine antacid
 """.split())
 _DRUG_STEM = re.compile(r"[a-z]{3,}(?:pril|sartan|statin|olol|dipine|prazole|thiazide|tidine|formin|gliptin|"
                         r"gliflozin|glutide|glitazone|semide|cillin|mycin|floxacin|oxetine|pram|triptyline|"
@@ -559,13 +573,15 @@ def _read_stopped(t: list[str]) -> Optional[MedRead]:
 
 #: text that normalise() rewrites (5'1 -> 51, 245,000 -> 245000): a head or rest cut out of the rewritten
 #: text would no longer be what was typed, so such a statement is left to the reader as it was
+_DOSE_COMMA = re.compile(r"\d,\d{3}(?=\s*(?:mg|mcg|ug|µg|μg|g|iu|units?)\b)", re.I)
 _LOSSY = re.compile(r"\d['´`’‘′ʼ＇]\d|\d,\d{3}(?!\d)")
 
 
 def read_medication(statement: str, ctx: MedContext = MedContext(),
                     head_ok: Callable[[str], bool] = lambda text: False) -> Optional[MedRead]:
     got = _read_medication(statement, ctx, head_ok)
-    if got is not None and (got.head or got.rest or got.tail) and _LOSSY.search(statement):
+    # a thousands comma INSIDE a dose ("metformin 1,000 mg") is read as the dose it is and never ends up in a slice
+    if got is not None and (got.head or got.rest or got.tail) and _LOSSY.search(_DOSE_COMMA.sub("", statement)):
         return None
     return got
 

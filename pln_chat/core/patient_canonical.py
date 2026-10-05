@@ -46,7 +46,7 @@ def canonical_alias(group: LabGroup) -> str:
     """The name a canonical lab line uses: the reader's label when it is itself a name the
     reader knows ("Albumin", "HbA1c"), else the group's first name ("BUN", "lymphocytes")."""
     if group.fasting:
-        return "fasting glucose"
+        return "fasting " + group.labels[0].lower()
     if len(group.labels) == 1 and group.labels[0].lower() in group.aliases:
         return group.labels[0]
     first = group.aliases[0]

@@ -165,7 +165,8 @@ def _no_witness_warnings(metta_query: str, patient: BuiltPatient) -> list[str]:
     results = []
     for form, who in _PERSONALISED_FORM_RE.findall(metta_query or ""):
         text = _NO_WITNESS_RESULT[form]
-        if form == "diagnose-patient" and patient.prevalent_chd:
+        if form == "diagnose-patient" and patient.prevalent_chd and any(
+                c is None or (c & CHD_REACHING_CAUSES) for c in _diagnoses_of(metta_query, patient)):
             text = "the diagnosis answers from the reported heart disease alone (a prevalence item, not a measurement)"
         if who == patient.patient_id and text not in results:
             results.append(text)
@@ -173,7 +174,7 @@ def _no_witness_warnings(metta_query: str, patient: BuiltPatient) -> list[str]:
         return []
     return [
         f"{patient.patient_id} has no elevated value the knowledge base can use (it has curated "
-        f"edges for {', '.join(sorted(kb_effect_markers()))}; a glucose counts only when typed as "
+        f"edges for {', '.join(sorted(kb_effect_markers()))}; a glucose or a triglyceride counts only when typed as "
         f"fasting; a typed diagnosis, a low value and any other lab count for none of them): "
         f"{'; '.join(results)}. Read that as 'nothing to work from', not 'no cause' or 'no benefit'."
     ]
@@ -189,14 +190,31 @@ def _prevalent_chd_warnings(metta_query: str, patient: BuiltPatient) -> list[str
     return [prevalent_chd_note(patient.prevalent_chd)]
 
 
-_DIAGNOSE_RE = re.compile(r"\(\s*diagnose-patient\s+&self\s+([A-Za-z][A-Za-z0-9_]*)")
+_DIAGNOSE_RE = re.compile(r"\(\s*diagnose-patient\s+&self\s+([A-Za-z][A-Za-z0-9_]*)(?:\s+\(([^()]*)\))?")
+#: The candidate causes with a positive Effect chain to CoronaryHeartDisease (probed: tests/test_patient_stack.py); a
+#: diagnosis over a list with none of them has nothing to explain the reported heart disease with.
+CHD_REACHING_CAUSES = frozenset({"InsulinResistance", "DeregulatedNutrientSensing", "CellularSenescence"})
+
+
+def _diagnoses_of(metta_query: str, patient: BuiltPatient) -> list[Optional[set]]:
+    """One entry per diagnose-patient form naming this patient: None for the default cause list, else the set of
+    causes the form lists."""
+    return [None if causes is None or not causes.strip() else set(causes.split())
+            for who, causes in ((m[0], m[1] or None) for m in _DIAGNOSE_RE.findall(metta_query or ""))
+            if who == patient.patient_id]
 
 
 def _chd_observation_warnings(metta_query: str, patient: BuiltPatient) -> list[str]:
     """A diagnosis for a person who reports CHD: the report is one of the observations it explains."""
-    if patient.prevalent_chd and patient.patient_id in _DIAGNOSE_RE.findall(metta_query or ""):
-        return [chd_observation_note(patient.prevalent_chd)]
-    return []
+    if not patient.prevalent_chd:
+        return []
+    calls = _diagnoses_of(metta_query, patient)
+    if not calls:
+        return []
+    if all(c is not None and not (c & CHD_REACHING_CAUSES) for c in calls):
+        return [f"Reported {', '.join(patient.prevalent_chd)} adds nothing to this diagnosis: none of the causes listed "
+                f"reaches heart disease in the knowledge base ({', '.join(sorted(CHD_REACHING_CAUSES))} do)."]
+    return [chd_observation_note(patient.prevalent_chd)]
 
 
 def patient_form_warnings(metta_query: str, patient: Optional[BuiltPatient]) -> list[str]:
@@ -260,7 +278,7 @@ def no_grimage_prompt_hint(patient: BuiltPatient) -> str:
             f"  (linage-hazard-patient &self {pid})\n"
             f"A what-if about a lever (\"if my inflammation were normal\", \"if I quit smoking\") is the LinAge2 form "
             f"(linage-counterfactual-patient &self {pid} <Lever>): counterfactual-patient needs a GrimAge "
-            f"value and returns nothing for this patient.\n")
+            f"value and returns a zero result for this patient.\n")
 
 
 def chd_observation_prompt_hint(patient: BuiltPatient) -> str:

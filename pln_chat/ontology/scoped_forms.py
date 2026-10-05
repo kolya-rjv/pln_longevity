@@ -81,6 +81,11 @@ def _definitions(paths: tuple[Path, ...]) -> dict[str, set[str]]:
     return out
 
 
+#: Predicates whose facts exist only per request (a caller's patient, the shared space of one query): the runtime
+#: KB never holds a row for them, which says nothing about a rule that reads them.
+_PER_REQUEST_FACTS = frozenset({"PatientCondition", "CurrentMedication"})
+
+
 def dataless_forms(
     kb_paths: Iterable[Path], inventory: RuntimeInventory
 ) -> dict[str, tuple[str, ...]]:
@@ -95,7 +100,7 @@ def dataless_forms(
         # Only predicates the INVENTORY classifies count as evidence either
         # way; a body that matches a helper the scan did not classify is left
         # alone rather than guessed at.
-        known = {r for r in reads if r in populated or r in empty}
+        known = {r for r in reads if (r in populated or r in empty) and r not in _PER_REQUEST_FACTS}
         if known and not (known & populated):
             out[name] = tuple(sorted(known))
     return out

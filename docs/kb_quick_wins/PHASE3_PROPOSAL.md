@@ -1,5 +1,11 @@
 # Phase 3 (curation): what I propose to write, for your decision
 
+> **Status, 2026-10-05: decided and implemented; this is the proposal as it was put to the user.** Where it differs
+> from what was built, `REPORT.md` ("Status of the implementation") and the commits are the record: decision 1 was
+> **A** (LinAge2's young reference), not the recommended B; the node is `LowSerumAlbumin`; white cell count and the urate
+> edge were not built; triglycerides are a fasting value of 150 mg/dL or more; the CHD observation is the narrow form.
+> The statements below that say "nothing is written yet" or recommend B are the state at proposal time.
+
 Nothing below is written yet. Per the brief, thresholds, gates and the albumin node name come to you first. After
 each decision I change `mechanistic_bridges.metta` (edges), `linage2_core.metta` §5 (readouts) and
 `patient_builder` / `patient_text` (witnesses), run `tests/test_patient_stack.py` (8 must-answer, 3 must-abort,

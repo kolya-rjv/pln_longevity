@@ -653,7 +653,7 @@ ENTRIES: list[Entry] = [
 
     # ── B. decomposition ─────────────────────────────────────────────────────
     E("B1", "which of my labs make me biologically older?", "(linage-decomposition-patient &self Caller_Me)",
-      "Cotinine is the largest measured input and is credited to smoking (witnessed by the stated status); albumin's years are reported with NO cause (no bridge reaches it); measured + imputed + age term = Δ exactly.",
+      "Cotinine is the largest measured input and is credited to smoking (witnessed by the stated status); albumin's years are credited to chronic inflammation and senescence (the albumin deficit is witnessed against LinAge2's young reference), while the systolic blood pressure's years are reported with NO cause (no bridge reaches it); measured + imputed + age term = Δ exactly.",
       check=c_decomp_top),
     E("B1", "what's behind the HbA1c years?", "(linage-decomposition-patient &self Caller_Me)",
       "HbA1c 6.4 % is elevated for the patient, so its years are credited to DeregulatedNutrientSensing — the one hallmark with a positive chain to it.",

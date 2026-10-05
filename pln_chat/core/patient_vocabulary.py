@@ -194,7 +194,7 @@ def _lab_groups() -> dict:
         aliases = tuple(a for s_ in specs for a in s_.aliases if a in grouped[key])
         aliases = tuple(dict.fromkeys(aliases))
         if fasting:
-            name = "fasting glucose"
+            name = "fasting " + specs[0].label.lower()          # "fasting glucose", "fasting triglycerides"
         elif len(specs) == 1:
             name = specs[0].label.lower()
         else:

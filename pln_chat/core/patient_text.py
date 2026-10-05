@@ -24,7 +24,7 @@ built to refuse rather than guess:
 `ParsedPatient.to_patient(...)` then scores LinAge2 (core.linage2_model) and returns
 the ordinary caller-patient payload `/query`, `/metta/run` and `build_patient`
 already accept — with the same values doubling as the knowledge base's own
-witnesses (CRP, HbA1c, fasting glucose, smoking status), so a cause can be credited
+witnesses (CRP, HbA1c, fasting glucose, RDW and a low albumin, a fasting triglyceride, smoking status), so a cause can be credited
 without typing anything twice.
 """
 from __future__ import annotations
@@ -382,8 +382,11 @@ class ParsedPatient:
         glucose = by_code.get("LBDSGLSI")
         if glucose is not None and glucose.fasting:
             raw["FastingGlucose"] = (round(glucose.value / 0.0555, 4), "mg/dL")
-        triglycerides = by_code.get("LBDSTRSI")
-        if triglycerides is not None and triglycerides.fasting:
+        # typed more than once (the same value twice: a different one is a duplicate and blocks): a fasting
+        # reading is the witness, whichever line came first
+        triglycerides = next((r for r in self.readings if r.code == "LBDSTRSI" and r.fasting and not r.blocking
+                              and r.value is not None), None)
+        if triglycerides is not None:
             raw["Triglycerides"] = (round(triglycerides.value / 0.01129, 1), "mg/dL")
         markers: dict[str, dict] = {}
         self.witness_notes = []
@@ -1657,7 +1660,7 @@ def read_patient_text(text: str) -> ParsedPatient:
         for sym, kind in (st.facts.get("medications") or {}).items():
             if kind == "current" and sym in p.medications:
                 p.medications.remove(sym)
-                p.notes.append(f"{sym} was not counted as a current medication: something after it on the same "
+                p.notes.append(f"{sym} was not counted as a current medication: something else on the same "
                                f"line could not be read and might change what it means — put the medication "
                                f"on a line of its own")
     # A drug the text names where it could not be read (a plan, a past, a question, "before metformin")
@@ -1697,11 +1700,14 @@ def read_patient_text(text: str) -> ParsedPatient:
         p.notes.append("glucose was not marked fasting: LinAge2 uses it as typed, but the "
                        "knowledge base's FastingGlucose witness needs a fasting value — write "
                        "'fasting glucose …' if it was")
-    triglycerides = next((r for r in p.readings if r.code == "LBDSTRSI" and not r.blocking), None)
-    if triglycerides is not None and not triglycerides.fasting:
-        p.notes.append("triglycerides were not marked fasting: LinAge2 uses them as typed (in the calculated LDL), but "
-                       "the knowledge base's Triglycerides witness needs a fasting value, which can run about 27 mg/dL "
-                       "lower — write 'fasting triglycerides …' if it was")
+    tg_readings = [r for r in p.readings if r.code == "LBDSTRSI" and not r.blocking]
+    if tg_readings and not any(r.fasting for r in tg_readings):
+        has_ldl = any(r.code == "LDLV" and not r.blocking for r in p.readings)
+        p.notes.append("triglycerides were not marked fasting: "
+                       + ("LinAge2 does not use them (you gave an LDL), and " if has_ldl
+                          else "LinAge2 uses them as typed (in the calculated LDL), but ")
+                       + "the knowledge base's Triglycerides witness needs a fasting value, which can run about 27 mg/dL "
+                         "lower — write 'fasting triglycerides …' if it was")
     if p.set_aside:
         p.notes.append("set aside (about someone else, or smoke you did not smoke): "
                        + "; ".join(f"'{s_}'" for s_ in p.set_aside))

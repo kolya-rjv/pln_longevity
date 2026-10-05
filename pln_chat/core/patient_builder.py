@@ -322,8 +322,9 @@ def chd_observation_note(conditions: Iterable[str]) -> str:
         f"Reported {', '.join(conditions)} is read by the diagnosis as one observation to explain, and by nothing "
         f"else: the supplement plan and the intervention ranking do not see it. It is a prevalence item (the "
         f"survey question is 'ever told you had'), not a measured value, and the causes the diagnosis offers for "
-        f"it (insulin resistance, senescence) are population-level associations, not the reason this person has "
-        f"it: smoking has no curated edge to heart disease in this knowledge base."
+        f"it (insulin resistance, deregulated nutrient sensing, cellular senescence) are population-level "
+        f"associations, not the reason this person has it: smoking has no curated edge to heart disease in this "
+        f"knowledge base."
     )
 
 
@@ -345,7 +346,7 @@ def no_witness_note(chd: bool = False) -> str:
         f"this patient the diagnosis returns (), every supplement tier is empty and the "
         f"intervention ranking is the population ranking, the same as for an unknown patient. "
         f"That is 'nothing to work from', not 'no cause'. A typed diagnosis, a lab with no edge "
-        f"(creatinine, blood pressure, cholesterol), a low value, and a glucose not marked "
+        f"(creatinine, blood pressure, cholesterol), a low value, and a glucose or triglyceride not marked "
         f"fasting count for none of them."
     )
 
@@ -404,7 +405,8 @@ class BuiltPatient:
     witnesses: list[str] = field(default_factory=list)
 
     #: Coronary heart disease / angina / heart attack the person reports (PREVALENT_CHD). A
-    #: flag, not an atom: nothing in the KB reads it; it qualifies the 10-year CHD risk.
+    #: flag for the 10-year CHD risk (which does not read it), and ONE shared-space atom, (PatientCondition <id>
+    #: CoronaryHeartDisease), that `diagnose-patient` alone explains (item #11).
     prevalent_chd: list[str] = field(default_factory=list)
 
     #: Drugs the person takes now that the KB has an Interaction fact for (kb_interaction_drugs).
@@ -570,8 +572,11 @@ def _resolve_marker(
             raise PatientSpecError(
                 "raw_value_unsupported",
                 f"Marker '{name}' has no reference distribution in this KB, so a "
-                f"raw value cannot be standardised. Send `z` instead — it is the "
-                f"native unit for an epigenetic-clock surrogate.",
+                f"raw value cannot be standardised. Send `z` instead"
+                + (" — it is the native unit for an epigenetic-clock surrogate."
+                   if spec.role in ("clock", "grimage_component")
+                   else f": {spec.reaches.split(' z only')[0].split(';')[0]}; its z is against LinAge2's "
+                        f"reference (core.linage2_model.young_reference_z)."),
                 marker=name,
             )
 
@@ -775,7 +780,7 @@ def build_patient(
         if not (LINAGE2_JOIN_MARKERS & {m.name for m in resolved}) and smoking != "CurrentSmoker":
             warnings.append(
                 "The LinAge2 block was sent without any of the markers the knowledge "
-                "base can join it to (CRP, HbA1c, FastingGlucose, RDW, LowSerumAlbumin as z or value) and "
+                "base can join it to (CRP, HbA1c, FastingGlucose as z or value; RDW, LowSerumAlbumin as z only) and "
                 "without smoking = CurrentSmoker — the witnesses a cause needs. The "
                 "per-lab years will be reported, "
                 "but no contribution can be credited to a cause and every "

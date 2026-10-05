@@ -8,7 +8,7 @@
 ;; adds on top of it, and nothing an LLM reading the same JSON could reproduce:
 ;;
 ;;   (1) an HONEST decomposition: measured vs imputed contributions kept apart,
-;;       an explicit age-term residual, and — for the four inputs that read out a
+;;       an explicit age-term residual, and — for the six inputs that read out a
 ;;       KB biomarker — the upstream hallmark causes, credited ONLY when the
 ;;       patient's own standardized value witnesses the direction (§3);
 ;;   (2) the clock's relative HAZARD, read off the Fong 2025 record and

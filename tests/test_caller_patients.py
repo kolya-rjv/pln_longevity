@@ -779,7 +779,7 @@ def test_a_linage2_block_is_joinable_through_rdw_or_the_albumin_deficit():
     fx = json.loads((REPO / "tests" / "fixtures" / "linage2_response.json").read_text(encoding="utf-8"))
     base = {"id": "J", "age": 58, "sex": "Male", "linage2": fx}
     nothing = build_patient({**base, "markers": {"DNAmADM": 1.0}})
-    assert any("RDW, LowSerumAlbumin as z or value" in w for w in nothing.warnings)
+    assert any("RDW, LowSerumAlbumin as z only" in w for w in nothing.warnings)
     for name in ("RDW", "LowSerumAlbumin"):
         joined = build_patient({**base, "markers": {name: 0.5}})
         assert not any("without any of the markers the knowledge base can join it to" in w for w in joined.warnings), name
@@ -841,3 +841,26 @@ def test_the_no_witness_note_for_a_patient_who_reports_heart_disease_does_not_sa
     assert "every supplement tier is empty" in plan
     # without the report the old note stands
     assert _notes(build_patient(NOTHING_USABLE), NO_WITNESS_PREFIX)
+
+
+def test_a_helper_over_a_per_request_patient_fact_is_not_called_data_less():
+    """patient-conditions reads PatientCondition, which only a caller's patient has: the runtime KB holds no row for
+    it, and the 'this space holds NO facts' warning would be false."""
+    from ontology.scoped_forms import dataless_forms, scoped_form_warnings
+    kb, inv = api_module._runtime_kb_paths(), api_module._runtime_inventory()
+    assert "patient-conditions" not in dataless_forms(kb, inv)
+    assert scoped_form_warnings("!(patient-conditions &self Caller_Me)", kb, inv) == []
+
+
+def test_the_reported_heart_disease_notes_follow_the_cause_list_the_diagnosis_was_given():
+    from core.patient_context import CHD_REACHING_CAUSES, patient_form_warnings
+    built = build_patient({**NOTHING_USABLE, "prevalent_chd": ["angina"]})
+    pid = built.patient_id
+    default = patient_form_warnings(f"(diagnose-patient &self {pid})", built)
+    assert any("answers from the reported heart disease alone" in w for w in default)
+    reaching = patient_form_warnings(f"(diagnose-patient &self {pid} (InsulinResistance ChronicInflammation))", built)
+    assert any("answers from the reported heart disease alone" in w for w in reaching)
+    listed = patient_form_warnings(f"(diagnose-patient &self {pid} (ChronicInflammation MitochondrialDysfunction))", built)
+    assert any("adds nothing to this diagnosis" in w for w in listed)
+    assert any("returns ()" in w for w in listed) and not any("answers from the reported heart disease alone" in w for w in listed)
+    assert CHD_REACHING_CAUSES == {"InsulinResistance", "DeregulatedNutrientSensing", "CellularSenescence"}

@@ -43,9 +43,10 @@ FIVE DECISIONS THAT ARE EASY TO GET QUIETLY WRONG, AND WHAT IS DONE HERE
    four blood analytes have a declared ``Biomarker`` symbol in this repo — ``CRP``,
    ``FastingGlucose``, ``HbA1c`` (mechanistic_bridges.metta) and ``PlasmaCystatinC``
    (grim_age_core.metta) — and the declaration is re-verified by scanning the repo at
-   run time. Triglycerides, total/HDL cholesterol, creatinine, insulin and eGFR are
-   NOT declared anywhere, so they appear in the manifest as "symbol undeclared, not
-   emitted" and produce no atoms.
+   run time. Total/HDL cholesterol, creatinine, insulin and eGFR are NOT declared
+   anywhere, so they appear in the manifest as "symbol undeclared, not emitted" and
+   produce no atoms. Triglycerides IS declared since item #12 (mechanistic_bridges.metta),
+   but has no calibrated NHANES reference here, so it stays "declared, not emitted".
 
 5. EVERY NHANES NAME HERE IS AN UNVERIFIED CLAIM. The CDC hosts are unreachable from
    the environment this was written in, so no file name, variable name or assay
@@ -310,7 +311,8 @@ class MarkerSpec:
 CONFIDENCE_LEVELS = ("high", "medium", "low")
 
 # ---------------------------------------------------------------------------
-# The four analytes with a DECLARED symbol in this repo. Nothing else may emit.
+# The four analytes with a DECLARED symbol in this repo AND a reference. Nothing else may emit
+# (Triglycerides is declared too, but below it has no calibrated reference: emit=False).
 # ---------------------------------------------------------------------------
 REGISTRY: list[MarkerSpec] = [
     MarkerSpec(
@@ -1095,7 +1097,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if wanted is not None and marker.symbol.lower() not in wanted:
             continue
         if not marker.emit:
-            log(f"  {marker.symbol}: symbol undeclared in the KB, not emitted "
+            log(f"  {marker.symbol}: {marker.notes or 'not emitted'} "
                 f"(see data/nhanes/MANIFEST.tsv)")
             continue
         if marker.symbol not in declared:

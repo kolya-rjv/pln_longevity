@@ -158,8 +158,8 @@ checkout, `drugage_etl_short.metta` is ~26,900 estimated tokens verbatim and
 ~340 as a card), and anything still too large is refused with **413
 `prompt_too_large`** before a call is billed.
 
-The default selection measures **308,703 characters, about 77,175 estimated
-tokens** (26 files; `tests/test_prompt_size.py` pins that figure against the
+The default selection measures **308,717 characters, about 77,179 estimated
+tokens** (25 files; `tests/test_prompt_size.py` pins that figure against the
 real `build_system_prompt`, so this sentence cannot drift from the code again).
 It came down from 301,035 (to 297,671) when execution was scoped to the curated stack:
 `cellage_calibration.metta` left the runtime inventory the prompt reports, since
@@ -450,7 +450,10 @@ against the raw `extra_atoms` path:
   one, and a `diagnose-patient`, `recommend-supplements[-patient]`, `supplement-for-patient`
   or `rank-interventions-for-patient` form naming it carries the same note in `warnings`.
   That is "nothing to work from", not "no cause": a typed diagnosis, a lab with no edge
-  (albumin, creatinine, blood pressure, RDW) and a low value count for none of them.
+  (creatinine, blood pressure, cholesterol), a low value, and a glucose or a triglyceride not typed as fasting count for
+  none of them. One exception: a reported heart disease (`prevalent_chd`) is an observation the diagnosis alone explains
+  (a prevalence item, never a measured value), so for such a patient the diagnosis answers and the plan and ranking
+  still have nothing to work from. `PatientCondition` is in the shared space only and is not in `atoms`.
 
 ### …and your LinAge2 result
 
@@ -491,7 +494,7 @@ that patient, and nothing there reads them anyway.
 
 | form | answers |
 |---|---|
-| `(linage-decomposition-patient &self <P>)` | every input's years, measured and imputed apart, the totals, the explicit age-term residual, and for the four inputs that read out a KB biomarker the hallmark causes — credited **only under a witness** |
+| `(linage-decomposition-patient &self <P>)` | every input's years, measured and imputed apart, the totals, the explicit age-term residual, and for the six inputs that read out a KB biomarker the hallmark causes — credited **only under a witness** |
 | `(linage-hazard-patient &self <P>)` | the relative all-cause-mortality hazard, `1.093^delta`, always |
 | `(linage-risk-patient &self <P>)` | an absolute ten-year risk — only when the generated NHANES all-cause baseline is loaded |
 | `(linage-counterfactual-patient &self <P> <Lever>)` | how many LinAge2 years normalizing the lever's driver would remove, through the causal graph |
@@ -502,8 +505,8 @@ direction*: the per-input weights are sex-specific projections that flip sign
 between the male and female models (CRP is +4.4 months/SD in women and −0.2 in
 men). So the engine credits a cause to an input only when the patient's own z for
 the biomarker it reads out is Elevated — or, for the cotinine input, when the
-patient is a `CurrentSmoker`. Send `CRP`, `HbA1c`, `FastingGlucose` (z or value)
-and `smoking` alongside the block; without them the years come back with no causes
+patient is a `CurrentSmoker`. Send `CRP`, `HbA1c`, `FastingGlucose` (z or value), `RDW` or `LowSerumAlbumin` (z
+only) and `smoking` alongside the block; without any of them the years come back with no causes
 and every counterfactual is 0, and the builder warns you so.
 
 **Or just type it.** `POST /patients/from-text` takes `{"text": "58 year old male,
@@ -515,7 +518,8 @@ LinAge2's unit, with a status — and, when everything is usable, `patient`: sen
 as `patient` anywhere above. A value whose unit cannot be pinned down (`CRP 3.1`:
 mg/L or mg/dL?) is not guessed; `ok` is false and `problems` says which. The same
 value doubles as the knowledge base's witness (CRP in mg/L, HbA1c, a *fasting*
-glucose, the stated smoking status), so causes can be credited without typing
+glucose, RDW and a low albumin against LinAge2's reference, a *fasting* triglyceride, the stated smoking
+status), so causes can be credited without typing
 anything twice. This is what the Gradio UI's **My Patient** tab does; the patient
 then lives in that browser session only.
 

@@ -611,3 +611,33 @@ def test_text_the_normaliser_rewrites_is_left_to_the_reader_as_it_was(text):
     p = read_patient_text(BASE + text)
     assert p.medications == []
     assert not any("height 51" in str(x) or "245000" in str(x) for x in p.all_problems()), p.all_problems()
+
+
+# ═══════════ review round 3: the closure's usability regressions ═══════════
+
+@pytest.mark.parametrize("text", [
+    "I have pre-diabetes\nI take metformin 500 mg twice daily", "I am active\nI take metformin", "pre-diabetes\nHbA1c 6.1 %\nI take metformin",
+    "feeling old\nI take metformin", "Pre-hypertension\nmetformin 500 mg", "I am old school\nI take metformin",
+    "type 2 diabetes on metformin 1,000 mg", "I take metformin 1,000 mg and aspirin",
+    "I take metformin and berberine", "I take metformin and a statin", "I take metformin and vitamin D3",
+    "I take metformin and a baby aspirin", "I take metformin and Lipitor", "I take metformin and Ozempic",
+    "Yes, I take metformin", "Hi, I take metformin", "At present, I take metformin", "Right now, I take metformin",
+    "Honestly, I take metformin",
+])
+def test_ordinary_phrasings_the_closure_stopped_reading_are_read_again(text):
+    assert read_patient_text(BASE + text).medications == ["Metformin"], text
+
+
+@pytest.mark.parametrize("heading", ["Old meds", "Hx", "Last visit", "At discharge", "Pre-op", "Old meds:", "Last visit:"])
+def test_a_line_of_nothing_but_heading_words_is_still_a_heading(heading):
+    assert read_patient_text(BASE + heading + "\nmetformin 500 mg").medications == [], heading
+
+
+def test_text_the_normaliser_rewrites_outside_the_dose_is_still_left_to_the_reader():
+    assert read_patient_text(BASE + "takes metformin 1,000 mg and height 5'1").medications == []
+
+
+def test_the_note_for_an_unread_neighbour_does_not_say_it_came_after_the_drug():
+    p = read_patient_text(BASE + "Sporadically, I take metformin")
+    assert p.medications == [] and any("something else on the same line" in n for n in p.notes)
+    assert not any("something after it" in n for n in p.notes)

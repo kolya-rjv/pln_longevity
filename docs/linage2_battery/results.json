@@ -219,7 +219,7 @@
    "patient": null,
    "pass_criterion": "Only the three that answer are offered (the clock, the hazard, the drivers of biological age). Quitting smoking, 'what could I do', the supplement plan and the diagnosis would come back empty or at zero, and a line says so.",
    "status": "pass",
-   "observed": "3 of 6 offered (Which of my labs make me biologica; How much does my biological age ra; What are the main drivers of my bi…); note: _Not offered for you, because they would come back empty: quitting smoking (you are not a current smoker); the…"
+   "observed": "3 of 6 offered (Which of my labs make me biologica; How much does my biological age ra; What are the main drivers of my bi…); note: _Not offered for you, because they would come back empty or at zero: quitting smoking (you are not a current s…"
   },
   {
    "n": 23,
@@ -277,7 +277,7 @@
    "query": "which of my labs make me biologically older?",
    "emits": "(linage-decomposition-patient &self Caller_Me)",
    "patient": "P1",
-   "pass_criterion": "Cotinine is the largest measured input and is credited to smoking (witnessed by the stated status); albumin's years are reported with NO cause (no bridge reaches it); measured + imputed + age term = Δ exactly.",
+   "pass_criterion": "Cotinine is the largest measured input and is credited to smoking (witnessed by the stated status); albumin's years are credited to chronic inflammation and senescence (the albumin deficit is witnessed against LinAge2's young reference), while the systolic blood pressure's years are reported with NO cause (no bridge reaches it); measured + imputed + age term = Δ exactly.",
    "status": "pass",
    "observed": "Δ +13.28 y; top: SerumCotinine +7.53 y (witnessed); SerumAlbumin +2.36 y, witnessed, DrivenBy ['ChronicInflammation', 'CellularSenescence']; SystolicBloodPressure +0.52 y, no cause; measured +14.42 + imputed -1.63 + age term +0.50",
    "routed": "linage2",
