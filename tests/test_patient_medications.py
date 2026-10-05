@@ -177,6 +177,10 @@ BLOCK_WORDS = (
     'trying', 'typo', 'unable', 'uncertain', 'unless', 'unsure', 'until', 'used', 'voided', 'want', 'wanted',
     'wants', 'was', 'wasnt', 'weaned', 'were', 'werent', 'what', 'when', 'whether', 'which', 'who', 'whom',
     'whose', 'why', 'will', 'wish', 'wishes', 'withdrawn', 'without', 'wont', 'would', 'wouldnt', 'wrong',
+    # round 2, the qualifiers that were still open: stopped / swapped / not mine / not sure / not a day yet
+    'dropped', 'drop', 'dropping', 'gave', 'give', 'giving', 'swapped', 'swap', 'swapping', 'ran', 'run', 'error',
+    'placebo', 'ordered', 'order', 'pending', 'guess', 'guessing', 'believe', 'idk', 'scratch', 'ignore',
+    'hypothetically', 'last', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
 )
 OTHER_WORDS = (
     'anyone', 'aunt', 'boss', 'boyfriend', 'brother', 'carer', 'cat', 'child', 'children', 'colleague',
@@ -550,3 +554,60 @@ def test_a_condition_on_an_unknown_drug_is_read_and_the_drug_stays_visible(text,
 def test_an_unknown_drug_does_not_rescue_a_head_the_reader_does_not_understand_or_a_line_that_says_not_now(text):
     p = read_patient_text(BASE + text)
     assert not p.ok or {k for k, v in p.questionnaire.items() if v == 1} == set(), text
+
+
+# ═══════════ round 2, the rows that stayed open: retractions, qualifiers, headings ═══════════
+
+#: a drug statement that must still read as current next to a list, a timing or another statement — the
+#: allow-list that withdraws a drug beside an unread qualifier must not eat a plain list
+STILL_CURRENT = [
+    "takes metformin", "I take metformin", "metformin 500 mg", "metformin 500 mg, lisinopril 10 mg",
+    "metformin 500 mg\nlisinopril 10 mg\natorvastatin 20 mg", "takes metformin and lisinopril", "takes metformin and aspirin",
+    "metformin 500 mg twice daily with food", "metformin 500 mg in the morning", "takes metformin and vitamin D",
+    "takes metformin and has hypertension", "takes metformin. HbA1c 6.1 %", "I take metformin\nmy albumin was 4.1 g/dL",
+    "medications: lisinopril, metformin", "meds: metformin, lisinopril 10 mg", "Medications:\nlisinopril 10 mg\nmetformin 500 mg",
+    "takes metformin\ndiagnoses: hypertension", "metformin 500 mg daily as prescribed", "diabetes on metformin",
+]
+
+
+@pytest.mark.parametrize("text", STILL_CURRENT, ids=[str(i) for i in range(len(STILL_CURRENT))])
+def test_a_plain_list_beside_a_medication_is_still_read(text):
+    assert read_patient_text(BASE + text).medications == ["Metformin"], text
+
+
+@pytest.mark.parametrize("sibling, benign", [
+    ("lisinopril 10 mg", True), ("and atorvastatin", True), ("twice daily with food", True), ("vitamin D 2000 IU", True),
+    ("dropped it", False), ("I guess", False), ("entered in error", False), ("idk", False), ("feeling fine", False),
+    ("last taken in March", False), ("", True), ("lisinopril?", False), ("not lisinopril", False),
+])
+def test_only_more_of_a_medication_list_may_follow_a_drug_unread(sibling, benign):
+    from core.patient_medications import benign_sibling
+    assert benign_sibling(sibling) is benign
+
+
+@pytest.mark.parametrize("nxt", [
+    "I do not take it", "I don't take it", "I haven't taken it", "I have recently stopped", "Dropped it", "Gave up on it",
+    "No, I stopped", "Not any more", "I never did", "Reason for stopping: nausea", "Active: N",
+])
+def test_a_next_line_that_takes_the_drug_back_is_a_retraction(nxt):
+    assert read_patient_text(BASE + "I take metformin\n" + nxt).medications == [], nxt
+
+
+@pytest.mark.parametrize("nxt", ["my albumin was 4.1 g/dL", "HbA1c 6.1 %", "blood pressure 142/88", "diagnoses: hypertension",
+                                 "self-rated health: fair", "I feel fine"])
+def test_a_neighbour_that_is_not_a_retraction_leaves_the_drug_current(nxt):
+    assert read_patient_text(BASE + "I take metformin\n" + nxt).medications == ["Metformin"], nxt
+
+
+@pytest.mark.parametrize("heading", ["Old meds", "Hx", "Last visit", "At discharge", "Pre-op", "Pre-op medications"])
+def test_more_headings_that_are_not_a_current_list(heading):
+    assert read_patient_text(BASE + heading + "\nmetformin 500 mg").medications == [], heading
+
+
+@pytest.mark.parametrize("text", ["takes metformin and height 5'1", "takes metformin and platelets 245,000"])
+def test_text_the_normaliser_rewrites_is_left_to_the_reader_as_it_was(text):
+    """5'1 became 51 and 245,000 became 245000 inside the part handed back, so the reader refused or misread
+    what had been typed; such a statement is now read as it was before the medication reader existed."""
+    p = read_patient_text(BASE + text)
+    assert p.medications == []
+    assert not any("height 51" in str(x) or "245000" in str(x) for x in p.all_problems()), p.all_problems()

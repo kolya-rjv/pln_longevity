@@ -902,3 +902,35 @@ def test_review_d_no_value_added_from_context_the_checks_do_not_see(text, items)
         for w in s.wordings:
             clicked = read_patient_text(s.apply(text, w))
             assert not clicked.ok or read_values(clicked)["age"] in (None, rules.age), (w, clicked.age)
+
+
+# ═══════════ a clicked wording must not decide whether a medication is current (round 2) ═══════════
+
+def test_a_clicked_wording_that_would_turn_a_withdrawn_medication_current_is_not_offered():
+    """'takes metformin, but not anymore, former smoker': the rules withdraw the drug; the model quotes
+    'but not anymore, former smoker' as a smoking disagreement, and the 'current smoker' button replaces the
+    span that holds 'not anymore', so clicking it used to build a current smoker ON metformin."""
+    text = "58 year old male\ntakes metformin, but not anymore, former smoker"
+    assert read_patient_text(text).medications == []
+    r = read_patient(text, Recorded(
+        {"quote": "but not anymore, former smoker", "kind": "smoking", "status": "current",
+         "occasional": False, "other_nicotine": "none"}))
+    for s_ in r.suggestions:
+        for wording in s_.wordings:
+            clicked = read_patient_text(s_.apply(text, wording))
+            assert clicked.medications == [] and clicked.medications_stopped == [], (wording, clicked.notes)
+    assert not r.parsed.ok                                  # the disagreement still blocks the build
+    assert any("not offered" in n for n in r.notes) or not r.suggestions
+
+
+def test_a_rewrite_that_changes_a_neighbours_medication_is_withdrawn_alone():
+    """'healthy otherwise thankfully' is rewritten to 'no other conditions', which takes the drug on the line above
+    back: that one rewrite is withdrawn, and the unrelated age and sex rewrites on the first line stand (they used
+    to be withdrawn with it, and the build was blocked)."""
+    text = "58 yo M\ntakes metformin\nhealthy otherwise thankfully"
+    r = read_patient(text, Recorded(
+        {"quote": "58 yo M", "kind": "age"}, {"quote": "58 yo M", "kind": "sex", "sex": "male"},
+        {"quote": "healthy otherwise thankfully", "kind": "no_other_conditions"}))
+    assert r.parsed.ok and r.parsed.sex == "Male" and r.parsed.age == 58
+    assert r.parsed.medications == ["Metformin"]
+    assert any("'healthy otherwise thankfully'" in n and "not used" in n for n in r.notes), r.notes

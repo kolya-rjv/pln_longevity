@@ -115,6 +115,9 @@ he she they his her their him them hes shes theyre
 what which how why who whom whose
 allergic allergy allergies intolerant intolerance reaction reactions adverse side avoid avoids avoided
 contraindicated contraindication
+dropped drop dropping gave give giving swapped swap swapping ran run error placebo ordered order pending
+guess guessing believe idk scratch ignore hypothetically last
+monday tuesday wednesday thursday friday saturday sunday
 """.split())
 #: …and these name someone other than the person. A word with a trailing "s" counts too (husband's,
 #: parents, friends). The reader's own set-aside rule (patient_text._SOMEONE_ELSE) is consulted as well.
@@ -130,6 +133,7 @@ _HEADING_OTHER = frozenset("""
 allergies allergy allergic intolerance intolerances reactions adverse avoid plan recommendations
 recommendation options treatment treatments history past previous prior former inactive historical
 discontinued stopped family relatives notes note contraindications contraindicated
+old hx visit discharge pre preop
 """.split())
 #: words of a heading that introduces a CURRENT medication list
 _CURRENT_HEADING = frozenset({
@@ -141,7 +145,14 @@ _STOP_START = frozenset("""
 stopped stop stops discontinued discontinue ceased ended finished completed tapered weaned held hold paused
 off no not never none until till status quit used previously formerly was were had replaced replace
 cancelled canceled inactive historical past expired withdrawn voided dc dcd entered history prior
-previous former switched changed
+previous former switched changed dropped gave swapped ran reason active
+""".split())
+#: a next line that has one of these in its first four words takes the drug above back ("I do not take it", "I don't
+#: take it anymore", "I haven't taken it since June", "I have recently stopped"). Narrower than _BLOCK on purpose: a
+#: neighbour such as "my albumin was 4.1" has to keep reading.
+_RETRACT_ANY = frozenset("""
+no not never nor dont doesnt didnt havent hasnt hadnt isnt arent wasnt werent cant wont wouldnt couldnt
+stopped stop stops quit quits discontinued ceased ended finished tapered dropped gave swapped recently
 """.split())
 
 _ALLOWED = frozenset("abcdefghijklmnopqrstuvwxyz0123456789 \t.,;:!?()%/+&=\"-–—°µμ")
@@ -254,6 +265,51 @@ def starts_current_header(statement: str) -> bool:
     return bool(j) and j < len(t) and t[j] in {":", "=", "-", "–", "—"}
 
 
+#: What may follow a current medication on its line without the reader understanding it: more of the same list.
+#: A CLOSED allow-list on purpose — a deny-list of qualifiers ("dropped it", "ran out", "entered in error",
+#: "I guess" …) never ends, and the round-2 red team found a new one each time. Anything else makes the
+#: medication unread (a missed flag, said aloud) instead of guessing it still holds.
+_LIST_FILLER = frozenset("""
+and with also currently now still regularly usually always daily nightly weekly twice once thrice a an the of to my
+plus day week morning evening night bedtime breakfast lunch dinner meal meals food at in per each as needed prn
+bid tid qd qhs mg mcg ug g iu units unit ml tablet tablets tab tabs pill pills capsule capsules cap caps er xr sr dr
+extended release on taking takes take using uses
+""".split())
+#: drugs and supplements a person lists beside a prescription, and the stems of the generic names
+_COMMON_DRUGS = frozenset("""
+aspirin insulin warfarin levothyroxine synthroid liothyronine ibuprofen paracetamol acetaminophen tylenol naproxen
+allopurinol amlodipine lisinopril losartan valsartan atorvastatin simvastatin rosuvastatin pravastatin metoprolol
+carvedilol bisoprolol propranolol atenolol hydrochlorothiazide furosemide spironolactone clopidogrel apixaban
+rivaroxaban digoxin omeprazole pantoprazole esomeprazole sertraline fluoxetine citalopram escitalopram venlafaxine
+bupropion amitriptyline gabapentin pregabalin prednisone prednisolone dexamethasone methotrexate hydroxychloroquine
+tamsulosin finasteride sildenafil tadalafil montelukast cetirizine loratadine fexofenadine albuterol salbutamol
+ezetimibe fenofibrate gemfibrozil glipizide glimepiride gliclazide sitagliptin linagliptin empagliflozin
+dapagliflozin canagliflozin liraglutide semaglutide tirzepatide pioglitazone vitamin vitamins d c e k b b6 b12
+multivitamin magnesium zinc calcium iron potassium fish oil omega 3 supplement supplements probiotic coq10 creatine
+""".split())
+_DRUG_STEM = re.compile(r"[a-z]{3,}(?:pril|sartan|statin|olol|dipine|prazole|thiazide|tidine|formin|gliptin|"
+                        r"gliflozin|glutide|glitazone|semide|cillin|mycin|floxacin|oxetine|pram|triptyline|"
+                        r"setron|zepam|zolam|fibrate|solone|terol)")
+
+
+def _list_word(w: str) -> bool:
+    return (w in _LIST_FILLER or w in _CURRENT_HEADING or w in _COMMON_DRUGS or w in _DRUGS or bool(_NUMBER.fullmatch(w))
+            or bool(_DRUG_STEM.fullmatch(w)))
+
+
+def benign_sibling(text: str) -> bool:
+    """`text` is something the reader did NOT understand, next to a current medication on the same line.
+    True only when it is more of a medication list ("lisinopril 10 mg", "and atorvastatin", "twice daily
+    with food"): every word a dose, a timing, a drug or supplement the allow-list knows. "dropped it", "I
+    guess", "entered in error" and anything unknown are not."""
+    if len(text) > MAX_STATEMENT_CHARS:
+        return False
+    norm = normalise(text)
+    if "?" in norm or _foreign(norm):
+        return False
+    return all(_list_word(w) for w in re.findall(r"[a-z0-9]+(?:\.[0-9]+)?", norm))
+
+
 def may_name_a_medication(text: str) -> bool:
     """A cheap pre-check for the reader: the text names a drug the KB knows, or has a word a medication
     clause hangs on ("on", "taking", "takes" …), which an unknown drug ("hypertension on lisinopril") needs."""
@@ -279,7 +335,7 @@ def retracts(line: str) -> bool:
     if _foreign(norm) or _DC.search(norm):
         return True
     words = re.findall(r"[a-z]+", norm)
-    if any(w in _STOP_START for w in words[:2]):
+    if any(w in _STOP_START for w in words[:2]) or any(w in _RETRACT_ANY for w in words[:4]):
         return True
     return len(words) <= 3 and any(not re.search(r"\bsince\s*$", norm[:m.start()]) for m in _YEAR.finditer(norm))
 
@@ -501,8 +557,21 @@ def _read_stopped(t: list[str]) -> Optional[MedRead]:
     return None
 
 
+#: text that normalise() rewrites (5'1 -> 51, 245,000 -> 245000): a head or rest cut out of the rewritten
+#: text would no longer be what was typed, so such a statement is left to the reader as it was
+_LOSSY = re.compile(r"\d['´`’‘′ʼ＇]\d|\d,\d{3}(?!\d)")
+
+
 def read_medication(statement: str, ctx: MedContext = MedContext(),
                     head_ok: Callable[[str], bool] = lambda text: False) -> Optional[MedRead]:
+    got = _read_medication(statement, ctx, head_ok)
+    if got is not None and (got.head or got.rest or got.tail) and _LOSSY.search(statement):
+        return None
+    return got
+
+
+def _read_medication(statement: str, ctx: MedContext = MedContext(),
+                     head_ok: Callable[[str], bool] = lambda text: False) -> Optional[MedRead]:
     """Read one statement as a medication statement, or return None (it is then read as before).
 
     `head_ok(text)` says whether the rest of the reader fully understands `text` as a condition or a

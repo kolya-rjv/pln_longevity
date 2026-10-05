@@ -37,8 +37,8 @@ from typing import Optional
 
 from core.linage2_model import compute_linage2, load_model
 from core.patient_builder import MARKERS, Z_LIMIT, PatientSpecError
-from core.patient_medications import (MedContext, context_for, may_name_a_medication, mentioned_symbols,
-                                      read_medication, starts_current_header)
+from core.patient_medications import (MedContext, benign_sibling, context_for, may_name_a_medication,
+                                      mentioned_symbols, read_medication, starts_current_header)
 
 # ═══════════════════════════ units ═════════════════════════════════════════════
 # Each LinAge2 lab input: its canonical (model) unit, and every unit accepted for
@@ -1595,6 +1595,19 @@ def read_patient_text(text: str) -> ParsedPatient:
             "diagnoses: " + (", ".join(yes) if yes else "none")
             + (f"; not: {', '.join(no)}" if no else "")
             + " — every diagnosis not listed is answered No"))
+    # Something on the same line that was not understood and is not more of a medication list ("dropped it",
+    # "I guess", "entered in error") may change what the drug statement means: do not count the drug.
+    unsafe_lines = {p.statements[u.statement].line for u in p.not_understood
+                    if 0 <= getattr(u, "statement", -1) < len(p.statements) and not benign_sibling(str(u))}
+    for st in p.statements:
+        if st.line not in unsafe_lines:
+            continue
+        for sym, kind in (st.facts.get("medications") or {}).items():
+            if kind == "current" and sym in p.medications:
+                p.medications.remove(sym)
+                p.notes.append(f"{sym} was not counted as a current medication: something after it on the same "
+                               f"line could not be read and might change what it means — put the medication "
+                               f"on a line of its own")
     # A drug the text names where it could not be read (a plan, a past, a question, "before metformin")
     # makes a current reading of the same drug unsafe: say what was left out rather than guess which
     # of the mentions is true.

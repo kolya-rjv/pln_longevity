@@ -87,3 +87,25 @@ Round 1 (`REVIEW_ROUND1.md`) led to a redesign of the medication reader (commit 
 | low | patient_text wiring is unpinned: header |  |
 | low | Dose, timing, subject and tail vocabulary can be deleted with no failing test (about 50 words/phrases): 'twice a day', 'with meals', 'every morning', 'we take', 'am on', 'managed with', 'on the metfor | r2:test-quality |
 | low | z rounding: z_round_7 passes; the test's input 1.0000004 cannot tell 6 from 7 significant digits, so the bug it guards (witness says Elevated, atom says 1) returns undetected | r2:test-quality |
+
+
+## Final synthesis (arrived after the fixes above)
+
+The round-2 workflow finished its last stage after commit 7cb7f27: 98 agents, 89 findings reported, 61 confirmed by
+an independent skeptic, 28 refuted. Its synthesizer re-ran every row against HEAD 7cb7f27. Thirty rows were already
+closed by 917861b and 7975813. Eight stayed open, and the summary above ("closed") was wrong for them. Each was
+re-run by hand before it was fixed:
+
+| # | Row | Severity | Outcome |
+|---|---|---|---|
+| 0 | A next line that takes the drug back ("I do not take it", "I don't take it anymore", "I haven't taken it since June", "I have recently stopped", "Dropped it", "Gave up on it", "Reason for stopping", "Active: N") left the drug current | medium | **Fixed.** `retracts` also looks at the first FOUR words of the next two lines for a negation or stop word (`_RETRACT_ANY`); lab lines still never retract, and `was/were/had` stay out of the set, which is what keeps "my albumin was 4.1" a neighbour |
+| 1 | Same-line qualifiers after the drug ("Dropped it", "Gave it up", "Swapped it for X", "Ran out", "entered in error", "placebo", "last taken in March", "ordered", "pending", "I guess", "I believe", "idk", "Scratch that", "From Monday,", "Hypothetically,") | medium | **Fixed, twice over.** `_BLOCK` has the words; and, because a deny-list never ends, a CLOSED allow-list now decides what may follow a current drug unread (`benign_sibling`: doses, timings, other drugs and supplements). Anything else on the same line that the reader could not read withdraws the drug, with a note. A list ("metformin 500 mg, lisinopril 10 mg", "takes metformin and aspirin") still reads. Cost: "takes metformin, feeling fine" is not read; the note says to put the medication on its own line |
+| 2 | Headings "Old meds", "Hx", "Last visit", "At discharge", "Pre-op" above a dosed drug | low | **Fixed** (heading vocabulary) |
+| 3 | The rest of a statement was handed back from normalised text: "takes metformin and height 5'1" refused with a message about "height 51" | low | **Fixed**: a statement whose text normalisation rewrites (5'1, 245,000) is left to the reader as it was |
+| 4 | A medication line next to a line the model rewrites ("healthy otherwise thankfully" -> "no other conditions") made `_check` withdraw EVERY rewrite, including age and sex, and blocked the build | low | **Fixed**: the one rewrite that flips the neighbour is withdrawn alone (nearest first, if one alone fixes it; else all, as before) |
+| 5 | A clicked "rules wording" button replaces the whole span and could delete the words that withdrew a medication ("takes metformin, but not anymore, former smoker" -> "current smoker" built a current smoker ON metformin) | low | **Fixed**: a wording that would change which medications the rules count is not offered, with a note |
+| 6 | Widening mutations of the closed grammar unpinned | low | **Pinned**: 13 inputs (dropped-rest tails, stray ")", "take of", bare number, "since 5", "am take", the apostrophe variants U+2018/U+2032/U+02BC, fullwidth "ｎｏｔ") |
+| 7 | z rounding, header memory and `read` keys without medication-aware tests | low | z 1.0000006 and 1.0000014 pinned (they tell 6 from 7 significant digits). The header-memory and `read`-key pins, and a medication crossing the model-route property tests, are **left open** |
+
+Five of the pinned fixture entries carried a stray trailing backslash (a shell-escape artefact), so they passed
+whether the reader was right or not; they are stripped. 61 of the new tests fail on the 7cb7f27 reader.

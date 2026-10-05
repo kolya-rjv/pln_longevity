@@ -1202,12 +1202,49 @@ def _with_model(text: str, rules: ParsedPatient, ex: Extraction) -> PatientRead:
         if not bad:
             break
         if not any(s.line in bad for s in subs):
-            bad = {-1}                          # a rewrite changed another line: withdraw them all
+            # a rewrite changed ANOTHER line (a neighbour's context: "no other conditions" below a medication
+            # takes it back). Withdraw the one rewrite that does it, nearest first, if one alone does; else all.
+            culprit = None
+            if -1 not in bad:
+                for c in sorted(subs, key=lambda s: min(abs(s.line - b) for b in bad)):
+                    trial = [x for x in subs if x is not c]
+                    ra, ex = _apply(lines, rules, trial)
+                    again = _check(rules, read_patient_text(ra), ex, trial)
+                    if not (again & bad) and -1 not in again:
+                        culprit = c
+                        break
+            if culprit is not None:
+                subs.remove(culprit)
+                out.notes.append(f"the model read '{culprit.original}' as '{'; '.join(culprit.lines)}'; not used, "
+                                 f"since it would change how other statements read")
+                continue
+            bad = {-1}                          # no single rewrite does it: withdraw them all
         for s in [s for s in subs if s.line in bad or -1 in bad]:
             subs.remove(s)                      # a note, not a button: in its context it reads otherwise
             out.notes.append(f"the model read '{s.original}' as '{'; '.join(s.lines)}'; not used, since it "
                              f"would change how other statements read")
 
+    # A button replaces its whole span, and the span can hold the words that withdrew a medication ("takes
+    # metformin, but not anymore, former smoker"): a wording that would change which medications the rules
+    # count is not offered.
+    meds = (rules.medications, rules.medications_stopped)
+    no_button: set = set()
+    kept: list = []
+    for s_ in suggestions:
+        good = [w for w in s_.wordings
+                if (lambda q: (q.medications, q.medications_stopped))(read_patient_text(s_.apply(text, w))) == meds]
+        if len(good) < len(s_.wordings):
+            out.notes.append(f"a wording for '{s_.original}' is not offered: putting it in place would change "
+                             f"whether a medication counts as one you take now")
+        s_.wordings = good
+        if good:
+            kept.append(s_)
+        else:
+            no_button.add((s_.line, s_.start, s_.end))
+    suggestions = kept
+    model_problems = [(t.replace("choose a wording below, or rewrite it", "rewrite it")
+                       if span and tuple(span[:3]) in no_button else t, k, tp, sts_, w, span)
+                      for t, k, tp, sts_, w, span in model_problems]
     index = {orig: n for n, (orig, _, _) in enumerate(expected) if orig is not None}
     for n, (orig, _, sub) in enumerate(expected):
         if sub is not None:

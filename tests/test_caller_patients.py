@@ -649,6 +649,11 @@ def test_the_builder_decides_elevated_on_the_value_the_engine_will_read():
     assert near.witnesses == [] and near.markers[0].status == "Normal"
     assert "(MeasuredZ Caller_Patient CRP 1)" in near.atoms
     assert build_patient({"age": 58, "sex": "Male", "markers": {"CRP": 1.00001}}).witnesses == ["CRP"]
+    # 6 significant digits, not 7: z 1.0000006 is written 1.0000006 -> `1.00000` (6 digits) and still not above 1.0
+    for z in (1.0000006, 1.0000014):
+        built = build_patient({"age": 58, "sex": "Male", "markers": {"CRP": z}})
+        assert built.witnesses == [] and built.markers[0].status == "Normal", z
+        assert "(MeasuredZ Caller_Patient CRP 1)" in built.atoms, z
 
 
 def test_the_no_grimage_promise_is_hedged_to_what_the_plan_and_the_ranking_can_do():
