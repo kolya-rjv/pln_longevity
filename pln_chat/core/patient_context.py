@@ -127,8 +127,10 @@ _PERSONALISED_FORM_RE = re.compile(
 
 #: The forms that read AgeAccelGrim and nothing else of the patient's clocks.
 _GRIM_RISK_RE = re.compile(
-    r"\(\s*(predict-risk-patient|risk-decomposition-patient|project-risk-patient)\s+&self\s+"
-    r"([A-Za-z][A-Za-z0-9_]*)")
+    r"\(\s*(predict-risk-patient|risk-decomposition-patient|project-risk-patient|risk-scenarios)\s+&self\s+"
+    r"([A-Za-z][A-Za-z0-9_]*)"
+    r"|\(\s*(predict-risk|risk-decomposition|project-risk)\s+&self\s+([A-Za-z][A-Za-z0-9_]*)\s+"
+    r"CoronaryHeartDisease\b")
 _LINAGE_HAZARD_RE = re.compile(r"\(\s*linage-hazard-patient\s+&self\s+([A-Za-z][A-Za-z0-9_]*)")
 
 
@@ -139,13 +141,14 @@ def _no_grimage_risk_warnings(metta_query: str, patient: BuiltPatient) -> list[s
     mortality and is never a heart risk, and never combined with a GrimAge result."""
     if patient.has_grimage:
         return []
-    forms = sorted({f for f, who in _GRIM_RISK_RE.findall(metta_query or "") if who == patient.patient_id})
+    forms = sorted({f or g for f, who, g, who2 in _GRIM_RISK_RE.findall(metta_query or "")
+                    if patient.patient_id in (who, who2)})
     if not forms:
         return []
     note = (f"{patient.patient_id} has no AgeAccelGrim value, and the 10-year heart-disease (CHD) risk "
             f"model reads that clock alone, so there is no heart-specific risk for them: "
             f"{', '.join(forms)} returns nothing.")
-    if patient.patient_id in _LINAGE_HAZARD_RE.findall(metta_query):
+    if patient.linage2 is not None and patient.patient_id in _LINAGE_HAZARD_RE.findall(metta_query):
         note += (" The LinAge2 hazard beside it is the ALL-CAUSE mortality multiplier for their "
                  "biological-age delta (outcome AllCauseMortality), not a heart risk, and it is never "
                  "multiplied or added to a GrimAge result. A GrimAge acceleration value is the only "
@@ -177,7 +180,7 @@ def _prevalent_chd_warnings(metta_query: str, patient: BuiltPatient) -> list[str
     estimates a first event, and returns the same number with or without that history."""
     if not (patient.prevalent_chd and patient.can_predict_risk):
         return []
-    if not any(who == patient.patient_id for _, who in _GRIM_RISK_RE.findall(metta_query or "")):
+    if not any(patient.patient_id in (who, who2) for _, who, _, who2 in _GRIM_RISK_RE.findall(metta_query or "")):
         return []
     return [prevalent_chd_note(patient.prevalent_chd)]
 
@@ -214,8 +217,8 @@ def linage2_prompt_hint(patient: BuiltPatient) -> str:
         "They run in their own space; a query may combine them with forms of other "
         "layers, each as its own top-level expression on its own line (never nested "
         "inside another form) — each part runs where it can and the answers come back "
-        "in order. The GrimAge forms (predict-risk-patient, "
-        "decompose-grimage) read AgeAccelGrim and do NOT see the LinAge2 result.\n"
+        "in order. The GrimAge forms never see the LinAge2 result: predict-risk-patient "
+        "reads AgeAccelGrim, decompose-grimage and counterfactual-patient the DNAm components.\n"
     )
 
 
@@ -225,7 +228,7 @@ def no_grimage_prompt_hint(patient: BuiltPatient) -> str:
     if patient.has_grimage:
         return ""
     pid = patient.patient_id
-    if not patient.has_linage2:
+    if patient.linage2 is None:          # a bare LinAgeAccel marker has no LinAgeDelta: no hazard to pair
         return (f"This patient has NO AgeAccelGrim value, so there is no heart-specific (10-year "
                 f"CHD) risk model for them: a heart-risk question is (predict-risk-patient &self "
                 f"{pid}), which returns nothing, and the answer says why.\n")

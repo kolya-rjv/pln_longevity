@@ -453,7 +453,7 @@ def test_the_tab_says_when_nothing_typed_gives_the_shared_layers_a_witness():
     assert "LinAge2 biological age" in notes
     smoker = _build(SMOKER)["summary"]
     assert "Nothing you typed gives" not in smoker                    # HbA1c and CRP witness
-    assert "can still work from your elevated labs" in smoker         # the no-GrimAge note keeps its promise
+    assert "The diagnosis can still work from your elevated labs" in smoker   # the no-GrimAge note keeps its promise
 
 
 def test_the_chat_explains_an_empty_diagnosis_for_a_patient_with_nothing_to_work_from(monkeypatch):
@@ -482,7 +482,7 @@ def test_the_translator_is_told_the_pair_to_emit_for_a_patient_with_no_grimage(m
     assert "  (predict-risk-patient &self Caller_Me)\n  (linage-hazard-patient &self Caller_Me)" in seen["prompt"]
     assert "ALL-CAUSE LinAge2 mortality hazard, not a heart risk" in seen["prompt"]
     assert "This model reads AgeAccelGrim ONLY" in seen["prompt"]                      # rule 12
-    assert "a patient with no AgeAccelGrim value gets nothing from these forms" in seen["prompt"]   # rule 16
+    assert "A patient with no AgeAccelGrim value gets nothing from predict-risk-patient" in seen["prompt"]   # rule 16
     clock = _build(SMOKER + "\nGrimAge acceleration +3 years")["state"]
     assert clock["markers"]["AgeAccelGrim"]
     _, seen, _ = _chat_with(monkeypatch, "(predict-risk-patient &self Caller_Me)", clock)
@@ -568,7 +568,9 @@ def test_the_tab_the_api_and_the_chat_carry_a_medication_to_the_supplement_forms
     state = out["state"]
     assert state["medications"] == ["Metformin"]
     assert "Current medication recorded: Metformin" in out["summary"]                      # the build notes
-    assert "CurrentMedication" not in out["atoms"]["value"]                               # not an atom of `atoms`
+    assert "(CurrentMedication Caller_Me Metformin)" in out["atoms"]["value"]             # the box shows it too ...
+    assert "(CurrentMedication Caller_Me Metformin)" in Path(out["download"]["value"]).read_text()   # ... and the file
+    assert "CurrentMedication" not in _build(SMOKER)["atoms"]["value"]
     assert _build(SMOKER + "\nstopped metformin")["state"].get("medications") is None
 
     async def post(path, body):

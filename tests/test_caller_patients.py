@@ -494,11 +494,18 @@ NO_GRIM = {"age": 58, "sex": "Male", "markers": {"HbA1c": 1.8}}
 WITH_GRIM = {"age": 58, "sex": "Male", "markers": {"HbA1c": 1.8, "AgeAccelGrim": {"value": 4.5, "unit": "years"}}}
 
 
+def _with_linage2(payload):
+    """The payload with the LinAge2 fixture's block (a real LinAgeDelta), as the tab's patient has."""
+    import json
+    fixture = json.loads((REPO / "tests" / "fixtures" / "linage2_response.json").read_text(encoding="utf-8"))
+    return {**payload, "age": 58, "sex": "Male", "linage2": fixture}
+
+
 def test_a_heart_risk_form_for_a_patient_with_no_grimage_says_there_is_no_heart_risk():
     from core.patient_context import patient_form_warnings
-    built = build_patient(NO_GRIM)
+    built = build_patient(_with_linage2(NO_GRIM))
     pid = built.patient_id
-    assert not built.has_grimage and not built.can_predict_risk
+    assert not built.has_grimage and not built.can_predict_risk and built.linage2 is not None
     (alone,) = patient_form_warnings(f"(predict-risk-patient &self {pid})", built)
     assert "no AgeAccelGrim value" in alone and "predict-risk-patient returns nothing" in alone
     assert "ALL-CAUSE" not in alone                       # no hazard in the program: nothing to label
@@ -593,17 +600,19 @@ def test_a_medication_is_a_shared_atom_never_a_linage2_or_preview_atom():
 
 
 @pytest.mark.parametrize("bad", [["Lisinopril"], ["metformin"], ["Metformin) (= (grimage-weight $m) 9.9) (X"],
-                                 "Metformin", [3], ["Metformin"] * 11, ["Rapamycin"]])
-def test_a_medication_is_checked_against_the_drugs_the_kb_has_an_interaction_for(bad):
+                                 "Metformin", [3], ["Metformin"] * 11, ["Rapamycin"], ["Berberine"],
+                                 ["Metformin\n(= (x) 1)"], [["Metformin"]], {"Metformin": 1}])
+def test_a_medication_is_checked_against_the_pharmaceuticals_the_kb_has_an_interaction_for(bad):
+    """Berberine is the SUPPLEMENT side of the one Interaction fact: no flag can fire for it as a drug."""
     with pytest.raises(PatientSpecError) as excinfo:
         build_patient({**NO_GRIM, "medications": bad})
-    assert excinfo.value.code == "invalid_medication" and excinfo.value.extra["supported"] == ["Berberine", "Metformin"]
+    assert excinfo.value.code == "invalid_medication" and excinfo.value.extra["supported"] == ["Metformin"]
 
 
 def test_a_medication_listed_twice_is_one_atom():
-    built = build_patient({**NO_GRIM, "medications": ["Metformin", "Berberine", "Metformin"]})
-    assert built.medications == ["Berberine", "Metformin"]
-    assert sum("CurrentMedication" in ln for ln in built.shared_atoms.splitlines()) == 2
+    built = build_patient({**NO_GRIM, "medications": ["Metformin", "Metformin"]})
+    assert built.medications == ["Metformin"]
+    assert sum("CurrentMedication" in ln for ln in built.shared_atoms.splitlines()) == 1
 
 
 def test_the_api_takes_medications_keeps_them_out_of_the_preview_atoms_and_into_the_shared_space(monkeypatch):
@@ -629,3 +638,94 @@ def test_the_api_takes_medications_keeps_them_out_of_the_preview_atoms_and_into_
     monkeypatch.setattr(api_module, "translate", lambda **kw: _translation("(infer &self Metformin CoronaryHeartDisease)"))
     _request("POST", "/query", json={"message": "q", "patient": {**WITH_METFORMIN, "id": "M"}})
     assert not seen.get("extra_atoms")
+
+
+# ═══════════════ what the second review round-1 pass confirmed about the notes ═══════
+
+def test_the_builder_decides_elevated_on_the_value_the_engine_will_read():
+    """The atom carries 6 significant digits: z 1.0000004 is written `1`, which the KB (> z 1.0) does not call
+    Elevated — so the witness promise must not either."""
+    near = build_patient({"age": 58, "sex": "Male", "markers": {"CRP": 1.0000004}})
+    assert near.witnesses == [] and near.markers[0].status == "Normal"
+    assert "(MeasuredZ Caller_Patient CRP 1)" in near.atoms
+    assert build_patient({"age": 58, "sex": "Male", "markers": {"CRP": 1.00001}}).witnesses == ["CRP"]
+
+
+def test_the_no_grimage_promise_is_hedged_to_what_the_plan_and_the_ranking_can_do():
+    from core.patient_builder import STILL_WORK
+    assert STILL_WORK.startswith("The diagnosis can still work")
+    assert "personalise only where a supplement or an intervention reaches them" in STILL_WORK
+    # a patient whose only witness is the smoking surrogate: the diagnosis names a cause, the plan is empty
+    built = build_patient({"age": 58, "sex": "Male", "markers": {"DNAmPACKYRS": 2.0}})
+    assert built.witnesses == ["DNAmPACKYRS"]
+
+
+def test_a_bare_linageaccel_marker_has_no_hazard_to_pair_and_the_note_does_not_claim_one():
+    from core.patient_context import no_grimage_prompt_hint, patient_form_warnings
+    bare = build_patient({"age": 58, "sex": "Male", "markers": {"LinAgeAccel": {"value": 4.0, "unit": "years"}}})
+    assert bare.has_linage2 and bare.linage2 is None                 # a marker, not a LinAgeDelta block
+    assert any("every LinAge2 form" in w and "return nothing" in w for w in bare.warnings)
+    assert "hazard is computable" not in " ".join(bare.warnings)
+    hint = no_grimage_prompt_hint(bare)
+    assert "(predict-risk-patient &self" in hint and "linage-hazard-patient" not in hint
+    pid = bare.patient_id
+    (note,) = patient_form_warnings(f"(predict-risk-patient &self {pid})\n(linage-hazard-patient &self {pid})", bare)
+    assert "ALL-CAUSE" not in note
+    # neither a clock nor a LinAge2 result: only the form that returns nothing
+    plain = build_patient(NO_GRIM)
+    assert "linage-hazard-patient" not in no_grimage_prompt_hint(plain)
+    with_block = build_patient(_with_linage2(NO_GRIM))
+    assert "(linage-hazard-patient &self" in no_grimage_prompt_hint(with_block)
+
+
+@pytest.mark.parametrize("form", [
+    "(predict-risk-patient &self {p})", "(risk-decomposition-patient &self {p})", "(project-risk-patient &self {p} Metformin)",
+    "(risk-scenarios &self {p})", "(predict-risk &self {p} CoronaryHeartDisease)",
+    "(risk-decomposition &self {p} CoronaryHeartDisease)", "(project-risk &self {p} CoronaryHeartDisease CellularSenescence)",
+])
+def test_every_form_that_prints_the_chd_number_gets_the_heart_risk_notes(form):
+    from core.patient_context import patient_form_warnings
+    no_clock = build_patient(NO_GRIM)
+    assert patient_form_warnings(form.format(p=no_clock.patient_id), no_clock)
+    reported = build_patient({**WITH_GRIM, "prevalent_chd": ["angina"]})
+    (note,) = patient_form_warnings(form.format(p=reported.patient_id), reported)
+    assert "FIRST coronary event" in note
+    # not for another outcome, not for another patient
+    assert patient_form_warnings(form.format(p="Patient001"), reported) == []
+    other = form.format(p=reported.patient_id).replace("CoronaryHeartDisease", "AllCauseMortality")
+    if "CoronaryHeartDisease" in form:
+        assert patient_form_warnings(other, reported) == []
+
+
+def test_a_note_that_two_checks_both_make_is_in_the_response_once(monkeypatch):
+    from core.pln_runner import PLNRunResult
+    monkeypatch.setattr(api_module, "translate", lambda **kw: _translation("(predict-risk-patient &self Caller_C2)"))
+    monkeypatch.setattr(api_module, "run_query", Mock(return_value=PLNRunResult(status="empty", mode="runtime")))
+    monkeypatch.setattr(api_module, "log_turn", Mock())
+    patient = {"id": "C2", "age": 58, "sex": "Male", "markers": {"AgeAccelGrim": {"z": 0.7}}, "prevalent_chd": ["angina"]}
+    for path, body in (("/query", {"message": "my heart risk?", "patient": patient}),
+                       ("/metta/run", {"metta_query": "(predict-risk-patient &self Caller_C2)", "patient": patient})):
+        warnings = _request("POST", path, json=body).json()["warnings"]
+        assert len([w for w in warnings if w.startswith("Reported angina")]) == 1, (path, warnings)
+        assert len(warnings) == len(set(warnings))
+
+
+def test_the_form_notes_say_what_they_claim_and_only_for_the_forms_they_name():
+    from core.patient_context import patient_form_warnings
+    built = build_patient(NOTHING_USABLE)
+    pid = built.patient_id
+    (note,) = patient_form_warnings(f"(recommend-supplements &self {pid} (Omega3 Berberine))", built)   # the pool form
+    assert "every supplement tier is empty" in note
+    assert "Read that as 'nothing to work from', not 'no cause' or 'no benefit'" in note
+    hazard_of_another = build_patient(_with_linage2(NO_GRIM))
+    (heart,) = patient_form_warnings(
+        f"(predict-risk-patient &self {hazard_of_another.patient_id})\n(linage-hazard-patient &self Patient001)", hazard_of_another)
+    assert "ALL-CAUSE" not in heart                      # the hazard is another patient's: nothing of this one's to label
+
+
+def test_a_grimage_value_with_no_age_or_sex_means_no_risk_model_input_and_no_first_event_note():
+    built = build_patient({"markers": {"AgeAccelGrim": 1.2}, "prevalent_chd": ["angina"]})
+    assert built.has_grimage and not built.can_predict_risk
+    assert not [w for w in built.warnings if w.startswith("Reported angina")]
+    from core.patient_context import medication_prompt_hint, prevalent_chd_prompt_hint
+    assert prevalent_chd_prompt_hint(built) == "" and medication_prompt_hint(built) == ""

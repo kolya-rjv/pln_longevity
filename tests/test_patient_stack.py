@@ -229,7 +229,7 @@ def test_a_built_in_patient_is_answered_to_the_digit_as_it_was_recorded(name):
     intended change to a built-in patient or to what a form says)."""
     case = GOLDEN[name]
     out = _run("patient", case["query"])
-    assert out["rc"] == 0 and out["status"] == "ok"
+    assert out["rc"] == 0 and out["status"] == ("ok" if case["atoms"] else "empty")     # empty: nothing relevant
     assert out["atoms"] == case["atoms"]
 
 
@@ -400,3 +400,28 @@ def test_the_built_in_patient_with_a_medication_now_carries_the_flag_in_the_sing
     one = _run("patient", "!(supplement-for-patient &self Patient002 Berberine)")["atoms"]
     assert len(one) == 2 and one[0].startswith("(SuppRec Berberine") and one[1] == FLAG
     assert len(_run("patient", "!(supplement-for-patient &self Patient001 Resveratrol)")["atoms"]) == 1
+
+
+@pytest.mark.slow
+def test_a_flag_needs_a_recommended_supplement_and_a_relevant_supplement_needs_no_flag():
+    """The guard of the single supplement-for-patient equation: the flag is looked up for the record only."""
+    met = "\n(CurrentMedication Caller_Me Metformin)"
+    # Patient001-like: only CRP elevated. Berberine is irrelevant -> nothing, and so no flag
+    crp_only = ("(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n"
+                "(MeasuredZ Caller_Me CRP 2.0)")
+    assert _run("patient", "!(supplement-for-patient &self Caller_Me Berberine)", crp_only + met)["atoms"] == []
+    # Omega3 is relevant and has no interaction with metformin: exactly the record, as without the drug
+    with_drug = _run("patient", "!(supplement-for-patient &self Caller_Me Omega3)", crp_only + met)["atoms"]
+    assert len(with_drug) == 1 and with_drug[0].startswith("(SuppRec Omega3")
+    assert with_drug == _run("patient", "!(supplement-for-patient &self Caller_Me Omega3)", crp_only)["atoms"]
+
+
+@pytest.mark.slow
+def test_the_single_supplement_form_costs_one_evaluation_not_two():
+    """A second equation re-ran supplement-rec for every call: double the latency for every patient, with or
+    without a medication. One let-forced equation costs a fraction of the five-supplement plan."""
+    atoms = TAB_SMOKER + "\n" + INERT_LABS
+    plan = _run("patient", SUPPLEMENTS.format(P="Caller_Me"), atoms)
+    one = _run("patient", "!(supplement-for-patient &self Caller_Me Berberine)", atoms)
+    assert one["status"] == "ok" and len(one["atoms"]) == 1
+    assert one["secs"] < 0.7 * plan["secs"], f"one supplement {one['secs']:.1f} s vs the plan {plan['secs']:.1f} s"

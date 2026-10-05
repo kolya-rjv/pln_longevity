@@ -1,5 +1,5 @@
 {
- "_about": "Outputs of the PATIENT stack for the three built-in patients, recorded at e3422a3 BEFORE patient-markers was changed to the grounded unique-atom (docs/kb_quick_wins/REPORT.md S2). tests/test_patient_stack.py asserts they are reproduced to the digit. Regenerate only for an intended change to a built-in patient or to what a form says.",
+ "_about": "Outputs of the PATIENT stack for the three built-in patients, recorded at e3422a3 BEFORE patient-markers was changed to the grounded unique-atom (docs/kb_quick_wins/REPORT.md S2). tests/test_patient_stack.py asserts they are reproduced to the digit. Regenerate only for an intended change to a built-in patient or to what a form says. The supplement-for-patient cases were recorded with the equation of 5d4a516 (before a second answer, the InteractionFlag, was added beside the record) and are reproduced by the single let-forced equation.",
  "cases": {
   "Patient001_dx": {
    "query": "!(diagnose-patient &self Patient001 (CellularSenescence MitochondrialDysfunction ChronicInflammation))",
@@ -108,6 +108,70 @@
    "atoms": [
     "(RiskPrediction Patient003 CoronaryHeartDisease (point 0.23634708218296813) (ci 0.18080551786997062 0.29188864649596563) (confidence 0.765) (baseline 0.15) (multiplier 1.5756472145531208))"
    ]
+  },
+  "Patient001_one_Omega3": {
+   "query": "!(supplement-for-patient &self Patient001 Omega3)",
+   "atoms": [
+    "(SuppRec Omega3 (tier Tier1HighConfidence) (score 0.43260750000000003) (evidence MultipleHumanTrials 0.85) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15)))"
+   ]
+  },
+  "Patient001_one_Berberine": {
+   "query": "!(supplement-for-patient &self Patient001 Berberine)",
+   "atoms": []
+  },
+  "Patient001_one_Fisetin": {
+   "query": "!(supplement-for-patient &self Patient001 Fisetin)",
+   "atoms": [
+    "(SuppRec Fisetin (tier Tier2Promising) (score 0.13434203327695315) (evidence AnimalStudies_Single 0.5) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15 DNAmPAI1)))"
+   ]
+  },
+  "Patient001_one_NMN": {
+   "query": "!(supplement-for-patient &self Patient001 NMN)",
+   "atoms": [
+    "(SuppRec NMN (tier Tier2Promising) (score 0.16891875) (evidence SingleHumanTrial 0.7) (safety GenerallyWellTolerated 1.0) (Targets (DNAmGDF15)))"
+   ]
+  },
+  "Patient001_one_Resveratrol": {
+   "query": "!(supplement-for-patient &self Patient001 Resveratrol)",
+   "atoms": [
+    "(SuppRec Resveratrol (tier NotRecommended) (score 0.07233801791835938) (evidence ITP_Negative 0.9) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15 DNAmPAI1)))"
+   ]
+  },
+  "Patient002_one_Omega3": {
+   "query": "!(supplement-for-patient &self Patient002 Omega3)",
+   "atoms": []
+  },
+  "Patient002_one_Fisetin": {
+   "query": "!(supplement-for-patient &self Patient002 Fisetin)",
+   "atoms": []
+  },
+  "Patient002_one_NMN": {
+   "query": "!(supplement-for-patient &self Patient002 NMN)",
+   "atoms": []
+  },
+  "Patient002_one_Resveratrol": {
+   "query": "!(supplement-for-patient &self Patient002 Resveratrol)",
+   "atoms": []
+  },
+  "Patient003_one_Omega3": {
+   "query": "!(supplement-for-patient &self Patient003 Omega3)",
+   "atoms": []
+  },
+  "Patient003_one_Berberine": {
+   "query": "!(supplement-for-patient &self Patient003 Berberine)",
+   "atoms": []
+  },
+  "Patient003_one_Fisetin": {
+   "query": "!(supplement-for-patient &self Patient003 Fisetin)",
+   "atoms": []
+  },
+  "Patient003_one_NMN": {
+   "query": "!(supplement-for-patient &self Patient003 NMN)",
+   "atoms": []
+  },
+  "Patient003_one_Resveratrol": {
+   "query": "!(supplement-for-patient &self Patient003 Resveratrol)",
+   "atoms": []
   }
  }
 }

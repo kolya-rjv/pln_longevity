@@ -309,7 +309,8 @@
    (diagnose $space $hyps (patient-observations $space $patient)))
 
 ;; (diagnose-patient <space> <patient>) — over the DEFAULT candidate causes: the six
-;; nodes with an Effect edge down to a marker a patient can witness. "What drives my
+;; hallmark and lifestyle nodes whose Effect chains reach a marker a patient can witness (SASP,
+;; which also has an edge into DNAmPAI1, is covered by CellularSenescence). "What drives my
 ;; abnormal labs?" names no list, and copying the only example a translator has seen
 ;; (senescence, inflammation, mitochondria) misses HbA1c and fasting glucose entirely:
 ;; the answer was () for exactly the patient whose witnesses those are. The 3-argument

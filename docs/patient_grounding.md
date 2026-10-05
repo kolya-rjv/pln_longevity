@@ -103,8 +103,9 @@ reproduces the population ranking straight from measured values:
 
 **Without a cause list.** `(diagnose-patient <space> <patient>)` searches the six default
 candidate causes — `CellularSenescence`, `ChronicInflammation`, `MitochondrialDysfunction`,
-`InsulinResistance`, `DeregulatedNutrientSensing` and `SmokingPackYears`, every node with an
-Effect edge down to a marker a patient can witness. It is what "what drives my abnormal
+`InsulinResistance`, `DeregulatedNutrientSensing` and `SmokingPackYears`, the hallmark and
+lifestyle nodes whose Effect chains reach a marker a patient can witness (`SASP`, which also has
+an edge into `DNAmPAI1`, is covered by `CellularSenescence`). It is what "what drives my abnormal
 labs?" maps to (prompt rule 17). The three hallmarks above do not reach HbA1c or fasting
 glucose, so that list returns `()` for a patient whose only elevated labs are those two;
 the default list returns `InsulinResistance` (coverage 2, `SupportedBy (HbA1c

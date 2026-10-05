@@ -256,6 +256,13 @@ _DOWNLOAD_TTL_S = 3600
 atexit.register(shutil.rmtree, _DOWNLOAD_DIR, True)
 
 
+def _atoms_text(built: BuiltPatient) -> str:
+    """Every atom of this patient: `atoms` (what the LinAge2 space gets) plus the medication, which
+    goes only to the shared space — so the box, and the file to download, rebuild the patient fully."""
+    meds = [ln for ln in built.shared_atoms.splitlines() if ln.startswith("(CurrentMedication ")]
+    return built.atoms + ("\n" + "\n".join(meds) if meds else "")
+
+
 def _write_download(built: BuiltPatient, read_as: Optional[str] = None) -> str:
     """A .metta copy for the person to keep: a NEW temp file per build (never shared
     between sessions), in a temp directory — not a folder the KB loads. With the text
@@ -277,7 +284,7 @@ def _write_download(built: BuiltPatient, read_as: Optional[str] = None) -> str:
     fd, path = tempfile.mkstemp(prefix=f"pln_patient_{built.patient_id}_", suffix=".metta",
                                 dir=_DOWNLOAD_DIR)
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        fh.write(header + built.atoms + "\n")
+        fh.write(header + _atoms_text(built) + "\n")
     return path
 
 
@@ -313,9 +320,10 @@ def _in_tab_words(note: str) -> str:
     for prefix, text in _TAB_WORDING:
         if note.startswith(prefix):
             if prefix == "No AgeAccelGrim measurement:":
-                return _NO_GRIM_TAB + (" Diagnosis, supplement ranking and intervention ranking "
-                                       "can still work from your elevated labs the knowledge "
-                                       "base has edges for." if STILL_WORK in note else "")
+                return _NO_GRIM_TAB + (" The diagnosis can still work from your elevated labs the "
+                                       "knowledge base has edges for; the supplement plan and the "
+                                       "ranking personalise only where a supplement or an "
+                                       "intervention reaches them." if STILL_WORK in note else "")
             if text is not None:
                 return text
             markers = note[len(prefix):].split(".")[0].strip()
@@ -416,7 +424,7 @@ def on_build(text: str, state: Optional[dict], read: Optional[PatientRead] = Non
     if warnings:
         summary += "\n\n<details><summary>Notes on this patient</summary>\n\n" + "\n".join(
             f"- {w}" for w in warnings) + "\n</details>"
-    return (reading, summary, gr.update(value=built.atoms, visible=True),
+    return (reading, summary, gr.update(value=_atoms_text(built), visible=True),
             gr.update(value=_write_download(built, read.read_as if read.substitutions else None),
                       visible=True), render_banner(payload), payload, gr.update(visible=True))
 
@@ -463,7 +471,7 @@ def build_tab(patient_state: gr.State, banner: gr.Markdown, question_box: gr.Tex
     with gr.Accordion("This patient as MeTTa atoms (this session only)", open=False):
         atoms = gr.Code(value="", language=None, interactive=False, visible=False,
                         label="Injected into each query's space; the LinAge2 atoms only into "
-                              "the LinAge2 space")
+                              "the LinAge2 space, a medication only into the shared space")
         download = gr.DownloadButton("Download .metta", visible=False)
 
     for btn, name in zip(example_btns, EXAMPLES):

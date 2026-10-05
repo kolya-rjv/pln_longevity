@@ -1112,8 +1112,8 @@ class PatientIn(BaseModel):
     )
     medications: list[str] = Field(
         default_factory=list, max_length=10,
-        description="Drugs the person takes NOW that the knowledge base holds an interaction fact "
-                    "for (today ['Metformin', 'Berberine']). Becomes `(CurrentMedication <id> <drug>)` "
+        description="Drugs the person takes NOW that the knowledge base types a Pharmaceutical and "
+                    "holds an interaction fact for (today ['Metformin']). Becomes `(CurrentMedication <id> <drug>)` "
                     "in the shared space only; a supplement plan, or supplement-for-patient, flags a "
                     "supplement that interacts with it. Changes no ranking and no LinAge2 number.",
     )
@@ -3506,6 +3506,7 @@ def query(req: QueryRequest) -> QueryResponse:
     # A personalised form for a patient with nothing elevated that the knowledge base
     # has an edge for: () or the population ranking, which reads as "no cause".
     warnings.extend(patient_form_warnings(translation.metta_query, patient))
+    warnings = list(dict.fromkeys(warnings))      # a note the builder and the form check both make, once
 
     log_turn(req.message, translation, pln_result)
 
@@ -3678,6 +3679,7 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
         + linage2_form_warnings(req.metta_query, injected)
         + patient_form_warnings(req.metta_query, patient)
     )
+    run_warnings = list(dict.fromkeys(run_warnings))
 
     return MettaRunResponse(
         metta_query=req.metta_query,

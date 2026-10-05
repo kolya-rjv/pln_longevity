@@ -221,27 +221,32 @@ def kb_effect_markers() -> frozenset[str]:
     return frozenset(found)
 
 
-#: `(Interaction <A> <B> "<note>"` at the start of a line.
+#: `(Interaction <A> <B> "<note>"` and `(Inheritance <X> Pharmaceutical)` at the start of a line.
 _INTERACTION_RE = re.compile(r"^\(Interaction\s+(\S+)\s+(\S+)", re.MULTILINE)
+_PHARMACEUTICAL_RE = re.compile(r"^\(Inheritance\s+(\S+)\s+Pharmaceutical\)", re.MULTILINE)
 MAX_MEDICATIONS = 10
 
 
 @lru_cache(maxsize=1)
 def kb_interaction_drugs() -> frozenset[str]:
-    """The KB symbols an `(Interaction A B …)` fact names (today Berberine, Metformin): the only
-    drugs a `(CurrentMedication <Patient> <Drug>)` can make a supplement flag fire on, and so the
-    allow-list for `medications`. Read off the KB's own files, like kb_effect_markers."""
+    """The KB drugs a `(CurrentMedication <Patient> <Drug>)` can make a supplement flag fire on: a
+    symbol the KB types a Pharmaceutical AND names in an `(Interaction A B …)` fact (today Metformin).
+    A supplement (Berberine) is the other side of that fact: the plan flags it against the drug, never
+    the reverse. The allow-list for `medications`, read off the KB's own files like kb_effect_markers."""
     from config import ONTOLOGY_DIR, PLN_MAX_KB_FILE_BYTES
-    found: set[str] = set()
+    named: set[str] = set()
+    pharma: set[str] = set()
     for path in sorted(ONTOLOGY_DIR.glob("*.metta")):
         try:
             if path.stat().st_size > PLN_MAX_KB_FILE_BYTES:
                 continue
-            for a, b in _INTERACTION_RE.findall(path.read_text(encoding="utf-8")):
-                found.update((a, b))
+            text = path.read_text(encoding="utf-8")
         except OSError:
             continue
-    return frozenset(found)
+        for a, b in _INTERACTION_RE.findall(text):
+            named.update((a, b))
+        pharma.update(_PHARMACEUTICAL_RE.findall(text))
+    return frozenset(named & pharma)
 
 
 def medication_note(drugs: Iterable[str]) -> str:
@@ -256,8 +261,9 @@ def medication_note(drugs: Iterable[str]) -> str:
 
 
 #: The sentence the no-GrimAge note carries only while it is true.
-STILL_WORK = ("Diagnosis, supplement ranking and intervention ranking can still work from the "
-              "elevated markers the knowledge base has edges for.")
+STILL_WORK = ("The diagnosis can still work from the elevated markers the knowledge base has edges for; "
+              "the supplement plan and the intervention ranking personalise only where a supplement or an "
+              "intervention reaches them.")
 #: Starts the builder's note that the shared layers have nothing to work from; the tab
 #: rewords it by this prefix.
 NO_WITNESS_PREFIX = "No elevated marker the knowledge base can use:"
@@ -524,6 +530,7 @@ def _resolve_marker(
             marker=name,
         )
 
+    z = float(f"{z:.6g}")       # the precision of the atom: Elevated must mean what the engine will read
     status = "Elevated" if z > elevated_threshold else (
         "Low" if z < -elevated_threshold else "Normal"
     )
@@ -718,9 +725,10 @@ def build_patient(
             )
     elif any(m.name == "LinAgeAccel" for m in resolved):
         warnings.append(
-            "LinAgeAccel was sent as a bare marker: the LinAge2 hazard is computable, "
-            "but the per-lab decomposition and the counterfactuals need the whole "
-            "/predict response under `linage2`."
+            "LinAgeAccel was sent as a bare marker: it records the clock's z, but every LinAge2 form "
+            "(the hazard, the per-lab decomposition, the counterfactuals) reads the LinAgeDelta atom "
+            "that only the whole /predict response under `linage2` creates, so they return nothing "
+            "for this patient."
         )
     edge_markers = kb_effect_markers() if effect_markers is None else frozenset(effect_markers)
     witnesses = sorted(m.name for m in resolved if m.status == "Elevated" and m.name in edge_markers)

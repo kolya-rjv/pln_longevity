@@ -37,7 +37,9 @@ from typing import Optional
 
 from core.linage2_model import compute_linage2, load_model
 from core.patient_builder import MARKERS, Z_LIMIT, PatientSpecError
-from core.patient_medications import read_medication
+from core.patient_medications import (MedContext, heading_kind, line_about_other, line_blocked,
+                                      mentioned_symbols, read_medication, starts_current_header,
+                                      starts_with_stop)
 
 # ═══════════════════════════ units ═════════════════════════════════════════════
 # Each LinAge2 lab input: its canonical (model) unit, and every unit accepted for
@@ -313,10 +315,9 @@ class ParsedPatient:
     #: knowledge-base markers that are not LinAge2 inputs (a GrimAge acceleration)
     extra_markers: dict[str, dict] = field(default_factory=dict)
     #: drugs the person takes now that the KB has an interaction fact for (core.patient_medications),
-    #: as KB symbols; those said NOT to be taken; and drug words the KB has nothing on (not used)
+    #: as KB symbols; and those said NOT to be taken
     medications: list[str] = field(default_factory=list)
     medications_stopped: list[str] = field(default_factory=list)
-    medications_unused: list[str] = field(default_factory=list)
     #: statements about someone else (or second-hand smoke), not used
     set_aside: list[str] = field(default_factory=list)
     #: set by kb_markers(): a witness value the KB's coarse reference cannot hold
@@ -418,7 +419,6 @@ class ParsedPatient:
             "not_understood": list(self.not_understood),
             "medications": list(self.medications),
             "medications_stopped": list(self.medications_stopped),
-            "medications_unused": list(self.medications_unused),
             "set_aside": list(self.set_aside),
             "witness_notes": list(self.witness_notes),
             "problems": self.all_problems(),
@@ -966,6 +966,43 @@ def _read_diagnoses(text: str, context: str = "") -> tuple[list[tuple[str, int]]
     return found, ignored, False
 
 
+def _heading_above(lines: list[str], n: int) -> Optional[str]:
+    """The kind of the heading on the nearest non-empty line above line `n` (core.patient_medications)."""
+    for k in range(n - 1, -1, -1):
+        if lines[k].strip():
+            return heading_kind(lines[k])
+    return None
+
+
+def _other_above(lines: list[str], n: int) -> bool:
+    """Is the nearest non-empty line above line `n` about someone else?"""
+    for k in range(n - 1, -1, -1):
+        if lines[k].strip():
+            return line_about_other(lines[k])
+    return False
+
+
+def _stop_below(lines: list[str], n: int) -> bool:
+    """Does the nearest non-empty line below line `n` start with a word that takes a drug back?"""
+    for k in range(n + 1, len(lines)):
+        if lines[k].strip():
+            return starts_with_stop(lines[k])
+    return False
+
+
+def _head_understood(text: str) -> bool:
+    """Is `text` — in front of 'on metformin' — fully understood by this reader as a condition (not
+    negated, nothing dropped) or as a lab value? Only such a head is split off a medication."""
+    reading = _read_lab(text, text)
+    if reading is not None:
+        return not reading.blocking
+    if re.search(r"[:=()\-–—]", re.sub(r"^(?:diagnos[ie]s|conditions?|medical history)\s*:\s*", "", text)):
+        return False                    # "stroke: - -", "cancer: 0 -": a form's answer, not a diagnosis
+    body = _DIAG_HEADER.sub("", text) if _DIAG_HEADER.match(text) else text
+    found, ignored, unclear = _read_diagnoses(body, context=text)
+    return bool(found) and not unclear and not ignored and all(a in (1, 3) for _, a in found)
+
+
 def read_patient_text(text: str) -> ParsedPatient:
     """Read `text` into a ParsedPatient. Never raises on content: everything that
     could not be used is reported on the result."""
@@ -997,8 +1034,10 @@ def read_patient_text(text: str) -> ParsedPatient:
     #: the last smoking clause: its line, statement index, kind, and whether it set the status
     last_smoking: dict = {"line": -1, "idx": -1, "kind": None, "set_here": False, "stmt": "",
                           "origin": -1}
-    #: the last medication frame (a statement of its own kind): a bare drug right after it is a list item
-    last_med: dict = {"idx": -2, "line": -1, "kind": None}
+    #: the last "medications: …" header statement: a bare drug after it, on the same line, is a list item
+    med_header: dict = {"idx": -2, "line": -1}
+    raw_lines = (text or "").splitlines()
+    line_ctx: dict[int, tuple] = {}
     cur = Statement(-1, -1, 0, 0, "")           # the statement being read
 
     def set_once(attr: str, value, what: str, stmt: str) -> None:
@@ -1334,6 +1373,7 @@ def read_patient_text(text: str) -> ParsedPatient:
         elif _SMOKING_TOPIC.search(rest):
             left = read_smoking(rest, stmt, line_no, idx)
             rest = left if left is not None else ""
+        had_demo = rest != low          # this statement also carried age, sex or smoking
         if rest != low:
             rest = _DURATION.sub(" ", rest)         # "quit smoking 20 years ago", "until 2015"
             leftover = re.sub(r"\s+", " ", _FILLER.sub(" ", rest)).strip()
@@ -1342,12 +1382,18 @@ def read_patient_text(text: str) -> ParsedPatient:
             low = stmt = leftover               # e.g. "58 year old man with diabetes"
 
         # ── a medication: a drug the knowledge base can act on (core.patient_medications) ──
-        med = read_medication(
-            low, last_med["kind"] if last_med["idx"] == idx - 1 and last_med["line"] == line_no else None,
-            _names_condition)
-        if med is not None:
-            last_med.update(idx=idx, line=line_no, kind=med.kind)
-            if med.symbols:
+        # Not for a statement that also carried age, sex or smoking: it was rewritten above (a "until
+        # 2019" dropped, "isn't" turned into "isn t") before any medication rule could see it.
+        if not had_demo and mentioned_symbols(low):
+            if line_no not in line_ctx:
+                line_ctx[line_no] = (line_blocked(raw_lines[line_no]), _heading_above(raw_lines, line_no),
+                                     _stop_below(raw_lines, line_no), _other_above(raw_lines, line_no))
+            blocked, heading, stops, other_above = line_ctx[line_no]
+            med = read_medication(
+                low, MedContext(blocked=blocked, heading=heading, next_stops=stops, after_other=other_above,
+                                list_kind="current" if med_header["line"] == line_no else None),
+                _head_understood)
+            if med is not None:
                 mine, other = ((p.medications, p.medications_stopped) if med.kind == "current"
                                else (p.medications_stopped, p.medications))
                 for sym in med.symbols:
@@ -1358,10 +1404,14 @@ def read_patient_text(text: str) -> ParsedPatient:
                                 "contradiction", "medication")
                     elif sym not in mine:
                         mine.append(sym)
-                p.medications_unused.extend(w for w in med.others if w not in p.medications_unused)
-                if not med.head:
+                remaining = med.head or med.rest
+                if not remaining:
+                    if starts_current_header(low):
+                        med_header.update(idx=idx, line=line_no)
                     continue
-                low = stmt = med.head            # "type 2 diabetes on metformin": the rest is read as before
+                low = stmt = remaining           # "type 2 diabetes on metformin", "… and has diabetes"
+        if starts_current_header(low):
+            med_header.update(idx=idx, line=line_no)    # "medications: lisinopril, metformin": a list
 
         # ── questionnaire ────────────────────────────────────────────────────
         if _OTHERWISE.match(low):
@@ -1555,15 +1605,24 @@ def read_patient_text(text: str) -> ParsedPatient:
             "diagnoses: " + (", ".join(yes) if yes else "none")
             + (f"; not: {', '.join(no)}" if no else "")
             + " — every diagnosis not listed is answered No"))
+    # A drug the text names where it could not be read (a plan, a past, a question, "before metformin")
+    # makes a current reading of the same drug unsafe: say what was left out rather than guess which
+    # of the mentions is true.
+    for st in p.statements:
+        if st.facts.get("medications") or st.facts.get("set_aside") or not p.medications:
+            continue
+        for sym in mentioned_symbols(st.text):
+            if sym in p.medications:
+                p.medications.remove(sym)
+                p.notes.append(f"'{st.text}' also mentions {sym} but could not be read, so {sym} was not "
+                               f"counted as a current medication — say plainly 'takes {sym.lower()}' or "
+                               f"'not on {sym.lower()}'")
     if p.medications:
         p.notes.append(f"medication: {', '.join(p.medications)} read as a current medication — used only "
                        f"to flag supplement interactions; no ranking and no LinAge2 number changes")
     not_taken = [m for m in p.medications_stopped if m not in p.medications]
     if not_taken:
         p.notes.append(f"not counted as a current medication (you said you do not take it): {', '.join(not_taken)}")
-    if p.medications_unused:
-        p.notes.append("medication the knowledge base has no interaction fact for (not used): "
-                       + ", ".join(p.medications_unused))
     def said(attr: str) -> tuple:
         return tuple(st.index for st in p.statements if attr in st.facts)
 

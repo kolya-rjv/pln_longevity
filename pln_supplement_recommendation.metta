@@ -229,14 +229,17 @@
 ;; One supplement's standalone recommendation record for a patient (the "should I take
 ;; X / what tier is X for me?" query). Nothing if X is irrelevant to this patient.
 (= (supplement-for-patient $space $patient $supp)
-   (supplement-rec $space $patient $supp))
+   (let* (($r     (supplement-rec $space $patient $supp))
+          ($flags (collapse (interaction-flag $space $patient (rec-supp $r))))
+          ($all   (cons-atom $r $flags)))
+      (superpose $all)))
 
-;; ...and the interaction flag beside it, when the patient takes a drug the KB has an Interaction
-;; fact for. A SECOND equation, so the record above is unchanged: a patient with no such drug gets
-;; exactly what they got (this equation then yields nothing); one who has it gets the flag too.
-(= (supplement-for-patient $space $patient $supp)
-   (let $r (supplement-rec $space $patient $supp)
-      (interaction-flag $space $patient (rec-supp $r))))
+;; The record, then — when the patient takes a drug the KB has an Interaction fact for — the
+;; InteractionFlag beside it, from ONE evaluation of supplement-rec (a second equation re-ran it:
+;; double the latency for every patient). With no such drug `$flags` is () and the answer is exactly
+;; the record, as before; an irrelevant supplement still yields nothing, and so no flag. `$all` is
+;; let-forced: superpose does not reduce its argument, and the bare call fans out over its own
+;; unevaluated parts (the record, the flags and the word "cons-atom").
 
 ;; ================================================================
 ;; 9. Smoke-test queries (intended values; live floats carry trailing noise —
