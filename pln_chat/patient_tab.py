@@ -70,8 +70,9 @@ SUGGESTED_QUESTIONS = (
 #:   always             the LinAge2 forms (decomposition, hazard): every built patient has a result
 #:   smoker             quitting smoking is 0.0 for anyone who is not a current smoker
 #:   witness_or_smoker  "what could I do": a lever moves only for an elevated witness or a smoker
-#:   witness            the supplement plan and the diagnosis read witnesses only
-_NEEDS = ("always", "always", "smoker", "witness_or_smoker", "witness", "witness")
+#:   witness            the supplement plan reads witnesses only
+#:   witness_or_chd     the diagnosis: a witness, or a reported heart disease (one observation, item #11)
+_NEEDS = ("always", "always", "smoker", "witness_or_smoker", "witness", "witness_or_chd")
 
 #: The fifth button without a witness: the plan half would be empty, the drivers half still answers.
 DRIVERS_ONLY_QUESTION = "What are the main drivers of my biological age?"
@@ -80,7 +81,8 @@ DRIVERS_ONLY_QUESTION = "What are the main drivers of my biological age?"
 def _offered(need: str, built: BuiltPatient) -> bool:
     smoker = built.smoking == "CurrentSmoker"
     return {"always": True, "smoker": smoker, "witness": bool(built.witnesses),
-            "witness_or_smoker": bool(built.witnesses) or smoker}[need]
+            "witness_or_smoker": bool(built.witnesses) or smoker,
+            "witness_or_chd": bool(built.witnesses) or bool(built.prevalent_chd)}[need]
 
 
 def question_buttons(built: Optional[BuiltPatient]) -> list[tuple[str, bool]]:
@@ -106,8 +108,8 @@ def hidden_note(built: Optional[BuiltPatient]) -> str:
     if not smoker:
         parts.append("quitting smoking (you are not a current smoker)")
     if not built.witnesses:
-        parts.append("the diagnosis and the supplement plan (none of your labs is elevated with "
-                     "a cause the knowledge base has curated)")
+        parts.append(("the supplement plan" if built.prevalent_chd else "the diagnosis and the supplement plan")
+                     + " (none of your labs is elevated with a cause the knowledge base has curated)")
         if not smoker:
             parts.append("\"what could I do\" (nothing it can move)")
     if not parts:

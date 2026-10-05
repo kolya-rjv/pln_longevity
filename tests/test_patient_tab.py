@@ -662,7 +662,7 @@ def test_each_gate_matches_what_the_forms_return():
     from core.patient_context import build_caller_patient
     from core.patient_text import read_patient_text
     import test_patient_stack as ps                                   # the subprocess runner
-    for text in (HEALTHY, SMOKER_NORMAL_LABS, FORMER_CRP_ONLY, NO_WITNESS, SMOKER):
+    for text in (HEALTHY, SMOKER_NORMAL_LABS, FORMER_CRP_ONLY, NO_WITNESS, SMOKER, NO_WITNESS + "\ndiagnoses: heart attack"):
         payload, _ = read_patient_text(text).to_patient("Me")
         built = build_caller_patient(payload, ())
         shown = set(_offered(text))
@@ -747,3 +747,11 @@ def test_the_translator_is_told_a_reported_chd_is_one_more_observation_not_a_mea
     plain = _build(SMOKER)["state"]
     _, seen, history = _chat_with(monkeypatch, "(diagnose-patient &self Caller_Me)", plain)
     assert "one more observation to explain" not in seen["prompt"] and "Reported" not in history[-1]["content"]
+
+
+def test_a_reported_heart_disease_keeps_the_diagnosis_button_because_the_diagnosis_answers_from_it():
+    """Item #11: with no elevated witness the diagnosis still explains the reported heart disease; the plan does not."""
+    text = NO_WITNESS + "\ndiagnoses: heart attack"
+    assert _offered(text) == [Q1, Q2, patient_tab.DRIVERS_ONLY_QUESTION, Q6]
+    note = patient_tab.on_show_questions(_build(text)["state"])[-1]["value"]
+    assert "the supplement plan" in note and "the diagnosis and the supplement plan" not in note
