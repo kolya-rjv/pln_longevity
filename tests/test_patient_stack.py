@@ -258,3 +258,50 @@ def test_sixteen_more_markers_make_the_supplement_plan_neither_slow_nor_differen
     assert wide["secs"] < 30, f"{wide['secs']:.1f} s for 16 extra markers (limit 30; the query timeout is 60)"
     assert wide["secs"] < 15 * base["secs"], (
         f"16 extra markers cost {wide['secs'] / base['secs']:.0f}x the plan without them")
+
+
+# ═══════════════════════════ "what drives my abnormal labs?": the default causes ══
+#
+# The 3-argument diagnose-patient needs a typed list of candidate causes. The tab's own
+# question names none, and a translator that copies the only example it has seen hands in
+# three hallmarks that do not reach HbA1c or glucose — () for the patient whose witnesses
+# those are. The 2-argument form carries the knowledge base's default list.
+
+DEFAULT_CAUSES = ("(CellularSenescence ChronicInflammation MitochondrialDysfunction "
+                  "InsulinResistance DeregulatedNutrientSensing SmokingPackYears)")
+THREE_HALLMARKS = "(CellularSenescence MitochondrialDysfunction ChronicInflammation)"
+HEALTHY_WOMAN = ("(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 45)\n(PatientSex Caller_Me Female)\n"
+                 "(PatientSmoking Caller_Me NeverSmoker)\n(MeasuredZ Caller_Me CRP -1.20397)\n"
+                 "(MeasuredZ Caller_Me FastingGlucose -0.583333)\n(MeasuredZ Caller_Me HbA1c -0.6)")
+
+
+@pytest.mark.slow
+def test_diagnosing_with_no_cause_list_searches_the_default_causes_and_finds_the_metabolic_one():
+    two = _run("patient", "!(diagnose-patient &self Caller_Me)", TAB_SMOKER)
+    assert two["rc"] == 0 and two["status"] == "ok"
+    assert two["atoms"] == _run("patient", f"!(diagnose-patient &self Caller_Me {DEFAULT_CAUSES})",
+                                TAB_SMOKER)["atoms"]
+    assert re.findall(r"\(Hypothesis (\w+) ", two["atoms"][0])[0] == "InsulinResistance"
+    assert "(Hypothesis InsulinResistance (stv 0.8 0.8775) 2.0 " in two["atoms"][0]
+    assert "(SupportedBy (HbA1c FastingGlucose))" in two["atoms"][0]
+    # the control: the list the translator used to copy does not reach these two labs
+    assert _run("patient", f"!(diagnose-patient &self Caller_Me {THREE_HALLMARKS})",
+                TAB_SMOKER)["atoms"] == ["()"]
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("patient, first", [("Patient001", "CellularSenescence"),
+                                            ("Patient002", "InsulinResistance"),
+                                            ("Patient003", "SmokingPackYears")])
+def test_the_default_causes_answer_each_built_in_patient_and_leave_the_three_argument_form_alone(patient, first):
+    two = _run("patient", f"!(diagnose-patient &self {patient})")
+    assert re.findall(r"\(Hypothesis (\w+) ", two["atoms"][0])[0] == first
+    assert two["atoms"] == _run("patient", f"!(diagnose-patient &self {patient} {DEFAULT_CAUSES})")["atoms"]
+    three = GOLDEN[f"{patient}_dx"]
+    assert _run("patient", three["query"])["atoms"] == three["atoms"]
+
+
+@pytest.mark.slow
+def test_a_patient_with_nothing_elevated_gets_an_honest_empty_not_a_cause():
+    out = _run("patient", "!(diagnose-patient &self Caller_Me)", HEALTHY_WOMAN)
+    assert out["rc"] == 0 and out["atoms"] == ["()"]

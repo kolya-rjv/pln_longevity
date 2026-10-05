@@ -117,7 +117,7 @@ def linage2_prompt_hint(patient: BuiltPatient) -> str:
         "add years, mortality hazard or risk, what would remove years — map to the "
         "dedicated LinAge2 forms, which take this patient id:\n"
         f"  (linage-decomposition-patient &self {patient.patient_id})\n"
-        f"  (linage-drivers-patient &self {patient.patient_id})\n"
+        f"  (linage-drivers-patient &self {patient.patient_id})   ; drivers of BIOLOGICAL AGE, not of abnormal labs\n"
         f"  (linage-hazard-patient &self {patient.patient_id})\n"
         f"  (linage-risk-patient &self {patient.patient_id})\n"
         f"  (linage-counterfactual-patient &self {patient.patient_id} <Lever>)\n"
@@ -145,5 +145,8 @@ def patient_prompt_section(patient: BuiltPatient) -> str:
         f"Treat `{patient.patient_id}` as a valid <Patient> for every "
         f"dedicated patient form. When the question says 'me', 'my', 'this "
         f"patient' or gives no id, it means {patient.patient_id}.\n"
+        f"What causes or drives this patient's abnormal LABS (not their biological age) "
+        f"is (diagnose-patient &self {patient.patient_id}) over the knowledge base's "
+        f"default candidate causes — never a hand-typed hallmark list (rule 17).\n"
         + (linage2_prompt_hint(patient) if patient.has_linage2 else "")
     )

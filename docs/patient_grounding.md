@@ -101,6 +101,17 @@ reproduces the population ranking straight from measured values:
 ;; CellularSenescence (cov 3) ≻ ChronicInflammation (cov 2) ≻ MitochondrialDysfunction (cov 1)
 ```
 
+**Without a cause list.** `(diagnose-patient <space> <patient>)` searches the six default
+candidate causes — `CellularSenescence`, `ChronicInflammation`, `MitochondrialDysfunction`,
+`InsulinResistance`, `DeregulatedNutrientSensing` and `SmokingPackYears`, every node with an
+Effect edge down to a marker a patient can witness. It is what "what drives my abnormal
+labs?" maps to (prompt rule 17). The three hallmarks above do not reach HbA1c or fasting
+glucose, so that list returns `()` for a patient whose only elevated labs are those two;
+the default list returns `InsulinResistance` (coverage 2, `SupportedBy (HbA1c
+FastingGlucose)`). A cause node added to the KB is added to the default list in
+`patient_profile.metta`. It is an abduction over hallmarks: it ignores how far above the
+threshold a value is, and `()` means no elevated marker has a curated cause.
+
 `AgeAccelGrim` is elevated too, but no bridge explains it, so it is **carried in
 the observation set yet credited to no hypothesis** — grounded, never invented.
 (Abductive diagnosis still leaves it un-credited; the composition edge added by the

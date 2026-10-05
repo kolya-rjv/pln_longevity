@@ -182,13 +182,13 @@
   },
   {
     "nl": "Patient001 has a discordant methylation profile. Diagnose the most likely upstream causes.",
-    "metta_query": "(diagnose-patient &self Patient001 (CellularSenescence MitochondrialDysfunction ChronicInflammation))",
-    "explanation": "Patient-grounded abductive diagnosis. Instead of a hand-typed marker list, it reads Patient001's measured standardized biomarkers, grounds them into the ELEVATED findings (via the documented threshold in patient_profile.metta), and runs the same backward causal search as `diagnose`. Returns (Hypothesis <cause> (stv s c) <coverage> <mass> (SupportedBy <markers>)) most-explanatory first. A measured finding no bridge can explain is carried but credited to no cause.",
+    "metta_query": "(diagnose-patient &self Patient001)",
+    "explanation": "Patient-grounded abductive diagnosis over the knowledge base's default candidate causes (pass a list as a third argument only when the user names the causes). It reads Patient001's measured standardized biomarkers, grounds them into the ELEVATED findings (via the documented threshold in patient_profile.metta), and runs the same backward causal search as `diagnose`. Returns (Hypothesis <cause> (stv s c) <coverage> <mass> (SupportedBy <markers>)) most-explanatory first. A measured finding no bridge can explain is carried but credited to no cause.",
     "intent": "inference",
     "requires_pln_inference": true,
     "confidence_filter": 0.0,
     "warnings": [
-      "Uses the patient's grounded observations; only markers above the elevated-z-threshold become findings. The candidate-cause list is explicit (here the relevant hallmarks of aging)."
+      "Uses the patient's grounded observations; only markers above the elevated-z-threshold become findings. () means none of the elevated markers has a curated cause here."
     ]
   },
   {
@@ -427,6 +427,15 @@
     "nl": "What could I do about my LinAge2 biological age?",
     "metta_query": "(linage-scenarios-patient &self Caller_W58)",
     "explanation": "Runs the four standing LinAge2 counterfactuals — reduce chronic inflammation, clear senescent cells, address insulin resistance, quit smoking — and returns the expected years removed by each, with confidence and the inputs credited. A lever that reaches no input whose direction the patient's own values witness returns 0 rather than a fabricated benefit.",
+    "intent": "inference",
+    "requires_pln_inference": true,
+    "confidence_filter": 0.0,
+    "warnings": []
+  },
+  {
+    "nl": "What is the likely driver of my abnormal labs?",
+    "metta_query": "(diagnose-patient &self Caller_W58)",
+    "explanation": "The causes of abnormal LABS are the abductive diagnosis, not the LinAge2 drivers of biological age: it runs the causal graph backward from the caller's elevated markers over the default candidate causes and returns (Hypothesis <cause> (stv s c) <coverage> <mass> (SupportedBy <markers>)) most-explanatory first. () means no elevated marker has a curated cause here.",
     "intent": "inference",
     "requires_pln_inference": true,
     "confidence_filter": 0.0,

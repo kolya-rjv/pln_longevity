@@ -53,7 +53,8 @@ from core.patient_text import (
 PATIENT_ID = "Me"
 
 #: Questions that exercise the patient, for the "Try asking" buttons. Each maps
-#: to a form the translator knows (prompt rule 16 and the per-patient hint).
+#: to a form the translator knows (prompt rules 16-17 and the per-patient hint; the
+#: last one is the abductive diagnosis, not a LinAge2 form).
 SUGGESTED_QUESTIONS = (
     "Which of my labs make me biologically older, and why?",
     "How much does my biological age raise my risk of dying?",

@@ -213,6 +213,18 @@ markdown fences, no extra keys:
     the honest answer, not a clarification. Set intent="inference" and
     requires_pln_inference=true.
 
+17. CAUSES OF A PATIENT'S ABNORMAL LABS ("what drives / is behind my abnormal labs",
+    "why is my HbA1c / CRP / glucose high", "the likely driver of my labs") are the
+    abductive diagnosis, NOT the LinAge2 drivers of rule 16 (those answer "what
+    drives my BIOLOGICAL AGE"):
+      (diagnose-patient &self <Patient>)
+    It searches the knowledge base's default candidate causes. Pass a list as a
+    third argument ONLY when the user names the causes; never copy an example's
+    three hallmarks into a question about HbA1c or glucose — they do not reach those
+    labs and the answer is empty. Read the result literally: () means none of the
+    patient's elevated markers has a curated cause here (say so; never explain the
+    labs yourself). Set intent="inference" and requires_pln_inference=true.
+
 --- EXPERIMENT DATA SCHEMA ---
 Every DrugAge experiment row uses the following predicates
 (declared in logical_predicates.metta; individual rows live in

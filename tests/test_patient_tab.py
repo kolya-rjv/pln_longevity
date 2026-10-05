@@ -414,3 +414,25 @@ def test_a_generic_question_with_a_patient_loaded_runs_without_the_patient(monke
     assert kwargs["kb_files"] == patient_stack(app_module._ALL_KB_PATHS)
     assert "(MeasuredZ Caller_Me CRP " in kwargs["extra_atoms"]
 
+
+
+# ═══════════════════════════ what drives my abnormal labs is the diagnosis ════
+
+def test_the_translator_is_told_that_the_causes_of_abnormal_labs_are_the_diagnosis(monkeypatch):
+    """The tab's own suggested question: without this the translator copies the one
+    diagnose few-shot's three hallmarks, which do not reach HbA1c or glucose (an empty
+    answer for the patient whose witnesses those are)."""
+    import json
+    import re
+    state = _build(SMOKER)["state"]
+    _, seen, _ = _chat_with(monkeypatch, "(diagnose-patient &self Caller_Me)", state)
+    assert "(diagnose-patient &self Caller_Me)" in seen["prompt"]          # the patient's own hint
+    assert "17. CAUSES OF A PATIENT'S ABNORMAL LABS" in seen["prompt"]     # the static rule
+    assert "drivers of BIOLOGICAL AGE, not of abnormal labs" in seen["prompt"]
+    few = json.loads((PLN_CHAT / "prompts" / "few_shot_examples.json").read_text(encoding="utf-8"))
+    asks = [e for e in few if e["nl"] == "What is the likely driver of my abnormal labs?"]
+    assert [e["metta_query"] for e in asks] == ["(diagnose-patient &self Caller_W58)"]
+    # no patient example hands a typed hallmark list to the diagnosis any more
+    assert not [e["metta_query"] for e in few
+                if re.search(r"diagnose-patient &self \S+ \(", e["metta_query"])]
+    assert patient_tab.SUGGESTED_QUESTIONS[-1] == "What is the likely driver of my abnormal labs?"

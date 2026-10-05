@@ -308,6 +308,17 @@
 (= (diagnose-patient $space $patient $hyps)
    (diagnose $space $hyps (patient-observations $space $patient)))
 
+;; (diagnose-patient <space> <patient>) — over the DEFAULT candidate causes: the six
+;; nodes with an Effect edge down to a marker a patient can witness. "What drives my
+;; abnormal labs?" names no list, and copying the only example a translator has seen
+;; (senescence, inflammation, mitochondria) misses HbA1c and fasting glucose entirely:
+;; the answer was () for exactly the patient whose witnesses those are. The 3-argument
+;; form is untouched. A new cause node goes in this list.
+(= (diagnose-patient $space $patient)
+   (diagnose-patient $space $patient
+      (CellularSenescence ChronicInflammation MitochondrialDysfunction
+       InsulinResistance DeregulatedNutrientSensing SmokingPackYears)))
+
 ;; ================================================================
 ;; 5. Patient factors for Demo 2 (intervention ranking)
 ;; ================================================================
