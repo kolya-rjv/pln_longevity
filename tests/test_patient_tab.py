@@ -436,3 +436,32 @@ def test_the_translator_is_told_that_the_causes_of_abnormal_labs_are_the_diagnos
     assert not [e["metta_query"] for e in few
                 if re.search(r"diagnose-patient &self \S+ \(", e["metta_query"])]
     assert patient_tab.SUGGESTED_QUESTIONS[-1] == "What is the likely driver of my abnormal labs?"
+
+
+# ═══════════════ "nothing to work from": the tab and the chat say it ═════════════
+
+#: diagnoses and labs with no curated edge: LinAge2 uses all of it, the shared layers none
+NO_WITNESS = ("58 year old male\nalbumin 4.0 g/dL\ncreatinine 1.8 mg/dL\nblood pressure 150/90\n"
+              "RDW 15.2 %\ndiagnoses: diabetes, hypertension, kidney disease")
+
+
+def test_the_tab_says_when_nothing_typed_gives_the_shared_layers_a_witness():
+    notes = _build(NO_WITNESS)["summary"]
+    assert "Nothing you typed gives the knowledge base a witness" in notes
+    assert "will come back empty" in notes and "still work" not in notes
+    # LinAge2 itself is unaffected: the clock and its years are built as usual
+    assert "LinAge2 biological age" in notes
+    smoker = _build(SMOKER)["summary"]
+    assert "Nothing you typed gives" not in smoker                    # HbA1c and CRP witness
+    assert "can still work from your elevated labs" in smoker         # the no-GrimAge note keeps its promise
+
+
+def test_the_chat_explains_an_empty_diagnosis_for_a_patient_with_nothing_to_work_from(monkeypatch):
+    """The chat never shows the builder's notes, and () reads as 'no cause'."""
+    state = _build(NO_WITNESS)["state"]
+    _, _, history = _chat_with(monkeypatch, "(diagnose-patient &self Caller_Me)", state)
+    answer = history[-1]["content"]
+    assert "> **Note.** Caller_Me has no elevated value the knowledge base can use" in answer
+    assert "the diagnosis returns ()" in answer
+    _, _, history = _chat_with(monkeypatch, "(diagnose-patient &self Caller_Me)", _build(SMOKER)["state"])
+    assert "has no elevated value" not in history[-1]["content"]

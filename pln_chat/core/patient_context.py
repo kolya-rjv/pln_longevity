@@ -12,7 +12,7 @@ from functools import lru_cache
 from typing import Iterable, Optional
 
 from config import ONTOLOGY_DIR
-from core.patient_builder import BuiltPatient, build_patient
+from core.patient_builder import BuiltPatient, build_patient, kb_effect_markers
 from ontology.inventory import merged_inventory
 from ontology.loader import parse_metta_text
 from ontology.registry import OntologyRegistry
@@ -108,6 +108,44 @@ def with_injected(registry: OntologyRegistry, inventory, injected: Optional[str]
 def validation_text(injected: Optional[str], metta_query: str) -> str:
     """What is validated: the injected atoms and the query, as the space will see them."""
     return "\n".join(part for part in (injected, metta_query) if part)
+
+
+#: The shared-layer forms that personalise from a patient's elevated markers, and what each
+#: returns for a patient with none the knowledge base can use (probed: tests/test_patient_stack.py).
+_NO_WITNESS_RESULT = {
+    "diagnose-patient": "the diagnosis returns ()",
+    "recommend-supplements-patient": "every supplement tier is empty",
+    "recommend-supplements": "every supplement tier is empty",
+    "supplement-for-patient": "the single-supplement form returns nothing",
+    "rank-interventions-for-patient": "the ranking is the population ranking, the same as for an "
+                                      "unknown patient",
+}
+_PERSONALISED_FORM_RE = re.compile(
+    r"\(\s*(" + "|".join(sorted(_NO_WITNESS_RESULT, key=len, reverse=True)) +
+    r")\s+&self\s+([A-Za-z][A-Za-z0-9_]*)")
+
+
+def patient_form_warnings(metta_query: str, patient: Optional[BuiltPatient]) -> list[str]:
+    """Say why a personalised form is about to come back empty or unpersonalised, before it
+    does — the same note on /query, /metta/run and the chat (the chat never shows the
+    builder's own notes, and an empty `()` reads as "no cause", which it is not).
+
+    Fires only for a form NAMING this patient while none of the patient's values is
+    elevated and has a curated edge (BuiltPatient.witnesses)."""
+    if patient is None or patient.witnesses:
+        return []
+    results = []
+    for form, who in _PERSONALISED_FORM_RE.findall(metta_query or ""):
+        if who == patient.patient_id and _NO_WITNESS_RESULT[form] not in results:
+            results.append(_NO_WITNESS_RESULT[form])
+    if not results:
+        return []
+    return [
+        f"{patient.patient_id} has no elevated value the knowledge base can use (it has curated "
+        f"edges for {', '.join(sorted(kb_effect_markers()))}; a glucose counts only when typed as "
+        f"fasting; a typed diagnosis, a low value and any other lab count for none of them): "
+        f"{'; '.join(results)}. Read that as 'nothing to work from', not 'no cause' or 'no benefit'."
+    ]
 
 
 def linage2_prompt_hint(patient: BuiltPatient) -> str:

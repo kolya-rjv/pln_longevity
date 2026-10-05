@@ -45,6 +45,7 @@ from core.patient_builder import PatientSpecError
 from core.patient_context import (
     build_caller_patient,
     patient_atoms_for,
+    patient_form_warnings,
     reads_patients,
     patient_prompt_section,
     validation_text,
@@ -461,6 +462,7 @@ def chat(
         lever_warnings(translation.metta_query, extra_atoms=full_atoms, known_patients=known)
         + scoped_form_warnings(translation.metta_query, _ALL_KB_PATHS, inventory)
         + linage2_form_warnings(translation.metta_query, full_atoms)
+        + patient_form_warnings(translation.metta_query, patient)
     ):
         bot_response += f"\n\n> **Note.** {warning}"
 

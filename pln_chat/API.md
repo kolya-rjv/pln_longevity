@@ -438,6 +438,13 @@ against the raw `extra_atoms` path:
 * a query naming a patient the KB does not hold is flagged
   `unpersonalized` — `rank-interventions-for-patient` otherwise returns a
   confident population-level ranking for a typo'd id.
+* a patient with no **elevated** value the KB has a curated edge into (CRP, DNAmGDF15,
+  DNAmPACKYRS, DNAmPAI1, FastingGlucose, HbA1c) is told so: `patient.warnings` says its
+  diagnosis returns `()`, every supplement tier is empty and its ranking is the population
+  one, and a `diagnose-patient`, `recommend-supplements[-patient]`, `supplement-for-patient`
+  or `rank-interventions-for-patient` form naming it carries the same note in `warnings`.
+  That is "nothing to work from", not "no cause": a typed diagnosis, a lab with no edge
+  (albumin, creatinine, blood pressure, RDW) and a low value count for none of them.
 
 ### …and your LinAge2 result
 

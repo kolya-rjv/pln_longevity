@@ -460,6 +460,12 @@ labs adding and removing years, the count and total of filled-in inputs, LinAge2
 (an age outside 40-85 is flagged as an extrapolation under the headline; an unanswered
 questionnaire is said to be assumed), the builder's notes reworded for someone who typed text
 rather than sent z-scores, the atoms, and suggested questions that jump to *PLN Query* with the question filled in.
+A patient none of whose values is both elevated and reached by a curated edge (CRP, HbA1c, a
+glucose marked fasting; typed diagnoses and every other lab count for none) is told that the
+diagnosis will come back empty, the supplement plan will have no tiers and the ranking will be
+the population's — in the build notes, and again in the chat next to any such answer, since the
+chat never shows the builder's notes and an empty `()` reads as "no cause"
+(`core.patient_context.patient_form_warnings`).
 Verified in a headless browser: build, banner, suggested question, download, and the
 unclear-unit refusal (`tests/test_patient_tab.py` covers the handlers and the chat wiring).
 

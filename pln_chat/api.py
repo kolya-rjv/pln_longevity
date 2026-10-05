@@ -139,6 +139,7 @@ from core.patient_read import read_patient
 from core.patient_context import (
     build_caller_patient,
     patient_atoms_for,
+    patient_form_warnings,
     reads_patients,
     patient_knobs,
     patient_prompt_section,
@@ -3476,6 +3477,9 @@ def query(req: QueryRequest) -> QueryResponse:
     warnings.extend(linage2_form_warnings(
         translation.metta_query, patient.atoms if patient is not None else None
     ))
+    # A personalised form for a patient with nothing elevated that the knowledge base
+    # has an edge for: () or the population ranking, which reads as "no cause".
+    warnings.extend(patient_form_warnings(translation.metta_query, patient))
 
     log_turn(req.message, translation, pln_result)
 
@@ -3644,6 +3648,7 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
             req.metta_query, _runtime_kb_paths(), _runtime_inventory()
         )
         + linage2_form_warnings(req.metta_query, injected)
+        + patient_form_warnings(req.metta_query, patient)
     )
 
     return MettaRunResponse(

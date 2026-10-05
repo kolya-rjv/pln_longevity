@@ -305,3 +305,43 @@ def test_the_default_causes_answer_each_built_in_patient_and_leave_the_three_arg
 def test_a_patient_with_nothing_elevated_gets_an_honest_empty_not_a_cause():
     out = _run("patient", "!(diagnose-patient &self Caller_Me)", HEALTHY_WOMAN)
     assert out["rc"] == 0 and out["atoms"] == ["()"]
+
+
+# ═══════════════ what the builder says about "nothing to work from" is what the engine does ═
+
+from core.patient_builder import kb_effect_markers  # noqa: E402
+
+NOTHING_ELEVATED_WITH_AN_EDGE = (
+    "(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n"
+    "(MeasuredZ Caller_Me AgeAccelGrim 2.0)\n(MeasuredZ Caller_Me DNAmADM 1.5)\n"
+    "(MeasuredZ Caller_Me CRP 0.2)\n(MeasuredZ Caller_Me HbA1c -2.0)")
+POOL = "(Metformin Berberine CaloricRestriction DasatinibPlusQuercetin)"
+
+
+@pytest.mark.slow
+def test_a_patient_with_nothing_the_kb_can_use_gets_exactly_what_the_builder_says():
+    """No elevated marker with an edge: the diagnosis is (), every supplement tier is empty,
+    the single-supplement form returns nothing and the ranking IS the population ranking
+    (core.patient_builder.no_witness_note, core.patient_context.patient_form_warnings)."""
+    atoms = NOTHING_ELEVATED_WITH_AN_EDGE
+    assert _run("patient", "!(diagnose-patient &self Caller_Me)", atoms)["atoms"] == ["()"]
+    plan = _run("patient", SUPPLEMENTS.format(P="Caller_Me"), atoms)["atoms"]
+    assert plan == ["(SupplementRecommendation Caller_Me (Tier1HighConfidence ()) (Tier2Promising ()) "
+                    "(NotRecommended ()) (Interactions ()))"]
+    one = _run("patient", "!(supplement-for-patient &self Caller_Me Berberine)", atoms)
+    assert one["status"] == "empty" and one["atoms"] == []
+    ranked = _run("patient", f"!(rank-interventions-for-patient &self Caller_Me {POOL} CoronaryHeartDisease)", atoms)
+    population = _run("patient", f"!(rank-interventions &self {POOL} CoronaryHeartDisease)")
+    assert ranked["atoms"] == population["atoms"] and ranked["atoms"]
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("marker", sorted(kb_effect_markers()))
+def test_the_default_causes_reach_every_marker_the_kb_has_an_edge_into(marker):
+    """The drift guard of #1 and #4: a marker counts as a witness only if it has an edge
+    into it, and the default cause list must then be able to explain it. A new bridge that
+    lands on a cause outside the list fails here."""
+    atoms = ("(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n"
+             f"(PatientSex Caller_Me Male)\n(MeasuredZ Caller_Me {marker} 2.0)")
+    out = _run("patient", "!(diagnose-patient &self Caller_Me)", atoms)
+    assert out["rc"] == 0 and out["atoms"] != ["()"], f"the default causes do not reach {marker}"

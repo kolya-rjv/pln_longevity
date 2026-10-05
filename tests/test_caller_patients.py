@@ -379,3 +379,104 @@ def test_the_published_z_convention_says_which_z_it_describes():
     assert "AGE- AND SEX-ADJUSTED" in convention
     # …and, since the server also PRODUCES z-scores, which of the two it means.
     assert "DERIVES" in convention and "NOT" in convention
+
+
+# ═══════════════ "nothing to work from" is said, and only when it is true ════════
+#
+# The shared layers (diagnosis, supplement plan, intervention ranking) read ONE thing of a
+# patient: a marker that is ELEVATED and has a curated Effect edge into it. A patient with
+# diabetes, hypertension, CKD, an albumin, a creatinine and a blood pressure — and none of
+# those — was told "Diagnosis, supplement ranking and intervention ranking still work";
+# the diagnosis returned (), every supplement tier was empty and the ranking was the
+# population's, byte for byte (docs/kb_quick_wins/REPORT.md #4).
+
+NOTHING_USABLE = {"age": 58, "sex": "Male", "markers": {"AgeAccelGrim": 2.0, "DNAmADM": 1.5, "CRP": 0.2}}
+
+
+def _notes(built, prefix):
+    return [w for w in built.warnings if w.startswith(prefix)]
+
+
+def test_the_markers_the_kb_has_edges_into_are_read_off_the_kb():
+    """A new bridge widens this with no edit — and this test then asks whether the default
+    cause list of diagnose-patient (patient_profile.metta) still reaches every one of them
+    (tests/test_patient_stack.py checks that)."""
+    from core.patient_builder import kb_effect_markers
+    assert kb_effect_markers() == frozenset(
+        {"CRP", "DNAmGDF15", "DNAmPACKYRS", "DNAmPAI1", "FastingGlucose", "HbA1c"})
+
+
+def test_a_patient_with_nothing_the_kb_can_use_is_told_the_shared_layers_have_nothing_to_work_from():
+    from core.patient_builder import NO_WITNESS_PREFIX
+    built = build_patient(NOTHING_USABLE)
+    assert built.witnesses == []
+    (note,) = _notes(built, NO_WITNESS_PREFIX)
+    assert "diagnosis returns ()" in note and "population ranking" in note and "not 'no cause'" in note
+    assert not any("still work" in w for w in built.warnings)       # the old promise is gone
+
+
+def test_an_elevated_marker_with_an_edge_keeps_the_promise_and_gets_no_such_note():
+    from core.patient_builder import NO_WITNESS_PREFIX, STILL_WORK
+    built = build_patient({"age": 58, "sex": "Male", "markers": {"HbA1c": 1.8, "AgeAccelGrim": 0.1}})
+    assert built.witnesses == ["HbA1c"] and not _notes(built, NO_WITNESS_PREFIX)
+    no_clock = build_patient({"age": 58, "sex": "Male", "markers": {"HbA1c": 1.8}})
+    (grim,) = _notes(no_clock, "No AgeAccelGrim measurement")
+    assert grim.endswith(STILL_WORK)
+    # with nothing to work from the clock note stops promising what is not so
+    (grim,) = _notes(build_patient({"age": 58, "sex": "Male", "markers": {"CRP": 0.2}}),
+                     "No AgeAccelGrim measurement")
+    assert "can still work" not in grim and "still work" not in grim
+
+
+@pytest.mark.parametrize("z, witnessed", [(1.0, False), (1.01, True), (-2.0, False), (0.0, False)])
+def test_only_an_elevated_value_is_a_witness_and_the_boundary_is_strict(z, witnessed):
+    built = build_patient({"age": 58, "sex": "Male", "markers": {"CRP": z}})
+    assert bool(built.witnesses) is witnessed
+    assert bool(_notes(built, "No elevated marker the knowledge base can use")) is not witnessed
+
+
+def test_the_form_warning_names_only_forms_that_name_this_patient():
+    from core.patient_context import patient_form_warnings
+    built = build_patient(NOTHING_USABLE)
+    pid = built.patient_id
+    both = patient_form_warnings(
+        f"(diagnose-patient &self {pid})\n!(rank-interventions-for-patient &self {pid} (Metformin) "
+        f"CoronaryHeartDisease)", built)
+    assert len(both) == 1
+    assert "the diagnosis returns ()" in both[0] and "the ranking is the population ranking" in both[0]
+    assert "recommend-supplements" not in both[0] and "every supplement tier" not in both[0]
+    assert "every supplement tier is empty" in patient_form_warnings(
+        f"(recommend-supplements-patient &self {pid})", built)[0]
+    assert "returns nothing" in patient_form_warnings(f"(supplement-for-patient &self {pid} Berberine)", built)[0]
+    # not for another patient, not for a form that reads the clock or LinAge2, not without a patient
+    assert patient_form_warnings("(diagnose-patient &self Patient001)", built) == []
+    assert patient_form_warnings(f"(predict-risk-patient &self {pid})", built) == []
+    assert patient_form_warnings(f"(linage-drivers-patient &self {pid})", built) == []
+    assert patient_form_warnings(f"(diagnose-patient &self {pid})", None) == []
+    # and not when the patient has something to work from
+    witnessed = build_patient({"age": 58, "sex": "Male", "markers": {"HbA1c": 1.8}})
+    assert patient_form_warnings(f"(diagnose-patient &self {witnessed.patient_id})", witnessed) == []
+
+
+def _translation(query):
+    from core.llm_translator import TranslationResult
+    return TranslationResult(metta_query=query, explanation="", intent="inference",
+                             requires_pln_inference=True, confidence_filter=0.0)
+
+
+def test_query_and_metta_run_attach_the_same_form_warning(monkeypatch):
+    from core.pln_runner import PLNRunResult
+    monkeypatch.setattr(api_module, "translate", lambda **kw: _translation("(diagnose-patient &self Caller_N)"))
+    monkeypatch.setattr(api_module, "run_query", Mock(return_value=PLNRunResult(status="empty", mode="runtime")))
+    monkeypatch.setattr(api_module, "log_turn", Mock())
+    nothing = {**NOTHING_USABLE, "id": "N"}
+    body = _request("POST", "/query", json={"message": "what drives my labs?", "patient": nothing}).json()
+    ours = [w for w in body["warnings"] if w.startswith("Caller_N has no elevated value")]
+    assert len(ours) == 1 and "the diagnosis returns ()" in ours[0]
+    run = _request("POST", "/metta/run", json={"metta_query": "(diagnose-patient &self Caller_N)",
+                                               "patient": nothing}).json()
+    assert [w for w in run["warnings"] if w.startswith("Caller_N has no elevated value")] == ours
+    # a patient with a witness gets neither
+    witnessed = {"id": "N", "age": 58, "sex": "Male", "markers": {"HbA1c": 1.8}}
+    body = _request("POST", "/query", json={"message": "q", "patient": witnessed}).json()
+    assert not [w for w in body["warnings"] if "has no elevated value" in w]

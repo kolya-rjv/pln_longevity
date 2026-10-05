@@ -35,6 +35,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Iterable, Optional
 
 # ── The vocabulary a patient may use ─────────────────────────────────────────
@@ -188,6 +189,54 @@ AGE_RANGE = (0.0, 130.0)
 MAX_MARKERS = 40
 
 
+#: `(Effect <from> <to> Pos|Neg` at the start of a line (a comment line starts with `;`).
+_EFFECT_INTO_RE = re.compile(r"^\(Effect\s+\S+\s+(\S+)\s+(?:Pos|Neg)\b", re.MULTILINE)
+
+
+@lru_cache(maxsize=1)
+def kb_effect_markers() -> frozenset[str]:
+    """The markers a patient can carry that the knowledge base has a curated Effect edge
+    INTO — the only ones a cause can be credited to (diagnose-patient), an intervention
+    can be said to act on (the personalised ranking) or a supplement can target. A value
+    outside this set (an albumin, a creatinine, a typed diagnosis), or a LOW one, changes
+    none of those forms. Read off the KB's own files, as core.patient_context reads the
+    thresholds, so a new bridge widens it with no edit here (today: CRP, DNAmGDF15,
+    DNAmPACKYRS, DNAmPAI1, FastingGlucose, HbA1c)."""
+    from config import ONTOLOGY_DIR, PLN_MAX_KB_FILE_BYTES   # lazily: nothing else here needs config
+    found: set[str] = set()
+    for path in sorted(ONTOLOGY_DIR.glob("*.metta")):
+        try:
+            if path.stat().st_size > PLN_MAX_KB_FILE_BYTES:
+                continue                                      # not loaded at run time
+            found.update(m for m in _EFFECT_INTO_RE.findall(path.read_text(encoding="utf-8"))
+                         if m in MARKERS)
+        except OSError:
+            continue
+    return frozenset(found)
+
+
+#: The sentence the no-GrimAge note carries only while it is true.
+STILL_WORK = ("Diagnosis, supplement ranking and intervention ranking can still work from the "
+              "elevated markers the knowledge base has edges for.")
+#: Starts the builder's note that the shared layers have nothing to work from; the tab
+#: rewords it by this prefix.
+NO_WITNESS_PREFIX = "No elevated marker the knowledge base can use:"
+
+
+def no_witness_note() -> str:
+    """Said when none of a patient's values is elevated AND has a curated edge: the
+    diagnosis, the supplement plan and the intervention ranking have nothing to read."""
+    return (
+        f"{NO_WITNESS_PREFIX} none of the values given is elevated and has a curated cause or "
+        f"effect (the knowledge base has them for {', '.join(sorted(kb_effect_markers()))}). For "
+        f"this patient the diagnosis returns (), every supplement tier is empty and the "
+        f"intervention ranking is the population ranking, the same as for an unknown patient. "
+        f"That is 'nothing to work from', not 'no cause'. A typed diagnosis, a lab with no edge "
+        f"(albumin, creatinine, blood pressure, RDW), a low value, and a glucose not marked "
+        f"fasting count for none of them."
+    )
+
+
 class PatientSpecError(ValueError):
     """A caller's patient could not be turned into atoms."""
 
@@ -235,6 +284,11 @@ class BuiltPatient:
 
     #: Set when the caller sent a LinAge2 response under `linage2`.
     linage2: Optional["BuiltLinAge2"] = None
+
+    #: The markers this patient has ELEVATED that the knowledge base has a curated edge
+    #: into (kb_effect_markers) — what the diagnosis, the supplement plan and the
+    #: intervention ranking can read. Empty: they have nothing to work from.
+    witnesses: list[str] = field(default_factory=list)
 
     #: The same patient WITHOUT its LinAge2 atoms — what the SHARED execution space
     #: gets. `atoms` (everything) is for the LinAge2 scoped space, the preview and
@@ -442,6 +496,7 @@ def build_patient(
     sd_to_years: float = 4.2,
     elevated_threshold: float = 1.0,
     linage_sd_to_years: Optional[float] = None,
+    effect_markers: Optional[Iterable[str]] = None,
 ) -> BuiltPatient:
     """Validate a caller's patient and render it as MeTTa atoms.
 
@@ -580,12 +635,16 @@ def build_patient(
             "but the per-lab decomposition and the counterfactuals need the whole "
             "/predict response under `linage2`."
         )
+    edge_markers = kb_effect_markers() if effect_markers is None else frozenset(effect_markers)
+    witnesses = sorted(m.name for m in resolved if m.status == "Elevated" and m.name in edge_markers)
     if not any(m.name == "AgeAccelGrim" for m in resolved):
         warnings.append(
             "No AgeAccelGrim measurement: the 10-year CHD risk model reads that "
-            "clock and will return nothing for this patient. Diagnosis, "
-            "supplement ranking and intervention ranking still work."
+            "clock and will return nothing for this patient."
+            + (f" {STILL_WORK}" if witnesses else "")
         )
+    if not witnesses:
+        warnings.append(no_witness_note())
     if age is None or sex is None:
         warnings.append(
             "Age and sex are both required for an absolute risk: they select the "
@@ -689,6 +748,7 @@ def build_patient(
         sex=sex,
         smoking=smoking,
         linage2=built_linage2,
+        witnesses=witnesses,
     )
 
 

@@ -37,7 +37,7 @@ from typing import Optional
 import gradio as gr
 
 from core.linage2_model import load_model
-from core.patient_builder import BuiltPatient, PatientSpecError
+from core.patient_builder import NO_WITNESS_PREFIX, STILL_WORK, BuiltPatient, PatientSpecError
 from core.patient_context import build_caller_patient
 from core.patient_extract import OpenAIExtractor, configured_model
 from core.patient_read import PatientRead, read_patient
@@ -292,16 +292,29 @@ _TAB_WORDING = (
      "to call a lab high."),
     ("Standardised server-side from a raw value:",
      None),     # rewritten below with its marker list
-    ("No AgeAccelGrim measurement:",
-     "No GrimAge acceleration given: the 10-year heart-disease risk model reads that clock "
-     "and returns nothing for you (add a line such as 'GrimAge acceleration +3 years' if you "
-     "have one). Diagnosis, supplement ranking and intervention ranking still work."),
+    ("No AgeAccelGrim measurement:", None),    # two variants, chosen below
+    (NO_WITNESS_PREFIX,
+     "Nothing you typed gives the knowledge base a witness: none of your values is elevated "
+     "and has a curated cause or effect (it has them for CRP, HbA1c, a fasting glucose and the "
+     "DNA-methylation markers). So the diagnosis will come back empty, the supplement plan "
+     "will have no tiers and the intervention ranking will be the same as for anyone. That is "
+     "\"nothing to work from\", not \"no cause\". Diagnoses you listed, labs such as albumin, "
+     "creatinine or blood pressure, low values and a glucose not marked fasting do not count "
+     "there — LinAge2 still uses them."),
 )
+
+_NO_GRIM_TAB = ("No GrimAge acceleration given: the 10-year heart-disease risk model reads that "
+                "clock and returns nothing for you (add a line such as 'GrimAge acceleration "
+                "+3 years' if you have one).")
 
 
 def _in_tab_words(note: str) -> str:
     for prefix, text in _TAB_WORDING:
         if note.startswith(prefix):
+            if prefix == "No AgeAccelGrim measurement:":
+                return _NO_GRIM_TAB + (" Diagnosis, supplement ranking and intervention ranking "
+                                       "can still work from your elevated labs the knowledge "
+                                       "base has edges for." if STILL_WORK in note else "")
             if text is not None:
                 return text
             markers = note[len(prefix):].split(".")[0].strip()
