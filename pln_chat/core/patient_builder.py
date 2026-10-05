@@ -221,6 +221,40 @@ def kb_effect_markers() -> frozenset[str]:
     return frozenset(found)
 
 
+#: `(Interaction <A> <B> "<note>"` at the start of a line.
+_INTERACTION_RE = re.compile(r"^\(Interaction\s+(\S+)\s+(\S+)", re.MULTILINE)
+MAX_MEDICATIONS = 10
+
+
+@lru_cache(maxsize=1)
+def kb_interaction_drugs() -> frozenset[str]:
+    """The KB symbols an `(Interaction A B …)` fact names (today Berberine, Metformin): the only
+    drugs a `(CurrentMedication <Patient> <Drug>)` can make a supplement flag fire on, and so the
+    allow-list for `medications`. Read off the KB's own files, like kb_effect_markers."""
+    from config import ONTOLOGY_DIR, PLN_MAX_KB_FILE_BYTES
+    found: set[str] = set()
+    for path in sorted(ONTOLOGY_DIR.glob("*.metta")):
+        try:
+            if path.stat().st_size > PLN_MAX_KB_FILE_BYTES:
+                continue
+            for a, b in _INTERACTION_RE.findall(path.read_text(encoding="utf-8")):
+                found.update((a, b))
+        except OSError:
+            continue
+    return frozenset(found)
+
+
+def medication_note(drugs: Iterable[str]) -> str:
+    """What a recorded medication does, and does not do (the KB does not model 'already taking')."""
+    return (
+        f"Current medication recorded: {', '.join(drugs)}. It is used only to flag a supplement that "
+        f"interacts with it (the knowledge base's one interaction fact: Berberine with Metformin), in "
+        f"the supplement plan and in the single-supplement answer. It changes no ranking and no "
+        f"LinAge2 number: the intervention ranking and the LinAge2 counterfactual still treat it as a "
+        f"candidate, not as something already taken."
+    )
+
+
 #: The sentence the no-GrimAge note carries only while it is true.
 STILL_WORK = ("Diagnosis, supplement ranking and intervention ranking can still work from the "
               "elevated markers the knowledge base has edges for.")
@@ -310,6 +344,11 @@ class BuiltPatient:
     #: Coronary heart disease / angina / heart attack the person reports (PREVALENT_CHD). A
     #: flag, not an atom: nothing in the KB reads it; it qualifies the 10-year CHD risk.
     prevalent_chd: list[str] = field(default_factory=list)
+
+    #: Drugs the person takes now that the KB has an Interaction fact for (kb_interaction_drugs).
+    #: `(CurrentMedication <id> <drug>)` goes to `shared_atoms` ONLY: the LinAge2 space has no
+    #: head-symbol room for a new head, and nothing there reads it.
+    medications: list[str] = field(default_factory=list)
 
     #: The same patient WITHOUT its LinAge2 atoms — what the SHARED execution space
     #: gets. `atoms` (everything) is for the LinAge2 scoped space, the preview and
@@ -584,6 +623,18 @@ def build_patient(
         )
     prevalent_chd = [c for c in PREVALENT_CHD if c in prevalent_chd]     # canonical order, once each
 
+    medications = payload.get("medications") or []
+    allowed_drugs = kb_interaction_drugs()
+    if (not isinstance(medications, (list, tuple)) or len(medications) > MAX_MEDICATIONS
+            or any(not isinstance(m, str) or m not in allowed_drugs for m in medications)):
+        raise PatientSpecError(
+            "invalid_medication",
+            f"`medications` must be a list (at most {MAX_MEDICATIONS}) drawn from the drugs the knowledge "
+            f"base holds an interaction fact for: {sorted(allowed_drugs)}.",
+            received=payload.get("medications"), supported=sorted(allowed_drugs),
+        )
+    medications = sorted(set(medications))
+
     raw_markers = payload.get("markers") or {}
     if not isinstance(raw_markers, dict):
         raise PatientSpecError("invalid_markers", "`markers` must be an object.")
@@ -683,6 +734,8 @@ def build_patient(
         warnings.append(no_witness_note())
     if prevalent_chd and any(m.name == "AgeAccelGrim" for m in resolved) and age is not None and sex is not None:
         warnings.append(prevalent_chd_note(prevalent_chd))
+    if medications:
+        warnings.append(medication_note(medications))
     if age is None or sex is None:
         warnings.append(
             "Age and sex are both required for an absolute risk: they select the "
@@ -773,6 +826,9 @@ def build_patient(
         lines.append(line)
         if marker.name not in LINAGE_YEARS_MARKERS:
             shared_lines.append(line)
+    # a medication goes to the SHARED space only (BuiltPatient.medications): not into `atoms`,
+    # which also feeds the LinAge2 space, where a new head symbol has no room
+    shared_lines.extend(f"(CurrentMedication {patient_id} {drug})" for drug in medications)
     if built_linage2 is not None:
         lines.append(built_linage2.atoms)
 
@@ -788,6 +844,7 @@ def build_patient(
         linage2=built_linage2,
         witnesses=witnesses,
         prevalent_chd=prevalent_chd,
+        medications=medications,
     )
 
 

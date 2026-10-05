@@ -37,6 +37,7 @@ from typing import Optional
 
 from core.linage2_model import compute_linage2, load_model
 from core.patient_builder import MARKERS, Z_LIMIT, PatientSpecError
+from core.patient_medications import read_medication
 
 # ═══════════════════════════ units ═════════════════════════════════════════════
 # Each LinAge2 lab input: its canonical (model) unit, and every unit accepted for
@@ -311,6 +312,11 @@ class ParsedPatient:
     height_cm: Optional[float] = None
     #: knowledge-base markers that are not LinAge2 inputs (a GrimAge acceleration)
     extra_markers: dict[str, dict] = field(default_factory=dict)
+    #: drugs the person takes now that the KB has an interaction fact for (core.patient_medications),
+    #: as KB symbols; those said NOT to be taken; and drug words the KB has nothing on (not used)
+    medications: list[str] = field(default_factory=list)
+    medications_stopped: list[str] = field(default_factory=list)
+    medications_unused: list[str] = field(default_factory=list)
     #: statements about someone else (or second-hand smoke), not used
     set_aside: list[str] = field(default_factory=list)
     #: set by kb_markers(): a witness value the KB's coarse reference cannot hold
@@ -397,6 +403,8 @@ class ParsedPatient:
         chd = [_ITEM_LABEL[i] for i in _CHD_ITEMS if self.questionnaire.get(i) == 1]
         if chd:
             payload["prevalent_chd"] = chd     # a flag for the 10-year CHD risk, not an atom
+        if self.medications:
+            payload["medications"] = list(self.medications)    # KB symbols; shared atoms only
         return payload, result
 
     def as_dict(self) -> dict:
@@ -408,6 +416,9 @@ class ParsedPatient:
             "questionnaire_notes": list(self.questionnaire_notes),
             "weight_kg": self.weight_kg, "height_cm": self.height_cm,
             "not_understood": list(self.not_understood),
+            "medications": list(self.medications),
+            "medications_stopped": list(self.medications_stopped),
+            "medications_unused": list(self.medications_unused),
             "set_aside": list(self.set_aside),
             "witness_notes": list(self.witness_notes),
             "problems": self.all_problems(),
@@ -986,6 +997,8 @@ def read_patient_text(text: str) -> ParsedPatient:
     #: the last smoking clause: its line, statement index, kind, and whether it set the status
     last_smoking: dict = {"line": -1, "idx": -1, "kind": None, "set_here": False, "stmt": "",
                           "origin": -1}
+    #: the last medication frame (a statement of its own kind): a bare drug right after it is a list item
+    last_med: dict = {"idx": -2, "line": -1, "kind": None}
     cur = Statement(-1, -1, 0, 0, "")           # the statement being read
 
     def set_once(attr: str, value, what: str, stmt: str) -> None:
@@ -1328,6 +1341,28 @@ def read_patient_text(text: str) -> ParsedPatient:
                 continue
             low = stmt = leftover               # e.g. "58 year old man with diabetes"
 
+        # ── a medication: a drug the knowledge base can act on (core.patient_medications) ──
+        med = read_medication(
+            low, last_med["kind"] if last_med["idx"] == idx - 1 and last_med["line"] == line_no else None,
+            _names_condition)
+        if med is not None:
+            last_med.update(idx=idx, line=line_no, kind=med.kind)
+            if med.symbols:
+                mine, other = ((p.medications, p.medications_stopped) if med.kind == "current"
+                               else (p.medications_stopped, p.medications))
+                for sym in med.symbols:
+                    cur.facts.setdefault("medications", {})[sym] = med.kind
+                    if sym in other:
+                        problem(f"'{stmt}' says you {'take' if med.kind == 'current' else 'do not take'} "
+                                f"{sym} but another line says the opposite; keep one",
+                                "contradiction", "medication")
+                    elif sym not in mine:
+                        mine.append(sym)
+                p.medications_unused.extend(w for w in med.others if w not in p.medications_unused)
+                if not med.head:
+                    continue
+                low = stmt = med.head            # "type 2 diabetes on metformin": the rest is read as before
+
         # ── questionnaire ────────────────────────────────────────────────────
         if _OTHERWISE.match(low):
             said_none = True                    # "asthma, but otherwise healthy"
@@ -1520,6 +1555,15 @@ def read_patient_text(text: str) -> ParsedPatient:
             "diagnoses: " + (", ".join(yes) if yes else "none")
             + (f"; not: {', '.join(no)}" if no else "")
             + " — every diagnosis not listed is answered No"))
+    if p.medications:
+        p.notes.append(f"medication: {', '.join(p.medications)} read as a current medication — used only "
+                       f"to flag supplement interactions; no ranking and no LinAge2 number changes")
+    not_taken = [m for m in p.medications_stopped if m not in p.medications]
+    if not_taken:
+        p.notes.append(f"not counted as a current medication (you said you do not take it): {', '.join(not_taken)}")
+    if p.medications_unused:
+        p.notes.append("medication the knowledge base has no interaction fact for (not used): "
+                       + ", ".join(p.medications_unused))
     def said(attr: str) -> tuple:
         return tuple(st.index for st in p.statements if attr in st.facts)
 

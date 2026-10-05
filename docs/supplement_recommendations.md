@@ -127,6 +127,11 @@ Four reads an LLM cannot reproduce from first principles:
 3. **Berberine appears only for the metabolic patient** — personalization (§3.2).
 4. **The interaction fires only against the patient's actual medication** — Patient002's
    metformin; Patient001 (no meds) gets an empty `Interactions` block.
+   A caller's own medication works the same way: "takes metformin" in the My Patient tab (or
+   `medications: ["Metformin"]` in a `patient`) becomes `(CurrentMedication <id> Metformin)` in the
+   shared atoms, the plan flags Berberine against it, and `(supplement-for-patient … Berberine)` returns the
+   `InteractionFlag` beside the `SuppRec` (a second equation: with no such drug it yields nothing and the
+   answer is what it was). It changes no tier and no ranking — "already taking" is not modelled.
 
 ## 5. Implementation notes (hyperon 0.2.10)
 

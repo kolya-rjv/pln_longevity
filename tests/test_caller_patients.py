@@ -569,3 +569,63 @@ def test_the_api_takes_prevalent_chd_and_the_response_says_so(monkeypatch):
     assert [w for w in run["warnings"] if w.startswith("Reported heart attack")]
     # an unknown key is still refused: the field is declared, not `extra="allow"`
     assert _request("POST", "/patients/preview", json={**WITH_GRIM, "prevalent_cvd": ["x"]}).status_code == 422
+
+
+# ═══════════════ a current medication: shared atoms only, from an allow-list ═════════
+#
+# `(CurrentMedication <id> <drug>)` is what the supplement forms read to flag an interaction. It
+# goes ONLY to the shared (patient-stack) space: the LinAge2 space has no head-symbol room for a new
+# head and nothing there reads it. The drug is checked against the drugs the KB holds an Interaction
+# fact for — never interpolated — and it changes no ranking and no LinAge2 number.
+
+WITH_METFORMIN = {**NO_GRIM, "markers": {"HbA1c": 1.8}, "medications": ["Metformin"]}
+
+
+def test_a_medication_is_a_shared_atom_never_a_linage2_or_preview_atom():
+    built = build_patient(WITH_METFORMIN)
+    line = f"(CurrentMedication {built.patient_id} Metformin)"
+    assert built.medications == ["Metformin"] and line in built.shared_atoms.splitlines()
+    assert line not in built.atoms                    # `atoms` feeds the LinAge2 space and the preview
+    assert built.atoms == build_patient({**WITH_METFORMIN, "medications": []}).atoms
+    (note,) = [w for w in built.warnings if w.startswith("Current medication recorded")]
+    assert "changes no ranking and no LinAge2 number" in note and "not as something already taken" in note
+    assert not [w for w in build_patient(NO_GRIM).warnings if w.startswith("Current medication")]
+
+
+@pytest.mark.parametrize("bad", [["Lisinopril"], ["metformin"], ["Metformin) (= (grimage-weight $m) 9.9) (X"],
+                                 "Metformin", [3], ["Metformin"] * 11, ["Rapamycin"]])
+def test_a_medication_is_checked_against_the_drugs_the_kb_has_an_interaction_for(bad):
+    with pytest.raises(PatientSpecError) as excinfo:
+        build_patient({**NO_GRIM, "medications": bad})
+    assert excinfo.value.code == "invalid_medication" and excinfo.value.extra["supported"] == ["Berberine", "Metformin"]
+
+
+def test_a_medication_listed_twice_is_one_atom():
+    built = build_patient({**NO_GRIM, "medications": ["Metformin", "Berberine", "Metformin"]})
+    assert built.medications == ["Berberine", "Metformin"]
+    assert sum("CurrentMedication" in ln for ln in built.shared_atoms.splitlines()) == 2
+
+
+def test_the_api_takes_medications_keeps_them_out_of_the_preview_atoms_and_into_the_shared_space(monkeypatch):
+    from core.pln_runner import PLNRunResult
+    body = _request("POST", "/patients/preview", json={**WITH_METFORMIN, "id": "M"}).json()
+    assert body["medications"] == ["Metformin"] and "CurrentMedication" not in body["atoms"]
+    assert any(w.startswith("Current medication recorded: Metformin") for w in body["warnings"])
+    assert _request("POST", "/patients/preview", json={**NO_GRIM, "medications": ["Lisinopril"]}).status_code == 422
+    seen = {}
+
+    def run(**kw):
+        seen["extra_atoms"] = kw["extra_atoms"]
+        return PLNRunResult(status="empty", mode="runtime")
+
+    monkeypatch.setattr(api_module, "run_query", run)
+    monkeypatch.setattr(api_module, "translate", lambda **kw: _translation("(recommend-supplements-patient &self Caller_M)"))
+    monkeypatch.setattr(api_module, "log_turn", Mock())
+    answer = _request("POST", "/query", json={"message": "what supplements?", "patient": {**WITH_METFORMIN, "id": "M"}}).json()
+    assert "(CurrentMedication Caller_M Metformin)" in seen["extra_atoms"]
+    assert answer["patient"]["medications"] == ["Metformin"]
+    # a question that reads no patient fact never gets the patient (and so never the medication)
+    seen.clear()
+    monkeypatch.setattr(api_module, "translate", lambda **kw: _translation("(infer &self Metformin CoronaryHeartDisease)"))
+    _request("POST", "/query", json={"message": "q", "patient": {**WITH_METFORMIN, "id": "M"}})
+    assert not seen.get("extra_atoms")

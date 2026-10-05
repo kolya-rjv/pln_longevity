@@ -247,6 +247,17 @@ def prevalent_chd_prompt_hint(patient: BuiltPatient) -> str:
             f"present it (the response carries the same note).\n")
 
 
+def medication_prompt_hint(patient: BuiltPatient) -> str:
+    """The medication is NOT in the atoms listed above (they also feed the LinAge2 space, where it
+    has no room); the supplement forms read it from the shared space, so the translator is told."""
+    if not patient.medications:
+        return ""
+    return (f"This patient currently takes {', '.join(patient.medications)} (recorded as "
+            f"(CurrentMedication {patient.patient_id} <drug>) in the space the supplement forms read; it "
+            f"is not in the atoms above). A supplement plan, or (supplement-for-patient &self "
+            f"{patient.patient_id} <Supplement>), flags an interaction with it.\n")
+
+
 def patient_prompt_section(patient: BuiltPatient) -> str:
     """Appended AFTER the static system prompt (so the static prefix stays cacheable).
 
@@ -266,5 +277,6 @@ def patient_prompt_section(patient: BuiltPatient) -> str:
         f"default candidate causes — never a hand-typed hallmark list (rule 17).\n"
         + no_grimage_prompt_hint(patient)
         + prevalent_chd_prompt_hint(patient)
+        + medication_prompt_hint(patient)
         + (linage2_prompt_hint(patient) if patient.has_linage2 else "")
     )

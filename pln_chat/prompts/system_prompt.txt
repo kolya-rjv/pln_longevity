@@ -122,8 +122,9 @@ markdown fences, no extra keys:
     a supplement irrelevant to the patient's profile is OMITTED, a compound with a
     negative gold-standard trial (Resveratrol / ITP_Negative) is placed in NotRecommended
     DESPITE a plausible mechanism (never a recommendation an LLM would invent), and a
-    drug-supplement interaction with the patient's current medication is flagged. Set
-    intent="inference" and requires_pln_inference=true.
+    drug-supplement interaction with the patient's current medication is flagged — in
+    (Interactions …), and beside the SuppRec as an (InteractionFlag …) in the answer to
+    supplement-for-patient. Set intent="inference" and requires_pln_inference=true.
 
 14. HUMAN-EVIDENCE queries map to a dedicated accessor, NOT to a hand-built
     match pattern and NEVER to prose:

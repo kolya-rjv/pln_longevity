@@ -357,3 +357,46 @@ def test_the_heart_risk_model_has_no_input_without_a_grimage_value():
     clock = _run("patient", RISK.format(P="Caller_Me"), TAB_SMOKER + "\n(MeasuredZ Caller_Me AgeAccelGrim 1.07143)")
     assert clock["status"] == "ok"
     assert re.match(r"\(RiskPrediction Caller_Me CoronaryHeartDisease \(point 0\.108", clock["atoms"][0])
+
+
+# ═══════════════ a current medication reaches the supplement forms and nothing else ══
+
+MED_LINE = "\n(CurrentMedication Caller_Me Metformin)"
+FLAG = '(InteractionFlag Berberine Metformin "Shared AMPK activation — additive glucose lowering; monitor and consult MD")'
+
+
+@pytest.mark.slow
+def test_metformin_makes_the_supplement_plan_and_the_single_supplement_answer_flag_berberine():
+    plan = _run("patient", SUPPLEMENTS.format(P="Caller_Me"), TAB_SMOKER + MED_LINE)["atoms"][0]
+    assert f"(Interactions ({FLAG}))" in plan
+    plain = _run("patient", SUPPLEMENTS.format(P="Caller_Me"), TAB_SMOKER)["atoms"][0]
+    assert plain.endswith("(Interactions ()))")
+    assert plan.replace(f"(Interactions ({FLAG}))", "(Interactions ())") == plain      # nothing else moved
+    one = _run("patient", "!(supplement-for-patient &self Caller_Me Berberine)", TAB_SMOKER + MED_LINE)["atoms"]
+    bare = _run("patient", "!(supplement-for-patient &self Caller_Me Berberine)", TAB_SMOKER)["atoms"]
+    assert len(bare) == 1 and one == bare + [FLAG]             # the record is unchanged, the flag comes beside it
+    for supp in ("Omega3", "Resveratrol"):                     # irrelevant to this patient: still omitted
+        assert _run("patient", f"!(supplement-for-patient &self Caller_Me {supp})", TAB_SMOKER + MED_LINE)["atoms"] == []
+
+
+@pytest.mark.slow
+def test_a_medication_changes_no_ranking_and_a_drug_with_no_interaction_is_inert():
+    rank = f"!(rank-interventions-for-patient &self Caller_Me {POOL} CoronaryHeartDisease)"
+    assert _run("patient", rank, TAB_SMOKER + MED_LINE)["atoms"] == _run("patient", rank, TAB_SMOKER)["atoms"]
+    inert = _run("patient", SUPPLEMENTS.format(P="Caller_Me"), TAB_SMOKER + "\n(CurrentMedication Caller_Me Lisinopril)")["atoms"]
+    assert inert == _run("patient", SUPPLEMENTS.format(P="Caller_Me"), TAB_SMOKER)["atoms"]
+
+
+@pytest.mark.slow
+def test_the_medication_atom_costs_the_patient_stack_no_head_symbol_margin():
+    pad = "\n".join(f'(ProbeHead{i} ProbeSym{i} "probe {i}")' for i in range(32))
+    for form in (SUPPLEMENTS.format(P="Caller_Me"), "!(supplement-for-patient &self Caller_Me Berberine)"):
+        out = _run("patient", form, TAB_SMOKER + MED_LINE + "\n" + pad)
+        assert out["rc"] == 0 and FLAG in " ".join(out["atoms"]), "the flag is lost with 32 extra head symbols"
+
+
+@pytest.mark.slow
+def test_the_built_in_patient_with_a_medication_now_carries_the_flag_in_the_single_supplement_form():
+    one = _run("patient", "!(supplement-for-patient &self Patient002 Berberine)")["atoms"]
+    assert len(one) == 2 and one[0].startswith("(SuppRec Berberine") and one[1] == FLAG
+    assert len(_run("patient", "!(supplement-for-patient &self Patient001 Resveratrol)")["atoms"]) == 1

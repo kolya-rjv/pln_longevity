@@ -1110,6 +1110,13 @@ class PatientIn(BaseModel):
                     "estimates a FIRST coronary event, so for someone who reports one the "
                     "answer carries a note that its number does not apply to them.",
     )
+    medications: list[str] = Field(
+        default_factory=list, max_length=10,
+        description="Drugs the person takes NOW that the knowledge base holds an interaction fact "
+                    "for (today ['Metformin', 'Berberine']). Becomes `(CurrentMedication <id> <drug>)` "
+                    "in the shared space only; a supplement plan, or supplement-for-patient, flags a "
+                    "supplement that interacts with it. Changes no ranking and no LinAge2 number.",
+    )
     markers: dict[str, object] = Field(
         default_factory=dict,
         description="Biomarker -> a z-score (a bare number), or an object with "
@@ -1436,6 +1443,11 @@ class PatientPreviewResponse(BaseModel):
     prevalent_chd: list[str] = Field(
         default_factory=list,
         description="The CHD / angina / heart attack the patient reports (PatientIn.prevalent_chd).",
+    )
+    medications: list[str] = Field(
+        default_factory=list,
+        description="The current medications recorded (PatientIn.medications). NOT in `atoms`: the "
+                    "`(CurrentMedication …)` fact goes only to the shared space.",
     )
     has_linage2: bool = Field(
         default=False,
@@ -2969,6 +2981,7 @@ def patients_preview(patient: PatientIn) -> PatientPreviewResponse:
         sex=built.sex,
         smoking=built.smoking,
         prevalent_chd=built.prevalent_chd,
+        medications=built.medications,
         has_linage2=built.has_linage2,
         linage2=built.linage2.as_dict() if built.linage2 is not None else None,
     )
@@ -3519,6 +3532,7 @@ def query(req: QueryRequest) -> QueryResponse:
                 can_predict_risk=patient.can_predict_risk,
                 age=patient.age, sex=patient.sex, smoking=patient.smoking,
                 prevalent_chd=patient.prevalent_chd,
+                medications=patient.medications,
             )
             if patient is not None else None
         ),

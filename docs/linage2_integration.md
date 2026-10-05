@@ -418,6 +418,19 @@ the outcome it must get):
   contradiction to fix (except "no diabetes" with "prediabetes", which is borderline), and
   an unread line that names or suggests a condition blocks the build — it would otherwise
   be answered No. "Takes lisinopril" or "no alcohol" do not.
+- *Medications.* The knowledge base has one medication fact that matters to a patient: a supplement
+  plan flags a supplement that interacts with a drug the person takes (`(Interaction Berberine
+  Metformin …)`). So the reader (`core/patient_medications.py`) reads a drug only from a small table of
+  identities for drugs the KB holds an Interaction fact for (metformin, its salts, formulations and
+  brands), and only from a statement about taking it — "takes metformin", "on Glucophage 500 mg twice
+  daily", "medications: metformin", "type 2 diabetes on metformin", "HbA1c 6.1 % on metformin" — never
+  from a mention ("before metformin", "allergic to metformin", "thinking of starting it", "was on it in
+  2019"). "Not on metformin", "stopped metformin", "never took it" are read as not taking it, and
+  saying both is a contradiction to fix. Any other drug is left unread, as before. A recorded
+  medication becomes `(CurrentMedication <id> <drug>)` in the **shared** space only (the LinAge2 space
+  has no head-symbol room for a new head and nothing there reads it), appears in the supplement plan's
+  `Interactions` and beside the record in `supplement-for-patient`, and changes no ranking and no
+  LinAge2 number: "already taking" is not modelled.
 - *Units.* Weight, height, cotinine and GrimAge need an explicit unit or form (a bare
   "GrimAge 46" is a clock age, not an acceleration); an abnormal value typed in the usual
   unit is never re-read as a normal value in another one (hemoglobin 9.5 asks); urea and

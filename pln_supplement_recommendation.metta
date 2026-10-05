@@ -231,6 +231,13 @@
 (= (supplement-for-patient $space $patient $supp)
    (supplement-rec $space $patient $supp))
 
+;; ...and the interaction flag beside it, when the patient takes a drug the KB has an Interaction
+;; fact for. A SECOND equation, so the record above is unchanged: a patient with no such drug gets
+;; exactly what they got (this equation then yields nothing); one who has it gets the flag too.
+(= (supplement-for-patient $space $patient $supp)
+   (let $r (supplement-rec $space $patient $supp)
+      (interaction-flag $space $patient (rec-supp $r))))
+
 ;; ================================================================
 ;; 9. Smoke-test queries (intended values; live floats carry trailing noise —
 ;;    tests/test_supplement_recommendation.py compares with tolerance)

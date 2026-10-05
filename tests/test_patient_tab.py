@@ -548,3 +548,44 @@ def test_the_tab_the_api_and_the_chat_carry_reported_chd_to_the_risk_answer(monk
     no_clock = _build(SMOKER + "\ndiagnoses: hypertension, heart attack")["state"]
     _, seen, _ = _chat_with(monkeypatch, "(predict-risk-patient &self Caller_Me)", no_clock)
     assert "This patient reports" not in seen["prompt"]
+
+
+# ═══════════════ "takes metformin": read, shown, carried to the supplement forms ══════
+
+MET_TEXT = SMOKER + "\nmedications: metformin"
+
+
+def test_the_tab_the_api_and_the_chat_carry_a_medication_to_the_supplement_forms_only(monkeypatch):
+    import asyncio
+    import httpx
+    import api as api_module
+    import core.executor as executor
+    monkeypatch.setattr(executor, "PLN_WORKER_POOL_SIZE", 0)
+
+    reading = patient_tab.on_read(MET_TEXT)
+    assert "medication: Metformin read as a current medication" in reading and "Not understood" not in reading
+    out = _build(MET_TEXT)
+    state = out["state"]
+    assert state["medications"] == ["Metformin"]
+    assert "Current medication recorded: Metformin" in out["summary"]                      # the build notes
+    assert "CurrentMedication" not in out["atoms"]["value"]                               # not an atom of `atoms`
+    assert _build(SMOKER + "\nstopped metformin")["state"].get("medications") is None
+
+    async def post(path, body):
+        transport = httpx.ASGITransport(app=api_module.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t", timeout=300) as c:
+            return await c.post(path, json=body)
+
+    r = asyncio.run(post("/patients/from-text", {"text": MET_TEXT}))                      # no 500: PatientIn has it
+    assert r.status_code == 200 and r.json()["preview"]["medications"] == ["Metformin"] and r.json()["patient"] == state
+
+    _, seen, _ = _chat_with(monkeypatch, "(recommend-supplements-patient &self Caller_Me)", state)
+    assert "This patient currently takes Metformin" in seen["prompt"]
+    assert "(CurrentMedication Caller_Me Metformin)" in seen["calls"][0][1]["extra_atoms"]
+    _, seen, _ = _chat_with(monkeypatch, "(linage-hazard-patient &self Caller_Me)\n(recommend-supplements-patient &self Caller_Me)", state)
+    (task, kwargs), = seen["calls"]
+    lin, gen = kwargs["parts"]
+    assert "CurrentMedication" not in lin["extra_atoms"] and "CurrentMedication" in gen["extra_atoms"]
+    plain = _build(SMOKER)["state"]
+    _, seen, _ = _chat_with(monkeypatch, "(recommend-supplements-patient &self Caller_Me)", plain)
+    assert "currently takes" not in seen["prompt"] and "CurrentMedication" not in seen["calls"][0][1]["extra_atoms"]
