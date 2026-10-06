@@ -9,7 +9,10 @@ space "past a few hundred rows".
 
 That attribution is wrong, and it matters, because it points at the wrong fix.
 The axis is the number of DISTINCT HEAD SYMBOLS in a space, not the number of
-atoms, rows or facts in it. Trimming rows buys nothing; adding a handful of new
+atoms, rows or facts in it. (Precisely: distinct key atoms — every distinct symbol,
+variable, number and string — past about 1,024 decode wrongly in hyperon 0.2.10's
+trie, upstream issues #1076/#1095; a new head symbol is one more key atom. See
+core.pln_runner, "Generic stack", and tests/test_generic_stack.py.) Trimming rows buys nothing; adding a handful of new
 predicates costs everything. On that deployment the way it happened was a
 generated ETL file in the repository root, because execution loaded every root
 .metta into one space.

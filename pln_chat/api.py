@@ -128,8 +128,10 @@ from core.pln_runner import (
     PLNRunResult,
     linage2_patient_kb,
     merge_run_results,
+    generic_stack,
     human_evidence_stack,
     is_human_evidence_program,
+    needs_patient_layers,
     patient_stack,
     run_cellage_effects,
     run_query,
@@ -3185,13 +3187,17 @@ def _offloaded_run(
 
 
 def _generic_kb(metta_query: str) -> list[Path]:
-    """The shared runtime stack — or, for a program that names a patient or reads
-    patient facts, the patient stack (core.pln_runner.patient_stack): the full space
-    aborts on the patient forms at its head-symbol edge, built-in patients included."""
+    """Where a program that is not a LinAge2 or DrugAge form runs. Never the full shared
+    space: it holds more distinct key atoms than hyperon 0.2.10 can read back
+    (core.pln_runner, "Generic stack"). A program made only of human-evidence forms runs
+    in their stack; one that names a patient, reads patient facts or uses a patient
+    layer's form in the patient stack; every other program in the generic stack."""
     runtime = _runtime_kb_paths()
     if is_human_evidence_program(metta_query):
-        return human_evidence_stack(runtime)          # the full space aborts on (human-evidence &self X)
-    return patient_stack(runtime) if reads_patients(metta_query) else runtime
+        return human_evidence_stack(runtime)
+    if reads_patients(metta_query) or needs_patient_layers(metta_query, runtime):
+        return patient_stack(runtime)
+    return generic_stack(runtime)
 
 
 def _join_atoms(*parts: Optional[str]) -> Optional[str]:

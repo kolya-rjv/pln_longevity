@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 import time
+from functools import lru_cache
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -151,6 +152,72 @@ def patient_stack(runtime_paths: list[Path]) -> list[Path]:
     return [p for p in runtime_paths if p.name not in PATIENT_STACK_EXCLUDED]
 
 
+# ── Generic stack ─────────────────────────────────────────────────────────────
+#
+# Where every program that reads no patient runs: the shared runtime stack minus the four patient
+# layers.
+#
+# What actually aborts is a bug in hyperon 0.2.10, the latest release (upstream issues #1076 and
+# #1095; the one-line fix, PR #1081, is not released). `TrieKey::value()` decodes a stored key as
+# `raw & TK_VALUE_MASK - TK_MAX_EXPRESSION_SIZE`, which Rust reads as `raw & (TK_VALUE_MASK - 1024)`.
+# For the first 1,024 distinct KEY ATOMS a space stores — every distinct symbol, variable, number and
+# string in it, not rows — the two errors cancel; from about the 1,025th on, a key decodes to a storage
+# id that does not exist. Inserts and exact lookups never decode, so such a space loads and answers
+# (TargetsHallmark Metformin $h). Whatever READS BACK a late-stored atom — a match that binds it, a
+# result template the interpreter evaluates ((pair $i $h) looks up (= (pair …) $r)), get-atoms —
+# calls get_atom_unchecked on the missing id and aborts the process (trie.rs:179). That is the
+# "head-symbol edge" the stacks above were measured against: a new predicate is a new key atom, and so
+# is one new float.
+#
+# The full shared stack holds about 1,064 distinct key atoms, so a program aborted whenever its answer
+# read back one stored late: (match &self (TargetsHallmark $i $h) (pair $i $h)) — the very template
+# the translator is taught (system prompt rule 10) — (match &self (SupportedByPublication $i $p) $i),
+# (match &self (PartOf $c GrimAge) (pair $c …)). Without the patient layers it holds about 804, answers
+# all of those, and survives 77 more rows of three new key atoms each (tests/test_generic_stack.py keeps
+# 48 of them). A program that reads no patient needs none of those layers: they define only the patient
+# forms and their helpers, and no other file of the stack uses one of their definitions (the test checks
+# that too). A program that names one of their definitions runs in the patient stack, which has them
+# (needs_patient_layers).
+GENERIC_STACK_EXCLUDED: tuple[str, ...] = (
+    "patient_profile.metta",
+    "pln_counterfactual.metta",
+    "pln_risk_prediction.metta",
+    "pln_supplement_recommendation.metta",
+)
+#: what a line of a .metta file defines: the function of (= (name …) …), or the head of a fact
+_DEFINED_HEAD_RE = re.compile(r"^\((?:=\s+\()?([^\s()]+)", re.M)
+_PROGRAM_TOKEN_RE = re.compile(r'[^\s()"]+')
+_STRING_RE = re.compile(r'"(?:[^"\\]|\\.)*"')
+
+
+def generic_stack(runtime_paths: list[Path]) -> list[Path]:
+    """The runtime stack, in its order, minus GENERIC_STACK_EXCLUDED."""
+    return [p for p in runtime_paths if p.name not in GENERIC_STACK_EXCLUDED]
+
+
+def defined_heads(path: Path) -> set[str]:
+    """The functions and fact heads a .metta file defines (comments aside)."""
+    text = "\n".join(line.split(";")[0] for line in path.read_text(encoding="utf-8").splitlines())
+    return {h for h in _DEFINED_HEAD_RE.findall(text) if h not in ("=", ":")}
+
+
+@lru_cache(maxsize=8)
+def patient_layer_symbols(runtime_paths: tuple[Path, ...]) -> frozenset[str]:
+    """What only the patient layers define: a function or fact head that no other file of the
+    runtime stack defines. Read from the files, so a new patient form is covered without a list."""
+    layers = [p for p in runtime_paths if p.name in GENERIC_STACK_EXCLUDED]
+    rest = [p for p in runtime_paths if p.name not in GENERIC_STACK_EXCLUDED]
+    elsewhere = set().union(*(defined_heads(p) for p in rest)) if rest else set()
+    return frozenset(set().union(*(defined_heads(p) for p in layers)) - elsewhere) if layers else frozenset()
+
+
+def needs_patient_layers(program: str, runtime_paths: list[Path]) -> bool:
+    """Does `program` use a form only the patient layers define? It then runs in the patient stack
+    (even without naming a patient), the only stack that holds them."""
+    tokens = set(_PROGRAM_TOKEN_RE.findall(_STRING_RE.sub(" ", program or "")))     # a word in a string is no form
+    return bool(tokens & patient_layer_symbols(tuple(runtime_paths)))
+
+
 # ── Human-evidence stack ──────────────────────────────────────────────────────
 #
 # `(human-evidence &self Metformin)` aborts hyperon 0.2.10 in the FULL shared space (the same
@@ -159,8 +226,8 @@ def patient_stack(runtime_paths: list[Path]) -> list[Path]:
 # (500 pln_worker_crashed). The layer needs only the types, the logical predicates and the evidence
 # tiers, and answers all its forms in these four files — including the cross-reference to
 # supplement_evidence for Omega3 (a text pointer, not a lookup). A program made ONLY of these forms runs
-# there (api._generic_kb, app._generic_kb); a program that mixes them with other layers' forms still runs
-# in the full space and still aborts on the human-evidence part (docs/kb_quick_wins/REPORT.md section 3).
+# there (api._generic_kb, app._generic_kb); one that mixes them with other layers' forms runs in the
+# generic stack below, which answers them too (it used to run in the full space and abort there).
 HUMAN_EVIDENCE_FILES: tuple[str, ...] = (
     "system_types.metta", "logical_predicates.metta", "epistemic_calibration.metta", "human_evidence.metta",
 )

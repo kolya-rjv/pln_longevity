@@ -68,8 +68,10 @@ from core.pln_runner import (
     PLNRunResult,
     linage2_patient_kb,
     merge_run_results,
+    generic_stack,
     human_evidence_stack,
     is_human_evidence_program,
+    needs_patient_layers,
     patient_stack,
     run_query,
     run_query_parts,
@@ -240,11 +242,13 @@ def _linage2_context() -> tuple:
 
 
 def _generic_kb(metta_query: str) -> list[Path]:
-    """As api._generic_kb: a program that names a patient or reads patient facts
-    runs in the patient stack."""
+    """As api._generic_kb: the human-evidence stack, the patient stack, or the generic
+    stack — never the full shared space (core.pln_runner, "Generic stack")."""
     if is_human_evidence_program(metta_query):
-        return human_evidence_stack(_ALL_KB_PATHS)    # the full space aborts on (human-evidence &self X)
-    return patient_stack(_ALL_KB_PATHS) if reads_patients(metta_query) else _ALL_KB_PATHS
+        return human_evidence_stack(_ALL_KB_PATHS)
+    if reads_patients(metta_query) or needs_patient_layers(metta_query, _ALL_KB_PATHS):
+        return patient_stack(_ALL_KB_PATHS)
+    return generic_stack(_ALL_KB_PATHS)
 
 
 def _build_context(selected_files: list[str]) -> tuple[OntologyRegistry, dict[str, str]]:

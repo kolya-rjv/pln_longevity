@@ -159,15 +159,17 @@ def test_the_patient_stack_keeps_a_head_symbol_margin():
 # ═══════════════════════════ it is where they run ═════════════════════════════
 
 def test_api_routes_a_patient_program_to_the_patient_stack(monkeypatch):
+    from core.pln_runner import generic_stack
     runtime = api_module._runtime_kb_paths()
     assert api_module._generic_kb("(predict-risk-patient &self Patient001)") == patient_stack(runtime)
-    assert api_module._generic_kb("(match &self (UsesSpecies $e Mus_musculus) $e)") == runtime
+    assert api_module._generic_kb("(match &self (UsesSpecies $e Mus_musculus) $e)") == generic_stack(runtime)
 
 
 def test_the_chat_routes_the_same_way():
     import app as app_module
+    from core.pln_runner import generic_stack
     assert app_module._generic_kb("(diagnose-patient &self Caller_Me (A))") == patient_stack(app_module._ALL_KB_PATHS)
-    assert app_module._generic_kb("(match &self (HasSex $e Hermaphrodite) $e)") == app_module._ALL_KB_PATHS
+    assert app_module._generic_kb("(match &self (HasSex $e Hermaphrodite) $e)") == generic_stack(app_module._ALL_KB_PATHS)
 
 
 # ═══════════════════════════ a loaded patient never reaches the full space ════
@@ -197,8 +199,10 @@ def test_listing_patient_facts_with_a_session_patient_loaded_does_not_abort():
     assert api_module._generic_kb(q) == patient_stack(api_module._runtime_kb_paths())
     routed = _run("patient", q, patient_atoms_for(q, caller) or "")
     assert routed["rc"] == 0 and any("Caller_Me" in a for a in routed["atoms"])
+    from core.pln_runner import generic_stack
     generic = "!(infer &self Metformin CoronaryHeartDisease)"
-    assert patient_atoms_for(generic, caller) is None and api_module._generic_kb(generic) == api_module._runtime_kb_paths()
+    assert patient_atoms_for(generic, caller) is None
+    assert api_module._generic_kb(generic) == generic_stack(api_module._runtime_kb_paths())
 
 
 

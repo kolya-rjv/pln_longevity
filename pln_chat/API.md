@@ -399,8 +399,12 @@ abort the interpreter depending on details as small as one float — built-in
 patients included (`rank-interventions-for-patient` for Patient001). In the
 patient stack they answer, with at least 64 head symbols of margin, and wherever
 the full stack answers at all the answer is byte-identical
-(`tests/test_patient_stack.py`). A program that names no patient runs in the full
-stack as before.
+(`tests/test_patient_stack.py`). A program that names no patient runs in the
+*generic stack*: the shared runtime stack minus the four patient layers
+(`patient_profile`, `pln_counterfactual`, `pln_risk_prediction`,
+`pln_supplement_recommendation`), which no such program needs; one that uses a
+patient layer's form without naming a patient still runs in the patient stack
+(`core.pln_runner.needs_patient_layers`). Nothing runs in the full shared space.
 
 **A z you send and a z we derive are not the same thing, and the atom cannot
 say which is which.** `Reference.to_z` standardises against a single POOLED
@@ -1011,8 +1015,17 @@ under `excluded_from_runtime`. It's still queryable in stub mode (no
 
 There is a second, sharper limit on the same space, and it is not about file
 size — nor, as this document said until the 2026-09-28 re-test, about how many
-expressions or rows the KB holds. **It is the number of DISTINCT HEAD SYMBOLS
-in the space** — distinct predicates. Measured on this build with
+expressions or rows the KB holds. **It is the number of distinct key atoms in
+the space** — every distinct symbol, variable, number and string, so in practice
+distinct predicates and values. hyperon 0.2.10 (the latest release) decodes its
+trie keys wrongly past about 1,024 of them (upstream issues #1076 and #1095; the
+one-line fix, PR #1081, is unreleased): such a space loads and answers exact
+lookups, and aborts when a query reads back an atom stored past that point — a
+match that binds it, or a result template the interpreter evaluates, such as
+`(pair $i $h)`. The full shared stack holds about 1,064, which is why
+`(match &self (TargetsHallmark $i $h) (pair $i $h))` aborted it; the generic
+stack holds about 804 and keeps a margin of 77 rows of three new key atoms
+(`tests/test_generic_stack.py`). Measured earlier in units of head symbols, with
 `predict-risk-patient` for Patient001:
 
 | Added to the space the query runs in | Result |
@@ -1034,12 +1047,11 @@ Python error: Aborted" and no failing test to point at.
 **Why this matters more than the atom count.** Trimming rows buys nothing:
 reshaping the human-evidence records to one atom per study rather than one per
 field helped because it removed *predicates*, not because it removed
-expressions. The full shared stack has no margin left for the patient forms,
-which is why a program that names a patient runs in the patient stack (see
-"Where a patient question runs" above), a program made only of human-evidence
-forms in its own four files, and the LinAge2 forms in theirs
-(`core.pln_runner`). A program that mixes a human-evidence form with other
-layers' forms still runs in the full stack and can abort there.
+expressions. The full shared stack has no margin at all, which is why no query
+runs in it: a program that names a patient runs in the patient stack, every other
+program in the generic stack (see "Where a patient question runs" above), a
+program made only of human-evidence forms in its own four files, and the LinAge2
+and DrugAge forms in theirs (`core.pln_runner`).
 
 **Why a generated file in the root no longer crashes it.** Execution loads only
 the curated stack (`_INFERENCE_STACK`), never every `.metta` in the root. The

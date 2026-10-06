@@ -83,18 +83,18 @@ class PLNWorkerCrashed(Exception):
     def __init__(self, detail: str = "") -> None:
         super().__init__(
             "The PLN worker process terminated while running this query. hyperon "
-            "0.2.10 aborts the interpreter (a non-unwinding Rust panic) once the "
-            "loaded space holds too many DISTINCT HEAD SYMBOLS -- distinct "
-            "predicates, NOT rows. The full shared stack has no margin left for "
-            "the patient forms, so a question that names a patient, a "
-            "human-evidence-only program and the LinAge2 forms each run in a "
-            "smaller scoped stack; a program that mixes a human-evidence form "
-            "with other layers' forms still runs in the shared stack and can "
-            "abort there, so ask those separately. If every inference query "
-            "fails, a KB change has added predicates to a stack: "
-            "tests/test_kb_head_symbol_budget.py and tests/test_patient_stack.py "
-            "measure the margin. The worker has been replaced and the service is "
-            "still up. "
+            "0.2.10 aborts the interpreter (a non-unwinding Rust panic, "
+            "trie.rs:179) when a query reads back an atom from a space that "
+            "stores more than about 1,024 DISTINCT KEY ATOMS -- distinct symbols, "
+            "variables, numbers and strings, NOT rows (upstream issues #1076 and "
+            "#1095). No query runs in the full shared space for that reason: a "
+            "program that reads no patient runs in the generic stack, one that "
+            "names a patient in the patient stack, and the human-evidence, "
+            "LinAge2 and DrugAge forms in their own. If queries start failing, a "
+            "KB change has pushed a stack past the edge: "
+            "tests/test_generic_stack.py, tests/test_patient_stack.py and "
+            "tests/test_kb_head_symbol_budget.py measure the margins. The worker "
+            "has been replaced and the service is still up. "
             + detail
         )
 

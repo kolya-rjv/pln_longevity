@@ -48,8 +48,9 @@ def test_both_surfaces_route_it_to_the_same_files():
     assert api_module._generic_kb(q) == human_evidence_stack(runtime)
     assert {p.name for p in api_module._generic_kb(q)} == set(HUMAN_EVIDENCE_FILES)
     assert app_module._generic_kb(q) == human_evidence_stack(app_module._ALL_KB_PATHS)
-    # everything else routes as before
-    assert api_module._generic_kb("(infer &self Metformin CoronaryHeartDisease)") == runtime
+    # everything else: the generic stack, or the patient stack for a patient's form
+    from core.pln_runner import generic_stack
+    assert api_module._generic_kb("(infer &self Metformin CoronaryHeartDisease)") == generic_stack(runtime)
     assert api_module._generic_kb("(predict-risk-patient &self Patient001)") == patient_stack(runtime)
 
 
