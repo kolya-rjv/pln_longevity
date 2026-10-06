@@ -39,10 +39,12 @@ from core.linage2_router import (  # noqa: E402
     hazard_to_dict,
     parse_sexpr,
 )
-from core.patient_text import EXAMPLES, read_patient_text  # noqa: E402
+from core.patient_extract import Extraction  # noqa: E402
+from core.patient_read import read_patient  # noqa: E402
+from core.patient_text import EXAMPLES, read_lines  # noqa: E402
 
 # ═══════════════════════════ the patients ══════════════════════════════════════
-# Built exactly as the tab builds them: read_patient_text -> to_patient("Me").
+# Built exactly as the tab's examples are: read_lines -> to_patient("Me").
 
 SMOKER = EXAMPLES["58-year-old smoker"]
 PATIENT_TEXT = {
@@ -78,7 +80,7 @@ PATIENT_LABEL = {
 
 
 def payload(pid: str) -> dict:
-    return read_patient_text(PATIENT_TEXT[pid]).to_patient("Me")[0]
+    return read_lines(PATIENT_TEXT[pid]).to_patient("Me")[0]
 
 
 # ═══════════════════════════ reading answers ═══════════════════════════════════
@@ -143,7 +145,23 @@ class Entry:
 
 
 def _read(text: str):
-    return read_patient_text(text)
+    return read_lines(text)
+
+
+class _Recorded:
+    """A model reading recorded once and replayed: the battery never calls the model, but these rows
+    run the model route's checks (core.patient_read.verify) and rules (core.patient_text.assemble)."""
+    model = "recorded"
+
+    def __init__(self, *items):
+        self.items = list(items)
+
+    def __call__(self, text):
+        return Extraction(list(self.items), self.model)
+
+
+def _model_read(text: str, *items):
+    return read_patient(text, _Recorded(*items)).parsed
 
 
 def _reading(text: str):
@@ -225,13 +243,22 @@ def t_no_age():
 
 
 def t_later_years():
-    p = _read("58 year old male\nquit smoking 20 years ago")
+    p = _model_read("58 year old male\nquit smoking 20 years ago",
+                    {"quote": "58 year old male", "kind": "age", "number": "58"},
+                    {"quote": "58 year old male", "kind": "sex", "sex": "male"},
+                    {"quote": "quit smoking 20 years ago", "kind": "smoking", "status": "former",
+                     "occasional": False, "other_nicotine": "none"})
     return ((p.age, p.smoking) == (58, "FormerSmoker") and not p.not_understood,
             f"age {p.age:g}, {p.smoking}, nothing left over")
 
 
 def t_someone_else():
-    p = _read("45 year old female, never smoked\nmy husband smokes")
+    p = _model_read("45 year old female, never smoked\nmy husband smokes",
+                    {"quote": "45 year old female", "kind": "age", "number": "45"},
+                    {"quote": "45 year old female", "kind": "sex", "sex": "female"},
+                    {"quote": "never smoked", "kind": "smoking", "status": "never", "occasional": False,
+                     "other_nicotine": "none"},
+                    {"quote": "my husband smokes", "kind": "someone_else"})
     return ((p.sex, p.smoking) == ("Female", "NeverSmoker") and p.set_aside == ["my husband smokes"],
             f"{p.sex}, {p.smoking}; set aside: {p.set_aside}")
 
@@ -621,9 +648,9 @@ ENTRIES: list[Entry] = [
       where="In My Patient → Read", patient=None, tab_check=t_not_understood),
     E("A2", "58 year old male, current smoker", None, "Age 58, Male, CurrentSmoker, cotinine level 3 — the bin a daily smoker falls in on the model's TRAINING scale (0–3), not the service's 0–2.",
       where="In My Patient → Read", patient=None, tab_check=t_smoker),
-    E("A2", "58 year old male · quit smoking 20 years ago", None, "Age stays 58 (only an explicit age phrase is an age), FormerSmoker, nothing left over.",
+    E("A2", "58 year old male · quit smoking 20 years ago", None, "Read by the model (a recorded reading: the battery makes no model calls), every item checked against the text: age stays 58 (the 20 years are not an age), FormerSmoker, nothing left over.",
       where="In My Patient → Read", patient=None, tab_check=t_later_years),
-    E("A2", "45 year old female, never smoked · my husband smokes", None, "The second line is about someone else: set aside and listed. She stays a female never-smoker.",
+    E("A2", "45 year old female, never smoked · my husband smokes", None, "Read by the model (a recorded reading): the second line is about someone else, so it is set aside and listed. She stays a female never-smoker.",
       where="In My Patient → Read", patient=None, tab_check=t_someone_else),
     E("A2", "cotinine 150 ng/mL", None, "Binned to level 2. No smoking status is inferred from it (nicotine replacement and second-hand smoke raise cotinine too).",
       where="In My Patient → Read", patient=None, tab_check=t_cotinine),
@@ -1096,7 +1123,7 @@ def main() -> None:
     ap.add_argument("--date", required=True, help="the run date printed on the cover")
     ap.add_argument("--no-pdf", action="store_true")
     args = ap.parse_args()
-    print("reader: rules (the battery never calls the model reader)")
+    print("reader: canonical lines, and recorded model readings (the battery never calls the model)")
     run_all()
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "results.json").write_text(json.dumps({

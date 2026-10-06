@@ -1,0 +1,2785 @@
+{
+ "about": "Phrasings of the My Patient text with the reading each should get. Kept from the rules reader's corpus (tests/test_patient_text_corpus.py, removed when the model became the reader): 'refused' marks a text the rules could not settle; for the model it is a judgement to review, not a failure. scripts/eval_patient_extraction.py reads every text live and reports agreement.",
+ "smoking": [
+  {
+   "text": "58 year old male\ncurrent smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male, current smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\ni smoke",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nI smoke cigarettes",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\ncigarette smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nsmokes daily",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker: yes",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nsmoking: current",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nsmoking status: current",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nheavy smoker for 30 years",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\ncurrent smoker since 1995",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker since 1990",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker since age 16",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, since 1990",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, since age 18",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nsmoking since 1990",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, 1 pack per day",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, 1 pack a day",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, 20 cigarettes a day",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nsmokes 10 cigarettes a day",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\n20 cigarettes a day",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\ncan't quit smoking",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\ntrying to quit smoking",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, trying to quit",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, no plans to quit",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, no diabetes",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\ncurrent smoker; no diabetes",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, quit 3 times but relapsed",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nlight smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 1
+   }
+  },
+  {
+   "text": "58 year old male\nsocial smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 1
+   }
+  },
+  {
+   "text": "58 year old male\nsmoke with friends on weekends",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 1
+   }
+  },
+  {
+   "text": "58 year old male\nmoderate smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 2
+   }
+  },
+  {
+   "text": "58 year old male\nnever smoked",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnon-smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnot a smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnever a smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnever been a smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nI have never been a smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker: no",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmokes: no",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker? no",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker - no",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\ndoesn't smoke",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnever smoked cigarettes",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnever smoked tobacco",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnever smoked or vaped",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnever smoked, never vaped",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnever smoked, does not vape",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnever smoked a day in my life",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoking status: never",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoking status - never",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nTobacco use: never smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\ntobacco: never",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\ntobacco: none",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nno tobacco use",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nno tobacco",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnever used tobacco",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nno history of smoking",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\ndenies smoking",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\ndenies tobacco use",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nno cigarettes",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnever vaped",
+   "refused": false,
+   "expect": {
+    "smoking": null,
+    "cotinine_level": null
+   }
+  },
+  {
+   "text": "58 year old male\ndoesn't vape",
+   "refused": false,
+   "expect": {
+    "smoking": null,
+    "cotinine_level": null
+   }
+  },
+  {
+   "text": "58 year old male\n20 pack years",
+   "refused": false,
+   "expect": {
+    "smoking": null,
+    "cotinine_level": null
+   }
+  },
+  {
+   "text": "58 year old male\nprevious smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nformer smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nex-smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nformer heavy smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker until 2015",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nquit smoking 20 years ago",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nwas a smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nused to be a smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nused to smoke",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nno longer smokes",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\ndon't smoke anymore",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker (quit 2010)",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker - quit 5 years ago",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nformer smoker, quit 2010",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nformer smoker, quit in 2010",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nformer smoker, quit 10 years ago",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nex-smoker, quit 2010",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nformer smoker, stopped in 2015",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nformer smoker - quit 2010",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nformer smoker (quit 2010)",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nformer smoker (quit in 2010)",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nex-smoker (quit 15 years ago)",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nformer smoker, quit smoking 2010",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nquit smoking 2010",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nstopped smoking 2015",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoking: quit 2010",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nformer smoker, quit at 40",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nformer smoker, 20 pack years, quit 2010",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoking status: former",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker - no longer",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker? no longer",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, quit 2015",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, quit in 2010",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, until 2015",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker (1990-2015)",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, 1990-2015",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker since 1990 until 2015",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, since 1990 until 2015",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, quit when my son was born",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, quit for my kids",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, until my first child was born",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, quit smoking in 2010",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, stopped drinking in 2019",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, gave up alcohol",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nnever smoked, quit drinking in 2015",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnon-smoker, retired since 2015",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnever smoked, born 1967",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nformer smoker, married since 1990",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\ncan't stop snacking",
+   "refused": false,
+   "expect": {
+    "smoking": null,
+    "cotinine_level": null
+   }
+  },
+  {
+   "text": "58 year old male\nfailed to quit alcohol",
+   "refused": false,
+   "expect": {
+    "smoking": null,
+    "cotinine_level": null
+   }
+  },
+  {
+   "text": "58 year old male\nunable to stop drinking",
+   "refused": false,
+   "expect": {
+    "smoking": null,
+    "cotinine_level": null
+   }
+  },
+  {
+   "text": "58 year old male\nstruggling to quit coffee",
+   "refused": false,
+   "expect": {
+    "smoking": null,
+    "cotinine_level": null
+   }
+  },
+  {
+   "text": "58 year old male\nfailed to quit until 2010",
+   "refused": false,
+   "expect": {
+    "smoking": null,
+    "cotinine_level": null
+   }
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, but my wife doesn't",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nnever smoked, but my wife smokes",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnon-smoker, but exposed to secondhand smoke",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "45 year old female, never smoked\nmy husband smokes",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnot a current smoker",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nnot currently a smoker",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nheavy smoker? not sure",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker - n/a",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker? n/a",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker: n/a",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nquit smoking after I failed to quit 5 times",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, quit 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, quit for 6 months in 2019",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, gave up for 3 months in 2020",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker - quit 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker (quit 2015)",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, stopped 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoking status: current smoker, quit 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nI smoke, quit 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nI'm a smoker, quit 2019",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, quit for 6 months in 2019",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, quit for a year in 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nheavy smoker, until 2010",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nlight smoker, until 2018",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, until 2019",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nheavy smoker, quit when my wife got pregnant",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nheavy smoker 1980-2005",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoke-free 2010",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nnever smoked 2020",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoking - none since 2010",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nwas a smoker, still am",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nused to be a smoker, still am",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker (quit 2015, started again)",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker - quit 2015 - back on it",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nI no longer smoke a pack a day, down to 5",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nno longer smoke as much",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nno longer smoking heavily",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nI was a smoker but started again",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nwas a smoker and still am",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nwas unable to quit smoking until 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nstruggled to stop smoking until 2012",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nnon-smoker, but smoke with friends on weekends",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nnever smoked, but started with my friends last year",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nvapes daily",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoked for 20 years",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nmy wife and I smoke",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker\nsmoker, quit 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nI never quit smoking",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncouldn't quit smoking",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ntried to quit smoking",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nI need to quit smoking",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\non Chantix to quit smoking",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nusing patches to quit smoking",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nquit smoking soon",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoked a pack a day for 40 years",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nI smoked 20 cigarettes a day",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmoker: Nil",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmoker: negative",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmoker: denies",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmoker: 0",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmoker: false",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmoker: -",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\n0 cigarettes a day",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nI smoke weed",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncannabis smoker",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmokes marijuana",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker in my youth",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nprior smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nformr smoker",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker from age 16 to 40",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker in college",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker previously",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, now quit",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, quit.",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, quit ten years ago",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, recently quit",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, recently quit",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nI smoke, just quit",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker\nquit 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nformer smoker\nrelapsed last year",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker since 1990 till now",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nquit cigarettes but smoke cigars",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nnon-smoker but vape",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nnever smoked but chew tobacco",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nformer smoker on nicotine patches",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nnever smoked; uses snus daily",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nnever smoked but vapes",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nquit smoking in 2015 and switched to vaping",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\noccasionally smokes",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmokes 2 cigarettes a day",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmoker: weekends only",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nlight smoker (20 cigarettes a day)",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmokes cigars occasionally",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker since my wife died",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nheavy smoker like my dad",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmokes with friends on weekends",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker since my father died",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker (wife also smokes)",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nI smoke with my friends on weekends",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nNever smoker: no",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmoker, current status unknown",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmoking status: Never assessed",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmokeless tobacco: never used",
+   "refused": false,
+   "expect": {
+    "smoking": null,
+    "cotinine_level": null
+   }
+  },
+  {
+   "text": "58 year old male\nSmoking status: Former smoker\nSmokeless tobacco: Never used",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nquit smoking for a year in 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ngave up smoking for Lent",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nstopped smoking for a while",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmoke-free for 10 years",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmoker: no, but used to",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nNon-smoker for 10 years",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker for the past 20 years",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, started 30 years ago",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nlight smoker\n20 cigarettes a day",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsocial smoker, 1 pack a day",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nheavy smoker, smokes socially",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoked for 30 years",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker since I was 16 years old",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nquit smoking at 45 years old",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nno history of smoking or diabetes",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnonsmoker",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nexsmoker",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nchainsmoker",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\nI am a nonsmoker",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnon–smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnon smoker",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nnon- smoker",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nnon.smoker",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncan’t quit smoking",
+   "refused": false,
+   "expect": {
+    "smoking": "CurrentSmoker",
+    "cotinine_level": 3
+   }
+  },
+  {
+   "text": "58 year old male\ndon’t smoke",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nI’ve never smoked",
+   "refused": false,
+   "expect": {
+    "smoking": "NeverSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker who was hospitalized",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nformer smoker cotinine 300 ng/mL",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, quit approximately 2010",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, kicked the habit in 2010",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, gave it up in 2010",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, not now",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, none since 2010",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, heavy, quit 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, quit long ago",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, until I was 40",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, past",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker: yes, in the past",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmoking: yes\nQuit date: 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker until 2015, then again from 2019",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nformer smoker, but fell off the wagon",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nformer smoker; slipped back in 2022",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nused to smoke, now only at parties",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ngave up cigarettes for cigars",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nquit smoking but have the occasional cigarette",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nquit smoking, mostly",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nabout to quit smoking",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nhad 20 cigarettes a day",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nLight tobacco smoker",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker (light)",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\none-time smoker",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker age 18-45",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker 85-05",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoke free 10 yrs",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nno cigarettes in 5 years",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmoker: no, ex",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nSmoker: no, previously yes",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker (-)",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker: -",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nCurrent smoker: 0",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nmarijuana",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker: reformed",
+   "refused": false,
+   "expect": {
+    "smoking": "FormerSmoker",
+    "cotinine_level": 0
+   }
+  },
+  {
+   "text": "58 year old male\nsmoker, pipe\nquit in 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, roll-ups\nquit 3 years ago",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nformer smoker, menthols\nstarted again last year",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nsmoker, quit during covid",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nformer smoker, quit 2010 by vaping",
+   "refused": true,
+   "expect": null
+  }
+ ],
+ "diagnoses": [
+  {
+   "text": "58 year old male\nhas diabetes, since 2015\nhypertension",
+   "refused": false,
+   "expect": {
+    "DIQ010": 1,
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\ncurrent smoker, hypertension, since 2010\nno diabetes",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1,
+    "DIQ010": 2
+   }
+  },
+  {
+   "text": "58 year old male\nasthma, but otherwise healthy",
+   "refused": false,
+   "expect": {
+    "MCQ010": 1,
+    "MCQ220": 2
+   }
+  },
+  {
+   "text": "58 year old male\nhypertension, otherwise in good health",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1,
+    "MCQ220": 2
+   }
+  },
+  {
+   "text": "58 year old male\nasthma, otherwise fit and well",
+   "refused": false,
+   "expect": {
+    "MCQ010": 1
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension, high cholesterol\nno other conditions",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1,
+    "MCQ220": 2
+   }
+  },
+  {
+   "text": "58 year old male\nhad a stroke\nno other conditions",
+   "refused": false,
+   "expect": {
+    "MCQ160F": 1
+   }
+  },
+  {
+   "text": "58 year old male\nhad a stroke in 2019\nno other conditions",
+   "refused": false,
+   "expect": {
+    "MCQ160F": 1
+   }
+  },
+  {
+   "text": "58 year old male\nmild hypertension\nno other conditions",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\nhigh BP\nno other conditions",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\nT2DM\nno other conditions",
+   "refused": false,
+   "expect": {
+    "DIQ010": 1
+   }
+  },
+  {
+   "text": "58 year old male\ntype 2 diabetes (2015)\nno other diagnoses",
+   "refused": false,
+   "expect": {
+    "DIQ010": 1
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nCKD stage 3",
+   "refused": false,
+   "expect": {
+    "KIQ020": 1,
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\nhypertension\nhospitalized in 2020\nno other conditions",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nhypertension\nhospitalized in the past year\nno other conditions",
+   "refused": false,
+   "expect": {
+    "HUQ070": 1
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: osteoporosis, hypothyroidism\nbroken wrist in 2019\nno other conditions",
+   "refused": false,
+   "expect": {
+    "OSQ010B": 1,
+    "OSQ060": 1,
+    "MCQ160I": 1
+   }
+  },
+  {
+   "text": "58 year old male with diabetes 2015\nno other conditions",
+   "refused": false,
+   "expect": {
+    "DIQ010": 1
+   }
+  },
+  {
+   "text": "58 year old male with hypertension diagnosed 2015\nno other conditions",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\nhypertension\nno conditions apart from hypertension",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\nno known conditions except diabetes\ndiagnoses: diabetes",
+   "refused": false,
+   "expect": {
+    "DIQ010": 1
+   }
+  },
+  {
+   "text": "58 year old male\nno diabetes, prediabetes",
+   "refused": false,
+   "expect": {
+    "DIQ010": 3
+   }
+  },
+  {
+   "text": "58 year old male\nprediabetes, no diabetes",
+   "refused": false,
+   "expect": {
+    "DIQ010": 3
+   }
+  },
+  {
+   "text": "58 year old male\nno diabetes\nprediabetes",
+   "refused": false,
+   "expect": {
+    "DIQ010": 3
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: prediabetes\nno diabetes",
+   "refused": false,
+   "expect": {
+    "DIQ010": 3
+   }
+  },
+  {
+   "text": "58 year old male\nhas prediabetes, not diabetic",
+   "refused": false,
+   "expect": {
+    "DIQ010": 3
+   }
+  },
+  {
+   "text": "58 year old male\nhistory of prediabetes, no diabetes",
+   "refused": false,
+   "expect": {
+    "DIQ010": 3
+   }
+  },
+  {
+   "text": "58 year old male\nprediabetes; no diabetes",
+   "refused": false,
+   "expect": {
+    "DIQ010": 3
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\ntakes lisinopril",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\nhypertension on lisinopril",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\ntype 2 diabetes on insulin",
+   "refused": false,
+   "expect": {
+    "DIQ010": 1
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension on lisinopril",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nno medications",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nexercises 3 times a week",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\nno known conditions\nallergic to penicillin",
+   "refused": false,
+   "expect": {
+    "BPQ020": 2
+   }
+  },
+  {
+   "text": "58 year old male\nno known conditions\nvegetarian",
+   "refused": false,
+   "expect": {
+    "BPQ020": 2
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nhigh cholesterol",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nself-reported health: good",
+   "refused": false,
+   "expect": {
+    "HUQ010": 3
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nhealth vs last year: same",
+   "refused": false,
+   "expect": {
+    "HUQ020": 3
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nhealth status: good",
+   "refused": false,
+   "expect": {
+    "HUQ010": 3
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nmy health is good",
+   "refused": false,
+   "expect": {
+    "HUQ010": 3
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\ndoctor's visits: 2",
+   "refused": false,
+   "expect": {
+    "HUQ050": 2
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: none\nno known conditions",
+   "refused": false,
+   "expect": {
+    "BPQ020": 2
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\n25-OH vitamin D 30 ng/mL",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\nno known conditions\nvitamin D 30 ng/mL (low)",
+   "refused": false,
+   "expect": {
+    "BPQ020": 2
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nno other known conditions",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1,
+    "MCQ220": 2
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nno other medical conditions",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nno other medical problems",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nno other illnesses",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nno other health issues",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nnothing else",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\ngenerally healthy",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nwalks daily",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nno allergies",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male, healthy\nno known conditions",
+   "refused": false,
+   "expect": {
+    "BPQ020": 2
+   }
+  },
+  {
+   "text": "58 year old male\nno known conditions except high cholesterol",
+   "refused": false,
+   "expect": {
+    "BPQ020": 2,
+    "MCQ220": 2
+   }
+  },
+  {
+   "text": "58 year old male\nno known conditions except mild asthma",
+   "refused": false,
+   "expect": {
+    "MCQ010": 1
+   }
+  },
+  {
+   "text": "58 year old male\nno known conditions except hypertension, asthma",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1,
+    "MCQ010": 1
+   }
+  },
+  {
+   "text": "58 year old male\nno known conditions except hypertension, asthma and arthritis",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1,
+    "MCQ010": 1,
+    "MCQ160A": 1
+   }
+  },
+  {
+   "text": "58 year old male\nno conditions apart from hypertension, diabetes and asthma",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1,
+    "DIQ010": 1,
+    "MCQ010": 1
+   }
+  },
+  {
+   "text": "58 year old male\nI have no known conditions, current smoker",
+   "refused": false,
+   "expect": {
+    "BPQ020": 2
+   }
+  },
+  {
+   "text": "58 year old male\nI have no diabetes, current smoker",
+   "refused": false,
+   "expect": {
+    "DIQ010": 2
+   }
+  },
+  {
+   "text": "58 year old male\nhistory: no stroke, smoker",
+   "refused": false,
+   "expect": {
+    "MCQ160F": 2
+   }
+  },
+  {
+   "text": "58 year old male\nmedical history: hypertension, not diabetic, smoker",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1,
+    "DIQ010": 2
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension, no diabetes, current smoker",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1,
+    "DIQ010": 2
+   }
+  },
+  {
+   "text": "58 year old male\nI have diabetes, never smoked, currently on insulin",
+   "refused": false,
+   "expect": {
+    "DIQ010": 1
+   }
+  },
+  {
+   "text": "58 year old male\nI have asthma now, never smoked",
+   "refused": false,
+   "expect": {
+    "MCQ010": 1
+   }
+  },
+  {
+   "text": "62 year old male\ndiagnoses: hypertension, diabetes\nno other conditions",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1,
+    "DIQ010": 1,
+    "MCQ220": 2
+   }
+  },
+  {
+   "text": "58 year old male\nhypertension, no diabetes and prediabetes",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1,
+    "DIQ010": 3
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: diabetes\nno diabetes",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nno known conditions other than diabetes\nhypertension",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nno known conditions\nno other conditions except diabetes",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nno medical history\nno known conditions except diabetes",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension\nno known conditions",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nno known conditions\ndiagnoses: hypertension",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nheart disease\nno other conditions",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nno diabetes or hypertension",
+   "refused": false,
+   "expect": {
+    "DIQ010": 2,
+    "BPQ020": 2
+   }
+  },
+  {
+   "text": "58 year old male\ndenies HTN, DM2, CAD",
+   "refused": false,
+   "expect": {
+    "BPQ020": 2,
+    "DIQ010": 2,
+    "MCQ160C": 2
+   }
+  },
+  {
+   "text": "58 year old male\nfree of diabetes and hypertension",
+   "refused": false,
+   "expect": {
+    "DIQ010": 2,
+    "BPQ020": 2
+   }
+  },
+  {
+   "text": "58 year old male\nnever had a heart attack or stroke",
+   "refused": false,
+   "expect": {
+    "MCQ160E": 2,
+    "MCQ160F": 2
+   }
+  },
+  {
+   "text": "58 year old male\nno history of cancer, stroke, or heart attack",
+   "refused": false,
+   "expect": {
+    "MCQ220": 2,
+    "MCQ160F": 2,
+    "MCQ160E": 2
+   }
+  },
+  {
+   "text": "58 year old male\nnegative for diabetes, hypertension and stroke",
+   "refused": false,
+   "expect": {
+    "DIQ010": 2,
+    "BPQ020": 2,
+    "MCQ160F": 2
+   }
+  },
+  {
+   "text": "58 year old male\nno diabetes or prediabetes",
+   "refused": false,
+   "expect": {
+    "DIQ010": 2
+   }
+  },
+  {
+   "text": "58 year old male\nno T2DM, HTN or CVA",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ndiagnosed with asthma or COPD, not sure which",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nNo diabetes. Hypertension.",
+   "refused": false,
+   "expect": {
+    "DIQ010": 2,
+    "BPQ020": 1
+   }
+  },
+  {
+   "text": "58 year old male\nNever had cancer. Had a stroke in 2019.",
+   "refused": false,
+   "expect": {
+    "MCQ220": 2,
+    "MCQ160F": 1
+   }
+  },
+  {
+   "text": "58 year old male\nNo kidney disease. Type 2 diabetes since 2015.",
+   "refused": false,
+   "expect": {
+    "KIQ020": 2,
+    "DIQ010": 1
+   }
+  },
+  {
+   "text": "58 year old male\nhealth: good apart from diabetes\nno other conditions",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nmy health is good but I have diabetes",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nI have COPD, my father had a stroke",
+   "refused": false,
+   "expect": {
+    "MCQ160G": 1
+   }
+  },
+  {
+   "text": "58 year old male\nhad asthma as a child\nno other conditions",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension, family history of diabetes\nno other conditions",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1,
+    "DIQ010": 2
+   }
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension, diabetes, father had a stroke",
+   "refused": false,
+   "expect": {
+    "BPQ020": 1,
+    "DIQ010": 1
+   }
+  },
+  {
+   "text": "58 year old male\nI have diabetes like my mother",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nnever treated hypertension",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nnot well controlled diabetes",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nnever hospitalized for asthma",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nno asthma since 2010",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nno recent stroke",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension, MI 2015",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nhypertensive\nno other conditions",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertensive, asthma",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension, two strokes",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ndiagnoses: hypertension, tumours",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nfractured hip and wrist",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ndiabetes: 0",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nstroke: -",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nasthma - 0",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nformer smoker, quit after my heart attack in 2015\nno other conditions",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\ncurrent smoker with T2DM",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nmedical history: smoker, quit 2015, hypertension, diabetes",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nno known conditions except asthma, former smoker, quit 2010, hypertension",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nformer smoker, quit 2010. diabetes.\nno other conditions",
+   "refused": false,
+   "expect": {
+    "DIQ010": 1
+   }
+  },
+  {
+   "text": "58 year old male\nhospitalized 15 years ago\nno other conditions",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nhistory of anemia\nno other conditions",
+   "refused": true,
+   "expect": null
+  },
+  {
+   "text": "58 year old male\nI have diabetes, HbA1c 7.1 %",
+   "refused": false,
+   "expect": {
+    "DIQ010": 1
+   }
+  }
+ ],
+ "body": [
+  {
+   "text": "A 35 year old female  height 5'3'' inch weight 135 lbs ",
+   "refused": false,
+   "expect": {
+    "age": 35,
+    "sex": "Female",
+    "height_cm": 160.02,
+    "weight_kg": 61.235
+   }
+  },
+  {
+   "text": "A 35 year old female 5'3'' 135lbs ",
+   "refused": false,
+   "expect": {
+    "age": 35,
+    "sex": "Female",
+    "height_cm": 160.02,
+    "weight_kg": 61.235
+   }
+  },
+  {
+   "text": "A 35 year old female 5'3'' inch height 135 lbs weight",
+   "refused": false,
+   "expect": {
+    "age": 35,
+    "sex": "Female",
+    "height_cm": 160.02,
+    "weight_kg": 61.235
+   }
+  },
+  {
+   "text": "35F, 5 ft 3 in, 135 lb",
+   "refused": false,
+   "expect": {
+    "age": 35,
+    "sex": "Female",
+    "height_cm": 160.02,
+    "weight_kg": 61.235
+   }
+  },
+  {
+   "text": "I'm a 52 year old man, 180 cm and 82 kg",
+   "refused": false,
+   "expect": {
+    "age": 52,
+    "sex": "Male",
+    "height_cm": 180,
+    "weight_kg": 82
+   }
+  },
+  {
+   "text": "Male, 61. Height 1.75 m, weight 90 kg.",
+   "refused": false,
+   "expect": {
+    "age": 61,
+    "sex": "Male",
+    "height_cm": 175,
+    "weight_kg": 90
+   }
+  },
+  {
+   "text": "58 year old male\nmy weight was 95 kg before the diet, now 84 kg\nheight 178 cm",
+   "refused": false,
+   "expect": {
+    "age": 58,
+    "sex": "Male",
+    "height_cm": 178,
+    "weight_kg": 84
+   }
+  },
+  {
+   "text": "58 year old male\nheight 178 cm\ntarget weight 70 kg",
+   "refused": false,
+   "expect": {
+    "age": 58,
+    "sex": "Male",
+    "height_cm": 178,
+    "weight_kg": null
+   }
+  },
+  {
+   "text": "58 year old male, BP 142/88, pulse 78",
+   "refused": false,
+   "expect": {
+    "age": 58,
+    "sex": "Male",
+    "labs": {
+     "BPXSAR": 142,
+     "BPXDAR": 88,
+     "BPXPLS": 78
+    }
+   }
+  },
+  {
+   "text": "58 year old male\nalbumin 4,1 g/dL",
+   "refused": false,
+   "expect": {
+    "age": 58,
+    "sex": "Male",
+    "labs": {
+     "LBDSALSI": 41
+    }
+   }
+  },
+  {
+   "text": "62 yo woman, on metformin since 2019, diabetic",
+   "refused": false,
+   "expect": {
+    "age": 62,
+    "sex": "Female",
+    "medications": [
+     "Metformin"
+    ],
+    "questionnaire": {
+     "DIQ010": 1
+    }
+   }
+  },
+  {
+   "text": "58 year old male\nmy doctor wants me to start metformin",
+   "refused": false,
+   "expect": {
+    "age": 58,
+    "sex": "Male",
+    "medications": []
+   }
+  },
+  {
+   "text": "58 year old male\nstopped metformin last year",
+   "refused": false,
+   "expect": {
+    "age": 58,
+    "sex": "Male",
+    "medications": []
+   }
+  }
+ ]
+}

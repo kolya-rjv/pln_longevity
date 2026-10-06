@@ -1,3 +1,64 @@
+# Reading the My Patient text — design (v4: the model reads, code checks, the person confirms)
+
+Status: **built** (2026-10-06). Supersedes v3 (below, kept as history).
+
+## Why v3 was replaced
+
+v3 kept the regex reader as the only path from text to values: the model could only
+rewrite what the rules missed into the rules' grammar, behind per-kind regex guards on its
+quotes. Every phrasing the rules did not know needed a new rule or a new guard, and the
+guards themselves broke: "A 35 year old female height 5'3'' inch weight 135 lbs" was read
+correctly by the model (height 5'3", weight 135 lb) and both items were thrown away — one
+guard required the word "height" in the quote, another tokenised `5'3` as a word, and one
+dropped item withdrew the whole rewrite. The live evaluation had not caught it because it
+scored the model against the rules' own corpus, which never had height and weight on the
+age line. About 3,200 lines of phrasing rules and guards (and a 705-line token grammar for
+one medication) were deleted.
+
+## Principle
+
+1. **The model reads the whole text** (`core/patient_extract.py`, strict structured
+   outputs): one item per fact — its kind, enum keys from `core.patient_vocabulary`
+   (generated from the KB, drift-checked), the number and unit **as written**, and the
+   quote that holds them. It never converts anything and never writes MeTTa.
+2. **Code checks each item against the text** (`core/patient_read.py`), with checks that
+   do not depend on phrasing: the quote is in the text (typography, case and spacing
+   aside); every number is in its quote as a whole number (or, for a count up to twelve,
+   as its word); a lab's unit, a weight's or a height's is in the quote; nothing inside a
+   statement the model says is about someone else is the person's. A failed item is
+   dropped and listed with the reason — except a condition or a smoking status, which is
+   asked about, because its absence would be read as an answer (a list answers every
+   unlisted diagnosis No).
+3. **The domain rules are applied once, for every reader** (`core.patient_text.assemble`):
+   units and the NHANES ranges (never guessed: `CRP 3.1` asks mg/L or mg/dL), duplicates
+   and contradictions, the smoking conventions (cotinine levels, vaping and patches need a
+   measured cotinine, cannabis is not tobacco, a measured cotinine wins), the
+   questionnaire, BMI, the checks on the whole person.
+4. **The person confirms.** Read shows every value with what was typed, LinAge2's value
+   and a status, the text that was not used, the items that failed a check, and what to
+   fix; Build uses that reading and never calls the model.
+5. **Without the model** (no key, a timeout, a refusal) the text is read as **canonical
+   lines** — one fact per line, like the examples — by `core.patient_canonical.parse`,
+   the exact inverse of `render` (round trip over the whole vocabulary in
+   `tests/test_patient_canonical.py`). Anything else is listed as not understood, and
+   the reading says why the model was not used.
+
+## Tests and evaluation
+
+Tests never call a model (`tests/conftest.py`). `tests/test_patient_read.py` drives the
+checks and the rules with recorded items, including hostile ones (a converted number, a
+number cut from a longer one, a unit the text does not give, a quote joined from two
+places, a status inside someone else's statement). `scripts/eval_patient_extraction.py`
+reads every text of `eval_corpus.json` (the old corpus's smoking and diagnosis phrasings,
+plus the body measurements people type) and the round-4 reproductions live, and fails on
+any text with an expected reading that comes back usable with a different value; the
+texts the old rules refused are listed for review, since the rules refused what they
+could not parse, not only what is ambiguous. Results: `eval_gpt-6-luna.md`.
+
+---
+
+# History: v3
+
 # Reading the My Patient text with a model — design (v3)
 
 Status: **built** (2026-10-05). `core/patient_vocabulary.py` (vocabulary, `drift()`),

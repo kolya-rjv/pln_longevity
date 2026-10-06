@@ -124,8 +124,9 @@ does not stop an adversary.
 ### Versioned responses
 
 Every response carries `X-API-Version`; `GET /health` reports the same string
-as `version`, and so does `info.version` in `/openapi.json`. It is **2.0.0**,
-and the major bump is not cosmetic: in 1.x an upstream outage, a hyperon
+as `version`, and so does `info.version` in `/openapi.json`. It is **3.0.0**: the
+third major changed `POST /patients/from-text` (a model reads the text; see "Or just
+type it"). The second major was not cosmetic either: in 1.x an upstream outage, a hyperon
 exception or an oversized prompt came back as HTTP 200 with
 `intent: "clarification"`. They are 4xx/5xx with a machine-readable `code` now
 (see "Failures are HTTP failures"), which breaks any client that branched on
@@ -524,8 +525,8 @@ patient is a `CurrentSmoker`. Send `CRP`, `HbA1c`, `FastingGlucose` (z or value)
 only) and `smoking` alongside the block; without any of them the years come back with no causes
 and every counterfactual is 0, and the builder warns you so.
 
-**Or just type it.** `POST /patients/from-text` takes `{"text": "58 year old male,
-current smoker\nalbumin 4.1 g/dL\nHbA1c 6.4 %\nCRP 3.1 mg/L"}` and scores LinAge2
+**Or just type it.** `POST /patients/from-text` takes `{"text": "58M, smoker,
+albumin 4.1 g/dL, HbA1c 6.4 %, CRP 3.1 mg/L"}` and scores LinAge2
 in-process from parameters extracted out of `Rejuve/LinAge2-Python` (matches the
 service to 2e-14 years; `docs/linage2_integration.md §9`), so no service and no
 pasted JSON are needed. It returns `read` — every value as typed, converted to
@@ -538,22 +539,25 @@ status), so causes can be credited without typing
 anything twice. This is what the Gradio UI's **My Patient** tab does; the patient
 then lives in that browser session only.
 
-`reader` (since API 2.1.0) is `"rules"` by default — fixed rules, no LLM, exactly as
-before. `"model"` also sends the text to OpenAI (`PLN_EXTRACT_MODEL`): the model may
-**rewrite** statements the rules did not understand into the rules' own wording, which
-the rules then read; it never supplies a value (numbers and units are copied from your
-text), never overrides a refusal, and never sets a smoking status on its own. The
-response says what happened: `reader_used` (`"rules"` or `"rules+model"`),
-`read_as_text` (what the rules read — send it back with `reader: "rules"` to get the
-same patient without the model), `model_error` (`{code, message, configuration}` when
-the model could not be used and the rules read alone: `timeout`, `refused`,
-`truncated`, `bad_output`, ...), `suggestions` (for a refused statement, or one the
-rules and the model read differently: `{line, start, end, original, wordings, reason,
-blocking}` — put a wording in place of `original` and resend) and `statements` (each
-with `source: "rules" | "model"` and what was `typed` there). `reader: "model"` answers
-503 `model_reader_not_configured` without the server's `OPENAI_API_KEY` (or with a
-`PLN_EXTRACT_MODEL` that lacks strict structured outputs) and 413
-`text_too_long_for_model_reader` over `PLN_EXTRACT_MAX_CHARS` (4,000).
+`reader` is `"auto"` by default: a language model reads the text when the server has
+`OPENAI_API_KEY` (`PLN_EXTRACT_MODEL`; the text is sent to OpenAI), else the text is read
+as canonical lines. `"model"` insists on the model, `"lines"` (or the older name `"rules"`)
+never calls it. The model returns each fact with the number and unit as written and the
+quote that holds them; code checks every item against the text (the quote is in it, the
+number and unit are in the quote, nothing inside a statement about someone else is the
+person's) and the same unit, range and contradiction rules as for canonical lines apply,
+so a unit is never guessed. Canonical lines are one fact per line, like the tab's examples
+(`58 year old male, current smoker`, `albumin 4.1 g/dL`, `blood pressure 142/88`, `weight 61 kg`,
+`height 5'3"`, `diagnoses: hypertension`, `medications: metformin`); anything else is listed
+as not understood. The response says what happened: `reader_used` (`"model"` or `"lines"`),
+`model_error` (`{code, message, configuration}` when the model was asked for but the text was
+read as lines: `timeout`, `refused`, `truncated`, `bad_output`, ...), `discarded` (the model's
+items that failed a check, `{quote, kind, why}`) and `statements` (`{index, line, start, end,
+text, outcome}`). `reader: "model"` answers 503 `model_reader_not_configured` without the
+server's `OPENAI_API_KEY` (or with a `PLN_EXTRACT_MODEL` that lacks strict structured outputs);
+the model reader answers 413 `text_too_long_for_model_reader` over `PLN_EXTRACT_MAX_CHARS`
+(4,000). Changed in API 3.0.0: the default was `"rules"`, and `read_as_text` and `suggestions`
+are gone with the rewrites they described.
 
 **No LLM needed.** `POST /linage2/analyze` takes the same patient at the top level
 (the `linage2` block required, plus optional `levers`) and returns the whole

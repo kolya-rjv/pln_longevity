@@ -422,99 +422,47 @@ code is `core/patient_context.py`, and the LinAge2 atoms still go only to the Li
 The *Download .metta* copy is written to the system temp directory, never to a folder the
 KB loaders scan. `POST /patients/from-text` is the same reader over HTTP.
 
-**Reading text without guessing** (`core/patient_text.py`, fixed rules). A lab value
-in the wrong unit is the commonest way to get a confident, wrong biological age (albumin 4.2
-read as g/L is −30 g/L from the median), so the reader refuses rather than guesses:
-an unknown name is listed as not understood; an unknown unit is refused with the accepted
-ones; a value **without** a unit is taken only when exactly one known unit puts it inside the
-middle 99% of NHANES adults (then shown as *unit assumed*) — `CRP 3.1` stops and asks, since
-both mg/L and mg/dL fit; a value outside everything NHANES observed is refused, naming the unit
-that would fit. Each unit table is checked against the reference cohort's medians, which is
-how the CRP mg/dL error of §9 would have been caught.
+**Reading the text: the model reads, code checks, the person confirms** (`core/patient_read.py`,
+`core/patient_extract.py`, `core/patient_text.py`; design in `docs/patient_extraction/design.md`).
+With `OPENAI_API_KEY` set, **Read** (and `POST /patients/from-text`, `reader` "auto" or "model")
+sends the text to a model (`PLN_EXTRACT_MODEL`, default `gpt-6-luna`) that returns one item per
+fact: its kind, enum keys from `core.patient_vocabulary` (generated from the KB, drift-checked),
+the number and unit **as written**, and the quote that holds them. Code checks each item against
+the text — the quote is in it, the number is in the quote as a whole number ("5'1" is not in
+"5'11"), a lab's, weight's or height's unit is in the quote, nothing inside a statement the model
+says is about someone else is the person's — and drops what fails, listing why. A condition or a
+smoking status that fails is asked about rather than dropped, since its absence would be read
+as an answer. Text no item quotes is listed as not used. Without a key, or when the model cannot
+be reached, the text is read as **canonical lines** (`core.patient_canonical`: one fact per
+line, like the examples, the exact inverse of the line renderer, round-trip tested); anything
+else is listed as not understood. The page's first reading, the examples and Build never call
+the model; Build uses the reading stored at Read and refuses if the text changed since.
 
-Four adversarial review rounds of the reader turned up the ways plain text produces a
-confident, wrong patient — and, when patched one pattern at a time, the ways each fix
-produced the next one. What it does now (`tests/test_patient_text.py`, and
-`tests/test_patient_text_corpus.py`, which pins every reproduction from those rounds with
-the outcome it must get):
+Both readers end in the same rules (`core.patient_text.assemble`), so **units are never
+guessed**. A lab value in the wrong unit is the commonest way to get a confident, wrong
+biological age (albumin 4.2 read as g/L is −30 g/L from the median): an unknown unit is
+refused with the accepted ones; a value **without** a unit is taken only when exactly one known
+unit puts it inside the middle 99% of NHANES adults (then shown as *unit assumed*) — `CRP 3.1`
+stops and asks, since both mg/L and mg/dL fit; a value outside everything NHANES observed is
+refused, naming the unit that would fit; hemoglobin 9.5 asks rather than being re-read as a
+normal value in another unit; urea and urea nitrogen have their own mg/dL factors; a weight,
+height or cotinine without its unit, and a GrimAge clock age given where an acceleration is
+meant, are asked about. Two different values for one thing are a contradiction to fix. Smoking
+follows the conventions the reader always had: cotinine level 0 for never and former, 1 for an
+occasional and 2 for a moderate smoker, 3 otherwise; vaping, patches or smokeless tobacco need a
+measured cotinine; cannabis is not tobacco; a measured cotinine always wins over words; a
+smoking status the model cannot settle blocks the build (0 vs 3 is about 8.8 years). A list of
+diagnoses answers every unlisted one No. A medication counts only for a drug the KB holds an
+Interaction fact for (today metformin) and only when taken now; it becomes
+`(CurrentMedication <id> <drug>)` in the **shared** space, appears in the supplement plan's
+`Interactions`, and changes no ranking and no LinAge2 number.
 
-- *Age and people.* Only an explicit age phrase is an age ("quit smoking 20 years ago" does
-  not make someone 20), and two different ages are a problem. A statement about someone
-  else ("my husband smokes", "family history of diabetes", second-hand smoke) is set aside
-  and listed; "my wife and I smoke" is asked about.
-- *Smoking is read only from a clause about smoking* (smoking, cigarettes, tobacco,
-  nicotine, vaping, packs), so "can't stop snacking" is not a smoker. Never, former and
-  current are told apart in clinical and form styles too ("denies tobacco use", "Smoking
-  status: never", "20 cigarettes a day"). What the rest of that clause, or the clause right
-  after it, says about time ("quit 2010", "still am", "started again", "quit for 6 months")
-  is checked against the status: a former smoker who started again, or a current smoker
-  who quit in 2015, is asked about; a bare "smoker" then "quit 2015" is a former smoker.
-  Cotinine level 0 vs 3 is about 8.8 years, so anything about smoking that is not
-  understood blocks the build rather than sitting in "not understood". A measured
-  cotinine is never replaced by the level a smoking phrase implies, in either order.
-- *Diagnoses.* "No diabetes" is a No, "no known conditions except hypertension, asthma" two
-  Yeses, "no other conditions" keeps the listed ones; dates, stages and severity are
-  understood ("type 2 diabetes (2015)", "CKD stage 3"), as are common abbreviations (T2DM,
-  HTN, high BP, CVA); a piece that is not one of the 23 conditions LinAge2 counts ("high
-  cholesterol") is dropped with a note. Two different answers for one condition are a
-  contradiction to fix (except "no diabetes" with "prediabetes", which is borderline), and
-  an unread line that names or suggests a condition blocks the build — it would otherwise
-  be answered No. "Takes lisinopril" or "no alcohol" do not. A condition in front of "on <a drug the KB has
-  nothing on>" ("hypertension on lisinopril", "type 2 diabetes on insulin") is read as the condition and the
-  drug stays in "not understood" (it used to refuse the whole statement).
-- *Medications.* The knowledge base has one medication fact that matters to a patient: a supplement
-  plan flags a supplement that interacts with a drug the person takes (`(Interaction Berberine
-  Metformin …)`). So the reader (`core/patient_medications.py`) reads a drug only from a small table of
-  identities for drugs the KB holds an Interaction fact for (metformin, its salts, formulations and
-  brands), and only from a statement about taking it — "takes metformin", "on Glucophage 500 mg twice
-  daily", "medications: metformin", "type 2 diabetes on metformin", "HbA1c 6.1 % on metformin" — never
-  from a mention ("before metformin", "allergic to metformin", "thinking of starting it", "was on it in
-  2019"). "Not on metformin", "stopped metformin", "never took metformin" are read as not taking it (a
-  closed set of whole statements: the drug and nothing else), and saying both is a contradiction to fix. Any other drug is left unread, as before. A recorded
-  medication becomes `(CurrentMedication <id> <drug>)` in the **shared** space only (the LinAge2 space
-  has no head-symbol room for a new head and nothing there reads it), appears in the supplement plan's
-  `Interactions` and beside the record in `supplement-for-patient`, and changes no ranking and no
-  LinAge2 number: "already taking" is not modelled. The reader is deliberately strict
-  (`core/patient_medications.py`; two adversarial review rounds, `docs/kb_quick_wins/REVIEW_ROUND1.md`
-  and `REVIEW_ROUND2.md`): a closed grammar with no free-text head, and no reading at all if any word of
-  the line says not-now, not-me or not-sure, if a character is not accounted for, if the heading above or
-  a line below says past or stopped, or if a relative is on the line above; a statement that also carries
-  age, sex or smoking is skipped. A missed reading costs a missing flag; a wrong one a flag for a drug the
-  person does not take.
-- *Units.* Weight, height, cotinine and GrimAge need an explicit unit or form (a bare
-  "GrimAge 46" is a clock age, not an acceleration); an abnormal value typed in the usual
-  unit is never re-read as a normal value in another one (hemoglobin 9.5 asks); urea and
-  urea nitrogen have their own mg/dL factors.
-
-A fourth round (61 confirmed findings, `docs/patient_extraction/review_round4.json`) showed
-the tail does not end, so the rules were made **stricter, not cleverer**: whatever a smoking
-clause leaves unread blocks ("I never quit smoking", "tried to quit smoking", "Smoker:
-Nil"); cannabis, zero cigarettes, past tense and occasional words are not a level-3 smoker;
-vaping or patches next to a status block; someone else is set aside only as the subject of
-a statement; a negation heading a list covers it, a bare "no X, Y" is refused; sentences
-are statements; synonyms the rules do not read ("MI", "T2D", "hypertensive"), a form's
-empty answer, a dated hospital stay (HUQ070 is the past 12 months) and a negation of
-treatment or time are refused, never answered. Each finding is pinned in the corpus.
-
-**Reading with a model** (`core/patient_read.py`, `core/patient_extract.py`; design in
-`docs/patient_extraction/design.md`). Only the **Read** button, and `POST
-/patients/from-text` with `reader: "model"`, also send the text to OpenAI
-(`PLN_EXTRACT_MODEL`, default `gpt-6-luna`); the page's first reading, the examples and
-Build never do, and without `OPENAI_API_KEY` Read is the rules alone and says so. The
-model **rewrites, the rules read**: it returns enum choices from
-`core.patient_vocabulary` (generated from the KB, drift-checked) and a quote; code checks
-the quote against the text, copies numbers and units out of it, and writes a canonical
-line in the rules' own grammar (`core.patient_canonical`, every line round-trip tested).
-A statement the rules did not understand is replaced by its line in a "read as" text,
-which the rules read — the row says "· model" and shows what was typed. What the rules
-**refused** is never replaced: the model's wording is a button. A smoking status from the
-model alone, or a smoking, age or sex reading that differs from the rules', blocks with
-both wordings; labs and conditions that differ give a note. A rewrite that would change
-anything else the rules read is withdrawn. Build uses the reading stored at Read, refuses
-if the text changed since, and the download carries the "read as" text, which the rules
-alone rebuild into the same patient. A property test holds this against a hostile model
-over every corpus entry and round-4 reproduction; the live evaluation is
-`docs/patient_extraction/eval_gpt-6-luna.md`.
+This replaced a regex reader (about 3,200 lines with its model guards, and a 705-line medication
+grammar for one drug) that four adversarial review rounds kept finding new failures in. The
+model was right where the guards failed it: "A 35 year old female height 5'3'' inch weight 135
+lbs" was read correctly by the model and thrown away by the guards. The live evaluation over the
+old corpus, the round-4 reproductions and the body phrasings people type is
+`docs/patient_extraction/eval_gpt-6-luna.md` (`scripts/eval_patient_extraction.py`).
 
 **One value, two consumers.** CRP typed once is LinAge2's `LBXCRP` (mg/dL) *and* the KB's
 `CRP` witness (mg/L); HbA1c likewise; a glucose is the `FastingGlucose` witness only when the

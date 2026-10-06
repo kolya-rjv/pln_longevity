@@ -1,8 +1,9 @@
 """The model reader's contract with OpenAI (core/patient_extract.py): its schema, its
 prompt, its client and its cache — with no network.
 
-The schema is what keeps the model from producing anything but enum keys and quotes,
-so it is checked against OpenAI's strict-mode rules and validated with jsonschema. The
+The schema is what keeps the model to enum keys, numbers and units as written, and the
+quotes that hold them, so it is checked against OpenAI's strict-mode rules and validated
+with jsonschema. The
 client is checked through a fake SDK: the timeout and retries it is built with, the
 parameters a reasoning model must not get, and every way an answer can fail.
 
@@ -46,7 +47,7 @@ def test_the_schema_follows_openais_strict_mode_rules():
     sch = px.schema()
     assert sch["type"] == "object" and "anyOf" not in sch          # the root may not be anyOf
     objects = [(p, n) for p, n in _walk(sch) if isinstance(n, dict) and n.get("type") == "object"]
-    assert len(objects) == 16                                      # the root and 15 item kinds
+    assert len(objects) == 17                                      # the root and 16 item kinds
     enum_values = 0
     enum_chars = 0
     for path, node in objects:
@@ -78,29 +79,36 @@ def test_the_schema_takes_its_enums_from_the_vocabulary():
     assert len(kinds["condition"]["properties"]["condition"]["enum"]) == 23
     assert set(kinds["smoking"]["properties"]["status"]["enum"]) == {"never", "former", "current", "unclear"}
     assert {px.STATUS[s] for s in ("never", "former", "current")} == set(V.smoking_statuses)
-    # no number, no unit, no NHANES code anywhere a model could write one
+    from core.patient_builder import kb_interaction_drugs
+    assert kinds["medication"]["properties"]["drug"]["enum"] == sorted(kb_interaction_drugs())
+    # free text only where it is copied from the person's words (and checked against them):
+    # the quote, a number, a lab's unit as typed, an unclear item's reason — never a code or a symbol
     for kind, branch in kinds.items():
         for name, prop in branch["properties"].items():
-            assert name in ("quote", "why") or "enum" in prop or prop["type"] == "boolean", (kind, name)
+            free = name in ("quote", "why", "number") or (kind, name) == ("lab", "unit")
+            assert free or "enum" in prop or prop["type"] == "boolean", (kind, name)
+            assert not free or prop["type"] == "string", (kind, name)
 
 
 def _full_extraction() -> dict:
     """One item of every kind — the shape a recorded extraction has."""
     return {"items": [
-        {"quote": "albumin 4.1 g/dL", "kind": "lab", "lab": "albumin"},
-        {"quote": "cotinine 250 ng/mL", "kind": "cotinine"},
-        {"quote": "ex-smoker", "kind": "smoking", "status": "former", "occasional": False,
+        {"quote": "albumin 4.1 g/dL", "kind": "lab", "lab": "albumin", "number": "4.1", "unit": "g/dL"},
+        {"quote": "cotinine 250 ng/mL", "kind": "cotinine", "number": "250", "unit": "ng/mL"},
+        {"quote": "ex-smoker", "kind": "smoking", "status": "former", "amount": "unstated",
          "other_nicotine": "none"},
         {"quote": "no diabetes", "kind": "condition", "condition": "diabetes", "answer": "no"},
         {"quote": "no other conditions", "kind": "no_other_conditions"},
         {"quote": "58 yo M", "kind": "sex", "sex": "male"},
-        {"quote": "58 yo M", "kind": "age"},
-        {"quote": "weight 80 kg", "kind": "weight"},
-        {"quote": "height 178 cm", "kind": "height"},
+        {"quote": "58 yo M", "kind": "age", "number": "58"},
+        {"quote": "weight 80 kg", "kind": "weight", "number": "80", "unit": "kg"},
+        {"quote": "5'10\"", "kind": "height", "number": "5'10", "unit": "ft-in"},
+        {"quote": "on metformin", "kind": "medication", "drug": "Metformin", "taking": "now"},
         {"quote": "health: good", "kind": "self_rated_health", "rating": "good"},
         {"quote": "better than last year", "kind": "health_vs_year_ago", "trend": "better"},
-        {"quote": "GP visits: 2 per month", "kind": "healthcare_visits", "period": "month"},
-        {"quote": "GrimAge +3 years", "kind": "grimage", "direction": "signed", "wording": "unstated"},
+        {"quote": "GP visits: 2 per month", "kind": "healthcare_visits", "number": "2", "period": "month"},
+        {"quote": "GrimAge +3 years", "kind": "grimage", "number": "+3", "direction": "signed",
+         "wording": "unstated"},
         {"quote": "my wife smokes", "kind": "someone_else"},
         {"quote": "heart trouble", "kind": "unclear", "topic": "condition", "why": "not a diagnosis"},
     ]}
@@ -114,7 +122,9 @@ def test_recorded_extractions_validate(output):
 
 @pytest.mark.parametrize("bad", [
     {"items": [{"quote": "albumin 4.1", "kind": "lab", "lab": "LBDSALSI"}]},           # a code, not a key
-    {"items": [{"quote": "albumin 4.1", "kind": "lab", "lab": "albumin", "value": 41}]},  # a number
+    {"items": [{"quote": "albumin 4.1", "kind": "lab", "lab": "albumin", "value": 41}]},  # a value field
+    {"items": [{"quote": "weight 80", "kind": "weight", "number": "80", "unit": "stone"}]},  # a unit outside the enum
+    {"items": [{"quote": "on lisinopril", "kind": "medication", "drug": "Lisinopril", "taking": "now"}]},
     {"items": [{"kind": "age"}]},                                                       # no quote
     {"items": [{"quote": "smoker", "kind": "smoking", "status": "heavy", "occasional": False,
                 "other_nicotine": "none"}]},
@@ -307,7 +317,7 @@ def test_supported_models(model):
 
 def test_the_cache_answers_a_repeat_and_keeps_deterministic_failures_only(fake_openai):
     install, _ = fake_openai
-    calls = install(_reply(json.dumps({"items": [{"quote": "58 year old", "kind": "age"}]})))
+    calls = install(_reply(json.dumps({"items": [{"quote": "58 year old", "kind": "age", "number": "58"}]})))
     ex = px.OpenAIExtractor()
     first, second = ex("58 year old male"), ex("58 year old male")
     assert len(calls.calls) == 1 and second.cached and second.items == first.items

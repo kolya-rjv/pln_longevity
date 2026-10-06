@@ -229,7 +229,7 @@ def test_old_downloads_are_pruned(monkeypatch):
 
 
 def test_the_questionnaire_caveat_names_only_what_was_assumed():
-    summary = _build("62 year old female, never smoked\ndiagnoses: hypertension\nhealth: poor\n"
+    summary = _build("62 year old female, never smoked\ndiagnoses: hypertension\nself-rated health: poor\n"
                      "albumin 4.0 g/dL")["summary"]
     assert "no healthcare visits in the past year (fs3Score)" in summary
     assert "assumed no diagnoses" not in summary and "'good' self-rated health" not in summary
@@ -251,80 +251,72 @@ class _Recorded:
 
 
 _TEXT = "58 yo M\nalbumin 4.1 g/dL\nmy CRP was 3.1 mg/L"
-_ITEMS = ({"quote": "58 yo M", "kind": "age"}, {"quote": "58 yo M", "kind": "sex", "sex": "male"},
-          {"quote": "CRP was 3.1 mg/L", "kind": "lab", "lab": "c-reactive protein"})
+_ITEMS = ({"quote": "58 yo M", "kind": "age", "number": "58"}, {"quote": "58 yo M", "kind": "sex", "sex": "male"},
+          {"quote": "albumin 4.1 g/dL", "kind": "lab", "lab": "albumin", "number": "4.1", "unit": "g/dL"},
+          {"quote": "CRP was 3.1 mg/L", "kind": "lab", "lab": "c-reactive protein", "number": "3.1", "unit": "mg/L"})
+_FIELDS = ("reading", "summary", "atoms", "download", "banner", "state", "suggestions")
 
 
-def test_read_marks_model_rows_and_leaves_rules_rows_byte_identical():
-    md, read, *buttons = patient_tab.on_read_model(_TEXT, _Recorded(*_ITEMS))
-    assert md.startswith("### What was read\n<sub>Read by rules + recorded</sub>")
-    assert "**Age** 58 (model) · **Sex** Male (model)" in md
-    assert "| C-reactive protein | `my CRP was 3.1 mg/L` | 0.31 mg/dL | ✓ · model |" in md
-    rules_row = "| Albumin | `albumin 4.1 g/dL` | 41 g/L | ✓ | 45 g/L |"
-    assert rules_row in md and rules_row in patient_tab.on_read("58 year old male\nalbumin 4.1 g/dL")
-    assert "**Read as**" in md and "58 year old; male\nalbumin 4.1 g/dL\nC-reactive protein 3.1 mg/L" in md
-    assert all(b["visible"] is False for b in buttons)
+def test_read_shows_what_was_typed_and_says_the_model_read_it():
+    md, read = patient_tab.on_read_model(_TEXT, _Recorded(*_ITEMS))
+    assert md.startswith("### What was read\n<sub>Read by recorded; every value was checked against your text</sub>")
+    assert "**Age** 58 · **Sex** Male" in md
+    assert "| C-reactive protein | `CRP was 3.1 mg/L` | 0.31 mg/dL | ✓ |" in md
+    row = "| Albumin | `albumin 4.1 g/dL` | 41 g/L | ✓ | 45 g/L |"
+    assert row in md and row in patient_tab.on_read("58 year old male\nalbumin 4.1 g/dL")
+    assert "Not used" not in md and "Ready to build" in md
 
 
-def test_the_first_reading_and_the_examples_are_the_rules_alone():
+def test_a_failed_check_is_listed_and_the_text_it_quoted_is_not_used():
+    items = _ITEMS + ({"quote": "albumin 4.1 g/dL", "kind": "lab", "lab": "albumin", "number": "41", "unit": "g/dL"},)
+    md, read = patient_tab.on_read_model(_TEXT, _Recorded(*items))
+    assert "Items the model gave that failed a check (1)" in md and "the number is not in the quote" in md
+    md, read = patient_tab.on_read_model(_TEXT + "\nI want to build muscle", _Recorded(*_ITEMS))
+    assert "**Not used**" in md and "`I want to build muscle`" in md
+
+
+def test_the_first_reading_and_the_examples_are_canonical_lines_without_the_model():
     md = patient_tab.on_read(SMOKER)
-    assert "<sub>Read by rules only</sub>" in md
-    text, md2, read, *_ = patient_tab.on_example("58-year-old smoker")
-    assert text == SMOKER and read.reader == "rules" and "Read by rules only" in md2
+    assert "<sub>Read as one fact per line, without the model</sub>" in md
+    text, md2, read = patient_tab.on_example("58-year-old smoker")
+    assert text == SMOKER and read.reader == "lines" and "one fact per line" in md2
 
 
-def test_a_model_error_says_why_and_reads_by_rules():
+def test_a_model_error_says_why_and_reads_one_fact_per_line():
     from core.patient_extract import ExtractError
 
     def failing(text):
-        raise ExtractError("timeout", "slow")
-    md, read, *_ = patient_tab.on_read_model(_TEXT, failing)
-    assert "<sub>Read by rules only — the model did not answer in time</sub>" in md
-    assert read.reader == "rules" and read.parsed.sex is None
+        raise ExtractError("timeout", "the model did not answer in time")
+    md, read = patient_tab.on_read_model(_TEXT, failing)
+    assert "without the model (the model did not answer in time)" in md
+    assert read.reader == "lines" and read.parsed.sex is None and not read.parsed.ok      # '58 yo M' is not a line
 
 
 def test_build_uses_the_stored_reading_and_never_the_model():
     extractor = _Recorded(*_ITEMS)
-    _, read, *_ = patient_tab.on_read_model(_TEXT, extractor)
-    out = _build(_TEXT, None) if False else dict(zip(
-        ("reading", "summary", "atoms", "download", "banner", "state", "suggestions"),
-        patient_tab.on_build(_TEXT, None, read)))
+    _, read = patient_tab.on_read_model(_TEXT, extractor)
+    out = dict(zip(_FIELDS, patient_tab.on_build(_TEXT, None, read)))
     assert extractor.calls == 1                                   # Read only
     assert out["state"]["sex"] == "Male" and out["state"]["markers"]["CRP"] == {"value": 3.1, "unit": "mg/L"}
     header = Path(out["download"]["value"]).read_text(encoding="utf-8")
-    assert ";; Read as (the fixed rules alone rebuild this patient from these lines):\n;;   58 year old; male" in header
-    # the rules alone, on the 'read as' lines, build the same patient
-    again = dict(zip(("reading", "summary", "atoms", "download", "banner", "state", "suggestions"),
-                     patient_tab.on_build(read.read_as, None)))
+    assert header.startswith(";; Caller_Me — built in the PLN 'My Patient' tab")
+    lines = "58 year old male\nalbumin 4.1 g/dL\nCRP 3.1 mg/L"       # the same facts as canonical lines
+    again = dict(zip(_FIELDS, patient_tab.on_build(lines, None)))
     assert again["atoms"]["value"] == out["atoms"]["value"]
 
 
 def test_build_refuses_text_that_changed_since_read():
-    _, read, *_ = patient_tab.on_read_model(_TEXT, _Recorded(*_ITEMS))
+    _, read = patient_tab.on_read_model(_TEXT, _Recorded(*_ITEMS))
     first = _build(SMOKER)["state"]
     out = patient_tab.on_build(_TEXT + "\nHbA1c 6.1 %", first, read)
     assert "The text changed since Read" in out[1] and out[5] is first
 
 
-def test_a_suggestion_button_writes_the_wording_and_the_next_read_uses_it():
-    text = "58 year old male\nI never quit smoking"
-    smoking = {"quote": "I never quit smoking", "kind": "smoking", "status": "current", "occasional": False,
-               "other_nicotine": "none"}
-    md, read, *buttons = patient_tab.on_read_model(text, _Recorded(smoking))
-    assert "Fix before building" in md and buttons[0]["visible"] is True
-    assert buttons[0]["value"] == "Use “current smoker” for “I never quit smoking”"
-    new_text = patient_tab.on_use_suggestion(text, read, 0)
-    assert new_text == "58 year old male\ncurrent smoker"
-    md2, read2, *_ = patient_tab.on_read_model(new_text, _Recorded())
-    assert "Ready to build" in md2 and read2.parsed.smoking == "CurrentSmoker"
-    assert patient_tab.on_use_suggestion("edited", read, 0) == "edited"   # stale: nothing changes
-
-
 def test_the_reading_survives_the_session_state_copy():
     import copy
-    _, read, *_ = patient_tab.on_read_model(_TEXT, _Recorded(*_ITEMS))
+    _, read = patient_tab.on_read_model(_TEXT, _Recorded(*_ITEMS))
     clone = copy.deepcopy(read)
-    assert clone.read_as == read.read_as and clone.parsed.as_dict() == read.parsed.as_dict()
+    assert clone.text == read.text and clone.parsed.as_dict() == read.parsed.as_dict()
     from core.patient_extract import ExtractError
     err = copy.deepcopy(ExtractError("timeout", "slow"))
     assert (err.code, err.message) == ("timeout", "slow")
@@ -333,7 +325,7 @@ def test_the_reading_survives_the_session_state_copy():
 def test_the_read_note_says_where_the_text_goes(monkeypatch):
     import config
     monkeypatch.setattr(config, "OPENAI_API_KEY", "")
-    assert "fixed rules only (no OPENAI_API_KEY)" in patient_tab.read_note()
+    assert "one fact per line, like the examples (no OPENAI_API_KEY" in patient_tab.read_note()
     monkeypatch.setattr(config, "OPENAI_API_KEY", "sk-test")
     monkeypatch.setattr(config, "PLN_EXTRACT_MODEL", "gpt-6-luna")
     assert "sends your text to OpenAI (gpt-6-luna)" in patient_tab.read_note()
@@ -355,12 +347,15 @@ def _post(body):
     return asyncio.run(go())
 
 
-def test_the_api_reads_by_rules_unless_asked_and_says_so(monkeypatch):
+@pytest.mark.parametrize("reader", [None, "lines", "rules"])
+def test_the_api_reads_lines_without_a_model_and_says_so(monkeypatch, reader):
+    import config
     import core.executor as executor
     monkeypatch.setattr(executor, "PLN_WORKER_POOL_SIZE", 0)
-    body = _post({"text": SMOKER}).json()
-    assert body["reader_used"] == "rules" and body["read_as_text"] == SMOKER and body["model_error"] is None
-    assert body["suggestions"] == [] and {s["source"] for s in body["statements"]} == {"rules"}
+    monkeypatch.setattr(config, "OPENAI_API_KEY", "")            # 'auto' falls back to lines
+    body = _post({"text": SMOKER} | ({"reader": reader} if reader else {})).json()
+    assert body["ok"] and body["reader_used"] == "lines" and body["model_error"] is None
+    assert body["discarded"] == [] and {s["outcome"] for s in body["statements"]} == {"read"}
 
 
 def test_the_api_model_reader_needs_a_key_and_a_short_text(monkeypatch):
@@ -375,30 +370,28 @@ def test_the_api_model_reader_needs_a_key_and_a_short_text(monkeypatch):
     assert _post({"text": SMOKER, "reader": "llm"}).status_code == 422
 
 
-def test_the_api_model_reader_rewrites_and_suggests(monkeypatch):
+def test_the_api_model_reader_reads_checks_and_falls_back(monkeypatch):
     import config
     import core.executor as executor
     from core import patient_extract
     monkeypatch.setattr(executor, "PLN_WORKER_POOL_SIZE", 0)
     monkeypatch.setattr(config, "OPENAI_API_KEY", "sk-test")
     monkeypatch.setattr(config, "PLN_EXTRACT_MODEL", "gpt-6-luna")
-    recorded = _Recorded(*_ITEMS)
+    bad = {"quote": "albumin 4.1 g/dL", "kind": "lab", "lab": "albumin", "number": "41", "unit": "g/dL"}
+    recorded = _Recorded(*_ITEMS, bad)
     monkeypatch.setattr(patient_extract.OpenAIExtractor, "__call__", lambda self, text: recorded(text))
-    body = _post({"text": _TEXT, "reader": "model"}).json()
-    assert body["ok"] and body["reader_used"] == "rules+model" and body["model_error"] is None
-    assert body["read_as_text"] == "58 year old; male\nalbumin 4.1 g/dL\nC-reactive protein 3.1 mg/L"
-    by_text = {s["text"]: s for s in body["statements"]}
-    assert by_text["male"]["source"] == "model" and by_text["male"]["typed"] == "58 yo M"
-    assert by_text["albumin 4.1 g/dL"]["source"] == "rules"
-    again = _post({"text": body["read_as_text"]}).json()        # the rules alone, same patient
-    assert again["patient"] == body["patient"]
+    body = _post({"text": _TEXT}).json()                             # 'auto': the model, configured
+    assert body["ok"] and body["reader_used"] == "model" and body["model_error"] is None
+    assert body["discarded"] == [{"quote": "albumin 4.1 g/dL", "kind": "lab", "why": "the number is not in the quote"}]
+    lines = _post({"text": "58 year old male\nalbumin 4.1 g/dL\nCRP 3.1 mg/L", "reader": "lines"}).json()
+    assert lines["patient"] == body["patient"]                      # the same facts as lines: the same patient
 
     def timing_out(self, text):
         raise patient_extract.ExtractError("timeout", "slow")
     monkeypatch.setattr(patient_extract.OpenAIExtractor, "__call__", timing_out)
     body = _post({"text": _TEXT, "reader": "model"}).json()
-    assert body["reader_used"] == "rules" and body["model_error"]["code"] == "timeout"
-    assert body["ok"] is False                                   # '58 yo M' alone: no sex
+    assert body["reader_used"] == "lines" and body["model_error"]["code"] == "timeout"
+    assert body["ok"] is False                                   # '58 yo M' is not a canonical line
 
 
 def test_a_generic_question_with_a_patient_loaded_runs_without_the_patient(monkeypatch):
@@ -660,10 +653,10 @@ def test_each_gate_matches_what_the_forms_return():
     """The gate is a claim about the knowledge base, so check it against the knowledge base: the
     diagnosis and the plan are offered exactly when they answer."""
     from core.patient_context import build_caller_patient
-    from core.patient_text import read_patient_text
+    from core.patient_text import read_lines
     import test_patient_stack as ps                                   # the subprocess runner
     for text in (HEALTHY, SMOKER_NORMAL_LABS, FORMER_CRP_ONLY, NO_WITNESS, SMOKER, NO_WITNESS + "\ndiagnoses: heart attack"):
-        payload, _ = read_patient_text(text).to_patient("Me")
+        payload, _ = read_lines(text).to_patient("Me")
         built = build_caller_patient(payload, ())
         shown = set(_offered(text))
         diag = ps._run("patient", "!(diagnose-patient &self Caller_Me)", built.shared_atoms)
@@ -783,8 +776,8 @@ def _linage2_answers(text: str):
     import re
     import test_linage2 as tl
     from core.patient_context import build_caller_patient
-    from core.patient_text import read_patient_text
-    built = build_caller_patient(read_patient_text(text).to_patient("Me")[0], ())
+    from core.patient_text import read_lines
+    built = build_caller_patient(read_lines(text).to_patient("Me")[0], ())
     m = tl._space(built.atoms)
     scenarios = tl._one(m, "!(linage-scenarios-patient &self Caller_Me)")
     levers = dict(re.findall(r"\(LinAgeCounterfactual Caller_Me (\w+) \(expected-delta-years ([-\d.eE]+)\)", scenarios))
@@ -816,9 +809,9 @@ def test_the_drivers_threshold_the_gate_uses_is_the_one_in_the_rules():
 
 def test_the_hidden_note_says_only_what_the_person_did_and_did_not_say_about_smoking():
     from core.patient_context import build_caller_patient
-    from core.patient_text import read_patient_text
+    from core.patient_text import read_lines
     def note(text):
-        return patient_tab.hidden_note(build_caller_patient(read_patient_text(text).to_patient("Me")[0], ()))
+        return patient_tab.hidden_note(build_caller_patient(read_lines(text).to_patient("Me")[0], ()))
     base = "\nalbumin 4.8 g/dL\nRDW 12.3 %\nCRP 0.4 mg/L\nHbA1c 5.0 %"
     unsaid = note("52 year old male" + base)
     assert "your text does not say you currently smoke" in unsaid and "not a current smoker" not in unsaid

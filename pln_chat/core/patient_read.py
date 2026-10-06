@@ -1,1381 +1,338 @@
-"""Read the My Patient text with the rules, and — only when asked — with a model too.
+"""Read the My Patient text: a model reads it, code verifies what the model says, the
+person confirms what was read.
 
-    read_patient(text)              the rules alone: core.patient_text.read_patient_text
-    read_patient(text, extractor)   the rules, then a model (core.patient_extract), then
-                                    the rules again on what the model rewrote
+    read_patient(text, extractor)  -> PatientRead
 
-The model never produces a value. Its items are checked here, in code, against the
-text: the quote must occur exactly once, inside one line; numbers and units are copied
-out of the quote; every claim needs its own words in the quote (an alias of the lab, a
-term of the condition, a smoking word, an explicit sex token, an age phrase). What
-passes becomes a canonical line (core.patient_canonical.render) — and then:
+With an extractor (core.patient_extract.OpenAIExtractor) the model reads the whole text and
+returns items — a kind, enum keys, the number and unit as written, and the QUOTE that holds
+them. Each item is checked against the text before it is used, by checks that do not depend
+on how the person phrased anything:
 
-* a statement the rules did NOT understand is replaced by its canonical line(s) in the
-  "read as" text, which the rules read like anything typed ("· model" in the table);
-* a statement the rules REFUSED (ambiguous, contradictory, unit, vaping, someone
-  else, a condition that would be lost) is never replaced: the canonical wording is
-  offered as a suggestion the person can click, and the refusal stands;
-* a smoking status from the model alone is a suggestion too, never a substitution;
-* a statement the rules read, which the model reads differently: smoking, age or sex
-  blocks the build with both wordings as buttons (unless the statement is already in
-  canonical form, which always wins); labs, conditions and the rest give a note.
+* the quote is in the text (typography, case and spacing aside);
+* every number the item carries is in its quote as a whole number ("5'1" is not in
+  "5'11"; "10" is not in "105"), and so is a lab's unit, a weight's or a height's;
+* an item inside a statement the model says is about someone else is not the person's.
 
-The rules then read the "read as" text, and code checks that the rewrite added only
-what it meant to: every statement it did not touch reads exactly as before, every
-problem on those statements is still there, and every canonical line reads exactly as
-it does alone. Otherwise the rewrite is withdrawn and offered as a suggestion.
+An item that fails is dropped and listed with the reason. What passes becomes Facts
+(core.patient_canonical), and core.patient_text.assemble applies the domain rules — units
+and the NHANES ranges, contradictions, the smoking conventions, the questionnaire — exactly
+as for canonical lines. Text that no item quotes is listed as not used, so the person sees
+everything that was left out. The person then sees the reading and presses Build.
 
-Build never calls the model: it builds from the stored reading (patient_tab.py).
+Without an extractor, or when the model cannot be reached, the text is read as canonical
+lines (core.patient_text.read_lines) and the reading says why.
 """
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import date
-from typing import Callable, Optional
+from typing import Optional
 
-from core.patient_canonical import Fact, is_canonical, render
-from core.patient_extract import SEX, STATUS, ExtractError, Extraction
-from core.patient_medications import mentioned_symbols
-from core.patient_text import (
-    _ALIAS_INDEX,
-    _DIAG_QUALIFIERS,
-    _NO_CONDITIONS,
-    _OTHERWISE,
-    _MEDICAL_WORDS,
-    _SOMEONE_ELSE,
-    ParsedPatient,
-    Problem,
-    _outcomes,
-    normalise_unit,
-    read_patient_text,
-)
-from core.patient_vocabulary import vocabulary
+from core.patient_canonical import Fact
+from core.patient_extract import SEX, STATUS, ExtractError
+from core.patient_text import ParsedPatient, Span, assemble, feet_inches, number, read_lines, unify
 
-Extractor = Callable[[str], Extraction]
-
-# ═══════════════════════════ text normalisation ════════════════════════════════
-
-_DASHES = set("‐‑‒–—―−﹘﹣－")
-_SQUOTES = set("‘’‚‛′ʼ`´")
-_DQUOTES = set("“”„‟″")
-
-
-def _unify_char(c: str) -> str:
-    if c in _DASHES:
-        return "-"
-    if c in _SQUOTES:
-        return "'"
-    if c in _DQUOTES:
-        return '"'
-    if c.isspace():
-        return " "
-    low = c.lower()
-    return low if len(low) == 1 else c
-
-
-def unify(s: str) -> str:
-    """One character for one: dashes, quotes and spaces unified, lower case. Offsets
-    into the result are offsets into `s`."""
-    return "".join(_unify_char(c) for c in s)
-
-
-def _collapse(s: str, loose: bool = False) -> tuple[str, list[int]]:
-    """`s` unified, runs of spaces collapsed (and, if loose, punctuation dropped), with
-    the offset in `s` of every character kept."""
-    u = unify(s)
-    out: list[str] = []
-    idx: list[int] = []
-    for i, c in enumerate(u):
-        if loose and c in ",;:()[]{}!?\"*" :
-            c = " "
-        if loose and c == "." and not (0 < i < len(u) - 1 and u[i - 1].isdigit() and u[i + 1].isdigit()):
-            c = " "
-        if c == " " and (not out or out[-1] == " "):
-            continue
-        out.append(c)
-        idx.append(i)
-    return "".join(out), idx
-
-
-_EDGE = " .,;:!?\"'"
-
-
-def _bounded(line: str, a: int, b: int) -> bool:
-    """The span starts and ends where a word or a number does: "glucose 10" is not in
-    "glucose 105", "man" not in "manager", "diabetic" not in "nondiabetic"."""
-    if a > 0 and line[a].isalnum() and line[a - 1].isalnum():
-        return False
-    if b < len(line) and line[b - 1].isalnum() and line[b].isalnum():
-        return False
-    if line[b - 1].isdigit() and re.match(r"[.,]\d|'\d", line[b:b + 2]):
-        return False                            # "glucose 5" in "glucose 5,8"; 5'1 in 5'11
-    return True
-
-
-def _locate(quote: str, lines: list[str]) -> tuple[Optional[tuple[int, int, int]], str]:
-    """(line, start, end) of the one place `quote` occurs, or None and why not."""
-    for loose in (False, True):
-        q, _ = _collapse(quote, loose)
-        q = q.strip(_EDGE)
-        if len(q.replace(" ", "")) < 3:
-            return None, "the quote is too short"
-        if "\n" in quote.strip():
-            return None, "the quote spans two lines"
-        hits = []
-        for n, line in enumerate(lines):
-            c, idx = _collapse(line, loose)
-            start = c.find(q)
-            while start >= 0:
-                a, b = idx[start], idx[start + len(q) - 1] + 1
-                if _bounded(line, a, b):
-                    hits.append((n, a, b))
-                start = c.find(q, start + 1)
-        if len(hits) == 1:
-            return hits[0], ""
-        if len(hits) > 1:
-            return None, "the quote occurs more than once"
-    return None, "the quote is not in the text"
-
-
-# ═══════════════════════════ what the model's items become ═════════════════════
-
-@dataclass
-class Item:
-    """One model item, grounded: where its quote is, and what it was checked to mean."""
-    raw: dict
-    kind: str
-    line: int
-    start: int
-    end: int
-    quote: str                                # the text there, as typed
-    statements: tuple = ()                    # the rules' statements it overlaps
-    fact: Optional[Fact] = None               # what it says, if it can be written as a line
-    problem: Optional[tuple] = None           # (text, kind, topic, wordings) — blocks
-    note: str = ""
-    #: (line text, start, end) of the statements the quote is in: what a claim is read against
-    ctx: Optional[tuple] = None
-    #: every word of the quote is accounted for by its kind's grammar, so the quote may
-    #: stand for its part of the statement when a rewrite replaces it
-    tight: bool = True
-
-
-@dataclass
-class Suggestion:
-    """A wording the person can click to put in place of what they typed."""
-    line: int
-    start: int
-    end: int
-    original: str
-    wordings: list                            # first: the model's reading; then the rules'
-    reason: str
-    blocking: bool = False                    # the build waits for it (a problem says why)
-
-    def apply(self, text: str, wording: str) -> str:
-        """`text` with this suggestion's span replaced by `wording`; unchanged if the
-        span no longer holds what it held at Read."""
-        lines = text.splitlines(keepends=True)            # numbered as the reader numbers them
-        if self.line >= len(lines) or lines[self.line][self.start:self.end] != self.original:
-            return text
-        lines[self.line] = lines[self.line][:self.start] + wording + lines[self.line][self.end:]
-        return "".join(lines)
-
-    def as_dict(self) -> dict:
-        return {"line": self.line, "start": self.start, "end": self.end, "original": self.original,
-                "wordings": list(self.wordings), "reason": self.reason, "blocking": self.blocking}
-
-
-@dataclass
-class Substitution:
-    line: int
-    start: int
-    end: int
-    original: str
-    lines: list
-    statements: tuple
+#: words that carry nothing on their own — filler, and a measurement's label left beside the
+#: value the model quoted ("height" in "height 5'3''"): a piece made only of these is not "not used"
+_FILLER = {"a", "an", "the", "i", "i'm", "im", "am", "is", "are", "and", "or", "but", "also", "my", "me",
+           "with", "of", "to", "in", "on", "at", "for", "so", "very", "really", "just", "hi", "hello",
+           "thanks", "please", "patient", "pt", "height", "weight", "tall", "age", "aged", "sex", "gender",
+           "year", "years", "old", "yo", "inch", "inches", "ft", "feet", "foot", "lb", "lbs", "pounds", "kg",
+           "cm"}
+_WORD = re.compile(r"[^\W\d_]{2,}")
+_OTHERS = "in what the model says is about someone else"
+#: the words that state a sex (the prompt's own list): a sex item's quote must hold one
+_SEX_WORDS = {"male": {"male", "man", "m", "gentleman", "masculine"},
+              "female": {"female", "woman", "f", "lady", "feminine"}}
+_UNIT_WORDS = {
+    "kg": r"kg|kgs|kilo|kilos|kilogram|kilograms",
+    "lb": r"lb|lbs|pound|pounds|#",
+    "cm": r"cm|centimet(?:er|re)s?",
+    "m": r"m|met(?:er|re)s?",
+    "in": r"in|inch|inches|\"|''",
+}
 
 
 @dataclass
 class PatientRead:
-    """Everything Read produced: what Build builds from, and what the tab shows."""
-    text: str                                 # as typed
-    read_as: str                              # what the rules read (the model's rewrites in)
-    parsed: ParsedPatient                     # the rules' reading of `read_as`, model problems added
-    reader: str = "rules"                     # "rules" | "rules+model"
+    """What was read from `text`, and how: `reader` is "model" or "lines" (canonical
+    lines, no model). `discarded` holds the model's items that failed a check, as
+    (quote, kind, why)."""
+    text: str
+    parsed: ParsedPatient
+    reader: str = "lines"
     model: Optional[str] = None
     model_error: Optional[ExtractError] = None
-    substitutions: list = field(default_factory=list)
-    suggestions: list = field(default_factory=list)
-    notes: list = field(default_factory=list)
-    #: (quote, kind, why) of every model item that did not pass the checks
     discarded: list = field(default_factory=list)
-    #: parsed.statements index -> the words the person typed, for rows from a model rewrite
-    model_quotes: dict = field(default_factory=dict)
     usage: dict = field(default_factory=dict)
     latency_s: float = 0.0
     cached: bool = False
 
-    def source(self, statement: int) -> str:
-        return "model" if statement in self.model_quotes else "rules"
-
     def header(self) -> str:
-        if self.reader == "rules+model":
-            return f"Read by rules + {self.model}"
-        if self.model_error is None:
-            return "Read by rules only"
-        e = self.model_error
-        why = {"no_key": "no OPENAI_API_KEY", "timeout": "the model did not answer in time",
-               "refused": "the model declined", "truncated": "the model's answer was cut off",
-               "too_long": e.message}.get(e.code, e.message)
-        if e.is_config and e.code != "no_key":
-            return f"Read by rules only — model reader misconfigured: {why}"
-        return f"Read by rules only — {why}"
+        if self.reader == "model":
+            return (f"Read by {self.model}; every value was checked against your text"
+                    + (" (cached)" if self.cached else ""))
+        if self.model_error is not None:
+            return (f"Read as one fact per line, without the model ({self.model_error.message}) — "
+                    f"write lines like the examples")
+        return "Read as one fact per line, without the model — write lines like the examples"
 
     def as_dict(self) -> dict:
         return {
-            "reader_used": self.reader, "model": self.model,
+            "reader": self.reader, "model": self.model,
             "model_error": None if self.model_error is None else
             {"code": self.model_error.code, "message": self.model_error.message,
              "configuration": self.model_error.is_config},
-            "read_as_text": self.read_as,
-            "suggestions": [s.as_dict() for s in self.suggestions],
-            "model_notes": list(self.notes),
-            "statements": [{**st.as_dict(), "source": self.source(st.index),
-                            "typed": self.model_quotes.get(st.index, st.text)}
-                           for st in self.parsed.statements],
+            "statements": [st.as_dict() for st in self.parsed.statements],
+            "discarded": [{"quote": q, "kind": k, "why": w} for q, k, w in self.discarded],
         }
 
 
-# ═══════════════════════════ checks per kind ═══════════════════════════════════
-
-_NUM = r"(?:\d+(?:\.\d+)?|\.\d+)"
-_SMOKE_WORD = re.compile(r"smok|cig|tobacco|nicotin|\bpacks?\b|pack[- ]?years?|cigar|\bpipe|vap|e-?cig|snus|"
-                         r"\bchew|zyn|juul|pouch|patch|nicotine gum|lozenge|weed|cannabis|marijuana|\bpot\b|joint")
-_TOBACCO_WORD = re.compile(r"cig|tobacco|cigar|\bpacks?\b|\bpipe")
-_NICOTINE_WORD = re.compile(r"vap|e-?cig|juul|snus|\bchew|\bdip\b|zyn|pouch|patch|nicotine gum|lozenge|nrt")
-_OCCASIONAL = re.compile(r"\b(?:occasional(?:ly)?|social(?:ly)?|rarely|light(?:ly)?|some ?days?|weekends?|"
-                         r"part(?:y|ies)|now and then|once in a while|sometimes|seldom|infrequent(?:ly)?)\b")
-_FLAG = re.compile(r"^(?:h|l|hh|ll|high|low|normal|abnormal|elevated|raised|ok|borderline|critical|wnl|"
-                   r"\*+|↑|↓|\(h\)|\(l\)|\(high\)|\(low\)|\(normal\))$")
-_CONTEXT_WORD = re.compile(r"^(?:today|yesterday|on|in|at|last|this|from|taken|measured|done|recently|"
-                           r"fasting|non-fasting|nonfasting|random|ref|reference|range|nr|normal)\b")
-_LEAD_FILLER = re.compile(r"^(?:(?:my|the|a|latest|last|recent|most recent|today'?s|current|repeat)\s+)*$")
-_RANGE = re.compile(r"\d+(?:\.\d+)?\s*-\s*\d+(?:\.\d+)?")
-_DATE = re.compile(r"\b\d{4}-\d{1,2}(?:-\d{1,2})?\b|\b\d{1,2}/\d{1,2}/\d{2,4}\b")
-
-_NEG = r"(?:no|not|never|denies|denied|deny|negative for|without|free of|nor|none of|n't|no history of|no hx of)"
-_HEADER = re.compile(r"^\W*(?:(?:past )?medical history|pmh|history|hx|diagnos[ie]s|dx|known conditions|"
-                     r"conditions?|comorbidities|problems?(?: list)?)\s*[:\-=]?\s*")
-_TRAIL_NEG = re.compile(r"^\s*(?:[:=\-]\s*)?(?:no|n|none|0|negative|neg|denies|denied|false|absent|"
-                        r"ruled out|excluded|resolved)\b|\b(?:ruled out|excluded|resolved|negative)\b|\?")
-_EMPTY_ANSWER = re.compile(r"^\s*[:=]\s*-*\s*$")
-
-
-_WORD = re.compile(r"[^\W_]+(?:'[^\W_]+)?")
-#: words any quote may carry without saying anything
-_QUOTE_FILLER = {"my", "the", "a", "an", "is", "are", "i", "im", "i'm", "ive", "i've", "me", "and", "also", "too",
-                 "of", "patient", "pt"}
-_SEX_AGE_WORDS = {"male", "female", "man", "woman", "gentleman", "lady", "m", "f", "sex", "gender", "age",
-                  "aged", "year", "years", "yr", "yrs", "old", "yo", "y", "o", "am"}
-_UNIT_WORDS = {"g", "dl", "mg", "l", "ml", "mmol", "umol", "µmol", "μmol", "nmol", "pmol", "pg", "ng", "ug", "µg",
-               "μg", "iu", "u", "meq", "fl", "mmhg", "kg", "m2", "bpm", "min", "beats", "per", "cells", "k", "thou",
-               "mil", "million", "x10", "mol", "x", "µl", "μl", "ul", "nl", "percent"}
-_FLAG_WORDS = {"h", "l", "hh", "ll", "high", "low", "normal", "abnormal", "elevated", "raised", "ok", "borderline",
-               "critical", "wnl", "ref", "reference", "range", "nr", "flag", "flagged"}
-
-
-#: The words each kind's quote may use besides its numbers, terms and units (filler aside).
-#: A check refuses a quote with other words; a rewrite counts a left-out word as covered
-#: only if it is in the grammar of an item the statement has — never a negation.
-_GRAMMAR = {
-    "lab": _FLAG_WORDS | _UNIT_WORDS | {"level", "value", "result", "count", "was", "of", "at", "serum", "blood",
-                                        "plasma"},
-    "cotinine": {"cotinine", "serum", "level", "value", "result", "was", "ng", "ml", "ug", "µg", "μg", "l",
-                 "less", "than", "under", "below"},
-    "sex": _SEX_AGE_WORDS, "age": _SEX_AGE_WORDS,
-    "weight": {"weight", "weigh", "weighs", "wt", "body", "kg", "kgs", "kilo", "kilos", "kilogram", "kilograms",
-               "lb", "lbs", "pound", "pounds", "am", "about", "around", "approx", "approximately", "now", "current",
-               "currently"},
-    "height": {"height", "tall", "ht", "cm", "centimeter", "centimeters", "centimetre", "centimetres", "m", "meter",
-               "meters", "metre", "metres", "in", "inch", "inches", "ft", "feet", "foot", "am", "stand", "about",
-               "around"},
-    "self_rated_health": {"self", "rated", "reported", "assessed", "general", "overall", "health", "status",
-                          "healthy", "rating", "would", "say", "describe", "consider", "feel", "it", "as",
-                          "excellent", "very", "good", "fair", "poor", "now", "currently"},
-    "health_vs_year_ago": {"health", "compared", "to", "with", "vs", "versus", "than", "one", "year", "ago", "past",
-                           "months", "feel", "has", "have", "got", "getting", "gotten", "become", "became", "better",
-                           "improved", "worse", "same", "unchanged", "similar", "overall", "general", "since",
-                           "been", "this", "time", "it"},
-    "healthcare_visits": {"visit", "visits", "visited", "doctor", "doctors", "doctor's", "gp", "physician",
-                          "physicians", "clinic", "medical", "healthcare", "health", "care", "appointment",
-                          "appointments", "check", "checkup", "checkups", "up", "ups", "saw", "seen", "see", "went",
-                          "to", "times", "time", "per", "each", "every", "year", "month", "week", "yearly", "monthly",
-                          "weekly", "annually", "annual", "past", "last", "this", "in", "months", "have", "had",
-                          "been",
-                          "was", "were", "not", "never", "no", "haven't", "didn't", "n't", "once", "twice", "none",
-                          "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"},
-    "grimage": {"grim", "grimage", "age", "accel", "acceleration", "ageaccelgrim", "epigenetic", "clock", "year",
-                "years", "yrs", "y", "older", "younger", "below", "above", "less", "more", "lower", "negative",
-                "positive", "minus", "plus", "than", "under", "over"},
-    "smoking": {"never", "non", "not", "no", "nonsmoker", "smoker", "smoked", "smokes", "smoking", "current",
-                "former", "ex", "exsmoker", "denies", "denied", "none", "n", "y", "yes", "free", "smoke", "do",
-                "does", "did", "don't", "doesn't", "didn't", "dont", "doesnt", "longer", "anymore", "more", "light",
-                "occasional", "pipe", "pipes", "cigar", "cigars", "cigarillo", "cigarillos"},
-}
-_NEGATION_WORDS = {"no", "not", "never", "non", "none", "nor", "without", "n't", "don't", "doesn't", "didn't",
-                   "haven't", "hasn't", "isn't", "wasn't", "wouldn't", "can't", "cannot", "denies", "denied",
-                   "deny", "negative", "free", "n"}
-
-
-def _unexplained(text: str, allowed: set, *patterns: str) -> list:
-    """The words of `text` that neither `patterns` nor `allowed` nor filler account for
-    (in any script: a qualifier in Cyrillic is a word too)."""
-    low = unify(text)
-    for pattern in patterns:
-        low = re.sub(pattern, " ", low)
-    low = re.sub(r"(?<=\d)(?=[^\W\d_])|(?<=[^\W\d_])(?=\d)", " ", low)     # "58M" is 58 and M
-    return [w for w in _WORD.findall(low) if w not in allowed and w not in _QUOTE_FILLER and not w.isdigit()]
-
-
-def _alias_spans(low: str) -> list[tuple[int, int, str]]:
-    """Every lab name in `low`, longest first, never overlapping — as the reader picks them."""
-    out: list[tuple[int, int, str]] = []
-    for alias, _ in _ALIAS_INDEX:
-        for m in re.finditer(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", low):
-            if not any(m.start() < e and s < m.end() for s, e, _ in out):
-                out.append((m.start(), m.end(), alias))
-    return sorted(out)
-
-
-def _group_of(alias: str):
-    for g in vocabulary().labs.values():
-        if alias in g.aliases:
-            return g
-    return None
-
-
-def _check_lab(it: Item) -> str:
-    v = vocabulary()
-    chosen = v.labs[it.raw["lab"]]
-    q = it.quote
-    low = unify(q)
-    names = _alias_spans(low)
-    # the chosen group's names; a fasting and a plain glucose name are one analyte (fasting is
-    # then never granted below), but urea and urea nitrogen are not: their mg/dL differ 2.1x
-    mine = [n for n in names if (g := _group_of(n[2])) is not None
-            and (g.key == chosen.key or (g.codes == chosen.codes and (g.fasting or chosen.fasting)))]
-    if len(mine) != 1:
-        return f"the quote does not name {chosen.key} exactly once"
-    s, e, alias = mine[0]
-    prefix = low[:s].strip(" -•*:").strip()
-    if any(n[0] < s for n in names) or (prefix and not _LEAD_FILLER.match(prefix + " ")):
-        return "other words name the analyte before it"
-    group = _group_of(alias)
-    if group.fasting and not chosen.fasting:
-        group = chosen                         # never grant 'fasting' the model did not choose
-    elif chosen.fasting and not group.fasting:
-        return "the quote does not say fasting"
-    accepted = {k for code in group.codes for spec in _specs(code, group) for k in spec.units}
-    m = re.match(rf"\s*(?:\((?P<bu>[^()]{{1,15}})\)\s*)?(?:level|value|result|count)?\s*"
-                 rf"(?:[:=]|\bis\b|\bwas\b|\bof\b|\bat\b|-)?\s*(?:about|around|approx\.?|approximately|~)?\s*"
-                 rf"(?P<cmp>(?:<|>|≤|≥|less than|greater than|under|over|below|above)\s*)?(?P<num>{_NUM})",
-                 low[e:])
-    if not m:
-        return "no number right after the name"
-    if any(n[0] >= e and n[0] < e + m.start("num") for n in names):
-        return "another lab name between the name and the number"
-    if m.group("cmp"):
-        return "a censored value (< or >)"
-    num_end = e + m.end("num")
-    number = q[e + m.start("num"):num_end]
-    tail = q[num_end:]
-    if re.match(r"\s*(?:,\d|/\s*\d|-\s*\d|\.\d)", tail):
-        return "the number continues (a decimal comma, a ratio or a range)"
-    unit = ""
-    bu = m.group("bu")
-    if bu and normalise_unit(bu) not in accepted:
-        return "a qualifier in brackets after the name"      # "Bilirubin (direct)", "Glucose (2 h)"
-    if bu:
-        unit = q[e + m.start("bu"):e + m.end("bu")]
-    rest = tail.strip()
-    if not unit:
-        bracket = re.match(r"^[(\[]\s*([^()\[\]]{1,15}?)\s*[)\]]", rest)
-        if bracket and normalise_unit(bracket.group(1)) in accepted:
-            unit, rest = bracket.group(1), rest[bracket.end():]
-        else:
-            tokens = re.findall(r"\S+", rest)
-            for k in range(min(4, len(tokens)), 0, -1):
-                cand = re.match(r"^\S+(?:\s+\S+){%d}" % (k - 1), rest).group(0)
-                cand_clean = cand.rstrip(".,;:")
-                if normalise_unit(cand_clean) in accepted:
-                    unit, rest = cand_clean, rest[len(cand_clean):]
-                    break
-            else:
-                first = tokens[0].rstrip(".,;:") if tokens else ""
-                if first and not _FLAG.match(first.lower()) and not _CONTEXT_WORD.match(first.lower()) \
-                        and not first.startswith(("(", "[")) and not re.match(r"^[<>≤≥\d]", first):
-                    unit, rest = first, rest[len(first):]          # unknown: the rules will refuse it
-    if re.search(r"\bor (?:less|more|lower|higher|above|below|greater|under|over)\b|^\s*\+|\b(?:max|min|maximum|"
-                 r"minimum|at most|at least|up to)\b", unify(rest)):
-        return "a censored value (or less, or more)"
-    left = _RANGE.sub(" ", unify(rest))
-    left = re.sub(r"(?:<|>|≤|≥)\s*\d+(?:\.\d+)?", " ", left)      # a reference limit "(<5)"
-    if re.search(r"\d", left):
-        return "a second number (or a date) for the analyte"
-    if _unexplained(left, _FLAG_WORDS | _UNIT_WORDS):
-        return "words after the value"           # "... before metformin", "... when I had covid"
-    it.fact = Fact("lab", chosen.key if not group.fasting else group.key, number, unit)
-    return ""
-
-
-def _specs(code: str, group):
-    from core.patient_text import LABS
-    return [s_ for s_ in LABS if s_.code == code and set(s_.aliases) & set(group.aliases)]
-
-
-def _check_cotinine(it: Item) -> str:
-    low = unify(it.quote)
-    if _unexplained(low, _GRAMMAR["cotinine"]):
-        return "words the cotinine grammar does not have"
-    m = re.search(r"\bcotinine\b", low)
-    if not m:
-        return "the quote does not say cotinine"
-    after = low[m.end():]
-    if re.search(r"\b(?:undetectable|not detected|negative|nd)\b", after):
-        return "a censored cotinine value"
-    c = re.match(rf"\s*(?P<lvl>level)?\s*(?:value|result)?\s*(?:[:=]|\bis\b|\bwas\b|\bof\b)?\s*"
-                 rf"(?P<cmp>(?:<|>|≤|≥|less than|greater than|under|over|below|above)\s*)?(?P<num>{_NUM})"
-                 rf"\s*(?P<unit>ng\s*/\s*ml|[uµμ]g\s*/\s*l)?\b", after)
-    if not c:
-        return "no cotinine value"
-    tail = _RANGE.sub(" ", after[c.end():])
-    if re.search(r"\d", tail):
-        return "a second number"
-    number = it.quote[m.end() + c.start("num"):m.end() + c.end("num")]
-    if c.group("cmp"):
-        if c.group("cmp").strip() in ("<", "less than", "under", "below", "≤") and c.group("unit") \
-                and float(number) <= 10:
-            it.fact = Fact("cotinine", number="0", unit="ng/mL")   # below 10 ng/mL: level 0
-            return ""
-        return "a censored cotinine value"
-    if c.group("unit"):
-        it.fact = Fact("cotinine", number=number, unit="ng/mL")
-        return ""
-    if c.group("lvl") and number in ("0", "1", "2", "3"):
-        it.fact = Fact("cotinine", number=number, unit="level")
-        return ""
-    return "cotinine without ng/mL or a level 0-3"
-
-
-def _check_smoking(it: Item, measured_cotinine: bool) -> str:
-    low = unify(it.quote)
-    if not _SMOKE_WORD.search(low):
-        return "the quote has no smoking word"
-    status, other = it.raw["status"], it.raw["other_nicotine"]
-    nicotine = _NICOTINE_WORD.search(low)
-    if other in ("vaping", "nicotine_replacement", "smokeless") and nicotine \
-            and re.search(r"\b(?:never|no|not|nor|without|don'?t|doesn'?t|didn'?t)\b|n't\b|\bor\s*$",
-                          re.split(r"[,;.]|\bbut\b", low[:nicotine.start()])[-1]):
-        other = "none"                           # "never smoked or vaped", "doesn't vape"
-    tobacco = _TOBACCO_WORD.search(low.replace("smokeless tobacco", "")) or re.search(
-        r"smok(?!eless)", low)
-    if status == "unclear" and other == "none" and not tobacco:
-        return "says nothing about smoking"      # "never vaped", "20 pack years", "smokeless: never"
-    if re.search(r"\bsmokeless\b", low) and not re.search(r"smok(?!eless)", low) and status != "unclear" \
-            and other == "none":
-        return "smokeless tobacco says nothing about smoking"
-    if other == "cannabis" and not _TOBACCO_WORD.search(low):
-        it.problem = (f"'{it.quote}': cannabis is not tobacco, and LinAge2 reads tobacco exposure "
-                      f"(cotinine); say your tobacco smoking on its own ('never smoked', 'former "
-                      f"smoker', 'current smoker')", "ambiguous", "smoking", [])
-        return ""
-    if other in ("vaping", "nicotine_replacement", "smokeless"):
-        what = {"vaping": "vaping", "nicotine_replacement": "nicotine replacement",
-                "smokeless": "smokeless tobacco"}[other]
-        text = (f"'{it.quote}': {what} raises cotinine, which LinAge2 reads, but is not smoking to "
-                f"the knowledge base; give 'cotinine N ng/mL' from a test, or remove the {what} to "
-                f"be read without it")
-        if measured_cotinine:
-            it.note = f"'{it.quote}': {what} — the measured cotinine is used for it"
-        else:
-            it.problem = (text, "vaping", "smoking", [])
-    elif other == "secondhand":
-        it.note = f"'{it.quote}': second-hand smoke is not smoking; it is not counted"
-    if status == "unclear":
-        why = re.sub(r"[`*_\[\]<>]", "", str(it.raw.get("why", "")))[:160]
-        if it.problem is None:
-            it.problem = (f"'{it.quote}': the model cannot tell whether you smoke now, used to, or never "
-                          f"did{f' ({why})' if why else ''}; write 'current smoker', 'former smoker' or "
-                          f"'never smoked'", "ambiguous", "smoking", [])
-        return ""
-    if other == "cannabis":
-        return ""                                # tobacco words too: the rules decide
-    it.fact = Fact("smoking", STATUS[status],
-                   occasional=bool(it.raw["occasional"] and status == "current" and _OCCASIONAL.search(low)))
-    from core.patient_text import _SMOKING_DETAIL
-    it.tight = not _unexplained(_SMOKING_DETAIL.sub(" ", low), _GRAMMAR["smoking"])
-    return ""
-
-
-def _negated(low: str, ts: int, te: int) -> bool:
-    """Is the condition at low[ts:te] denied? A negation heading a list covers the whole
-    list ("no diabetes or hypertension"); one heading the nearest clause covers it
-    ("hypertension, no diabetes"); a trailing "ruled out", "?" or ": no" too."""
-    before = low[:ts]
-    head = _HEADER.sub("", before)
-    if re.match(rf"^\W*(?:i\s+)?(?:have\s+|had\s+|has\s+)?{_NEG}\b", head):
-        return True
-    clause = re.split(r"[,;.]|\band\b|\bbut\b|\bwith\b", before)[-1]
-    if re.match(rf"^\s*(?:i\s+)?(?:have\s+|had\s+|has\s+)?{_NEG}\b", clause):
-        return True
-    if re.search(r"(?:\b(?:no|not|never|denies|denied|without|nor|free of|negative for)|n't)\s+"
-                 r"(?:[^\W_]+\s+){0,2}$", before):
-        return True                             # "male without hep A"
-    after = re.split(r"[,;.]", low[te:])[0]
-    return bool(_TRAIL_NEG.search(after) or _EMPTY_ANSWER.match(after))
-
-
-def _dated_past(low: str, window: str) -> bool:
-    """A time reference that puts the event outside the item's window."""
-    this_year = date.today().year
-    years = [int(y) for y in re.findall(r"\b(19\d{2}|20\d{2})\b", low)]
-    recent = re.search(r"\b(?:past|last) (?:12|twelve) months\b|\bpast year\b|\blast year\b|\bthis year\b"
-                       r"|\bthis month\b|\blast month\b|\b(?:past|last) (?:3|three) months\b|\bcurrently\b|\bnow\b",
-                       low)
-    old = re.search(r"\b(?:history of|hx of|as a (?:child|kid|teen\w*)|in my (?:teens|twenties|thirties|20s|30s|40s)"
-                    r"|years ago|long ago|previous(?:ly)?|prior|in the past|had|once)\b", low)
-    if window == "12 months":
-        if any(y < this_year - 1 for y in years):
-            return True
-        if re.search(r"\b(?:\d+|two|three|four|five|several|many)\s+years?\s+ago\b", low):
-            return True
-        return bool(old and not recent)
-    if window == "3 months":
-        if any(y < this_year for y in years):
-            return True
-        m = re.search(r"\b(\d+)\s+months?\s+ago\b", low)
-        if m and int(m.group(1)) > 3:
-            return True
-        return bool(old and not recent)
-    return False
-
-
-def _is_lab_or_vital(low: str) -> bool:
-    names = _alias_spans(low)
-    if names and re.match(rf"\s*(?:level|value)?\s*(?:[:=]|is|was|of)?\s*{_NUM}", low[names[0][1]:]):
-        return True
-    return bool(re.search(r"\b(?:bp|blood pressure)\s*[:=]?\s*\d{2,3}\s*/\s*\d{2,3}", low)
-                or re.search(rf"{_NUM}\s*(?:%|mg/dl|mmol/l|mmol/mol|g/dl|g/l|u/l|ng/ml)", low))
-
-
-_CONDITION_WORDS = {"no", "not", "never", "denies", "denied", "deny", "negative", "for", "without", "free", "nor",
-                    "none", "n't", "diagnoses", "diagnosis", "history", "hx", "pmh", "medical", "past", "conditions",
-                    "condition", "problems", "problem", "dx", "known", "list", "comorbidities", "or", "have", "had",
-                    "has", "was", "were", "diagnosed", "with", "told", "doctor", "by", "being", "been", "got",
-                    "suffer", "suffers", "suffering", "from", "living", "yes", "y", "type", "of"}
-
-
-def _check_condition(it: Item) -> str:
-    v = vocabulary()
-    by_key = {c.key: c for c in v.condition_info.values()}
-    c = by_key[it.raw["condition"]]
-    low = unify(it.quote)
-    answer = it.raw["answer"]
-    yes_line, no_line = render(Fact("condition", c.item, answer="yes")), render(Fact("condition", c.item, answer="no"))
-    term = re.search(rf"\b(?:{c.terms})\b", low)
-    if term and _unexplained(low, _CONDITION_WORDS, *[rf"\b(?:{x.terms})\b" for x in v.condition_info.values()],
-                             _DIAG_QUALIFIERS.pattern):
-        return "words the diagnosis grammar does not have"
-    if not term or _is_lab_or_vital(low):
-        if answer != "no":
-            it.note = (f"the model reads {c.key} from '{it.quote}', which does not say it; write "
-                       f"'{yes_line}' if a doctor told you so")
-        return ""
-    if c.exclusions and re.search(rf"\b(?:{c.exclusions})\b", low):
-        it.problem = (f"'{it.quote}': LinAge2's {c.key} item is NHANES's question \"{c.question}\" — "
-                      f"this wording may be one it leaves out; write '{yes_line}' or '{no_line}'",
-                      "ambiguous", "condition", [yes_line, no_line])
-        return ""
-    if c.window and _dated_past(low, c.window):
-        it.problem = (f"'{it.quote}': LinAge2's {c.key} item covers only the past {c.window} "
-                      f"(\"{c.question}\"); write '{yes_line}' or '{no_line}'",
-                      "ambiguous", "condition", [yes_line, no_line])
-        return ""
-    borderline_words = re.search(r"pre-?diabet|borderline diabet", low)
-    if answer == "borderline" and not (c.item == "DIQ010" and borderline_words):
-        return "borderline without 'prediabetes' or 'borderline diabetes'"
-    if answer == "yes" and c.item == "DIQ010" and borderline_words:
-        return "prediabetes read as diabetes"
-    if it.ctx is not None:                       # read the claim in its statement, not alone
-        line, cs, _ = it.ctx
-        ts = it.start + term.start() - cs
-        ctx_low = unify(line[cs:max(it.end, it.ctx[2])])
-        computed = "no" if _negated(ctx_low, ts, ts + term.end() - term.start()) else "yes"
-    else:
-        computed = "no" if _negated(low, term.start(), term.end()) else "yes"
-    if computed != ("no" if answer == "no" else "yes"):
-        return f"the wording reads {computed}, the model says {answer}"
-    it.fact = Fact("condition", c.item, answer=answer)
-    return ""
-
-
-_NO_OTHER = re.compile(
-    r"\bno\b.*\b(?:conditions?|diagnos[ie]s|diseases?|illness(?:es)?|medical (?:history|problems?|issues?)|"
-    r"health (?:problems?|issues?|conditions?)|problems?|issues?|comorbidit(?:y|ies)|pmh|history)\b"
-    r"|\botherwise (?:healthy|well|fit)\b|\bnothing else\b|\bhealthy otherwise\b|^\W*none\W*$")
-
-
-def _check_no_other(it: Item) -> str:
-    low = unify(it.quote).strip(" .!")
-    low = re.sub(r"\s+(?:to speak of|at all|that i know of|thankfully|whatsoever)$", "", low)
-    if not (_NO_CONDITIONS.match(low) or _OTHERWISE.match(low)) or re.search(r"\bno\s+(?:\w+\s+)*history\b", low) \
-            and not re.search(r"\bno\s+(?:past\s+)?medical history\b", low):
-        return "the quote does not say there are no (other) conditions"
-    if re.search(r"\b(?:except|apart from|other than|besides|aside from|but)\b", low):
-        return "the quote names exceptions"
-    it.fact = Fact("no_other_conditions")
-    return ""
-
-
-_SEX_WORDS = {"male": "Male", "man": "Male", "gentleman": "Male", "m": "Male",
-              "female": "Female", "woman": "Female", "lady": "Female", "f": "Female"}
-
-
-def _sex_tokens(low: str) -> set:
-    found = set()
-    for m in re.finditer(r"\b(male|female|man|woman|gentleman|lady)\b", low):
-        found.add(_SEX_WORDS[m.group(1)])
-    for m in re.finditer(r"\b(?:sex|gender)\s*[:=]?\s*(male|female|m|f)\b", low):
-        found.add(_SEX_WORDS[m.group(1)])
-    if not re.search(r"height|weight|tall|\bcm\b|\bkg\b|\blbs?\b|bmi|\bmm\b|met(?:er|re)|\bmg\b|temp|fever|°|º|"
-                     r"degrees?|\bdeg\b", low):
-        for m in re.finditer(r"(?<![\d.])[1-9]\d\s*(?:y/?o|yo|y\.o\.?|yrs?|years?(?:\s*old)?|-year-old)?\s*[,/]?\s*"
-                             r"([mf])\b(?!\s*[/\d])", low):
-            found.add(_SEX_WORDS[m.group(1)])
-        for m in re.finditer(r"(?<![a-z])([mf])\s*[,/]?\s*(?:aged?\s*)?[1-9]\d\b(?![./\d])", low):
-            found.add(_SEX_WORDS[m.group(1)])
-    return found
-
-
-def _check_sex(it: Item) -> str:
-    low = unify(it.quote)
-    if _unexplained(low, _GRAMMAR["sex"], r"y/o|y\.o\.?|-?year-old"):
-        return "words that are not a sex or an age"
-    mentioned = {_SEX_WORDS[w] for w in re.findall(r"\b(male|female|man|woman|gentleman|lady|m|f)\b", low)}
-    if len(mentioned) > 1:
-        return "both sexes in the quote"          # "gender: M / F", a blank form field
-    found = _sex_tokens(low)
-    want = SEX[it.raw["sex"]]
-    if found != {want}:
-        return "no explicit sex in the quote" if not found else "the quote's sex is not the model's"
-    it.fact = Fact("sex", want)
-    return ""
-
-
-_AGE_PHRASES = (
-    re.compile(r"(?<![\d.])(\d{1,3})\s*(?:-|\s)?(?:years?|yrs?)(?:\s*|-)old\b"),
-    re.compile(r"(?<![\d.])(\d{1,3})\s*(?:-|\s)?(?:y/?o|yo|y\.o\.?|yr-old|year-old)(?![a-z])"),
-    re.compile(r"\b(?:age|aged)\s*(?:is|:|=)?\s*(\d{1,3})\b"),
-    re.compile(r"(?<![\d.])(\d{2})\s*,?\s*(?:m|f|male|female)\b"),
-    re.compile(r"\b(?:m|f|male|female)\s*,?\s*(?:aged?\s*)?(\d{2})\b(?![./\d])"),
-)
-_NOT_AN_AGE = re.compile(r"\b(?:biological|bio|metabolic|epigenetic|grim\w*|lin\w*|pheno\w*|clock|"
-                         r"heart age|lung age|brain age|since|until|when|at age|ago|onset|diagnos\w*|"
-                         r"retire\w*|menopaus\w*|quit|started|stopped|child|son|daughter|husband|wife|"
-                         r"partner|mother|father|died|death|married|born)\b")
-
-
-def _check_age(it: Item) -> str:
-    low = unify(it.quote)
-    if _unexplained(low, _GRAMMAR["age"], r"y/o|y\.o\.?|-?year-old"):
-        return "words that are not an age or a sex"   # "male, 82 kg", "fitness age 42", "walk 50 m daily"
-    if _NOT_AN_AGE.search(low):
-        return "the quote is about another age"
-    if re.search(r"\b(?:was|were|last year|ago|when|then|back|in (?:19|20)\d{2})\b", low):
-        return "an age of another time"          # "I was 58 years old"
-    if it.ctx is not None:                       # and in its statement: "my HbA1c was 9 % at age 45"
-        line, cs, ce = it.ctx
-        before, after = unify(line[cs:it.start]), unify(line[it.end:ce])
-        if re.search(r"\b(?:at|when|since|until|till|from|by|before|after|was|were|of|aged? at)\s*$", before) \
-                or _NOT_AN_AGE.search(before) or re.search(
-                    r"\b(?:ago|last year|when|then|back|in (?:19|20)\d{2}|at the time|at diagnosis)\b", after):
-            return "an age of another time in its statement"
-    numbers = {m.group(1) for rx in _AGE_PHRASES for m in rx.finditer(low)}
-    if len(numbers) != 1:
-        return "no single age phrase in the quote"
-    (number,) = numbers
-    if len(re.findall(r"\d+", low)) != 1:
-        return "other numbers in the quote"
-    it.fact = Fact("age", number=str(int(number)))
-    return ""
-
-
-def _check_weight(it: Item) -> str:
-    low = unify(it.quote)
-    if not re.search(r"\b(?:weight|weigh(?:s|ed)?|wt)\b", low):
-        return "the quote does not say weight"
-    if re.search(r"\b(?:lost|lose|losing|gain\w*|down|up|target|goal|ideal|want|less|more|by)\b", low):
-        return "a change or a goal, not a weight"
-    if re.search(r"\b(?:was|were|had|used|before|ago|then|previously|after)\b", low) or _unexplained(
-            low, _GRAMMAR["weight"]):
-        return "words that are not a weight now"
-    m = re.findall(r"(\d+(?:\.\d+)?)\s*(kgs?|kilos?|kilograms?|lbs?|pounds?)\b", low)
-    if len(m) != 1 or len(re.findall(r"\d+(?:\.\d+)?", low)) != 1:
-        return "not one weight with a unit"
-    number, unit = m[0]
-    it.fact = Fact("weight", number=number, unit="lb" if unit.startswith(("lb", "pound")) else "kg")
-    return ""
-
-
-def _check_height(it: Item) -> str:
-    low = unify(it.quote)
-    if not re.search(r"\b(?:height|tall|ht)\b", low):
-        return "the quote does not say height"
-    if _unexplained(low, _GRAMMAR["height"]):
-        return "words that are not a height"
-    ftin = re.findall(r"\b(\d)\s*(?:'|ft|feet|foot)\s*(\d{1,2})\s*(?:\"|''|in\b|inch(?:es)?)?", low)
-    if ftin:
-        if len(ftin) != 1 or len(re.findall(r"\d+", low)) != 2:
-            return "not one height"
-        it.fact = Fact("height", number=f"{ftin[0][0]}'{ftin[0][1]}", unit="ft-in")
-        return ""
-    m = re.findall(r"(\d+(?:\.\d+)?)\s*(cm|centimet(?:er|re)s?|m|met(?:er|re)s?|in|inch(?:es)?)\b", low)
-    if len(m) != 1 or len(re.findall(r"\d+(?:\.\d+)?", low)) != 1:
-        return "not one height with a unit"
-    number, unit = m[0]
-    unit = "cm" if unit.startswith(("cm", "centi")) else "in" if unit.startswith("in") else "m"
-    it.fact = Fact("height", number=number, unit=unit)
-    return ""
-
-
-def _check_health(it: Item) -> str:
-    low = unify(it.quote)
-    rating = it.raw["rating"]
-    found = set(re.findall(r"\bvery good\b|\bexcellent\b|\bfair\b|\bpoor\b", low))
-    if re.search(r"(?<!very )\bgood\b", low):
-        found.add("good")
-    if found != {rating}:
-        return "the rating word is not alone in the quote" if found else "no rating word in the quote"
-    if not re.search(r"\bhealth\b|\bself[- ]rated\b", low):
-        return "the quote is not about health"   # "I feel good about it"
-    if re.search(r"\b(?:not|isn'?t|never|hardly|no)\b|n't\b|\b(?:dont|doesnt|wouldnt|cant|isnt)\b", low):
-        return "a negated rating"
-    if _unexplained(low, _GRAMMAR["self_rated_health"]):
-        return "words that are not a self-rated health"     # "dental health: poor"
-    if _PAST_WORDING.search(low):
-        return "a rating of another time"        # "my health used to be excellent"
-    it.fact = Fact("self_rated_health", rating)
-    return ""
-
-
-def _check_trend(it: Item) -> str:
-    low = unify(it.quote)
-    trend = it.raw["trend"]
-    found = set()
-    for word, key in (("better", "better"), ("improved", "better"), ("worse", "worse"), ("same", "about the same"),
-                      ("unchanged", "about the same"), ("similar", "about the same")):
-        if re.search(rf"\b{word}\b", low):
-            found.add(key)
-    if found != {trend}:
-        return "the trend word is not alone in the quote" if found else "no trend word"
-    if not re.search(r"year ago|last year|past year|12 months|a year back|than a year|this time last year", low):
-        return "not a comparison with a year ago"
-    if not re.search(r"\b(?:than|compared|vs|versus|since|getting|got|gotten|become|became|improved)\b", low):
-        return "no comparison in the quote"      # "health better a year ago": then, or now?
-    if re.search(r"\b(?:not|never|no)\b|n't\b|\b(?:dont|doesnt|wouldnt|cant)\b", low):
-        return "a negated trend"
-    if _unexplained(low, _GRAMMAR["health_vs_year_ago"]):
-        return "words that are not health against a year ago"   # "I felt better a year ago"
-    if re.search(r"\bused to\b|\bwas\b|\bwere\b|\bhad been\b|\buntil\b|\bpreviously\b|\bformerly\b", low):
-        return "a trend of another time"
-    it.fact = Fact("health_vs_year_ago", trend)
-    return ""
-
-
-#: a health answer about another time than now
-_PAST_WORDING = re.compile(r"\bused to\b|\bwas\b|\bwere\b|\bhad been\b|\buntil\b|\bpreviously\b|\bformerly\b"
-                           r"|\bin the past\b|\bago\b|\bbefore\b|\bback in\b|\b(?:19|20)\d{2}\b")
-_COUNT_WORDS = {"once": 1, "twice": 2, "none": 0, "no": 0, "zero": 0, "never": 0, "one": 1, "two": 2,
-                "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
-
-
-def _check_visits(it: Item) -> str:
-    low = unify(it.quote)
-    if not re.search(r"visit|appointment|doctor|\bgp\b|physician|clinic|check-?up|\bseen\b|\bsaw\b", low):
-        return "the quote is not about healthcare visits"
-    if _unexplained(low, _GRAMMAR["healthcare_visits"]):
-        return "words that are not a count of visits"
-    if re.search(r"\d+\s*(?:-|to)\s*\d+", low):
-        return "a range of visits"
-    nums = re.findall(r"\b\d+\b", low)
-    words = [w for w in re.findall(r"\b[a-z]+\b", low) if w in _COUNT_WORDS]
-    if len(nums) + len(words) != 1:
-        nums = [n for n in nums if n != "12" or not re.search(r"\b12 months\b", low)]
-        if len(nums) + len(words) != 1:
-            return "not one count"
-    n = int(nums[0]) if nums else _COUNT_WORDS[words[0]]
-    if n and re.search(r"\b(?:not|never|no|haven'?t|hasn'?t|didn'?t|don'?t|without)\b|n't\b", low):
-        return "a negated count"                 # "I have not seen a doctor once this year"
-    if re.search(r"\b(?:week|month|year|day)s?\s+ago\b|\blast (?:week|month)\b", low):
-        return "a time that is not a period"      # "once, a week ago"
-    if re.search(r"\bper month\b|\ba month\b|/\s*month|\bmonthly\b|\beach month\b|\bevery month\b", low):
-        period, factor = "month", 12
-    elif re.search(r"\bper week\b|\ba week\b|/\s*week|\bweekly\b|\beach week\b|\bevery week\b", low):
-        period, factor = "week", 52
-    elif re.search(r"\bper year\b|\ba year\b|/\s*year|\byearly\b|\bannual(?:ly)?\b|\blast year\b|\bpast year\b|"
-                   r"\b12 months\b|\bthis year\b", low):
-        period, factor = "year", 1
-    else:
-        period, factor = "unstated", 1
-    rest = re.sub(r"(?:per|a|each|every|/)\s*(?:week|month|year)\b|\b(?:weekly|monthly|yearly|annually|annual)\b"
-                  r"|\b(?:last|past|this)\s+year\b|\bin the (?:past|last) (?:year|12 months)\b"
-                  r"|\b(?:past|last) 12 months\b|\b12 months\b", " ", low)
-    if re.search(r"\b(?:days?|weeks?|months?|years?|decades?|ever|lifetime)\b", rest):
-        return "a period other than a year, a month or a week"   # "every six months", "this month"
-    if it.raw["period"] != period:
-        return f"the period reads {period}, the model says {it.raw['period']}"
-    it.fact = Fact("healthcare_visits", number=str(n * factor))
-    return ""
-
-
-def _check_grimage(it: Item) -> str:
-    low = unify(it.quote)
-    if not re.search(r"grim|ageaccelgrim", low):
-        return "the quote does not say GrimAge"
-    if it.raw["wording"] == "clock_age":
-        return "a clock age, not an acceleration"
-    if _unexplained(low, _GRAMMAR["grimage"]):
-        return "words that are not a GrimAge acceleration"
-    m = re.findall(r"([+-]?)\s*(\d+(?:\.\d+)?)", low)
-    if len(m) != 1:
-        return "not one number"
-    sign, number = m[0]
-    if sign and re.search(r"[+-]\s+\d", low):
-        return "a dash that may be a separator, not a sign"
-    if re.search(r"\b(?:below|less|lower|under|negative|minus|above|more|over|positive|plus|behind|ahead)\b", low):
-        return "the sign is written in words the check does not read"
-    direction = it.raw["direction"]
-    older, younger = bool(re.search(r"\bolder\b", low)), bool(re.search(r"\byounger\b", low))
-    if direction == "signed" and sign:
-        value = f"{sign}{number}"
-    elif direction == "older" and older and not younger and not sign:
-        value = f"+{number}"
-    elif direction == "younger" and younger and not older and not sign:
-        value = f"-{number}"
-    elif direction == "unstated" and not sign and not older and not younger \
-            and re.search(r"accel|ageaccelgrim", low):
-        value = number
-    else:
-        return "the sign is not written in the quote"
-    it.fact = Fact("grimage", number=value)
-    return ""
-
-
-def _check_unclear(it: Item) -> str:
-    low = unify(it.quote)
-    topic = it.raw["topic"]
-    why = re.sub(r"[`*_\[\]<>]", "", str(it.raw.get("why", "")))[:160]
-    v = vocabulary()
-    if topic == "smoking" and (_TOBACCO_WORD.search(low.replace("smokeless tobacco", ""))
-                               or re.search(r"smok(?!eless)", low)):
-        it.problem = (f"'{it.quote}': the model cannot tell what this says about your smoking"
-                      f"{f' ({why})' if why else ''}; write 'current smoker', 'former smoker' or "
-                      f"'never smoked'", "ambiguous", "smoking", [])
-    elif topic == "condition" and (_MEDICAL_WORDS.search(low) or any(
-            re.search(rf"\b(?:{c.terms})\b", low) for c in v.condition_info.values())):
-        it.problem = (f"'{it.quote}': the model cannot tell whether this is one of the conditions "
-                      f"LinAge2 counts{f' ({why})' if why else ''}; write it as 'diagnoses: …' or "
-                      f"'no …' with the condition's name", "ambiguous", "condition", [])
-    else:
-        it.note = f"the model could not read '{it.quote}'{f' ({why})' if why else ''}"
-    return ""
-
-
-# ═══════════════════════════ reading ═══════════════════════════════════════════
-
-def read_patient(text: str, extractor: Optional[Extractor] = None) -> PatientRead:
-    """The rules' reading of `text`, and with an extractor the model's rewrites too."""
+def read_patient(text: str, extractor=None) -> PatientRead:
+    """Read `text`: with an extractor by the model, else as canonical lines."""
     text = text or ""
-    rules = read_patient_text(text)
     if extractor is None:
-        return PatientRead(text, text, rules)
+        return PatientRead(text, read_lines(text))
     model = getattr(extractor, "model", None)
     try:
         ex = extractor(text)
     except ExtractError as exc:
-        return PatientRead(text, text, rules, model=model, model_error=exc)
+        return PatientRead(text, read_lines(text), model=model, model_error=exc)
     except Exception as exc:                    # noqa: BLE001 — Read must still answer
-        return PatientRead(text, text, rules, model=model,
+        return PatientRead(text, read_lines(text), model=model,
                            model_error=ExtractError("upstream", f"{type(exc).__name__}: {exc}"[:300]))
-    out = _with_model(text, rules, ex)
-    out.model, out.usage, out.latency_s, out.cached = ex.model, dict(ex.usage), ex.latency_s, ex.cached
-    return out
+    spans, discarded = verify(text, ex.items)
+    return PatientRead(text, assemble(spans, lost=_lost(discarded)), reader="model", model=ex.model,
+                       discarded=discarded, usage=dict(ex.usage), latency_s=ex.latency_s, cached=ex.cached)
 
 
-_CHECKS = {"lab": _check_lab, "cotinine": _check_cotinine, "condition": _check_condition,
-           "no_other_conditions": _check_no_other, "sex": _check_sex, "age": _check_age,
-           "weight": _check_weight, "height": _check_height, "self_rated_health": _check_health,
-           "health_vs_year_ago": _check_trend, "healthcare_visits": _check_visits,
-           "grimage": _check_grimage, "unclear": _check_unclear}
+#: kinds whose loss would not be a missing value but a wrong one: a dropped condition would be
+#: answered No beside a list, a dropped smoking status would leave a smoker's cotinine to imputation
+_ASK_IF_LOST = ("condition", "no_other_conditions", "smoking")
 
 
-def _ground(raw: dict, lines: list[str], rules: ParsedPatient) -> tuple[Optional[Item], str]:
-    if not isinstance(raw, dict) or not isinstance(raw.get("quote"), str):
-        return None, "no quote"
-    where, why = _locate(raw["quote"], lines)
-    if where is None:
-        return None, why
-    line, start, end = where
-    sts = tuple(st.index for st in rules.statements
-                if st.line == line and st.start < end and start < st.end)
-    if not sts:
-        return None, "the quote is in no statement"
-    cs = min(rules.statements[i].start for i in sts)
-    ce = max(rules.statements[i].end for i in sts)
-    return Item(raw, raw.get("kind", ""), line, start, end, lines[line][start:end], sts,
-                ctx=(lines[line], cs, ce)), ""
+def _lost(discarded: list) -> list:
+    """The dropped items the person must be asked about. A condition inside what the model says
+    is about someone else is that person's, and dropping it is right; a smoking status there may
+    be the person's own ("my wife and I smoke"), so it is asked about."""
+    return [(q, kind, why) for q, kind, why in discarded if kind in _ASK_IF_LOST
+            and not (kind != "smoking" and why == _OTHERS)]
 
 
-def _merge(facts_list: list[dict]) -> dict:
-    out: dict = {}
-    for facts in facts_list:
-        for k, val in facts.items():
-            if isinstance(val, dict):
-                out.setdefault(k, {}).update(val)
-            else:
-                out[k] = val
-    return out
+# ═══════════════════════════ the checks ════════════════════════════════════════
 
-
-_LINE_FACTS: dict = {}
-
-
-def _line_facts(line: str) -> dict:
-    """What the rules read from one canonical line on its own."""
-    if line not in _LINE_FACTS:
-        p = read_patient_text(line)
-        _LINE_FACTS[line] = _merge([st.facts for st in p.statements])
-    return _LINE_FACTS[line]
-
-
-_WHO_PHRASE = {("NeverSmoker", 0): "never smoked", ("FormerSmoker", 0): "former smoker",
-               ("CurrentSmoker", 3): "current smoker", ("CurrentSmoker", 1): "occasional smoker",
-               ("CurrentSmoker", 2): "moderate smoker"}
-
-
-def _rules_wording(facts: dict, questionnaire: Optional[dict] = None) -> Optional[str]:
-    """The rules' reading of a statement as canonical lines, if it is only who-facts and
-    conditions (a condition as the rules answered it in the end: 'no diabetes' with
-    'prediabetes' is borderline)."""
-    lines = []
-    for k, val in facts.items():
-        if k == "age":
-            lines.append(f"{val:g} year old")
-        elif k == "sex":
-            lines.append(val.lower())
-        elif k == "smoking":
-            lines.append(_WHO_PHRASE.get(tuple(val), ""))
-        elif k == "conditions":
-            for item, a in val.items():
-                a = (questionnaire or {}).get(item, a)
-                lines.append(render(Fact("condition", item, answer={1: "yes", 2: "no", 3: "borderline"}[a])))
-        else:
-            return None
-    return "; ".join(x for x in lines if x) or None
-
-
-def _describe(key: str, val) -> str:
-    if key == "smoking":
-        return _WHO_PHRASE.get(tuple(val), f"{val[0]} (level {val[1]})")
-    if key == "age":
-        return f"age {val:g}"
-    return str(val).lower()
-
-
-def _with_model(text: str, rules: ParsedPatient, ex: Extraction) -> PatientRead:
-    lines = text.splitlines()                  # as the reader numbers them
-    out = PatientRead(text, text, rules, reader="rules+model")
-
-    grounded: list[Item] = []
-    for raw in ex.items:
-        it, why = _ground(raw, lines, rules)
-        if it is None:
-            out.discarded.append((str(raw.get("quote", ""))[:120], str(raw.get("kind", "")), why))
-        else:
-            grounded.append(it)
-    others = [it for it in grounded if it.kind == "someone_else"]
-    items: list[Item] = []
-    for it in grounded:
-        if it.kind == "someone_else":
-            continue
-        why = ""
-        if any(o.line == it.line and o.start < it.end and it.start < o.end for o in others):
-            why = "in what the model says is about someone else"
-        elif any(rules.statements[i].outcome == "set_aside" for i in it.statements):
-            why = "in a statement the rules set aside as about someone else"
-        elif _SOMEONE_ELSE.search(unify(it.quote)):
-            why = "the quote is about someone else"
-        elif it.kind == "smoking":
-            why = _check_smoking(it, rules.cotinine_measured)
-        elif it.kind in _CHECKS:
-            why = _CHECKS[it.kind](it)
-        else:
-            why = f"no such kind {it.kind!r}"
-        if why:
-            out.discarded.append((it.quote, it.kind, why))
-        else:
-            items.append(it)
-
-    model_problems: list[tuple] = []           # (text, kind, topic, statements, wordings, span)
-
-    # a rules reading inside what the model calls someone else's
-    for o in others:
-        for i in o.statements:
-            st = rules.statements[i]
-            if st.outcome in ("set_aside", "refused") or not st.facts:
+def _fold(text: str) -> tuple[str, list[int]]:
+    """`text` with typography unified, case folded and every run of whitespace one space —
+    and, for each character kept, its offset in `text`."""
+    out, where = [], []
+    t = unify(text)
+    for i, c in enumerate(t):
+        if c.isspace():
+            if out and out[-1] == " ":
                 continue
-            if "smoking" in st.facts and not is_canonical(st.text):
-                model_problems.append((
-                    f"'{st.text}': the model reads this as about someone else, but your smoking was read "
-                    f"from it; put your own smoking on its own line ('never smoked', 'former smoker', "
-                    f"'current smoker')", "disagreement", "smoking", (i,), [], None))
-            else:
-                out.notes.append(f"the model reads '{o.quote}' as about someone else; it was read as yours")
+            c = " "
+        out.append(c.lower())
+        where.append(i)
+    return "".join(out), where
 
-    # components: statements joined by the items that quote them
-    parent = {st.index: st.index for st in rules.statements}
 
-    def find(i: int) -> int:
-        while parent[i] != i:
-            parent[i] = parent[parent[i]]
-            i = parent[i]
-        return i
+def locate(quote: str, lines: list[str]) -> Optional[tuple[int, int, int]]:
+    """(line, start, end) of the first place `quote` is in the text as whole words ("male" is
+    not in "female", "5'1" is not in "5'11"), or None."""
+    q, _ = _fold(quote.strip())
+    if len(q) < 3:
+        return None
+    for n, line in enumerate(lines):
+        folded, where = _fold(line)
+        i = folded.find(q)
+        while i >= 0:
+            j = i + len(q)
+            if (i == 0 or not (folded[i - 1].isalnum() and q[0].isalnum())) and \
+                    (j == len(folded) or not (folded[j].isalnum() and q[-1].isalnum())):
+                return n, where[i], where[j - 1] + 1
+            i = folded.find(q, i + 1)
+    return None
 
-    for it in items:
-        for i in it.statements[1:]:
-            parent[find(i)] = find(it.statements[0])
-    groups: dict[int, list[Item]] = {}
-    for it in items:
-        groups.setdefault(find(it.statements[0]), []).append(it)
 
-    subs: list[Substitution] = []
-    suggestions: list[Suggestion] = []
-    for root, its in groups.items():
-        sts = sorted(i for i in parent if find(i) == root)
-        first, last = rules.statements[sts[0]], rules.statements[sts[-1]]
-        line = first.line
-        span = (line, first.start, last.end)
-        original = lines[line][first.start:last.end]
-        facts = [it.fact for it in its if it.fact is not None]
-        wording = "; ".join(dict.fromkeys(render(f) for f in facts))
-        outcomes = {rules.statements[i].outcome for i in sts}
-        canonical = is_canonical(original)
-        tight = [it for it in its if it.fact is not None and it.tight]
-        dropped = _leftover(lines[line], first.start, last.end, tight)
-        # a silent rewrite needs more: its quotes hold the statement but for filler
-        dropped_strict = _leftover(lines[line], first.start, last.end, tight, strict=True)
+#: a small count written as a word: "twice a month", "three visits"
+_COUNT_WORDS = {0: "zero", 1: "one|once", 2: "two|twice", 3: "three|thrice", 4: "four", 5: "five", 6: "six",
+                7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve"}
 
-        for it in its:
-            if it.note:
-                out.notes.append(it.note)
-            if it.problem is not None:
-                ptext, pkind, ptopic, pwords = it.problem
-                if canonical and ptopic == "smoking":
-                    out.notes.append(f"the model was unsure about '{it.quote}'; it is in canonical form, "
-                                     f"so it stands")
-                elif "refused" in outcomes:
-                    out.notes.append(ptext)
-                else:
-                    model_problems.append((ptext, pkind, ptopic, tuple(sts), pwords,
-                                           (line, it.start, it.end, it.quote)))
-        if not wording:
-            continue
 
-        rules_facts = _merge([rules.statements[i].facts for i in sts])
-        model_facts = _merge([_line_facts(render(f)) for f in facts])
-        model_smoking = any(f.kind == "smoking" for f in facts)
-        if "refused" in outcomes:
-            if dropped:
-                out.notes.append(f"the model read part of '{original}' as '{wording}', leaving out "
-                                 f"'{dropped}'; not used")
-            else:
-                suggestions.append(Suggestion(*span, original, [wording],
-                                              "the rules could not use this as typed; the model reads it as",
-                                              blocking=False))
-            continue
-        read = outcomes <= {"read"}
-        blocking = []
-        for key in ("smoking", "age", "sex"):
-            if key in rules_facts and key in model_facts and rules_facts[key] != model_facts[key]:
-                r, m = rules_facts[key], model_facts[key]
-                if key == "smoking" and r[0] == m[0] == "CurrentSmoker" and r[1] == 2 and m[1] == 3:
-                    continue                    # "moderate": a current smoker the model has no level for
-                blocking.append((key, r, m))
-        if read and model_smoking and "smoking" not in rules_facts:
-            blocking.append(("smoking", None, model_facts.get("smoking")))
-        if blocking and not canonical:
-            # a disagreement on smoking, age or sex blocks, however the model quoted it; its own
-            # wording is a button only when its quotes hold the whole statement
-            said = "; ".join(f"the rules read {_describe(k, r) if r is not None else 'no smoking status'}, "
-                             f"the model reads {_describe(k, m)}" for k, r, m in blocking)
-            rules_way = _rules_wording(rules_facts, rules.questionnaire)
-            choices = ([] if dropped else [wording]) + ([rules_way] if rules_way and rules_way != wording else [])
-            model_problems.append((
-                f"'{original}': {said}; "
-                + ("choose a wording below, or rewrite it" if choices else "rewrite it"),
-                "disagreement", blocking[0][0], tuple(sts), choices, span + (original,)))
-            if choices:
-                suggestions.append(Suggestion(*span, original, choices, "the rules and the model differ",
-                                              blocking=True))
-            continue
-        if dropped:
-            # the quotes do not hold the whole statement ("I have not seen a doctor once", "my
-            # HDL cholesterol 45", "retired at 65 years old"): a wording would drop what they
-            # leave out, so none is offered — and nothing is rewritten
-            out.notes.append(f"the model read part of '{original}' as '{wording}', leaving out "
-                             f"'{dropped}'; not used")
-            if model_smoking and "smoking" not in rules_facts:
-                model_problems.append((
-                    f"'{original}' was not understood by the rules, and the model read only part of it as "
-                    f"'{wording}'; say your smoking in one phrase ('current smoker', 'former smoker', "
-                    f"'never smoked')", "not_understood", "smoking", tuple(sts), [], span + (original,)))
-            continue
-        if read:
-            notes = []
-            for key in ("labs", "conditions", "questionnaire"):
-                for k, val in model_facts.get(key, {}).items():
-                    r = rules_facts.get(key, {}).get(k)
-                    if r is None or (r != val and not (isinstance(r, float) and isinstance(val, float)
-                                                       and abs(r - val) <= 1e-6 * max(1.0, abs(r)))):
-                        notes.append(k)
-            for key in ("cotinine", "weight_kg", "height_cm", "grimage", "no_conditions"):
-                if key in model_facts and rules_facts.get(key) != model_facts[key]:
-                    notes.append(key)
-            if notes and not canonical:
-                out.notes.append(f"the model reads '{original}' differently from the rules ({', '.join(notes)}); "
-                                 f"the rules' reading is used — the wording below gives the model's")
-                suggestions.append(Suggestion(*span, original, [wording], "the model reads it as",
-                                              blocking=False))
-            continue
+def _has_number(quote: str, num: str) -> bool:
+    """`num` is in `quote` as a whole number — no digit, decimal point or comma-digit runs on
+    — or, for a count up to twelve, as its word."""
+    n = unify(num).strip().lstrip("+-")
+    if not re.fullmatch(r"\d+(?:[.,]\d+)?", n):
+        return False
+    body = "[.,]".join(re.escape(part) for part in re.split(r"[.,]", n))   # 4.1 or 4,1
+    if re.search(rf"(?<![\d.,]){body}(?![\d]|[.,]\d)", unify(quote)):
+        return True
+    words = _COUNT_WORDS.get(int(n)) if n.isdigit() else None
+    return bool(words and re.search(rf"\b(?:{words})\b", unify(quote).lower()))
 
-        # not (fully) understood by the rules: rewrite, unless the model alone says how the
-        # person smokes (the same status the rules read from it may be rewritten)
-        if model_smoking and "smoking" not in rules_facts:
-            model_problems.append((
-                f"'{original}' was not understood by the rules; the model reads it as '{wording}' — use "
-                f"that wording, or rewrite it", "not_understood", "smoking", tuple(sts), [wording],
-                span + (original,)))
-            suggestions.append(Suggestion(*span, original, [wording],
-                                          "a smoking status is never taken from the model without you",
-                                          blocking=True))
-            continue
-        lost = [k for k, val in rules_facts.items() if k != "ignored" and not _covers(model_facts, k, val)]
-        if lost:
-            suggestions.append(Suggestion(*span, original, [wording],
-                                          "the model reads it as (it leaves out part of what the rules read)",
-                                          blocking=False))
-            continue
-        if dropped_strict:
-            suggestions.append(Suggestion(*span, original, [wording], "the model reads it as",
-                                          blocking=False))
-            continue
-        subs.append(Substitution(*span, original, list(dict.fromkeys(render(f) for f in facts)), tuple(sts)))
 
-    # a rewrite only on a line every other statement of which the rules read (or that is
-    # rewritten too): an unread neighbour may carry what the rewrite means ("Before
-    # metformin, | my HbA1c was 9 %"; "My mother has diabetes. | Her HbA1c is 9 %")
-    while True:
-        rewritten = {i for s_ in subs for i in s_.statements}
-        unsafe = [s_ for s_ in subs if any(st.line == s_.line and st.index not in rewritten
-                                           and st.outcome != "read" for st in rules.statements)]
-        if not unsafe:
-            break
-        for s_ in unsafe:
-            subs.remove(s_)
-            out.notes.append(f"the model read '{s_.original}' as '{'; '.join(s_.lines)}'; not used, since "
-                             f"something else on its line was not read")
+def _has_unit(quote: str, unit: str) -> bool:
+    """A lab's unit as written is in the quote (spacing, case and µ/u aside)."""
+    from core.patient_text import normalise_unit
+    u = normalise_unit(unit)
+    return bool(u) and u in normalise_unit(unify(quote))
 
-    # rewrite, read again, and keep only rewrites that add exactly what they say
-    while True:
-        read_as, expected = _apply(lines, rules, subs)
-        final = read_patient_text(read_as)
-        bad = _check(rules, final, expected, subs)
-        if not bad:
-            break
-        if not any(s.line in bad for s in subs):
-            # a rewrite changed ANOTHER line (a neighbour's context: "no other conditions" below a medication
-            # takes it back). Withdraw the one rewrite that does it, nearest first, if one alone does; else all.
-            culprit = None
-            if -1 not in bad:
-                for c in sorted(subs, key=lambda s: min(abs(s.line - b) for b in bad)):
-                    trial = [x for x in subs if x is not c]
-                    ra, ex = _apply(lines, rules, trial)
-                    again = _check(rules, read_patient_text(ra), ex, trial)
-                    if not (again & bad) and -1 not in again:
-                        culprit = c
-                        break
-            if culprit is not None:
-                subs.remove(culprit)
-                out.notes.append(f"the model read '{culprit.original}' as '{'; '.join(culprit.lines)}'; not used, "
-                                 f"since it would change how other statements read")
-                continue
-            bad = {-1}                          # no single rewrite does it: withdraw them all
-        for s in [s for s in subs if s.line in bad or -1 in bad]:
-            subs.remove(s)                      # a note, not a button: in its context it reads otherwise
-            out.notes.append(f"the model read '{s.original}' as '{'; '.join(s.lines)}'; not used, since it "
-                             f"would change how other statements read")
 
-    # A button replaces its whole span, and the span can hold the words that withdrew a medication ("takes
-    # metformin, but not anymore, former smoker"): a wording that would change which medications the rules
-    # count is not offered.
-    meds = (rules.medications, rules.medications_stopped)
-    no_button: set = set()
-    kept: list = []
-    # no drug the reader knows anywhere in the text, and none read: a wording cannot change a medication reading,
-    # and re-reading the whole text once per wording of every suggestion is the cost of this check
-    drug_in_play = bool(rules.medications or rules.medications_stopped or mentioned_symbols(text))
-    for s_ in suggestions:
-        good = [w for w in s_.wordings
-                if not drug_in_play
-                or (lambda q: (q.medications, q.medications_stopped))(read_patient_text(s_.apply(text, w))) == meds]
-        if len(good) < len(s_.wordings):
-            out.notes.append(f"a wording for '{s_.original}' is not offered: putting it in place would change "
-                             f"whether a medication counts as one you take now")
-        s_.wordings = good
-        if good:
-            kept.append(s_)
+def _has_unit_word(quote: str, unit: str) -> bool:
+    return bool(re.search(rf"(?<![a-z])(?:{_UNIT_WORDS[unit]})(?![a-z])", unify(quote).lower()))
+
+
+def _fact(raw: dict, quote: str) -> tuple[Optional[Fact], str]:
+    """The Fact an item says, after the checks that need only its quote; or why not."""
+    kind = raw.get("kind", "")
+    if kind == "lab":
+        if not _has_number(quote, raw["number"]):
+            return None, "the number is not in the quote"
+        unit = raw["unit"].strip()
+        if unit and not _has_unit(quote, unit):
+            return None, "the unit is not in the quote"
+        return Fact("lab", raw["lab"], number=raw["number"].strip(), unit=unit), ""
+    if kind == "cotinine":
+        if not _has_number(quote, raw["number"]):
+            return None, "the number is not in the quote"
+        if not (_has_unit(quote, "ng/mL") if raw["unit"] == "ng/mL" else "level" in quote.lower()):
+            return Fact("unclear", "cotinine", detail="no unit"), ""
+        return Fact("cotinine", number=raw["number"].strip(), unit=raw["unit"]), ""
+    if kind == "smoking":
+        status = STATUS.get(raw["status"], "unclear")
+        amount = raw["amount"] if status == "CurrentSmoker" and raw["amount"] != "unstated" else ""
+        return Fact("smoking", status, amount=amount,
+                    detail="" if raw["other_nicotine"] == "none" else raw["other_nicotine"]), ""
+    if kind == "condition":
+        from core.patient_vocabulary import vocabulary
+        item = next(q for q, c in vocabulary().condition_info.items() if c.key == raw["condition"])
+        return Fact("condition", item, answer=raw["answer"]), ""
+    if kind == "no_other_conditions":
+        return Fact("no_other_conditions"), ""
+    if kind == "sex":
+        words = set(re.findall(r"[a-z]+", re.sub(r"(?<=\d)(?=[a-z])", " ", unify(quote).lower())))  # 58M
+        if not words & _SEX_WORDS[raw["sex"]]:
+            return None, f"the quote does not say {raw['sex']}"
+        return Fact("sex", SEX[raw["sex"]]), ""
+    if kind == "age":
+        if not _has_number(quote, raw["number"]):
+            return None, "the number is not in the quote"
+        return Fact("age", number=raw["number"].strip()), ""
+    if kind in ("weight", "height"):
+        unit, num = raw["unit"], raw["number"].strip()
+        if unit == "ft-in":
+            fi = feet_inches(num)
+            if fi is None:
+                return None, "not feet and inches"
+            if not re.search(rf"(?<!\d){fi[0]}\s*(?:'|ft\b|feet|foot)\s*{fi[1]}(?!\d)", unify(quote).lower()):
+                return None, "the height is not in the quote"
         else:
-            no_button.add((s_.line, s_.start, s_.end))
-    suggestions = kept
-    model_problems = [(t.replace("choose a wording below, or rewrite it", "rewrite it")
-                       if span and tuple(span[:3]) in no_button else t, k, tp, sts_, w, span)
-                      for t, k, tp, sts_, w, span in model_problems]
-    index = {orig: n for n, (orig, _, _) in enumerate(expected) if orig is not None}
-    for n, (orig, _, sub) in enumerate(expected):
-        if sub is not None:
-            out.model_quotes[n] = sub.original
-    for ptext, pkind, ptopic, sts, _, _ in model_problems:
-        final.problems.append(Problem(ptext, pkind, ptopic, tuple(index[i] for i in sts if i in index)))
-    _outcomes(final)
-    out.read_as, out.parsed, out.substitutions = (read_as if subs else text), final, subs
-    out.suggestions = sorted(suggestions, key=lambda s: (not s.blocking, s.line, s.start))
-    out.notes = list(dict.fromkeys(out.notes))
-    return out
+            if not _has_number(quote, num):
+                return None, "the number is not in the quote"
+            if not _has_unit_word(quote, unit):
+                return Fact("unclear", kind, detail="no unit"), ""     # never the model's guess
+        return Fact(kind, number=num, unit=unit), ""
+    if kind == "medication":
+        return Fact("medication", raw["drug"], answer=raw["taking"]), ""
+    if kind == "self_rated_health":
+        return Fact("self_rated_health", raw["rating"]), ""
+    if kind == "health_vs_year_ago":
+        return Fact("health_vs_year_ago", raw["trend"]), ""
+    if kind == "healthcare_visits":
+        if not _has_number(quote, raw["number"]):
+            return None, "the number is not in the quote"
+        return Fact("healthcare_visits", raw["period"], number=raw["number"].strip()), ""
+    if kind == "grimage":
+        if not _has_number(quote, raw["number"]):
+            return None, "the number is not in the quote"
+        if raw["wording"] != "acceleration":
+            return Fact("unclear", "grimage", detail="a clock age, or not said to be an acceleration"), ""
+        size = number(raw["number"])
+        if size is None:
+            return None, "the number is not a number"
+        written = unify(raw["number"]).strip()
+        if raw["direction"] == "signed" and written[:1] in "+-":
+            value = written
+        elif raw["direction"] == "older":
+            value = f"+{abs(size):g}"
+        elif raw["direction"] == "younger":
+            value = f"-{abs(size):g}"
+        elif raw["direction"] == "unstated" and written[:1] not in "+-":
+            value = written
+        else:
+            return Fact("unclear", "grimage", detail="its sign is not clear"), ""
+        return Fact("grimage", number=value), ""
+    if kind == "someone_else":
+        return Fact("someone_else"), ""
+    if kind == "unclear":
+        why = re.sub(r"[`*_\[\]<>]", "", str(raw.get("why", "")))[:160]
+        return Fact("unclear", raw["topic"], detail=why), ""
+    return None, f"no such kind {kind!r}"
 
 
-_FILLER_WORDS = _QUOTE_FILLER
+def verify(text: str, items: list) -> tuple[list[Span], list]:
+    """The model's items -> Spans of verified Facts (plus a Span for each stretch of text no
+    item quotes), and the items that failed, as (quote, kind, why)."""
+    lines = text.splitlines()
+    discarded: list = []
+    placed: list[tuple[tuple[int, int, int], Fact]] = []
+    others: list[tuple[int, int, int]] = []
+    covered: list[tuple[int, int, int]] = []
+    for raw in items:
+        quote, kind = str(raw.get("quote", "")), str(raw.get("kind", ""))
+        where = locate(quote, lines)
+        if where is None:
+            discarded.append((quote[:120], kind, "the quote is not in the text"))
+            continue
+        covered.append(where)
+        line, start, end = where
+        typed = lines[line][start:end]
+        fact, why = _fact(raw, typed)
+        if fact is None:
+            discarded.append((typed, kind, why))
+            continue
+        if fact.kind == "someone_else":
+            others.append(where)
+        placed.append((where, fact))
+
+    def inside_other(w: tuple[int, int, int]) -> bool:
+        return any(o[0] == w[0] and o[1] < w[2] and w[1] < o[2] for o in others)
+
+    by_span: dict[tuple[int, int, int], list[Fact]] = {}
+    for where, fact in placed:
+        if fact.kind != "someone_else" and inside_other(where):
+            discarded.append((lines[where[0]][where[1]:where[2]], fact.kind, _OTHERS))
+            continue
+        facts = by_span.setdefault(where, [])
+        if fact not in facts:
+            facts.append(fact)
+    spans = [Span(line, start, end, lines[line][start:end], facts)
+             for (line, start, end), facts in by_span.items()]
+    spans += [Span(line, a, b, lines[line][a:b], unread=True) for line, a, b in _unused(lines, covered)]
+    return spans, discarded
 
 
-def _leftover(line: str, start: int, end: int, items: list, strict: bool = False) -> str:
-    """The words of line[start:end] no quote covers, minus filler ("my", "was") and minus
-    the grammar of the items' own kinds ("told" next to a diagnosis, "say" next to a
-    health rating) — but a negation is never covered by anything but a quote."""
-    covered = [False] * (end - start)
-    for it in items:
-        a = it.start
-        if it.kind == "lab":                     # "my last | HbA1c 6.1 %": the lead-in the lab check allows
-            lead = re.search(r"(?:\b(?:my|the|a|latest|last|recent|most recent|today'?s|current|repeat)\s+)+$",
-                             unify(line[start:a]))
-            if lead:
-                a = start + lead.start()
-        for k in range(max(a, start), min(it.end, end)):
-            covered[k - start] = True
-    rest = unify("".join(" " if cov else ch for ch, cov in zip(line[start:end], covered)))
-    grammar = set()
-    for it in items:
-        grammar |= _CONDITION_WORDS if it.kind == "condition" else _GRAMMAR.get(it.kind, set())
-        if it.kind == "condition":
-            for c in vocabulary().condition_info.values():
-                rest = re.sub(rf"\b(?:{c.terms})\b", " ", rest)
-    grammar = set() if strict else grammar - _NEGATION_WORDS
-    words = re.findall(r"[^\W_]+(?:[.'][^\W_]+)*", rest)
-    if strict:
-        words += re.findall(r"[%°×^]", rest)    # a unit left out of the quote: "HbA1c 6.1 | %"
-    return " ".join(w for w in words if w.strip("'") not in _FILLER_WORDS and w not in grammar)
-
-
-def _covers(model_facts: dict, key: str, val) -> bool:
-    if isinstance(val, dict):
-        got = model_facts.get(key, {})
-        return all(k in got and (got[k] == x or (isinstance(x, float) and isinstance(got[k], float)
-                                                  and abs(got[k] - x) <= 1e-6 * max(1.0, abs(x))))
-                   for k, x in val.items())
-    return model_facts.get(key) == val
-
-
-def _apply(lines: list[str], rules: ParsedPatient, subs: list[Substitution]):
-    """The read-as text, and the statements it should split into: (original index or
-    None, text, the substitution it came from or None)."""
-    new_lines = list(lines)
-    by_line: dict[int, list[Substitution]] = {}
-    for s in subs:
-        by_line.setdefault(s.line, []).append(s)
-    for n, ss in by_line.items():
-        line = new_lines[n]
-        for s in sorted(ss, key=lambda s: -s.start):
-            line = line[:s.start] + "; ".join(s.lines) + line[s.end:]
-        new_lines[n] = line
-    covered = {i: s for s in subs for i in s.statements}
-    expected: list = []
-    done = set()
-    for st in rules.statements:
-        s = covered.get(st.index)
-        if s is None:
-            expected.append((st.index, st.text, None))
-        elif id(s) not in done:
-            done.add(id(s))
-            expected.extend((None, x, s) for x in s.lines)
-    return "\n".join(new_lines), expected
-
-
-def read_values(p: ParsedPatient) -> dict:
-    """What the rules READ: a smoking status, a measured cotinine, age, sex, every
-    questionnaire answer a statement gave (as the rules combined them), the labs, weight,
-    height, GrimAge. A rewrite may add to these; it may never change one."""
-    answered: dict = {}
-    for st in p.statements:
-        for key in ("conditions", "questionnaire"):
-            for item in st.facts.get(key, {}):
-                answered[item] = p.questionnaire.get(item)
-    return {"smoking": p.smoking, "cotinine": p.cotinine_level if p.cotinine_measured else None,
-            "age": p.age, "sex": p.sex, "q": answered, "weight": p.weight_kg, "height": p.height_cm,
-            "grimage": (p.extra_markers.get("AgeAccelGrim") or {}).get("value"),
-            "labs": {r.code: r.value for r in p.readings if not r.blocking}}
-
-
-def _same_read_values(rules: ParsedPatient, final: ParsedPatient) -> bool:
-    a, b = read_values(rules), read_values(final)
-    for key, val in a.items():
-        if isinstance(val, dict):
-            if any(b[key].get(k) != v for k, v in val.items()):
-                return False
-        elif val is not None and b[key] != val:
-            return False
-    return True
-
-
-def _check(rules: ParsedPatient, final: ParsedPatient, expected: list, subs: list) -> set:
-    """Lines whose rewrite did more than add its own lines (-1: withdraw them all)."""
-    if not subs:
-        return set()
-    got = [st.text for st in final.statements]
-    if got != [t for _, t, _ in expected]:
-        return {-1}
-    bad = set()
-    for st, (orig, text_, sub) in zip(final.statements, expected):
-        if sub is None:
-            if st.facts != rules.statements[orig].facts:
-                bad.add(rules.statements[orig].line)
-        elif st.facts != _line_facts(text_):
-            bad.add(sub.line)
-    if bad:
-        return bad
-    if not _same_read_values(rules, final):
-        return {-1}
-    touched = {i for s in subs for i in s.statements}
-    before = {str(p) for p in rules.all_problems() if p.kind != "missing"
-              and set(getattr(p, "statements", ())) and not set(p.statements) & touched}
-    after = {str(p) for p in final.all_problems()}
-    if not before <= after:
-        return {-1}
-    return set()
+def _unused(lines: list[str], covered: list[tuple[int, int, int]]):
+    """(line, start, end) of each stretch of text no item quotes that says something."""
+    for n, line in enumerate(lines):
+        mask = [False] * len(line)
+        for ln, a, b in covered:
+            if ln == n:
+                for i in range(a, b):
+                    mask[i] = True
+        i = 0
+        while i < len(line):
+            if mask[i]:
+                i += 1
+                continue
+            j = i
+            while j < len(line) and not mask[j]:
+                j += 1
+            piece = line[i:j]
+            words = [w for w in _WORD.findall(piece.lower()) if w not in _FILLER]
+            if words:
+                lead = len(piece) - len(piece.lstrip(" \t,;:.-–—•*"))
+                trail = len(piece.rstrip(" \t,;:.-–—•*"))
+                yield n, i + lead, i + max(trail, lead)
+            i = j

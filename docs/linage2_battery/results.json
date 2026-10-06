@@ -1,5 +1,5 @@
 {
- "date": "2026-10-05",
+ "date": "2026-10-06",
  "entries": [
   {
    "n": 1,
@@ -127,7 +127,7 @@
    "query": "58 year old male · quit smoking 20 years ago",
    "emits": null,
    "patient": null,
-   "pass_criterion": "Age stays 58 (only an explicit age phrase is an age), FormerSmoker, nothing left over.",
+   "pass_criterion": "Read by the model (a recorded reading: the battery makes no model calls), every item checked against the text: age stays 58 (the 20 years are not an age), FormerSmoker, nothing left over.",
    "status": "pass",
    "observed": "age 58, FormerSmoker, nothing left over"
   },
@@ -137,7 +137,7 @@
    "query": "45 year old female, never smoked · my husband smokes",
    "emits": null,
    "patient": null,
-   "pass_criterion": "The second line is about someone else: set aside and listed. She stays a female never-smoker.",
+   "pass_criterion": "Read by the model (a recorded reading): the second line is about someone else, so it is set aside and listed. She stays a female never-smoker.",
    "status": "pass",
    "observed": "Female, NeverSmoker; set aside: ['my husband smokes']"
   },

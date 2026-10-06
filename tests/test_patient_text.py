@@ -1,9 +1,11 @@
-"""Plain text about a person -> a patient (core/patient_text.py).
+"""What was read -> a patient (core/patient_text.py): the units, the domain rules, and
+the canonical-line reader.
 
-The reader's job is to refuse rather than guess: a unit it cannot pin down is a
-question back to the person, because a wrong unit is the commonest way to get a
-confident, wrong biological age. These tests pin that contract, the unit table
-against the reference cohort it serves, and the hand-off into LinAge2 and the KB.
+The rules' job is to refuse rather than guess: a unit they cannot pin down is a question
+back to the person, because a wrong unit is the commonest way to get a confident, wrong
+biological age. These tests pin that contract, the unit table against the reference
+cohort it serves, and the hand-off into LinAge2 and the KB — through `read_lines`, the
+reader of canonical lines. Free text is the model's (tests/test_patient_read.py).
 
     pytest tests/test_patient_text.py -q
 """
@@ -32,12 +34,12 @@ from core.patient_text import (  # noqa: E402
     SPECS,
     UNKNOWN_UNIT,
     normalise_unit,
-    read_patient_text,
+    read_lines,
 )
 
 
 def _one(text: str):
-    p = read_patient_text(text)
+    p = read_lines(text)
     assert len(p.readings) == 1, (text, p.readings, p.not_understood)
     return p.readings[0]
 
@@ -125,18 +127,18 @@ def test_an_impossible_value_is_refused_with_the_unit_that_would_fit():
 
 
 def test_unknown_names_are_not_matched_loosely():
-    p = read_patient_text("frobnicate 3\nalbuminuria 30 mg/g\nmy mood is great")
+    p = read_lines("frobnicate 3\nalbuminuria 30 mg/g\nmy mood is great")
     assert p.readings == [] and len(p.not_understood) == 3
 
 
 def test_a_value_given_twice_differently_is_refused():
-    p = read_patient_text("albumin 4.1 g/dL\nalbumin 38 g/L")
+    p = read_lines("albumin 4.1 g/dL\nalbumin 38 g/L")
     assert [r.status for r in p.readings] == [OK, DUPLICATE]
     assert not p.ok
 
 
 def test_short_aliases_do_not_swallow_longer_words():
-    p = read_patient_text("k 4.1 mmol/L\nkidney disease")
+    p = read_lines("k 4.1 mmol/L\ndiagnoses: kidney disease")
     assert [r.code for r in p.readings] == ["LBXSKSI"]
     assert p.questionnaire["KIQ020"] == 1
 
@@ -145,24 +147,24 @@ def test_short_aliases_do_not_swallow_longer_words():
 
 @pytest.mark.parametrize("text, age, sex, smoking, level", [
     ("58 year old male, current smoker", 58, "Male", "CurrentSmoker", 3),
-    ("58-year-old woman who never smoked", 58, "Female", "NeverSmoker", 0),
+    ("58 year old woman\nnever smoked", 58, "Female", "NeverSmoker", 0),
     ("age 66, male, former smoker", 66, "Male", "FormerSmoker", 0),
-    ("I'm a 41 yo female; light smoker", 41, "Female", "CurrentSmoker", 1),
-    ("sex: m\nage: 50\nsmoking: no", 50, "Male", "NeverSmoker", 0),
+    ("41 year old female; occasional smoker", 41, "Female", "CurrentSmoker", 1),
+    ("50 year old man, moderate smoker", 50, "Male", "CurrentSmoker", 2),
 ])
 def test_demographics_and_smoking(text, age, sex, smoking, level):
-    p = read_patient_text(text)
+    p = read_lines(text)
     assert (p.age, p.sex, p.smoking, p.cotinine_level) == (age, sex, smoking, level)
     assert not p.not_understood
 
 
 def test_a_measured_cotinine_uses_the_training_bins():
     for ng, level in ((3, 0), (45, 1), (150, 2), (250, 3)):
-        assert read_patient_text(f"cotinine {ng} ng/mL").cotinine_level == level
+        assert read_lines(f"cotinine {ng} ng/mL").cotinine_level == level
 
 
 def test_age_and_sex_are_required_to_score():
-    p = read_patient_text("albumin 4.1 g/dL")
+    p = read_lines("albumin 4.1 g/dL")
     assert not p.ok and any("no age" in x for x in p.all_problems())
     assert any("no sex" in x for x in p.all_problems())
     with pytest.raises(PatientSpecError) as excinfo:
@@ -173,39 +175,38 @@ def test_age_and_sex_are_required_to_score():
 # ═══════════════════════════ the questionnaire ════════════════════════════════
 
 def test_diagnoses_answer_the_whole_list():
-    p = read_patient_text("diagnoses: hypertension, type 2 diabetes, osteoporosis")
+    p = read_lines("diagnoses: hypertension, diabetes, osteoporosis")
     q = p.questionnaire
     assert (q["BPQ020"], q["DIQ010"], q["OSQ060"]) == (1, 1, 1)
     assert q["MCQ160F"] == 2                                   # not listed: No
-    assert read_patient_text("prediabetes").questionnaire["DIQ010"] == 3
-    assert read_patient_text("no known conditions").questionnaire["MCQ220"] == 2
-    p = read_patient_text("62 year old man with diabetes and hypertension")
-    assert p.age == 62 and p.questionnaire["DIQ010"] == 1 and not p.not_understood
+    assert read_lines("diagnoses: prediabetes").questionnaire["DIQ010"] == 3
+    assert read_lines("no known conditions").questionnaire["MCQ220"] == 2
+    assert read_lines("no diabetes").questionnaire["DIQ010"] == 2
 
 
 @pytest.mark.parametrize("text, item, answer", [
     ("self-rated health: fair", "HUQ010", 4),
-    ("general health excellent", "HUQ010", 1),
+    ("self-rated health: excellent", "HUQ010", 1),
     ("health compared to a year ago: worse", "HUQ020", 2),
-    ("doctor visits last year: 6", "HUQ050", 3),
-    ("healthcare visits: 1", "HUQ050", 1),
-    ("healthcare visits: 15", "HUQ050", 5),
+    ("healthcare visits in the past year: 6", "HUQ050", 3),
+    ("healthcare visits in the past year: 1", "HUQ050", 1),
+    ("healthcare visits in the past year: 15", "HUQ050", 5),
 ])
 def test_health_questions(text, item, answer):
-    assert read_patient_text(text).questionnaire[item] == answer
+    assert read_lines(text).questionnaire[item] == answer
 
 
 def test_weight_and_height_give_a_bmi():
-    p = read_patient_text("weight 180 lb\nheight 5'10\"")
+    p = read_lines("weight 180 lb\nheight 5'10\"")
     assert p.labs()["BMXBMI"] == pytest.approx(25.8, abs=0.1)
-    assert read_patient_text("weight 70 kg\nheight 1.75 m").labs()["BMXBMI"] == pytest.approx(22.86, abs=0.01)
+    assert read_lines("weight 70 kg\nheight 1.75 m").labs()["BMXBMI"] == pytest.approx(22.86, abs=0.01)
 
 
 # ═══════════════════════════ into LinAge2 and the KB ══════════════════════════
 
 @pytest.mark.parametrize("name", list(EXAMPLES))
 def test_every_example_reads_cleanly_and_scores(name):
-    p = read_patient_text(EXAMPLES[name])
+    p = read_lines(EXAMPLES[name])
     assert p.ok, p.all_problems()
     assert not p.not_understood
     payload, result = p.to_patient()
@@ -218,16 +219,16 @@ def test_every_example_reads_cleanly_and_scores(name):
 def test_one_value_feeds_both_the_clock_and_the_witnesses():
     """CRP typed once is LinAge2's LBXCRP in mg/dL AND the KB's CRP marker in mg/L;
     a fasting glucose is the FastingGlucose witness, a plain glucose is not."""
-    p = read_patient_text("50 year old man\nCRP 3.1 mg/L\nHbA1c 6.4 %\nfasting glucose 112 mg/dL")
+    p = read_lines("50 year old man\nCRP 3.1 mg/L\nHbA1c 6.4 %\nfasting glucose 112 mg/dL")
     assert p.labs()["LBXCRP"] == pytest.approx(0.31)
     assert p.kb_markers() == {"CRP": {"value": 3.1, "unit": "mg/L"},
                               "HbA1c": {"value": 6.4, "unit": "%"},
                               "FastingGlucose": {"value": pytest.approx(112.0), "unit": "mg/dL"}}
-    assert "FastingGlucose" not in read_patient_text("glucose 112 mg/dL").kb_markers()
+    assert "FastingGlucose" not in read_lines("glucose 112 mg/dL").kb_markers()
 
 
 def test_the_smoker_example_credits_cotinine_to_smoking():
-    payload, result = read_patient_text(EXAMPLES["58-year-old smoker"]).to_patient()
+    payload, result = read_lines(EXAMPLES["58-year-old smoker"]).to_patient()
     built = build_patient(payload)
     assert built.smoking == "CurrentSmoker"
     cot = next(c for c in built.linage2.contributions if c.code == "LBXCOT")
@@ -236,7 +237,7 @@ def test_the_smoker_example_credits_cotinine_to_smoking():
 
 
 def test_a_grimage_result_becomes_the_kb_clock_marker_not_a_linage2_input():
-    p = read_patient_text("58 year old male\nGrimAge acceleration +4.5 years\nalbumin 4.1 g/dL")
+    p = read_lines("58 year old male\nGrimAge acceleration +4.5 years\nalbumin 4.1 g/dL")
     assert p.kb_markers()["AgeAccelGrim"] == {"value": 4.5, "unit": "years"}
     assert "AgeAccelGrim" not in p.labs() and not p.not_understood
     payload, _ = p.to_patient()
@@ -244,165 +245,65 @@ def test_a_grimage_result_becomes_the_kb_clock_marker_not_a_linage2_input():
     assert built.can_predict_risk and built.has_linage2
 
 
-# ═══════════════════════ what an adversarial review broke ════════════════════
-# Each case below produced a CONFIDENT WRONG patient before it was fixed.
-
-@pytest.mark.parametrize("text", [
-    "58 year old male\nquit smoking 20 years ago",
-    "58 year old male, smoker for 40 years",
-    "58 year old male\nhypertension for 25 years",
-    "58 year old male\nbiological age 65",
-    "58 year old male\nheart age 70",
-])
-def test_a_later_number_of_years_is_never_the_age(text):
-    assert read_patient_text(text).age == 58
-
+# ═══════════════════════ contradictions and questions, never a last-wins ═══════
 
 def test_two_different_ages_are_a_problem_not_a_last_wins():
-    p = read_patient_text("58 year old male\nage 61")
+    p = read_lines("58 year old male\nage 61")
     assert not p.ok and any("two different ages" in x for x in p.all_problems())
 
 
-@pytest.mark.parametrize("text, status, level", [
-    ("58 year old male, not a smoker", "NeverSmoker", 0),
-    ("never a smoker", "NeverSmoker", 0),
-    ("smoker: no", "NeverSmoker", 0),
-    ("45 year old female, smokes: no", "NeverSmoker", 0),
-    ("previous smoker", "FormerSmoker", 0),
-    ("smoker until 2015", "FormerSmoker", 0),
-    ("58 year old male, former heavy smoker", "FormerSmoker", 0),
-    ("58 year old male, trying to quit smoking", "CurrentSmoker", 3),
-    ("58 year old male, can't quit smoking", "CurrentSmoker", 3),
-    ("58 year old male, never been a smoker", "NeverSmoker", 0),
-    ("58 year old male, I have never been a smoker", "NeverSmoker", 0),
-    ("58 year old male, was a smoker", "FormerSmoker", 0),
-    ("58 year old male, used to be a smoker", "FormerSmoker", 0),
-    ("58 year old male, no longer smokes", "FormerSmoker", 0),
-    ("58 year old male, smoker (quit 2010)", "FormerSmoker", 0),
-    ("58 year old male, smoker - quit 5 years ago", "FormerSmoker", 0),
-    ("58 year old male, smoker? no", "NeverSmoker", 0),
-    ("58 year old male, smoker: yes", "CurrentSmoker", 3),
-    ("58 year old male, smoker, no plans to quit", "CurrentSmoker", 3),
-    ("58 year old male, current smoker, no diabetes", "CurrentSmoker", 3),
-])
-def test_negated_past_and_ongoing_smoking(text, status, level):
-    p = read_patient_text(text)
-    assert (p.smoking, p.cotinine_level) == (status, level) and not p.not_understood
-    assert not any("smok" in x for x in p.all_problems())
-
-
-@pytest.mark.parametrize("text", ["not a current smoker", "not currently a smoker",
-                                  "heavy smoker? not sure", "current smoker (quit 2015)",
-                                  "current smoker - quit 2015", "smoker - n/a", "smoker: n/a",
-                                  "quit smoking after I failed to quit 5 times"])
-def test_a_smoking_phrase_it_cannot_pin_down_is_asked_not_guessed(text):
-    p = read_patient_text("58 year old male, " + text)
-    assert p.smoking is None and p.cotinine_level is None
-    assert not p.ok and any("cannot tell whether you smoke" in x for x in p.all_problems())
-
-
-# More smoking and diagnosis phrasings, with the outcome each must get, are pinned in
-# tests/test_patient_text_corpus.py (every reproduction from the review rounds).
-
-
-def test_a_time_piece_after_something_else_is_not_blamed_on_smoking():
-    p = read_patient_text("58 year old male\ncurrent smoker, hypertension, since 2010")
-    assert p.ok and p.questionnaire["BPQ020"] == 1 and p.not_understood == ["since 2010"]
-
-
-def test_someone_elses_clause_after_a_comma_leaves_the_persons_own_status():
-    p = read_patient_text("58 year old male, current smoker, but my wife doesn't")
-    assert (p.smoking, p.cotinine_level, p.ok) == ("CurrentSmoker", 3, True) and p.set_aside
-
-
 @pytest.mark.parametrize("text", [
-    "58 year old male\ncotinine 5 ng/mL\nsmoking: current",
-    "58 year old male\nsmoking: current\ncotinine 5 ng/mL",
+    "58 year old male\ncotinine 5 ng/mL\ncurrent smoker",
+    "58 year old male\ncurrent smoker\ncotinine 5 ng/mL",
 ])
 def test_a_measured_cotinine_is_never_replaced_by_words_whatever_the_order(text):
-    p = read_patient_text(text)
+    p = read_lines(text)
     assert (p.smoking, p.cotinine_level, p.ok) == ("CurrentSmoker", 0, True)
     assert any("measured value" in n for n in p.notes)
 
 
-@pytest.mark.parametrize("text", [
-    "45 year old female, never smoked\nmy husband smokes",
-    "45 year old female, never smoked\nlives with male partner who smokes",
-    "45 year old female, never smoked\nexposed to second-hand smoke",
-])
-def test_someone_else_is_set_aside_and_said_to_be(text):
-    p = read_patient_text(text)
-    assert (p.sex, p.smoking, p.cotinine_level) == ("Female", "NeverSmoker", 0)
-    assert len(p.set_aside) == 1 and any("set aside" in n for n in p.notes)
-
-
-def test_a_family_history_is_not_the_persons_diagnosis():
-    p = read_patient_text("58 year old male\nfamily history of diabetes")
-    assert "DIQ010" not in p.questionnaire and p.set_aside
-
-
-@pytest.mark.parametrize("text, item, answer", [
-    ("no known conditions except hypertension", "BPQ020", 1),
-    ("no medical history apart from diabetes", "DIQ010", 1),
-    ("no chronic diseases besides asthma", "MCQ010", 1),
-    ("no diabetes, no hypertension", "DIQ010", 2),
-    ("hypertension, no diabetes", "DIQ010", 2),
-])
-def test_exceptions_and_negations_in_diagnoses(text, item, answer):
-    assert read_patient_text(text).questionnaire[item] == answer
-
-
-def test_no_other_conditions_keeps_the_diagnoses_and_one_note_says_so():
-    p = read_patient_text("62 year old male\ndiagnoses: hypertension, diabetes\nno other conditions")
+def test_a_list_of_diagnoses_answers_the_rest_no_and_one_note_says_so():
+    p = read_lines("62 year old male\ndiagnoses: hypertension, diabetes\nno other conditions")
     assert (p.questionnaire["BPQ020"], p.questionnaire["DIQ010"], p.questionnaire["MCQ220"]) == (1, 1, 2)
     assert p.questionnaire_notes == ["diagnoses: hypertension, diabetes — every diagnosis not "
                                      "listed is answered No"]
-    two = read_patient_text("58 year old man with diabetes\nhypertension")
-    assert (two.questionnaire["DIQ010"], two.questionnaire["BPQ020"]) == (1, 1)
-    assert len(two.questionnaire_notes) == 1
 
 
-@pytest.mark.parametrize("text", [
-    "62 year old male\ndiagnoses: hypertension\nno known conditions",
-    "62 year old male\nno known conditions\ndiagnoses: hypertension",
-    "62 year old male\nno known conditions other than diabetes\nhypertension",
-    "62 year old male\nno known conditions\nno other conditions except diabetes",
-    "62 year old male\ndiagnoses: diabetes\nno diabetes",
-])
-def test_no_conditions_and_a_diagnosis_contradict(text):
-    p = read_patient_text(text)
-    assert not p.ok and any("contradicts" in x or "differently" in x for x in p.all_problems())
+def test_a_diagnosis_and_its_denial_contradict():
+    p = read_lines("62 year old male\ndiagnoses: diabetes\nno diabetes")
+    assert not p.ok and any("differently" in x for x in p.all_problems())
+    assert read_lines("62 year old male\nno diabetes\ndiagnoses: prediabetes").questionnaire["DIQ010"] == 3
 
 
 def test_a_glucose_not_marked_fasting_is_said_not_to_be_a_witness():
-    p = read_patient_text("60 year old female\nglucose 140 mg/dL")
+    p = read_lines("60 year old female\nglucose 140 mg/dL")
     assert "FastingGlucose" not in p.kb_markers() and any("not marked fasting" in n for n in p.notes)
     assert not any("not marked fasting" in n
-                   for n in read_patient_text("60 year old female\nfasting glucose 140 mg/dL").notes)
+                   for n in read_lines("60 year old female\nfasting glucose 140 mg/dL").notes)
 
 
 @pytest.mark.parametrize("text", ["weight 150", "height 165", "height 1.75"])
 def test_weight_and_height_need_their_unit(text):
-    p = read_patient_text("40 year old female\n" + text)
-    assert any("give the" in x for x in p.all_problems())
+    p = read_lines("40 year old female\n" + text)
+    assert any("give the" in x and "unit" in x for x in p.all_problems())
 
 
 def test_an_impossible_bmi_from_weight_and_height_is_refused():
-    p = read_patient_text("58 year old male\nweight 30 kg\nheight 220 cm")
+    p = read_lines("58 year old male\nweight 30 kg\nheight 220 cm")
     assert any("BMI" in x for x in p.all_problems())
 
 
 def test_cotinine_needs_ng_per_ml_or_the_word_level():
-    assert any("cotinine" in x for x in read_patient_text("58 year old male\ncotinine 3").all_problems())
-    assert read_patient_text("cotinine level 3").cotinine_level == 3
-    assert read_patient_text("cotinine 3 ng/mL").cotinine_level == 0
+    assert any("cotinine" in x for x in read_lines("58 year old male\ncotinine 3").all_problems())
+    assert read_lines("cotinine level 3").cotinine_level == 3
+    assert read_lines("cotinine 3 ng/mL").cotinine_level == 0
 
 
 def test_a_grimage_clock_age_is_not_taken_as_an_acceleration():
-    p = read_patient_text("42 year old female\nGrimAge 46.3")
-    assert "AgeAccelGrim" not in p.kb_markers() and any("clock AGE" in x for x in p.all_problems())
-    assert read_patient_text("GrimAge acceleration -3 years").kb_markers()["AgeAccelGrim"]["value"] == -3
-    assert any("±30" in x for x in read_patient_text("GrimAge acceleration +46 years").all_problems())
+    p = read_lines("42 year old female\nGrimAge 46.3")
+    assert "AgeAccelGrim" not in p.kb_markers() and any("ACCELERATION" in x for x in p.all_problems())
+    assert read_lines("GrimAge acceleration -3 years").kb_markers()["AgeAccelGrim"]["value"] == -3
+    assert any("±30" in x for x in read_lines("GrimAge acceleration +46 years").all_problems())
 
 
 def test_urea_is_not_read_with_the_urea_nitrogen_factor():
@@ -425,43 +326,33 @@ def test_units_the_reader_displays_are_units_it_accepts(text):
 
 @pytest.mark.parametrize("line", ["HbA1c 12 %", "fasting glucose 250 mg/dL"])
 def test_a_real_but_extreme_value_still_builds_and_witnesses(line):
-    p = read_patient_text("58 year old male\n" + line)
+    p = read_lines("58 year old male\n" + line)
     payload, _ = p.to_patient()
     built = build_patient(payload)
     marker = next(m for m in built.markers if m.name in ("HbA1c", "FastingGlucose"))
     assert marker.status == "Elevated" and p.witness_notes
 
 
-@pytest.mark.parametrize("text, item", [
-    ("58 year old male\nhypertension\nno conditions apart from hypertension", "BPQ020"),
-    ("58 year old male\nno known conditions except diabetes\ndiagnoses: diabetes", "DIQ010"),
-    ("58 year old male\nasthma, but otherwise healthy", "MCQ010"),
-])
-def test_consistent_diagnoses_are_not_called_contradictions(text, item):
-    p = read_patient_text(text)
-    assert p.ok and p.questionnaire[item] == 1 and p.questionnaire["MCQ220"] == 2
-
-
 def test_an_unknown_lab_next_to_diagnoses_is_only_not_understood():
-    p = read_patient_text("58 year old male\nvitamin D 30 ng/mL\ndiagnoses: hypertension")
+    p = read_lines("58 year old male\nvitamin D 30 ng/mL\ndiagnoses: hypertension")
     assert p.ok and p.not_understood == ["vitamin D 30 ng/mL"]
 
 
 # ═══════════════════════════ statements, spans and typed problems ═══════════════
-# A model that reads the text may only rewrite what the rules did not understand, so
-# every statement and every problem says where it is and what kind it is. The strings
-# a caller sees do not change: a Problem is still a str.
+# Every statement and every problem says where it is and what kind it is, so the tab and
+# the API can point at what was typed. The strings a caller sees are plain: a Problem is
+# still a str.
 
 def test_every_statement_points_at_its_text():
     text = "58 year old male, current smoker\n  - albumin 4.1 g/dL; CRP 3.1 mg/L\ndiagnoses: asthma,  arthritis"
-    p = read_patient_text(text)
+    p = read_lines(text)
     lines = text.splitlines()
     for st in p.statements:
         typed = lines[st.line][st.start:st.end]
         assert typed == st.text or typed.replace(",  ", ", ") == st.text, (st, typed)
     assert [st.text for st in p.statements] == [
         "58 year old male", "current smoker", "albumin 4.1 g/dL", "CRP 3.1 mg/L",
-        "diagnoses: asthma, arthritis"]
+        "diagnoses: asthma,  arthritis"]
     assert p.statements[0].facts == {"age": 58.0, "sex": "Male"}
     assert p.statements[1].facts["smoking"] == ("CurrentSmoker", 3)
     assert p.statements[2].facts["labs"] == {"LBDSALSI": pytest.approx(41.0)}
@@ -477,35 +368,22 @@ def test_problems_are_still_strings_with_a_kind_and_a_statement():
 
     from core.patient_text import PROBLEM_KINDS, Problem
 
-    p = read_patient_text("58 year old\nI was a smoker, still am\nCRP 3.1\nfoo bar")
+    p = read_lines("58 year old\nCRP 3.1\nfoo bar\ndiagnoses: diabetes\nno diabetes")
     problems = p.all_problems()
     assert all(isinstance(x, Problem) and isinstance(x, str) for x in problems)
     by_kind = {x.kind: x for x in problems}
     assert set(by_kind) <= set(PROBLEM_KINDS)
     assert by_kind["missing"] == "no sex found ('male' or 'female'): LinAge2 has a separate model for each"
-    smoking = by_kind["ambiguous"]
-    assert smoking.topic == "smoking" and [p.statements[i].text for i in smoking.statements] == [
-        "I was a smoker", "still am"]
     assert by_kind["unit"].topic == "lab" and p.statements[by_kind["unit"].statements[0]].text == "CRP 3.1"
-    assert p.not_understood == ["foo bar"] and p.not_understood[0].statement == 4
-    assert [st.outcome for st in p.statements] == ["read", "refused", "refused", "refused", "not_understood"]
+    contradiction = by_kind["contradiction"]
+    assert contradiction.topic == "condition" and p.statements[contradiction.statements[0]].text == "no diabetes"
+    assert p.not_understood == ["foo bar"] and p.not_understood[0].statement == 2
+    assert [st.outcome for st in p.statements] == ["read", "refused", "not_understood", "read", "refused"]
     # what the API and the tab do with them: serialise, copy (gr.State), pickle
     assert json.loads(json.dumps(problems)) == [str(x) for x in problems]
     for clone in (copy.deepcopy(p), pickle.loads(pickle.dumps(p))):
         assert [(x.kind, x.statements) for x in clone.all_problems()] == \
             [(x.kind, x.statements) for x in problems]
-
-
-def test_a_condition_that_would_be_lost_is_its_own_kind():
-    p = read_patient_text("58 year old male\ndiagnoses: hypertension\nheart trouble")
-    (lost,) = p.all_problems()
-    assert lost.kind == "lost_condition" and p.statements[lost.statements[0]].text == "heart trouble"
-
-
-def test_set_aside_statements_say_which_statement():
-    p = read_patient_text("58 year old male\nmy husband smokes")
-    assert p.set_aside == ["my husband smokes"] and p.set_aside[0].statement == 1
-    assert p.statements[1].outcome == "set_aside"
 
 
 # ═══════════════ the 10-year CHD risk is a first-event model ═════════════════════
@@ -517,14 +395,14 @@ def test_set_aside_statements_say_which_statement():
 def test_reported_chd_a_heart_attack_and_angina_are_flagged_and_heart_failure_is_not():
     from core.patient_builder import PREVALENT_CHD
     base = "58 year old male\nCRP 3.1 mg/L\n"
-    payload, _ = read_patient_text(base + "diagnoses: heart attack, angina, coronary heart disease").to_patient("X")
+    payload, _ = read_lines(base + "diagnoses: heart attack, angina, coronary heart disease").to_patient("X")
     assert payload["prevalent_chd"] == ["coronary heart disease", "angina", "heart attack"]   # item order, not typed order
     assert set(payload["prevalent_chd"]) <= set(PREVALENT_CHD)             # the builder's allow-list
     for text in ("diagnoses: heart failure", "diagnoses: hypertension", "no heart attack",
-                 "diagnoses: hypertension, no angina"):
-        payload, _ = read_patient_text(base + text).to_patient("X")
+                 "diagnoses: hypertension\nno angina"):
+        payload, _ = read_lines(base + text).to_patient("X")
         assert "prevalent_chd" not in payload, text
-    assert "prevalent_chd" not in read_patient_text(base).to_patient("X")[0]
+    assert "prevalent_chd" not in read_lines(base).to_patient("X")[0]
 
 
 # ═══════════ RDW and albumin as a z against LinAge2's young reference (#7) ═══════════
@@ -542,7 +420,7 @@ def test_young_reference_z_puts_the_cut_points_where_the_report_said():
 
 
 def test_an_elevated_rdw_and_a_low_albumin_are_passed_as_z_with_the_note_that_says_what_that_means():
-    p = read_patient_text(EXAMPLES["58-year-old smoker"])
+    p = read_lines(EXAMPLES["58-year-old smoker"])
     m = p.kb_markers()
     assert m["RDW"]["z"] == pytest.approx(2.70, abs=0.01) and m["LowSerumAlbumin"]["z"] == pytest.approx(1.69, abs=0.01)
     assert set(m["RDW"]) == {"z"}                                    # z only: the KB has no raw reference for them
@@ -553,21 +431,21 @@ def test_an_elevated_rdw_and_a_low_albumin_are_passed_as_z_with_the_note_that_sa
 
 
 def test_a_value_that_is_not_beyond_the_reference_is_no_witness_and_says_nothing():
-    p = read_patient_text(EXAMPLES["healthy 45-year-old woman"])
+    p = read_lines(EXAMPLES["healthy 45-year-old woman"])
     assert "RDW" not in p.kb_markers() and "LowSerumAlbumin" not in p.kb_markers() and p.witness_notes == []
 
 
 @pytest.mark.parametrize("sex, rdw, expected", [("male", 13.0, False), ("male", 13.2, True), ("female", 13.2, False),
                                                 ("female", 13.4, True)])
 def test_rdw_is_a_witness_just_above_the_sex_specific_reference(sex, rdw, expected):
-    p = read_patient_text(f"58 year old {sex}\nRDW {rdw} %")
+    p = read_lines(f"58 year old {sex}\nRDW {rdw} %")
     assert ("RDW" in p.kb_markers()) is expected
 
 
 @pytest.mark.parametrize("sex, g_per_dl, expected", [("male", 4.4, False), ("male", 4.2, True), ("female", 4.2, False),
                                                      ("female", 4.0, True)])
 def test_albumin_is_a_witness_just_below_the_sex_specific_reference(sex, g_per_dl, expected):
-    p = read_patient_text(f"58 year old {sex}\nalbumin {g_per_dl} g/dL")
+    p = read_lines(f"58 year old {sex}\nalbumin {g_per_dl} g/dL")
     assert ("LowSerumAlbumin" in p.kb_markers()) is expected
 
 
@@ -576,7 +454,7 @@ def test_albumin_is_a_witness_just_below_the_sex_specific_reference(sex, g_per_d
     ("vitamin b12 120 pmol/L", True), ("vitamin b12 300 pmol/L", False), ("folate 8 nmol/L", True), ("folate 25 nmol/L", False),
 ])
 def test_a_raised_rdw_is_withheld_when_an_anaemia_or_a_deficiency_explains_it(extra, withheld):
-    p = read_patient_text(f"58 year old male\nRDW 14.5 %\n{extra}")
+    p = read_lines(f"58 year old male\nRDW 14.5 %\n{extra}")
     m = p.kb_markers()
     assert ("RDW" not in m) is withheld
     assert any("was not passed on as a sign of inflammation" in n for n in p.witness_notes) is withheld
@@ -584,12 +462,12 @@ def test_a_raised_rdw_is_withheld_when_an_anaemia_or_a_deficiency_explains_it(ex
 
 
 def test_the_hemoglobin_limit_is_sex_specific():
-    assert "RDW" not in read_patient_text("58 year old male\nRDW 14.5 %\nhemoglobin 12.5 g/dL").kb_markers()
-    assert "RDW" in read_patient_text("58 year old female\nRDW 14.5 %\nhemoglobin 12.5 g/dL").kb_markers()
+    assert "RDW" not in read_lines("58 year old male\nRDW 14.5 %\nhemoglobin 12.5 g/dL").kb_markers()
+    assert "RDW" in read_lines("58 year old female\nRDW 14.5 %\nhemoglobin 12.5 g/dL").kb_markers()
 
 
 def test_albumin_is_never_gated_on_a_deficiency():
-    assert "LowSerumAlbumin" in read_patient_text("58 year old male\nalbumin 4.0 g/dL\nferritin 20 ug/L").kb_markers()
+    assert "LowSerumAlbumin" in read_lines("58 year old male\nalbumin 4.0 g/dL\nferritin 20 ug/L").kb_markers()
 
 
 # ═══════════ fasting triglycerides as a witness (#12) ═══════════
@@ -600,7 +478,7 @@ def test_albumin_is_never_gated_on_a_deficiency():
 ])
 def test_a_fasting_triglyceride_of_150_mg_dl_or_more_is_elevated(typed, elevated):
     from core.patient_builder import build_patient
-    p = read_patient_text(f"58 year old male\n{typed}")
+    p = read_lines(f"58 year old male\n{typed}")
     m = p.kb_markers()
     assert set(m["Triglycerides"]) == {"value", "unit"} and m["Triglycerides"]["unit"] == "mg/dL"
     built = build_patient({"age": 58, "sex": "Male", "markers": {"Triglycerides": m["Triglycerides"]}})
@@ -608,26 +486,26 @@ def test_a_fasting_triglyceride_of_150_mg_dl_or_more_is_elevated(typed, elevated
 
 
 def test_a_triglyceride_not_marked_fasting_is_no_witness_and_says_why():
-    p = read_patient_text("58 year old male\ntriglycerides 190 mg/dL")
+    p = read_lines("58 year old male\ntriglycerides 190 mg/dL")
     assert "Triglycerides" not in p.kb_markers()
     assert any("triglycerides were not marked fasting" in n and "fasting triglycerides" in n for n in p.notes)
     assert p.labs()["LBDSTRSI"] == pytest.approx(190 * 0.01129)       # LinAge2 still has it, as typed
     assert not any("triglycerides were not marked fasting" in n
-                   for n in read_patient_text("58 year old male\nfasting triglycerides 190 mg/dL").notes)
+                   for n in read_lines("58 year old male\nfasting triglycerides 190 mg/dL").notes)
 
 
 def test_a_triglyceride_typed_twice_is_a_witness_whichever_line_came_first():
     for text in ("58 year old male\nfasting triglycerides 190 mg/dL\ntriglycerides 190 mg/dL",
                  "58 year old male\ntriglycerides 190 mg/dL\nfasting triglycerides 190 mg/dL"):
-        p = read_patient_text(text)
+        p = read_lines(text)
         assert p.kb_markers()["Triglycerides"] == {"value": 190.0, "unit": "mg/dL"}, text
         assert not any("not marked fasting" in n for n in p.notes), (text, p.notes)
 
 
 def test_the_not_fasting_note_does_not_claim_linage2_uses_a_triglyceride_it_does_not():
-    plain = read_patient_text("58 year old male\ntriglycerides 190 mg/dL")
+    plain = read_lines("58 year old male\ntriglycerides 190 mg/dL")
     assert any("in the calculated LDL" in n for n in plain.notes)
-    with_ldl = read_patient_text("58 year old male\ntriglycerides 190 mg/dL\nLDL 130 mg/dL")
+    with_ldl = read_lines("58 year old male\ntriglycerides 190 mg/dL\nLDL 130 mg/dL")
     note = next(n for n in with_ldl.notes if "not marked fasting" in n)
     assert "in the calculated LDL" not in note and "does not use them (you gave an LDL)" in note
 
@@ -637,7 +515,7 @@ def test_the_not_fasting_note_does_not_claim_linage2_uses_a_triglyceride_it_does
 def test_an_rdw_beyond_the_references_range_is_passed_on_as_the_largest_z_the_kb_accepts(sex, rdw, capped):
     from core.patient_builder import Z_LIMIT
     from core.patient_context import build_caller_patient
-    p = read_patient_text(f"58 year old {sex}\nRDW {rdw} %")
+    p = read_lines(f"58 year old {sex}\nRDW {rdw} %")
     z = p.kb_markers()["RDW"]["z"]
     assert (z == Z_LIMIT) is capped, (sex, rdw, z)
     built = build_caller_patient(p.to_patient("Me")[0], ())          # the build does not refuse it
@@ -653,10 +531,10 @@ def test_an_rdw_beyond_the_references_range_is_passed_on_as_the_largest_z_the_kb
 ])
 def test_each_rdw_gate_limit_withholds_just_below_it_and_not_at_it(sex, lab, below, at_or_above):
     def kept(value):
-        return "RDW" in read_patient_text(f"58 year old {sex}\nRDW 14.5 %\n{lab.format(value)}").kb_markers()
+        return "RDW" in read_lines(f"58 year old {sex}\nRDW 14.5 %\n{lab.format(value)}").kb_markers()
     assert not kept(below) and kept(at_or_above), (sex, lab)
 
 
 def test_an_rdw_just_above_the_z_one_cut_point_is_a_witness_and_just_below_is_not():
-    assert "RDW" in read_patient_text("58 year old male\nRDW 13.12 %").kb_markers()
-    assert "RDW" not in read_patient_text("58 year old male\nRDW 13.07 %").kb_markers()
+    assert "RDW" in read_lines("58 year old male\nRDW 13.12 %").kb_markers()
+    assert "RDW" not in read_lines("58 year old male\nRDW 13.07 %").kb_markers()

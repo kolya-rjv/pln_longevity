@@ -10,19 +10,19 @@ loader scans.
 
 The flow, and why it has two buttons:
 
-    Read   -> core.patient_read.read_patient: the fixed rules (core.patient_text),
-              and — only from this button, only if OPENAI_API_KEY is set — a model
-              that rewrites what the rules did not understand into the rules' own
-              wording (never a value: numbers and units are copied from what you
-              typed). Every value with the unit it was typed in, the unit LinAge2
-              takes, and a status; a row from a rewrite says "· model". A value
-              whose unit cannot be pinned down stops here, with the reason; what
-              the rules refused is only ever offered as a wording to click.
+    Read   -> core.patient_read.read_patient: with OPENAI_API_KEY set, a model reads the
+              whole text and code checks every item against it (the quote is in the text,
+              the number and unit are in the quote) before core.patient_text applies the
+              units, ranges and other rules. Without a key, or when the model cannot be
+              reached, the text is read as canonical lines (one fact per line, like the
+              examples). Every value is shown with the unit it was typed in, the unit
+              LinAge2 takes, and a status; a value whose unit cannot be pinned down stops
+              here, with the reason; text that was not used is listed.
     Build  -> the reading stored at Read (never the model again) -> core.linage2_model
               (LinAge2, in-process) -> build_patient -> state. If the text changed
               since Read, Build asks for Read first.
 
-The page's first reading and the example buttons use the rules alone.
+The page's first reading and the example buttons use the canonical-line reader.
 """
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ from core.patient_text import (
     OK,
     SPECS,
     ParsedPatient,
-    read_patient_text,
+    read_lines,
 )
 
 PATIENT_ID = "Me"
@@ -148,9 +148,6 @@ def hidden_note(built: Optional[BuiltPatient]) -> str:
 
 _STATUS_ICON = {OK: "✓", ASSUMED_UNIT: "⚠ assumed"}
 
-#: How many "Use this wording" buttons the tab has room for (the rest are listed).
-SUGGESTION_SLOTS = 6
-
 #: Readable names for the model inputs the reader does not type directly.
 _INPUT_LABEL = {
     "LBXCOT": "Cotinine (smoking)", "fs1Score": "Comorbidity score",
@@ -169,27 +166,23 @@ def _fmt(v: Optional[float]) -> str:
     return f"{v:.3g}" if abs(v) < 1000 else f"{v:,.0f}"
 
 
-def _from_model(parsed: ParsedPatient, read: Optional[PatientRead], fact: str) -> str:
-    """' (model)' when the statement that gave `fact` came from a model rewrite."""
-    if read is None or not read.model_quotes:
-        return ""
-    return " (model)" if any(fact in st.facts and read.source(st.index) == "model"
-                             for st in parsed.statements) else ""
-
-
 def render_reading(parsed: ParsedPatient, read: Optional[PatientRead] = None) -> str:
-    """The 'here's what we read' table, as Markdown. With a PatientRead, rows from a
-    model rewrite say '· model' and show what was typed; the rest is unchanged."""
+    """The 'here's what we read' table, as Markdown: every value with what was typed,
+    LinAge2's value and a status; then notes, what was not used, and what to fix."""
     who = []
-    who.append(f"**Age** {parsed.age:g}{_from_model(parsed, read, 'age')}"
-               if parsed.age is not None else "**Age** —")
-    who.append(f"**Sex** {parsed.sex or '—'}{_from_model(parsed, read, 'sex') if parsed.sex else ''}")
+    who.append(f"**Age** {parsed.age:g}" if parsed.age is not None else "**Age** —")
+    who.append(f"**Sex** {parsed.sex or '—'}")
     if parsed.smoking:
-        who.append(f"**Smoking** {parsed.smoking} (cotinine level {parsed.cotinine_level})"
-                   f"{_from_model(parsed, read, 'smoking')}")
+        who.append(f"**Smoking** {parsed.smoking} (cotinine level {parsed.cotinine_level})")
     elif parsed.cotinine_level is not None:
         who.append(f"**Cotinine level** {parsed.cotinine_level}")
-    header = read.header() if read is not None else "Read by rules only"
+    if parsed.height_cm or parsed.weight_kg:
+        who.append(" ".join(x for x in (f"**Height** {parsed.height_cm:.0f} cm" if parsed.height_cm else "",
+                                          f"**Weight** {parsed.weight_kg:.1f} kg" if parsed.weight_kg else "")
+                            if x))
+    if parsed.medications:
+        who.append(f"**Medication** {', '.join(parsed.medications)}")
+    header = read.header() if read is not None else "Read as one fact per line, without the model"
     lines = ["### What was read", f"<sub>{header}</sub>", "", " · ".join(who), ""]
     model = load_model()
     if parsed.readings:
@@ -203,8 +196,6 @@ def render_reading(parsed: ParsedPatient, read: Optional[PatientRead] = None) ->
                 typical = f"{_fmt(model.imputed_value(parsed.sex, parsed.age, r.code))} {unit}"
             status = _STATUS_ICON.get(r.status, f"✗ {r.status}")
             typed = r.typed
-            if read is not None and read.source(r.statement) == "model":
-                status, typed = f"{status} · model", read.model_quotes[r.statement]
             note = f"<br><sub>{r.note}</sub>" if r.note else ""
             value = f"{_fmt(r.value)} {r.unit}" if r.value is not None else "—"
             lines.append(f"| {r.label} | `{typed}` | {value} | {status}{note} | {typical} |")
@@ -224,64 +215,28 @@ def render_reading(parsed: ParsedPatient, read: Optional[PatientRead] = None) ->
         for note in parsed.witness_notes:
             lines.append(f"- {note}")
     if parsed.not_understood:
-        lines.append("\n**Not understood** (ignored — rephrase as `name value unit`):")
-        lines += [f"- `{s}`" for s in parsed.not_understood]
+        if read is not None and read.reader == "model":
+            lines.append("\n**Not used** (nothing the clock or the knowledge base reads):")
+        else:
+            lines.append("\n**Not understood** (ignored — write one fact per line, like the examples):")
+        lines += [f"- {_code(s)}" for s in parsed.not_understood]
     problems = parsed.all_problems()
     if problems:
         lines.append("\n**Fix before building:**")
         lines += [f"- ✗ {p}" for p in problems]
     else:
         lines.append("\n✓ **Ready to build.**")
-    if read is not None and read.reader == "rules+model":
-        lines += _render_model_part(read)
+    if read is not None and read.discarded:
+        lines.append(f"\n<details><summary>Items the model gave that failed a check ({len(read.discarded)})"
+                     f"</summary>\n")
+        lines += [f"- {_code(q)} ({_code(kind)}): {why}" for q, kind, why in read.discarded]
+        lines.append("</details>")
     return "\n".join(lines)
 
 
 def _code(text: str) -> str:
     """Text shown verbatim in a Markdown code span: nothing in it can close the span."""
     return "`" + str(text).replace("`", "'").replace("\n", " ").replace("\r", " ") + "`"
-
-
-def _render_model_part(read: PatientRead) -> list:
-    out = []
-    if read.substitutions:
-        out += ["\n**Read as** — the model's rewrites of what the rules did not understand, which "
-                "the rules then read:", "```", read.read_as, "```"]
-    if read.suggestions:
-        out.append("\n**Wordings to choose** (the buttons below put one in place of what you typed, "
-                   "and read again):")
-        for s_ in read.suggestions:
-            words = " or ".join(_code(w) for w in s_.wordings)
-            out.append(f"- {'⛔ ' if s_.blocking else ''}{_code(s_.original)} — {s_.reason}: {words}")
-    for note in read.notes:
-        out.append(f"- Model → {note}")
-    if read.discarded:
-        out.append(f"\n<details><summary>Model items not used ({len(read.discarded)})</summary>\n")
-        out += [f"- {_code(q)} ({_code(kind)}): {why}" for q, kind, why in read.discarded]
-        out.append("</details>")
-    return out
-
-
-def suggestion_choices(read: Optional[PatientRead]) -> list:
-    """(suggestion index, wording index, button label) for each button slot, in order."""
-    out = []
-    if read is None:
-        return out
-    for i, s_ in enumerate(read.suggestions):
-        # the part that tells the wordings apart goes first: "…; former smoker" vs "…; current smoker"
-        common = 0
-        if len(s_.wordings) > 1:
-            parts = [w.split("; ") for w in s_.wordings]
-            while all(len(p) > common + 1 and p[common] == parts[0][common] for p in parts):
-                common += 1
-        for j, wording in enumerate(s_.wordings):
-            shown = ("…; " if common else "") + "; ".join(wording.split("; ")[common:])
-            label = f"Use “{shown}” for “{s_.original}”"
-            label = label if len(label) <= 90 else label[:87] + "…"
-            if any(label == o[2] for o in out):
-                label = f"{label[:80]} (choice {j + 1})"
-            out.append((i, j, label))
-    return out[:SUGGESTION_SLOTS]
 
 
 def render_summary(built: BuiltPatient) -> str:
@@ -346,10 +301,9 @@ def _atoms_text(built: BuiltPatient) -> str:
     return built.atoms + ("\n" + "\n".join(extra) if extra else "")
 
 
-def _write_download(built: BuiltPatient, read_as: Optional[str] = None) -> str:
+def _write_download(built: BuiltPatient) -> str:
     """A .metta copy for the person to keep: a NEW temp file per build (never shared
-    between sessions), in a temp directory — not a folder the KB loads. With the text
-    the rules read, so the patient can be rebuilt from it by the rules alone."""
+    between sessions), in a temp directory — not a folder the KB loads."""
     now = time.time()
     for old in _DOWNLOAD_DIR.glob("*.metta"):
         try:
@@ -360,9 +314,6 @@ def _write_download(built: BuiltPatient, read_as: Optional[str] = None) -> str:
     header = (f";; {built.patient_id} — built in the PLN 'My Patient' tab for one browser\n"
               f";; session. Not part of the knowledge base; load it as extra_atoms or\n"
               f";; send the same text again to rebuild it.\n")
-    if read_as is not None:
-        header += (";; Read as (the fixed rules alone rebuild this patient from these lines):\n"
-                   + "".join(f";;   {line}\n" for line in read_as.splitlines()))
     _DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     fd, path = tempfile.mkstemp(prefix=f"pln_patient_{built.patient_id}_", suffix=".metta",
                                 dir=_DOWNLOAD_DIR)
@@ -426,16 +377,18 @@ def _in_tab_words(note: str) -> str:
 # ── handlers ──────────────────────────────────────────────────────────────────
 
 def on_read(text: str) -> str:
-    """The rules alone: the page's first reading and the example buttons."""
-    return render_reading(read_patient_text(text or ""))
+    """The canonical-line reader alone (no model): the page's first reading."""
+    return render_reading(read_lines(text or ""))
 
 
 def rules_read(text: str) -> PatientRead:
+    """The canonical-line reader, as a PatientRead (no model)."""
     return read_patient(text or "")
 
 
 def _extractor():
-    """The model reader if configured; else one that says why not (rules only)."""
+    """The model reader. When it is not configured it says why, and Read falls back to the
+    canonical-line reader with that reason in its header."""
     return OpenAIExtractor()
 
 
@@ -443,44 +396,24 @@ def read_note() -> str:
     """What the Read button does with the text, said next to it."""
     model, error = configured_model()
     if error is None:
-        return f"<sub>Read sends your text to OpenAI ({model}) to rewrite what the rules do not understand.</sub>"
+        return (f"<sub>Read sends your text to OpenAI ({model}); every value it reads is checked "
+                f"against what you typed, and you see it all before Build.</sub>")
     if error.code == "no_key":
-        return "<sub>Read uses the fixed rules only (no OPENAI_API_KEY).</sub>"
-    return f"<sub>Read uses the fixed rules only — model reader misconfigured: {error.message}</sub>"
-
-
-def _button_updates(read: Optional[PatientRead]) -> list:
-    choices = suggestion_choices(read)
-    out = []
-    for slot in range(SUGGESTION_SLOTS):
-        if slot < len(choices):
-            out.append(gr.update(value=choices[slot][2], visible=True))
-        else:
-            out.append(gr.update(visible=False))
-    return out
+        return "<sub>Read takes one fact per line, like the examples (no OPENAI_API_KEY for the model).</sub>"
+    return f"<sub>Read takes one fact per line — the model reader is misconfigured: {error.message}</sub>"
 
 
 def on_read_model(text: str, extractor=None):
-    """The Read button: the rules, then the model (if configured) on what they missed.
-    -> (reading, read state, *suggestion buttons)"""
+    """The Read button: the model when configured, else one fact per line.
+    -> (reading, read state)"""
     read = read_patient(text or "", extractor if extractor is not None else _extractor())
-    return (render_reading(read.parsed, read), read, *_button_updates(read))
+    return render_reading(read.parsed, read), read
 
 
 def on_example(name: str):
-    """-> (text, reading, read state, *suggestion buttons): an example, by the rules."""
+    """-> (text, reading, read state): an example, read as canonical lines (no model)."""
     read = rules_read(EXAMPLES[name])
-    return (EXAMPLES[name], render_reading(read.parsed, read), read, *_button_updates(None))
-
-
-def on_use_suggestion(text: str, read: Optional[PatientRead], slot: int) -> str:
-    """Put the chosen wording in place of what was typed (the caller reads again)."""
-    choices = suggestion_choices(read)
-    if read is None or slot >= len(choices) or (text or "") != read.text:
-        return text
-    i, j, _ = choices[slot]
-    s_ = read.suggestions[i]
-    return s_.apply(text, s_.wordings[j])
+    return EXAMPLES[name], render_reading(read.parsed, read), read
 
 
 def on_build(text: str, state: Optional[dict], read: Optional[PatientRead] = None):
@@ -515,7 +448,7 @@ def on_build(text: str, state: Optional[dict], read: Optional[PatientRead] = Non
         summary += "\n\n<details><summary>Notes on this patient</summary>\n\n" + "\n".join(
             f"- {w}" for w in warnings) + "\n</details>"
     return (reading, summary, gr.update(value=_atoms_text(built), visible=True),
-            gr.update(value=_write_download(built, read.read_as if read.substitutions else None),
+            gr.update(value=_write_download(built),
                       visible=True), render_banner(payload), payload, gr.update(visible=True))
 
 
@@ -544,10 +477,10 @@ def build_tab(patient_state: gr.State, banner: gr.Markdown, question_box: gr.Tex
               tabs: gr.Tabs, query_tab_id: str) -> None:
     """Lay out the tab inside the caller's `gr.Tabs()` context and wire it."""
     gr.Markdown(
-        "Describe yourself in a few lines — age, sex, smoking, any lab values with their "
-        "units, diagnoses. **Read** shows what was understood — by fixed rules, and, if a model "
-        "is configured, by a model that rewrites only what the rules missed (each rewrite is "
-        "shown; values are always yours); **Build** scores LinAge2 "
+        "Describe yourself in your own words — age, sex, height and weight, smoking, any lab "
+        "values with their units, diagnoses, medications. **Read** shows what was understood: a "
+        "model reads the text, and every value it reads is checked against what you typed "
+        "(without a model, write one fact per line, like the examples); **Build** scores LinAge2 "
         "(the blood-panel mortality clock of Fong et al. 2025) and makes you a patient for "
         "this browser session only. Nothing is added to the knowledge base (the optional "
         "download is a temporary file made for you alone)."
@@ -563,8 +496,6 @@ def build_tab(patient_state: gr.State, banner: gr.Markdown, question_box: gr.Tex
                 build_btn = gr.Button("Build patient", variant="primary")
                 clear_btn = gr.Button("Clear patient", variant="stop", size="sm")
             gr.Markdown(read_note())
-            with gr.Column():
-                use_btns = [gr.Button("", size="sm", visible=False) for _ in range(SUGGESTION_SLOTS)]
         with gr.Column(scale=3):
             first = rules_read(EXAMPLES["58-year-old smoker"])
             reading = gr.Markdown(render_reading(first.parsed, first))
@@ -581,13 +512,8 @@ def build_tab(patient_state: gr.State, banner: gr.Markdown, question_box: gr.Tex
         download = gr.DownloadButton("Download .metta", visible=False)
 
     for btn, name in zip(example_btns, EXAMPLES):
-        btn.click(lambda n=name: on_example(n), outputs=[text, reading, read_state, *use_btns])
-    read_btn.click(on_read_model, inputs=text, outputs=[reading, read_state, *use_btns],
-                   concurrency_limit=4)
-    for slot, btn in enumerate(use_btns):
-        btn.click(lambda t, r, i=slot: on_use_suggestion(t, r, i), inputs=[text, read_state],
-                  outputs=text).then(on_read_model, inputs=text, outputs=[reading, read_state, *use_btns],
-                                     concurrency_limit=4)
+        btn.click(lambda n=name: on_example(n), outputs=[text, reading, read_state])
+    read_btn.click(on_read_model, inputs=text, outputs=[reading, read_state], concurrency_limit=4)
     build_btn.click(on_build, inputs=[text, patient_state, read_state],
                     outputs=[reading, summary, atoms, download, banner, patient_state, suggestions]
                     ).then(on_show_questions, inputs=patient_state, outputs=[*ask_btns, not_offered])

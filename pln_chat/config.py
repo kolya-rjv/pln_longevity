@@ -184,11 +184,14 @@ PLN_CORS_ORIGINS: list[str] = [
 # /interventions, /hallmarks, /kb/schema, /patients/markers), caller-supplied
 # patients, and the optional auth + rate limiting below.
 #
-# 2.1.0 is additive: POST /patients/from-text takes `reader: "rules" | "model"`
-# (default "rules", so every 2.0 body means what it meant) and answers with
-# `reader_used`, `read_as_text`, `model_error`, `suggestions` and a per-statement
-# `source`.
-PLN_API_VERSION: str = "2.1.0"
+# 2.1.0 was additive: POST /patients/from-text took `reader: "rules" | "model"`.
+#
+# 3.0.0 breaks POST /patients/from-text: a model reads the text and code checks it
+# (core/patient_read.py). `reader` is "auto" (the model when configured, else canonical
+# lines) | "model" | "lines" ("rules" is the old name of "lines"); the default was
+# "rules". The response loses `read_as_text`, `suggestions` and the statements'
+# `source`/`typed` (there are no rewrites any more) and gains `discarded`.
+PLN_API_VERSION: str = "3.0.0"
 
 # ── HTTP API: optional access control ────────────────────────────────────────
 # BOTH CONTROLS ARE OFF BY DEFAULT. Unset, the service behaves exactly as it

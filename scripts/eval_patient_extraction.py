@@ -5,22 +5,23 @@
     python scripts/eval_patient_extraction.py --record           # also write the replay fixture
 
 Needs OPENAI_API_KEY (pln_chat/.env). It is a script, not a test: it calls OpenAI once per
-text (about 950 texts; the ~3k-token instructions are a cached prefix).
+text (the instructions are a cached prefix).
 
 1. One schema-acceptance call. A 400 (the model refuses the strict schema or a
    parameter) is a configuration error: exit 2 before anything else runs.
-2. Every corpus entry (tests/test_patient_text_corpus.py: smoking and diagnoses, each
-   with its expected outcome) and every reproduction quoted in
-   docs/patient_extraction/review_round4.json, read by the rules alone and by
-   read_patient with the model.
-3. Reported: agreement with the corpus's expected outcomes (rules alone and with the
-   model), the rewrite rate, suggestions and blocks, what the model changed on the
-   round-4 texts, why items were discarded, p50/p95 latency and tokens.
-4. Exit 1 if any expected-refused text became usable without a click, or any text
-   came back read by the rules only (a model error).
+2. Every text in docs/patient_extraction/eval_corpus.json — smoking and diagnoses
+   phrasings, and the body measurements people type — and every reproduction quoted in
+   docs/patient_extraction/review_round4.json, read with the model.
+3. Reported: agreement with each entry's expected reading; the texts the old rules
+   refused and how the model reads them (a judgement to review, not a failure); why
+   items were discarded; p50/p95 latency and tokens.
+4. Exit 1 if any text with an expected reading is read as USABLE with a different value
+   (a confident, wrong patient), or any text came back without the model (a model error).
+   A value that is missing where one was expected (the model skipped a statement: it is
+   listed as not used, and LinAge2 imputes and flags the input) is reported, not failed.
 
 Writes docs/patient_extraction/eval_<model>.md and .json; with --record, the raw
-extractions to tests/fixtures/patient_extractions.json.gz, which tests replay offline.
+extractions to tests/fixtures/patient_extractions.json.gz.
 """
 from __future__ import annotations
 
@@ -39,26 +40,17 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "pln_chat"))
-sys.path.insert(0, str(REPO / "tests"))
 OUT = REPO / "docs" / "patient_extraction"
 FIXTURE = REPO / "tests" / "fixtures" / "patient_extractions.json.gz"
 
 from core import patient_extract as px  # noqa: E402
 from core.patient_read import read_patient  # noqa: E402
-from core.patient_text import read_patient_text  # noqa: E402
 
 
 def corpus() -> list[dict]:
-    from test_patient_text_corpus import DIAGNOSES, SMOKING, _STATUS, _text
-
-    out = []
-    for text, expect in SMOKING:
-        out.append({"text": _text(text), "source": "corpus:smoking", "refused": expect == "X",
-                    "expect": None if expect == "X" else list(_STATUS[expect])})
-    for text, ok, items in DIAGNOSES:
-        out.append({"text": _text(text), "source": "corpus:diagnoses", "refused": not ok,
-                    "expect": None if not ok else items})
-    return out
+    d = json.loads((OUT / "eval_corpus.json").read_text(encoding="utf-8"))
+    return [{**e, "source": f"corpus:{section}"} for section in ("smoking", "diagnoses", "body")
+            for e in d[section]]
 
 
 #: the first line of a round-4 reproduction that is itself an age/sex header
@@ -72,8 +64,7 @@ def round4() -> list[dict]:
         for n, f in enumerate(d[section]):
             for a, b in re.findall(r"'([^'\n]{3,200})'|\"([^\"\n]{3,200})\"", f["reproduction"]):
                 t = (a or b).replace("\\n", "\n")
-                header = re.match(HEADER, t)            # a header test brings its own age and sex
-                t = t if header else "58 year old male\n" + t
+                t = t if re.match(HEADER, t) else "58 year old male\n" + t
                 if t not in seen:
                     seen.add(t)
                     out.append({"text": t, "source": f"round4:{section[:4]}{n}", "refused": None,
@@ -81,13 +72,32 @@ def round4() -> list[dict]:
     return out
 
 
-def _matches(entry: dict, p) -> bool:
-    """The corpus's own check: the expected values, and usable."""
-    if not p.ok:
-        return False
+def _close(a, b) -> bool:
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return abs(a - b) <= max(0.05, 0.002 * abs(b))
+    return a == b
+
+
+def _mismatches(entry: dict, p) -> list[str]:
+    """How the reading differs from the entry's expected one ([] = as expected)."""
+    e = entry["expect"]
     if entry["source"] == "corpus:smoking":
-        return [p.smoking, p.cotinine_level] == entry["expect"]
-    return all(p.questionnaire.get(k) == v for k, v in entry["expect"].items())
+        got = {"smoking": p.smoking, "cotinine_level": p.cotinine_level}
+        return [f"{k} {got[k]!r} (expected {v!r})" for k, v in e.items() if got[k] != v]
+    if entry["source"] == "corpus:diagnoses":
+        return [f"{k} {p.questionnaire.get(k)!r} (expected {v!r})" for k, v in e.items()
+                if p.questionnaire.get(k) != v]
+    out = []
+    labs = p.labs()
+    for k, v in e.items():
+        if k == "labs":
+            out += [f"{c} {labs.get(c)!r} (expected {x!r})" for c, x in v.items() if not _close(labs.get(c), x)]
+        elif k == "questionnaire":
+            out += [f"{c} {p.questionnaire.get(c)!r} (expected {x!r})" for c, x in v.items()
+                    if p.questionnaire.get(c) != x]
+        elif not _close(getattr(p, k), v):
+            out.append(f"{k} {getattr(p, k)!r} (expected {v!r})")
+    return out
 
 
 def _schema_acceptance(model: str) -> None:
@@ -107,31 +117,22 @@ def _schema_acceptance(model: str) -> None:
 def _read(entry: dict, ex) -> dict:
     text = entry["text"]
     for attempt in range(4):
-        t0 = time.monotonic()
         r = read_patient(text, ex)
         if r.model_error is None or r.model_error.code not in px.TRANSIENT_ERRORS:
             break
         time.sleep(2 * (attempt + 1))
-    rules = read_patient_text(text)
     raw = px._cache_get(px.cache_key(ex.model, text))
+    p = r.parsed
     return {
         **entry,
-        "seconds": time.monotonic() - t0 if not r.cached else r.latency_s,
-        "model_seconds": r.latency_s, "usage": r.usage,
+        "model_seconds": r.latency_s, "cached": r.cached, "usage": r.usage,
         "model_error": None if r.model_error is None else [r.model_error.code, r.model_error.message],
-        "rules_ok": rules.ok, "ok": r.parsed.ok,
-        "rules_match": _matches(entry, rules) if entry["expect"] is not None else None,
-        "match": _matches(entry, r.parsed) if entry["expect"] is not None else None,
-        "read_as": r.read_as if r.read_as != text else None,
-        "rewrites": len(r.substitutions),
-        "unread_statements": sum(st.outcome in ("not_understood", "partly_read") for st in rules.statements),
-        "suggestions": [s.as_dict() for s in r.suggestions],
-        "model_problems": [[x.kind, x.topic, str(x)] for x in r.parsed.all_problems()
-                           if str(x) not in {str(y) for y in rules.all_problems()}],
-        "notes": r.notes, "discarded": r.discarded,
-        "values": {"smoking": [r.parsed.smoking, r.parsed.cotinine_level], "age": r.parsed.age,
-                   "sex": r.parsed.sex},
-        "rules_values": {"smoking": [rules.smoking, rules.cotinine_level], "age": rules.age, "sex": rules.sex},
+        "ok": p.ok,
+        "mismatches": _mismatches(entry, p) if entry["expect"] is not None else None,
+        "problems": [[x.kind, x.topic, str(x)] for x in p.all_problems()],
+        "not_used": list(p.not_understood), "discarded": r.discarded,
+        "values": {"age": p.age, "sex": p.sex, "smoking": p.smoking, "cotinine_level": p.cotinine_level,
+                   "height_cm": p.height_cm, "weight_kg": p.weight_kg, "medications": list(p.medications)},
         "items": raw.items if isinstance(raw, px.Extraction) else None,
     }
 
@@ -144,66 +145,68 @@ def report(model: str, rows: list[dict], wall: float) -> tuple[str, list[str]]:
     failures = []
     errors = [r for r in rows if r["model_error"]]
     if errors:
-        failures.append(f"{len(errors)} texts came back read by the rules only: "
+        failures.append(f"{len(errors)} texts were read without the model: "
                         + "; ".join(f"{r['model_error'][0]}" for r in errors[:5]))
-    leaked = [r for r in rows if r["refused"] and r["ok"]]
-    if leaked:
-        failures.append(f"{len(leaked)} expected-refused texts became usable: "
-                        + "; ".join(repr(r["text"]) for r in leaked[:5]))
-    c = [r for r in rows if r["source"].startswith("corpus")]
-    c_ok = [r for r in c if r["expect"] is not None]
-    c_x = [r for r in c if r["refused"]]
+    expected = [r for r in rows if r["expect"] is not None]
+    right = [r for r in expected if r["ok"] and not r["mismatches"]]
+    wrong = [r for r in expected if r["ok"] and any(" None (" not in m for m in r["mismatches"])]
+    missing = [r for r in expected if r["ok"] and r["mismatches"] and r not in wrong]
+    asked = [r for r in expected if not r["ok"]]
+    if wrong:
+        failures.append(f"{len(wrong)} texts read as a usable patient with a different value")
+    refused = [r for r in rows if r.get("refused")]
+    refused_read = [r for r in refused if r["ok"]]
     r4 = [r for r in rows if r["source"].startswith("round4")]
-    secs = sorted(r["model_seconds"] for r in rows if r["model_seconds"])
+    disc = collections.Counter(why for r in rows for _, _, why in r["discarded"])
+    disc_kind = collections.Counter(kind for r in rows for _, kind, _ in r["discarded"])
+    secs = sorted(r["model_seconds"] for r in rows if not r["cached"] and r["model_seconds"])
     tok = collections.Counter()
     for r in rows:
-        for k, v in (r["usage"] or {}).items():
-            tok[k] += v or 0
-    unread = [r for r in rows if r["unread_statements"]]
-    disc = collections.Counter(d[2].split(" (")[0] for r in rows for d in r["discarded"])
-    disc_kind = collections.Counter(d[1] for r in rows for d in r["discarded"])
-    blocked_ok = [r for r in c_ok if r["rules_match"] and not r["ok"]]
-    wrong = [r for r in c_ok if r["ok"] and not r["match"]]
-    r4_blocked = [r for r in r4 if r["rules_ok"] and not r["ok"]]
-    r4_changed = [r for r in r4 if r["rules_ok"] and r["ok"] and r["values"] != r["rules_values"]]
+        for k in ("prompt_tokens", "completion_tokens", "cached_tokens", "reasoning_tokens"):
+            tok[k] += r["usage"].get(k, 0)
 
     md = [f"# Model reader — live evaluation ({model})", "",
-          f"Run {date.today().isoformat()}: {len(rows)} texts ({len(c)} corpus entries with expected "
-          f"outcomes, {len(r4)} round-4 reproductions), wall {wall:.0f} s.", "",
+          f"Run {date.today().isoformat()}: {len(rows)} texts ({len(expected)} with an expected reading, "
+          f"{len(refused)} the old rules refused, {len(r4)} round-4 reproductions), wall {wall:.0f} s.", "",
           "## Verdict", "",
-          ("**FAIL**: " + " | ".join(failures)) if failures else
-          "**PASS**: no expected-refused text became usable without a click, and every text was "
-          "read by the model (no rules-only fall-back).", "",
-          "## Corpus (expected outcomes)", "",
-          "| | rules alone | rules + model |", "|---|---|---|",
-          f"| expected refused, still refused | {_pct(sum(not r['rules_ok'] for r in c_x), len(c_x))} | "
-          f"{_pct(sum(not r['ok'] for r in c_x), len(c_x))} |",
-          f"| expected usable, read as expected | {_pct(sum(bool(r['rules_match']) for r in c_ok), len(c_ok))} | "
-          f"{_pct(sum(bool(r['match']) for r in c_ok), len(c_ok))} |",
-          f"| expected usable, blocked by the model | — | {_pct(len(blocked_ok), len(c_ok))} |",
-          f"| expected usable, usable but different | — | {len(wrong)} |", ""]
-    if blocked_ok:
-        md += ["Blocked by the model although the corpus expects a usable reading (each needs a click "
-               "or a canonical wording):", ""]
-        for r in blocked_ok[:40]:
-            why = "; ".join(p[2] for p in r["model_problems"])[:300]
-            md.append(f"- `{r['text'].splitlines()[-1]}` — {why}")
-        md.append("")
+          ("**PASS**: no text with an expected reading was read as a usable patient with a different value, "
+           "and every text was read by the model." if not failures else
+           "**FAIL**: " + "; ".join(failures)), "",
+          "## Texts with an expected reading", "",
+          "| | count |", "|---|---|",
+          f"| read as expected | {_pct(len(right), len(expected))} |",
+          f"| asked about (not usable until reworded) | {_pct(len(asked), len(expected))} |",
+          f"| a value missing (the statement listed as not used) | {_pct(len(missing), len(expected))} |",
+          f"| **usable but different** | {_pct(len(wrong), len(expected))} |", ""]
+    by_source = collections.defaultdict(lambda: [0, 0])
+    for r in expected:
+        by_source[r["source"]][1] += 1
+        by_source[r["source"]][0] += bool(r["ok"] and not r["mismatches"])
+    md += [f"- {s}: {_pct(*v)} as expected" for s, v in sorted(by_source.items())] + [""]
     if wrong:
-        md += ["Usable but not the corpus's values:", ""]
-        md += [f"- `{r['text']!r}` → {r['values']}" for r in wrong[:20]] + [""]
-    md += ["## What the model did", "",
-           f"- Texts with a statement the rules did not (fully) understand: {len(unread)}; "
-           f"rewritten: {_pct(sum(1 for r in unread if r['rewrites']), len(unread))} "
-           f"({sum(r['rewrites'] for r in rows)} rewrites in all).",
-           f"- Texts with a suggestion: {sum(bool(r['suggestions']) for r in rows)}; with a blocking "
-           f"one: {sum(any(s['blocking'] for s in r['suggestions']) for r in rows)}.",
-           f"- Round-4 texts the rules read as usable that the model now blocks: "
-           f"{_pct(len(r4_blocked), sum(r['rules_ok'] for r in r4))}; usable with a different "
-           f"smoking, age or sex: {len(r4_changed)}.",
-           f"- Items discarded by the checks: {sum(disc.values())} of "
-           f"{sum(len(r['items'] or []) for r in rows)} ({', '.join(f'{k} {v}' for k, v in disc_kind.most_common(8))}).",
-           "", "Why items were discarded (top 15):", ""]
+        md += ["Usable but different (each is a wrong patient):", ""]
+        md += [f"- `{r['text']!r}`: {'; '.join(r['mismatches'])}" for r in wrong] + [""]
+    if missing:
+        md += ["A value missing (the model skipped the statement; it is listed as not used):", ""]
+        md += [f"- `{r['text']!r}`: {'; '.join(r['mismatches'])}" for r in missing] + [""]
+    if asked:
+        md += ["Asked about (the person rewords; nothing wrong is built):", ""]
+        md += [f"- `{r['text']!r}`: {'; '.join(p[2] for p in r['problems'])[:240]}" for r in asked[:40]] + [""]
+    md += ["## Texts the old rules refused", "",
+           f"The model asked about {_pct(len(refused) - len(refused_read), len(refused))} of them and read "
+           f"{len(refused_read)} as usable. A usable reading here is a judgement to review, not a failure: the "
+           f"rules refused what they could not parse, not only what is ambiguous.", ""]
+    md += [f"- `{r['text']!r}` → smoking {r['values']['smoking']} (level {r['values']['cotinine_level']})"
+           for r in refused_read[:60]] + [""]
+    r4_asked = [r for r in r4 if not r["ok"]]
+    md += ["## Round-4 reproductions", "",
+           f"The texts the rules reader's fourth review round broke (no expected reading): read as usable "
+           f"{_pct(len(r4) - len(r4_asked), len(r4))}, asked about {len(r4_asked)}.", ""]
+    md += [f"- `{r['text'].splitlines()[-1]!r}` — {'; '.join(p[2] for p in r['problems'])[:200]}"
+           for r in r4_asked[:25]] + [""]
+    md += ["## What the checks discarded", "",
+           f"- Items discarded: {sum(disc.values())} of {sum(len(r['items'] or []) for r in rows)} "
+           f"({', '.join(f'{k} {v}' for k, v in disc_kind.most_common(8))}).", ""]
     md += [f"- {n} × {why}" for why, n in disc.most_common(15)] + [""]
     md += ["## Latency and tokens", "",
            f"- Model call: p50 {statistics.median(secs):.1f} s, p95 {secs[int(0.95 * (len(secs) - 1))]:.1f} s, "
@@ -212,14 +215,6 @@ def report(model: str, rows: list[dict], wall: float) -> tuple[str, list[str]]:
            f"{tok['completion_tokens']:,} (reasoning {tok['reasoning_tokens']:,}); per call "
            f"{tok['prompt_tokens'] // max(1, len(secs)):,} in, {tok['completion_tokens'] // max(1, len(secs)):,} out.",
            ""]
-    md += ["## Round 4: texts the model now blocks (sample)", ""]
-    for r in r4_blocked[:40]:
-        why = "; ".join(p[2] for p in r["model_problems"])[:260]
-        md.append(f"- `{r['text'].splitlines()[-1]}` — {why}")
-    md.append("")
-    if r4_changed:
-        md += ["## Round 4: usable, with a different smoking, age or sex than the rules alone", ""]
-        md += [f"- `{r['text']!r}`: rules {r['rules_values']} → {r['values']}" for r in r4_changed[:30]] + [""]
     return "\n".join(md), failures
 
 
@@ -239,7 +234,11 @@ def main() -> None:
     entries = [] if args.only == "round4" else corpus()
     r4 = [] if args.only == "corpus" else round4()
     if args.limit:
-        entries, r4 = entries[:args.limit], r4[:args.limit]
+        by: dict = collections.defaultdict(list)
+        for e in entries:
+            by[e["source"]].append(e)
+        entries = [e for v in by.values() for e in v[:args.limit]]
+        r4 = r4[:args.limit]
     entries += r4
     ex = px.OpenAIExtractor(model=args.model)
     t0 = time.monotonic()
@@ -266,7 +265,7 @@ def main() -> None:
             json.dump({"model": args.model, "prompt_hash": px.prompt_hash(), "schema_hash": px.schema_hash(),
                        "extractions": rec}, fh, ensure_ascii=False, sort_keys=True)
         print(f"recorded {len(rec)} extractions to {FIXTURE.relative_to(REPO)}")
-    print(md.split("## What the model did")[0])
+    print(md.split("## Texts the old rules refused")[0])
     print(f"wrote {(OUT / f'{stem}.md').relative_to(REPO)}")
     sys.exit(1 if failures else 0)
 
