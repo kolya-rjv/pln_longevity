@@ -239,3 +239,6 @@ data/nhanes/*.zip
 # this repo claims is inside them, and data/nhanes/README.md points at it. An earlier
 # rule for the HAGR extracts (data/**/*.tsv) would otherwise swallow it.
 !data/nhanes/MANIFEST.tsv
+
+# PeTTa migration: pinned upstream checkouts (scripts/setup_petta.sh)
+.petta/
