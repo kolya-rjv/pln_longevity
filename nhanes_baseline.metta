@@ -306,13 +306,13 @@
                         (BaseSex     $bid $sex))
                      $bid))
       (if (== $cells ())
-          (superpose ())                                   ; no record -> nothing
+          (empty)                                   ; no record -> nothing
           ;; `==` does not evaluate its arguments, so the tail is let-forced first;
           ;; comparing an unreduced (cdr-atom …) would make even a single record decline.
           (let $rest (cdr-atom $cells)
              (if (== $rest ())
                  (car-atom $cells)                         ; exactly one -> use it
-                 (superpose ()))))))                       ; ambiguous -> nothing
+                 (empty))))))                       ; ambiguous -> nothing
 
 ;; The data-backed baseline absolute risk for (outcome, age, sex), or NOTHING.
 ;;

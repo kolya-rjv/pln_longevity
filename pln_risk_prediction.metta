@@ -241,7 +241,7 @@
    (if (== $outcome CoronaryHeartDisease)
        (let* (($a (patient-age $space $patient)) ($s (patient-sex $space $patient)))
           (baseline-risk-chd $a $s))
-       (superpose ())))                        ; no curated table for this outcome
+       (empty)))                        ; no curated table for this outcome
 
 (= (data-baseline-candidates $space $patient $outcome)
    (let $recs (collapse (match $space (: $bid BaselineRiskRecord) $bid))

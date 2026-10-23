@@ -291,7 +291,7 @@
       (let $m (superpose $ms)
          (let* (($z (patient-z $space $patient $m))
                 ($t (elevated-z-threshold)))
-            (if (> $z $t) $m (superpose ()))))))
+            (if (> $z $t) $m (empty))))))
 
 ;; Collapsed into one tuple, e.g. (DNAmPAI1 DNAmGDF15 CRP AgeAccelGrim). Tuple
 ;; order is collapse-order (not significant — diagnose ranks by coverage/mass).

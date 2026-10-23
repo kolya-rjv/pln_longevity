@@ -95,7 +95,7 @@
 ;; contribution. For a patient carrying only MeasuredZ atoms this is unchanged.
 (= (patient-elevated-z $space $patient $m)
    (let $z (patient-z $space $patient $m)
-      (if (> $z (elevated-z-threshold)) $z (superpose ()))))
+      (if (> $z (elevated-z-threshold)) $z (empty))))
 
 ;; The (stv s c) of the strongest / first POSITIVE transmission $a -> $b, or
 ;; nothing when $a does not raise $b. We keep only Pos derivations (the
@@ -106,7 +106,7 @@
 ;; multiple paths is the documented follow-up, deduction_layer.md §7.4).
 (= (pos-transmission $space $a $b)
    (let $ps (collapse (let (signed Pos $tv) (infer $space $a $b) $tv))
-      (if (== $ps ()) (superpose ()) (car-atom $ps))))
+      (if (== $ps ()) (empty) (car-atom $ps))))
 
 ;; ================================================================
 ;; 2. Causal decomposition of an elevated GrimAge  (Demo §5.1)
@@ -199,7 +199,7 @@
       (if (== $neg ())
           (if (== $out ())
               (if (== $inc ())
-                  (superpose ())          ; (4) no edges -> unresolvable -> omitted
+                  (empty)          ; (4) no edges -> unresolvable -> omitted
                   (car-atom $inc))        ; (2) leaf marker -> its driver
               $lever)                     ; (3) has outgoing edges -> a driver, itself
           (car-atom $neg))))              ; (1) intervention -> the node it reduces

@@ -234,7 +234,7 @@
                         (RefSex     $rid $sex))
                      $rid))
       (if (== $cells ())
-          (superpose ())                                   ; no cell -> nothing
+          (empty)                                   ; no cell -> nothing
           ;; `==` does not evaluate its arguments, so the tail must be let*-forced to a
           ;; concrete tuple before it is compared — the grounded-op discipline every
           ;; layer here documents. Comparing the unreduced (cdr-atom …) silently fails
@@ -242,7 +242,7 @@
           (let $rest (cdr-atom $cells)
              (if (== $rest ())
                  (car-atom $cells)                         ; exactly one -> use it
-                 (superpose ()))))))                       ; ambiguous -> nothing
+                 (empty))))))                       ; ambiguous -> nothing
 
 ;; ================================================================
 ;; 5. Standardization  —  z = (value - mean) / sd, ON THE RECORD'S SCALE
@@ -292,9 +292,9 @@
                          (let* (($lg  (log-math 10 $raw))
                                 ($dev (- $lg $mean)))
                             (/ $dev $sd))
-                         (superpose ()))      ; non-positive on a log scale -> nothing
-                     (superpose ())))         ; unknown scale -> nothing, never Identity
-             (superpose ()))))) ; degenerate SD -> nothing
+                         (empty))      ; non-positive on a log scale -> nothing
+                     (empty)))         ; unknown scale -> nothing, never Identity
+             (empty))))) ; degenerate SD -> nothing
 
 ;; ================================================================
 ;; 6. Smoke-test queries (shapes only — this file ships no numbers, so a live

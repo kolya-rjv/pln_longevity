@@ -184,7 +184,7 @@
          (let $t (linage-driver-threshold-years)
             (if (> $y $t)
                 (linage-contribution-record $space $patient $f $y Measured)
-                (superpose ()))))))
+                (empty))))))
 
 ;; ================================================================
 ;; 4. Hazard and absolute risk
@@ -298,7 +298,7 @@
 (= (linage-cf-feature $space $patient $lever $driver $f $y)
    (let $bs (collapse (linage-readout $space $f))
       (if (== $bs ())
-          (superpose ())
+          (empty)
           (let* (($b   (car-atom $bs))
                  ($w   (linage-witnessed $space $patient $b))
                  ($pos (> $y 0.0))
@@ -316,14 +316,14 @@
                         ($c    (cf-tv-c $tv))
                         ($red  (* $s $y)))
                     (lin-part $f (stv $s $c) $red))
-                 (superpose ()))))))
+                 (empty))))))
 
 ;; Every (driver, measured input) pair, collapsed. Nothing at all for an
 ;; unresolvable lever.
 (= (linage-cf-parts $space $patient $lever)
    (let $drivers (linage-lever-drivers $space $lever)
       (if (== $drivers ())
-          (superpose ())
+          (empty)
           (collapse
              (let $driver (superpose $drivers)
                 (let ($f $y) (match $space (LinAgeContribution $patient $ff $yy Measured) ($ff $yy))

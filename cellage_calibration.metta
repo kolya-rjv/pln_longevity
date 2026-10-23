@@ -158,8 +158,8 @@
 ;; senescence".
 (= (genes-affecting-senescence-in $s $dir $context)
    (match $s (, (HasSenescenceEffect $row ($dir CellularSenescence))
-                (, (UsesCellContext $row $context)
-                   (InvolvesGene $row $gene)))
+                (UsesCellContext $row $context)
+                   (InvolvesGene $row $gene))
       $gene))
 
 ;; ================================================================

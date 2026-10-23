@@ -110,6 +110,14 @@
 ;;       HR<1 protective=Neg).
 (= (hr->sign $hr) (if (< $hr 1.0) Neg Pos))
 
+;; PeTTa types a variable bound by `match` over a declared relation (HasOutcome -> Outcome,
+;; HasPredictor -> Biomarker, UsesIntervention -> Intervention) and demands that type of every
+;; caller. link-effect, infer and explain are polymorphic over node categories (an intervention,
+;; a mechanism, a biomarker, an outcome), so they say so. %Undefined% is the gradual type: no
+;; effect on evaluation here, and the explicit signature stops the inferred one.
+(: link-effect (-> %Undefined% %Undefined% %Undefined% %Undefined%))
+(: infer (-> %Undefined% %Undefined% %Undefined% %Undefined%))
+(: explain (-> %Undefined% %Undefined% %Undefined% %Undefined%))
 (= (link-effect $s $a $c)
    (match $s (Effect $a $c $sgn $tv) (signed $sgn $tv)))
 (= (link-effect $s $a $c)

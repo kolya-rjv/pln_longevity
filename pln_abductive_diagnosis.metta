@@ -102,7 +102,7 @@
 (= (diagnose-one $space $h $obs)
    (let $ev (hyp-evidence $space $h $obs)
       (if (== $ev ())
-          (superpose ())
+          (empty)
           (Hypothesis $h
              (stv (ev-maxs $ev) (ev-orc $ev))
              (ev-count $ev)

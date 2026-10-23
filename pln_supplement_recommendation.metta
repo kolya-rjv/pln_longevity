@@ -83,6 +83,10 @@
 ;; deterministic lookups (one result). A supplement missing an EvidenceLevel /
 ;; SafetyProfile simply yields nothing here and drops out of the recommendation —
 ;; we never invent a tier or a safety rating.
+;; Supplements are Intervention nodes that carry no type declaration; PeTTa would type $supp as
+;; Intervention from the EvidenceLevel / SafetyProfile schemas and reject an undeclared symbol.
+(: supp-evidence-cat (-> %Undefined% %Undefined% %Undefined%))
+(: supp-safety-label (-> %Undefined% %Undefined% %Undefined%))
 (= (supp-evidence-cat $space $supp) (match $space (EvidenceLevel  $supp $cat) $cat))
 (= (supp-safety-label $space $supp) (match $space (SafetyProfile $supp $lbl) $lbl))
 
@@ -103,7 +107,7 @@
       (collapse
          (let $m (superpose $obs)
             (let $r (relevance-on $space $supp $m)
-               (if (> $r 0.0) $m (superpose ())))))))
+               (if (> $r 0.0) $m (empty)))))))
 
 ;; ================================================================
 ;; 3. One scored, tiered recommendation record  (or nothing if irrelevant)
@@ -126,7 +130,7 @@
              (SuppRec $supp (tier $tier) (score $score)
                       (evidence $cat $conf) (safety $lbl $saf)
                       (Targets $tgts)))
-          (superpose ()))))
+          (empty))))
 
 ;; Field accessors (all let*-forced by callers; grounded ops don't evaluate args).
 (= (rec-supp  (SuppRec $s $t $sc $e $sf $tg)) $s)
@@ -168,7 +172,7 @@
 (= (recs-in-tier $recs $tier)
    (collapse
       (let $r (superpose $recs)
-         (if (== (rec-tier $r) $tier) $r (superpose ())))))
+         (if (== (rec-tier $r) $tier) $r (empty)))))
 (= (tier-bucket $recs $tier)
    (sort-recs (recs-in-tier $recs $tier)))
 
