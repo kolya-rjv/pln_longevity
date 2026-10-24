@@ -1,0 +1,8 @@
+# Optional: the PeTTa runtime (PLN_RUNTIME=petta). The default runtime, hyperon, needs none of this.
+# Also needed, outside pip: SWI-Prolog >= 9.3 (brew install swi-prolog) and a PeTTa checkout
+# (bash scripts/setup_petta.sh clones the pinned one into ./.petta/PeTTa). See API.md, "The PeTTa runtime".
+# The version the runtime adapter was measured with:
+janus-swi==1.5.3    # PeTTa's python wrapper drives SWI-Prolog through it
+# sexpdata is NOT needed by this adapter or its tests (grep finds no import of it in pln_chat, tests or
+# scripts); it was listed here for PeTTa's own python tests and the migration tooling, neither of which
+# this file installs for.

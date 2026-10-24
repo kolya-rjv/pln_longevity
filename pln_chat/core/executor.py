@@ -78,12 +78,17 @@ class PLNExecutionTimeout(Exception):
 
 
 class PLNWorkerCrashed(Exception):
-    """The MeTTa worker process died — almost always a hyperon abort."""
+    """The MeTTa worker process died without sending back a result — under PLN_RUNTIME=hyperon (the
+    default), almost always a hyperon abort (below). Under PLN_RUNTIME=petta this is NOT how a PeTTa
+    failure is reported: `PettaRuntime.run_program` catches a dying PeTTa child itself, inside the worker,
+    and returns an ordinary `error_code="runtime_error"` result (never reaching this exception) — so this
+    one, under petta, means the WORKER process itself died for some other reason (killed, OOM, a bug in
+    the fork/pipe plumbing), not a PeTTa-internal crash."""
 
     def __init__(self, detail: str = "") -> None:
         super().__init__(
-            "The PLN worker process terminated while running this query. hyperon "
-            "0.2.10 aborts the interpreter (a non-unwinding Rust panic, "
+            "The PLN worker process terminated while running this query. Under the default runtime, "
+            "hyperon 0.2.10 aborts the interpreter (a non-unwinding Rust panic, "
             "trie.rs:179) when a query reads back an atom from a space that "
             "stores more than about 1,024 DISTINCT KEY ATOMS -- distinct symbols, "
             "variables, numbers and strings, NOT rows (upstream issues #1076 and "
@@ -93,7 +98,9 @@ class PLNWorkerCrashed(Exception):
             "LinAge2 and DrugAge forms in their own. If queries start failing, a "
             "KB change has pushed a stack past the edge: "
             "tests/test_generic_stack.py, tests/test_patient_stack.py and "
-            "tests/test_kb_head_symbol_budget.py measure the margins. The worker "
+            "tests/test_kb_head_symbol_budget.py measure the margins. Under PLN_RUNTIME=petta a PeTTa-"
+            "internal crash never reaches this exception at all (it comes back as an ordinary "
+            "runtime_error result), so this one means the worker process itself died. The worker "
             "has been replaced and the service is still up. "
             + detail
         )
@@ -361,7 +368,10 @@ def run_offloaded(
         try:
             status, payload = parent_conn.recv()
         except EOFError:
-            # The child died without sending anything: a hyperon abort.
+            # The child died without sending anything. Under hyperon, almost always a hyperon abort. Under
+            # petta, this is NOT how a PeTTa-internal crash is reported (PettaRuntime.run_program catches
+            # that itself and returns a normal result) — reaching here under petta means the worker
+            # process itself died for some other reason.
             exit_code = proc.exitcode
             _terminate(proc)
             raise PLNWorkerCrashed(

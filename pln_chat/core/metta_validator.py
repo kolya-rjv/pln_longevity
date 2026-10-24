@@ -9,6 +9,14 @@ Three checks, no MeTTa evaluation (which would need the Hyperon runtime):
 3. every predicate the query calls holds facts. A query over a declared-but-
    empty predicate is well-formed and returns nothing, which is the single most
    confusing failure mode the 2026-09-18 API evaluation reported.
+
+A fourth check applies only when the selected runtime is PeTTa (PLN_RUNTIME=petta);
+under hyperon the validator behaves exactly as it always did:
+
+4. the program uses none of the forms PeTTa must not be given
+   (`core.metta_runtime.PETTA_REFUSED_FORMS`): `add-atom`, `remove-atom` and a
+   `(= ...)` definition change PeTTa's process-global space, `assert` and `test`
+   halt the process, `import!`, `py-call`, `shell` ... reach the host.
 """
 from __future__ import annotations
 
@@ -16,6 +24,7 @@ import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence
 
+from core.metta_runtime import petta_refused_forms, selected_runtime_name
 from ontology.inventory import RuntimeInventory
 from ontology.registry import OntologyRegistry
 
@@ -152,6 +161,7 @@ def validate(
     metta_query: str,
     registry: OntologyRegistry,
     inventory: Optional[RuntimeInventory] = None,
+    runtime: Optional[str] = None,
 ) -> ValidationResult:
     """Check a MeTTa query for syntax, symbol and GROUNDING issues.
 
@@ -172,6 +182,9 @@ def validate(
     When an inventory is supplied, an unknown symbol means unknown to the ACTUAL
     atoms, and using a declared-but-empty predicate becomes an explicit warning
     instead of a silent empty result.
+
+    `runtime` names the runtime the program will run on ("hyperon" | "petta" |
+    "auto"); None means the one PLN_RUNTIME selects. Only "petta" adds a check.
     """
     metta_query = strip_metta_comments(metta_query)
     if not metta_query.strip():
@@ -183,6 +196,13 @@ def validate(
 
     if not _balanced_parens(metta_query):
         issues.append("Unbalanced parentheses in MeTTa query.")
+
+    if selected_runtime_name(runtime) == "petta":
+        refused = petta_refused_forms(metta_query)
+        if refused:
+            issues.append(
+                f"Form(s) not allowed under the PeTTa runtime: {', '.join(refused)}"
+            )
 
     # Blank out string and numeric literals first: the words inside a quoted
     # string are data, and `2.0e-75` must not contribute `e-75`.

@@ -51,21 +51,59 @@ PLN_CHARS_PER_TOKEN: float = float(os.getenv("PLN_CHARS_PER_TOKEN", "4.0"))
 PLN_PROMPT_FILE_MAX_BYTES: int = int(os.getenv("PLN_PROMPT_FILE_MAX_BYTES", "25000"))
 
 # ── PLN runtime ────────────────────────────────────────────────────────────────
-# Auto-detected: true when the `hyperon` package is importable.
+# Which MeTTa engine runs the knowledge base (core/metta_runtime.py):
+#   hyperon  hyperon-experimental 0.2.10, in process. The default, and exactly what the service always did.
+#   petta    PeTTa (MeTTa compiled to SWI-Prolog) through janus, in a forked child per program. Needs
+#            SWI-Prolog, `pip install janus-swi` and a PeTTa checkout (PETTA_HOME); see API.md.
+#   auto     hyperon when it is importable, else petta.
+# An unknown value is a configuration error, not a silent fall-back.
+def _runtime_choice() -> str:
+    choice = os.getenv("PLN_RUNTIME", "hyperon").strip().lower() or "hyperon"
+    if choice not in ("hyperon", "petta", "auto"):
+        raise ValueError(f"PLN_RUNTIME must be hyperon, petta or auto; got {choice!r}")
+    return choice
+
+PLN_RUNTIME: str = _runtime_choice()
+# The PeTTa checkout: it holds src/main.pl, python/helper.pl and python/petta/. scripts/setup_petta.sh clones
+# the pinned commit to <repo>/.petta/PeTTa, which is the default. Only read when PLN_RUNTIME needs PeTTa.
+PETTA_HOME: Path = Path(os.getenv("PETTA_HOME") or (ONTOLOGY_DIR / ".petta" / "PeTTa"))
+# SWI-Prolog stack limit of a PeTTa child, in MB. PeTTa's own default is 8 GB; a runaway recursion should die
+# of this long before it takes the machine, as an exception the API answers with a 502.
+PETTA_STACK_LIMIT_MB: int = max(64, int(os.getenv("PETTA_STACK_LIMIT_MB", "2048")))
+
+# Auto-detected: true when the SELECTED runtime can run here (`hyperon` is importable; for petta,
+# `janus_swi` is importable and PETTA_HOME holds a PeTTa checkout). Nothing is imported to find out.
 # Override with PLN_RUNTIME_AVAILABLE=false in .env to force stub mode.
-def _detect_hyperon() -> bool:
+def _detect_runtime_available() -> bool:
     _env = os.getenv("PLN_RUNTIME_AVAILABLE", "").lower()
     if _env == "false":
         return False
     if _env == "true":
         return True
     try:
-        import importlib.util  # NB: submodule must be imported explicitly
-        return importlib.util.find_spec("hyperon") is not None
+        from core.metta_runtime import runtime_available_for
+        available = runtime_available_for(PLN_RUNTIME, PETTA_HOME)
     except Exception:
-        return False
+        # core.metta_runtime could not be imported (an odd sys.path): decide as the service always did.
+        if PLN_RUNTIME == "petta":
+            available = False
+        else:
+            try:
+                import importlib.util  # NB: submodule must be imported explicitly
+                available = importlib.util.find_spec("hyperon") is not None
+            except Exception:
+                available = False
+    if not available:
+        # Not an override (PLN_RUNTIME_AVAILABLE is unset here) and not the implicit default either: the
+        # service falls back to stub (mock) results silently otherwise, which reads as "it works" until a
+        # real query is sent. One line at import time, so an operator sees it in the startup log.
+        import logging
+        logging.getLogger(__name__).warning(
+            "PLN_RUNTIME=%s was selected but cannot run here; PLN_RUNTIME_AVAILABLE is false and the "
+            "service answers with stub (mock) results until this is fixed.", PLN_RUNTIME)
+    return available
 
-PLN_RUNTIME_AVAILABLE: bool = _detect_hyperon()
+PLN_RUNTIME_AVAILABLE: bool = _detect_runtime_available()
 
 # Max size (bytes) of a .metta file loaded into the hyperon runtime space.
 # Files larger than this are SKIPPED at execution time: hyperon 0.2.10 panics

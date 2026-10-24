@@ -121,6 +121,7 @@ from core.drugage_router import (
     route_drugage_ranking,
 )
 from core.llm_translator import translate
+from core.metta_runtime import get_runtime
 from core.metta_validator import ValidationResult, merge_validation_results, validate
 from core.pln_runner import (
     CELLAGE_STACK,
@@ -1856,7 +1857,15 @@ class HealthResponse(BaseModel):
     )
     rate_limit_per_minute: int = Field(description="0 when off (the default).")
     pln_mode: str = Field(description="'runtime' | 'stub'.")
-    runtime_importable: bool = Field(description="Is `hyperon` importable here?")
+    runtime_name: str = Field(
+        description="The MeTTa runtime PLN_RUNTIME selects: 'hyperon' (the default) | 'petta'. "
+                    "`auto` is reported as the one it resolved to.",
+    )
+    runtime_importable: bool = Field(
+        description="Is the selected runtime's engine available here? For hyperon: is `hyperon` "
+                    "importable. For petta: is `janus_swi` importable and PETTA_HOME a PeTTa checkout "
+                    "(nothing is imported to find out).",
+    )
     runtime_ready: bool = Field(
         description="Importable AND enabled AND at least one KB file loadable.",
     )
@@ -1876,7 +1885,8 @@ class HealthResponse(BaseModel):
 @app.get("/health", response_model=HealthResponse)
 def health() -> dict:
     """Liveness + config check — confirm the server is reachable before querying."""
-    runtime_importable = importlib.util.find_spec("hyperon") is not None
+    runtime = get_runtime()
+    runtime_importable = runtime.available()        # hyperon: importlib.util.find_spec("hyperon") is not None
     runtime_ready = PLN_RUNTIME_AVAILABLE and runtime_importable and bool(_runtime_kb_paths())
     return {
         "status": "ok",
@@ -1887,6 +1897,7 @@ def health() -> dict:
         "api_key_required": bool(PLN_API_KEYS),
         "rate_limit_per_minute": _RATE_LIMITER.per_minute,
         "pln_mode": "runtime" if PLN_RUNTIME_AVAILABLE else "stub",
+        "runtime_name": runtime.name,
         "runtime_importable": runtime_importable,
         "runtime_ready": runtime_ready,
         "runtime_kb_file_count": len(_runtime_kb_paths()),

@@ -2,14 +2,16 @@
 
 Two modes:
   stub    — returns pattern-matched mock results; no runtime dependency.
-  runtime — delegates to the Hyperon MeTTa interpreter (requires `hyperon`
-            package and knowledge base files to be loaded).
+  runtime — delegates to the selected MeTTa runtime (core/metta_runtime.py):
+            hyperon (the default) or PeTTa, chosen by PLN_RUNTIME.
 
-To enable runtime mode, set PLN_RUNTIME_AVAILABLE=true in your .env and
-ensure `hyperon` is installed.
+PLN_RUNTIME_AVAILABLE is true when the selected runtime can run here (for
+hyperon: the `hyperon` package is importable). Set it to false in your .env to
+force stub mode.
 """
 from __future__ import annotations
 
+import contextvars
 import re
 import time
 from functools import lru_cache
@@ -17,7 +19,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from config import ONTOLOGY_DIR, PLN_RUNTIME_AVAILABLE
+from config import ONTOLOGY_DIR, PLN_QUERY_TIMEOUT_SECONDS, PLN_RUNTIME_AVAILABLE
+from core.metta_runtime import MettaRuntimeError, get_runtime
 
 # ── Scoped DrugAge inference stack ───────────────────────────────────────────────
 # The MINIMAL set of hand-written layers needed to lift + rank DrugAge rows,
@@ -353,9 +356,13 @@ class PLNRunResult:
     error: Optional[str] = None
     #: Machine-readable failure class when status == "error", so the HTTP layer
     #: can pick a status code without grepping the message.
-    #:   runtime_error       — the hyperon interpreter raised
+    #:   runtime_error       — the MeTTa runtime raised (hyperon: an exception; PeTTa: a failed load,
+    #:                          an expression that raised, a process that died or hit its deadline)
     #:   drugage_build_missing — build/drugage_etl.metta has not been generated
     error_code: Optional[str] = None
+    #: Which MeTTa runtime produced a "runtime"-mode result ("hyperon" | "petta"); None for stub results and
+    #: for results built outside the runner. Not part of any API response: /health reports `runtime_name`.
+    runtime_name: Optional[str] = None
 
     @property
     def ok(self) -> bool:
@@ -703,7 +710,15 @@ def merge_run_results(
         results=results,
         query_time_ms=sum(part.query_time_ms for part in parts),
         mode=parts[0].mode,
+        runtime_name=parts[0].runtime_name,
     )
+
+
+#: The absolute (time.monotonic) deadline a group of runs shares, or None. Set by run_query_parts so that
+#: the parts of one program draw on ONE budget; read by _runtime_run. A context variable rather than an
+#: argument because run_query's signature is patched by many callers and tests.
+_SHARED_DEADLINE: contextvars.ContextVar[Optional[float]] = contextvars.ContextVar(
+    "pln_shared_deadline", default=None)
 
 
 def run_query_parts(parts: list[dict], confidence_threshold: float = 0.0) -> list[PLNRunResult]:
@@ -711,33 +726,53 @@ def run_query_parts(parts: list[dict], confidence_threshold: float = 0.0) -> lis
     process — so a program split across spaces costs one worker, one deadline and
     one admission, like any other request. Each part: {metta_query, kb_files,
     extra_atoms}. (Measured: the LinAge2 scoped stack and the shared stack run back
-    to back in one process in either order.)"""
-    return [
-        run_query(
-            part["metta_query"],
-            confidence_threshold=confidence_threshold,
-            kb_files=part.get("kb_files"),
-            extra_atoms=part.get("extra_atoms"),
-        )
-        for part in parts
-    ]
+    to back in one process in either order.)
+
+    Every part gets a fresh interpreter (hyperon: a new `MeTTa()`; PeTTa: a new
+    child process, because a second KB load in one process would duplicate every
+    clause). The parts share ONE deadline, PLN_QUERY_TIMEOUT_SECONDS from the
+    first part's start: a part gets what is left of it. A runtime that cannot
+    enforce a deadline in process (hyperon) ignores it; the executor's kill is
+    its deadline."""
+    budget = PLN_QUERY_TIMEOUT_SECONDS
+    token = _SHARED_DEADLINE.set(time.monotonic() + budget if budget and budget > 0 else None)
+    try:
+        return [
+            run_query(
+                part["metta_query"],
+                confidence_threshold=confidence_threshold,
+                kb_files=part.get("kb_files"),
+                extra_atoms=part.get("extra_atoms"),
+            )
+            for part in parts
+        ]
+    finally:
+        _SHARED_DEADLINE.reset(token)
+
+
+def _bang_expressions(metta_query: str) -> list[str]:
+    """Each top-level expression of the query with a ! in front, so MeTTa evaluates it."""
+    return [expr if expr.startswith("!") else "!" + expr for expr in _iter_top_level_exprs(metta_query)]
 
 
 def _normalize_query(metta_query: str) -> str:
     """Prefix each top-level expression with ! so MeTTa evaluates it."""
-    parts: list[str] = []
-    for expr in _iter_top_level_exprs(metta_query):
-        parts.append(expr if expr.startswith("!") else "!" + expr)
-    return "\n".join(parts)
+    return "\n".join(_bang_expressions(metta_query))
 
 
-def _hyperon_run(
+def _remaining_deadline() -> Optional[float]:
+    """Seconds left of the budget a group of runs shares (run_query_parts), None when there is none."""
+    deadline = _SHARED_DEADLINE.get()
+    return None if deadline is None else deadline - time.monotonic()
+
+
+def _runtime_run(
     metta_query: str,
     confidence_threshold: float,
     kb_files: Optional[list[Path]],
     extra_atoms: Optional[str] = None,
 ) -> PLNRunResult:
-    """Execute query using the real Hyperon MeTTa interpreter.
+    """Execute query on the selected MeTTa runtime (core/metta_runtime.py): hyperon by default.
 
     The knowledge base is loaded by concatenating every KB file's content into
     one shared space, then the query is run separately against it:
@@ -752,6 +787,12 @@ def _hyperon_run(
     cannot see atoms defined in another (it returns empty silently), and module
     name resolution is order-dependent. One shared space avoids both problems.
 
+    The runtime gets the KB text and the list of `!` expressions and returns the
+    result atoms of each as strings; everything after that (the threshold, the
+    PLNRunResult) is runtime-independent. A runtime failure — hyperon raising, a
+    PeTTa load that fails, a deadline that kills the PeTTa child — is reported
+    as status="error", error_code="runtime_error", with the runtime's message.
+
     Parameters
     ----------
     metta_query:
@@ -763,12 +804,12 @@ def _hyperon_run(
         Ordered list of .metta knowledge-base files whose contents are loaded
         into the space before the query runs.
     """
+    runtime_name: Optional[str] = None
     try:
-        from hyperon import MeTTa  # type: ignore
-
-        normalized = _normalize_query(metta_query)
-        if not normalized:
+        expressions = _bang_expressions(metta_query)
+        if not expressions:
             return PLNRunResult(status="empty", mode="runtime")
+        normalized = "\n".join(expressions)
 
         # Concatenate every KB file's content into one block. A missing or
         # unreadable file is skipped rather than aborting the whole query.
@@ -797,22 +838,27 @@ def _hyperon_run(
             pass  # logging must never break query execution
 
         try:
-            metta = MeTTa()
+            runtime = get_runtime()
+            runtime_name = runtime.name
+            # Only a runtime that can stop a program itself is given the shared budget: hyperon cannot
+            # (the executor's kill is its deadline), and it keeps running a part however late it starts.
+            remaining = _remaining_deadline() if getattr(runtime, "enforces_deadline", False) else None
+            if remaining is not None and remaining <= 0:
+                raise MettaRuntimeError(
+                    "the request's time budget was used up before this part of the program could run",
+                    kind="timeout")
             start = time.monotonic()
-            if kb_text.strip():
-                metta.run(kb_text)                   # populate &self; result ignored
-            raw: list[list] = metta.run(normalized)  # every group is a query result
+            raw: list[list[str]] = runtime.run_program(kb_text, expressions, deadline_s=remaining)
             elapsed = int((time.monotonic() - start) * 1000)
         except Exception as run_exc:
             return PLNRunResult(
                 status="error", mode="runtime", error=str(run_exc),
-                error_code="runtime_error",
+                error_code="runtime_error", runtime_name=runtime_name,
             )
 
         results: list[PLNAtomResult] = []
         for index, result_group in enumerate(raw):
-            for atom in result_group:
-                atom_str = str(atom)
+            for atom_str in result_group:
                 results.append(PLNAtomResult(atom=atom_str, stv=_stv_from_atom(atom_str),
                                              expr_index=index))
 
@@ -822,11 +868,17 @@ def _hyperon_run(
             results=results,
             query_time_ms=elapsed,
             mode="runtime",
+            runtime_name=runtime_name,
         )
     except Exception as exc:   # noqa: BLE001
         return PLNRunResult(
             status="error", mode="runtime", error=str(exc), error_code="runtime_error",
+            runtime_name=runtime_name,
         )
+
+
+#: The execution site's old name, kept so an importer (or a test that patches it) keeps working.
+_hyperon_run = _runtime_run
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
@@ -854,6 +906,9 @@ def run_query(
     if not metta_query.strip():
         return PLNRunResult(status="empty", mode="stub" if not PLN_RUNTIME_AVAILABLE else "runtime")
     if PLN_RUNTIME_AVAILABLE:
+        # Through the alias, not _runtime_run directly, so a test (or an importer) that patches
+        # pln_runner._hyperon_run still intercepts this call — a plain module-level name lookup, resolved
+        # at call time, not bound to _runtime_run's object at def time.
         return _hyperon_run(metta_query, confidence_threshold, kb_files, extra_atoms)
     return _stub_run(metta_query, confidence_threshold)
 

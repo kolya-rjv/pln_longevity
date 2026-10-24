@@ -221,6 +221,9 @@ under `pln_execution`.
 | `PLN_WORKER_POOL_SIZE`           | 2       | concurrent query processes; **0 runs inline** (below) |
 | `PLN_QUERY_TIMEOUT_SECONDS`      | 60      | per-request PLN budget; 0 disables                    |
 | `PLN_MAX_INFLIGHT_QUERIES`       | 0       | admission limit; 0 derives 4x `PLN_WORKER_POOL_SIZE`  |
+| `PLN_RUNTIME`                    | hyperon | the MeTTa engine: `hyperon` \| `petta` \| `auto` (hyperon when importable, else petta) |
+| `PETTA_HOME`                     | `<repo>/.petta/PeTTa` | the PeTTa checkout (`src/main.pl`, `python/`); only read for `petta` |
+| `PETTA_STACK_LIMIT_MB`           | 2048    | SWI-Prolog stack limit of a PeTTa process; a runaway recursion dies of it |
 | `PLN_MAX_RANK_COMPOUNDS`         | 60      | cap on a ranking's compound pool, at every entrance    |
 | `PLN_MAX_METTA_SORT_COMPOUNDS`   | 10      | the much smaller cap for `strategy="metta_sort"`       |
 | `PLN_MAX_ONTOLOGY_FILES`         | 64      | cap on an `ontology_files` selection (deduped)        |
@@ -319,8 +322,8 @@ never noticed. Every failure now carries its own status and a structured
 | `connection`              | 502    | could not reach upstream                           |
 | `upstream_error`          | 502    | any other OpenAI-side failure                      |
 | `bad_json`                | 502    | the model answered with something unparseable      |
-| `runtime_error`           | 502    | the hyperon interpreter raised                     |
-| `pln_worker_crashed`      | 500    | the MeTTa worker process died (hyperon abort)      |
+| `runtime_error`           | 502    | the MeTTa runtime raised (hyperon: an exception; PeTTa: a failed load, an expression that raised, a process that died or — in inline mode, or a late `run_query_parts` part — was killed at its deadline) |
+| `pln_worker_crashed`      | 500    | the MeTTa WORKER process itself died (under hyperon, almost always a hyperon abort; under petta a PeTTa-internal crash is already `runtime_error` and never reaches this, so this means the worker process itself died) |
 | `missing_api_key` / `auth`| 503    | the service has no usable OpenAI credential        |
 | `drugage_build_missing`   | 503    | `build/drugage_etl.metta` has not been generated   |
 | `pln_overloaded`          | 503    | too many PLN tasks in flight (`Retry-After` is set)|
@@ -1086,6 +1089,116 @@ above — and an operator sizing `PLN_MAX_PROMPT_TOKENS` off them (say, 60,000 a
 generous headroom) gets a **413 on every default query**. The number is now
 asserted by a test rather than written down twice.
 
+## The PeTTa runtime (optional)
+
+MeTTa runs on **hyperon-experimental 0.2.10** unless told otherwise. With
+`PLN_RUNTIME=petta` it runs on [PeTTa](https://github.com/trueagi-io/PeTTa)
+instead, MeTTa compiled to SWI-Prolog, through the single seam
+`pln_chat/core/metta_runtime.py` (`get_runtime().run_program(kb_text,
+expressions)`). Nothing else changes: the stacks, the routing, the validator's
+symbol checks, the executor and every response shape are the same, and
+`GET /health` reports which engine answered:
+
+```
+"runtime_name": "hyperon"        # or "petta"; `auto` is reported as the one it resolved to
+"runtime_importable": true       # the SELECTED engine is available here
+```
+
+`pln_mode`, `runtime_ready` and every other key keep their meaning.
+`PLN_RUNTIME_AVAILABLE` is true when the selected runtime can run (for petta:
+`janus_swi` is importable and `PETTA_HOME` holds a PeTTa checkout; nothing is
+imported to find out).
+
+**Install.** hyperon stays the default and needs none of this.
+
+```bash
+brew install swi-prolog                       # SWI-Prolog >= 9.3 (Homebrew ships 10.0.2)
+bash scripts/setup_petta.sh                   # clones the pinned PeTTa into ./.petta/PeTTa
+pip install janus-swi                         # or: pip install -r pln_chat/requirements-petta.txt
+PLN_RUNTIME=petta python app.py               # PETTA_HOME=/elsewhere/PeTTa to use another checkout
+```
+
+**One KB load per process.** PeTTa's space and its compiled clauses are
+process-global and cannot be reset, and a second load in the same process
+duplicates every clause and multiplies recursive answers. So every program gets
+a process of its own: each `run_program` forks a fresh child that imports janus
+and PeTTa, loads the knowledge base once, evaluates each `!` expression with its
+own call (which keeps the per-expression result grouping) and sends the strings
+back; the child is then gone. The API process never imports janus or PeTTa
+(forking after SWI-Prolog has started is unsafe), and a program that runs in two
+stacks (`run_query_parts`, the LinAge2 mixed program) gets one child per stack
+and one shared deadline. Measured on the development Mac (arm64, SWI-Prolog
+10.0.2): 1-3 ms to fork, 0.14 s to import janus and consult PeTTa's `main.pl`
+(0.024 + 0.118 s), then 0.04 s (the ten-file smoke stack) to 0.32 s (the LinAge2
+stack) to load the knowledge base, and a child peak RSS of 33-110 MB. A whole
+`run_program` is 0.19-0.48 s on those stacks, against 0.01-2.1 s on hyperon
+(hyperon is faster to load, PeTTa to answer the patient and LinAge2 forms).
+
+**Deadlines and crashes.** The child is killed with SIGKILL at the deadline
+(`PLN_QUERY_TIMEOUT_SECONDS`), also in inline mode (`PLN_WORKER_POOL_SIZE=0`),
+where hyperon cannot be stopped; it is capped by `PETTA_STACK_LIMIT_MB` and,
+if the process that started it disappears (the executor SIGKILLs a worker at
+its own deadline, which leaves the worker's PeTTa child behind), by a CPU-time
+backstop ten CPU seconds past the deadline (and on Linux by
+`PR_SET_PDEATHSIG`, at once). Its stdin, stdout and stderr are `/dev/null`:
+PeTTa's traces reach neither the log nor the client. A load that raises, an expression that raises, and a
+child that dies (a PeTTa `halt`, a crash) come back as `runtime_error` (502) with the engine's text; a
+query that fails without raising comes back empty, like any query with no answer. A deadline is `runtime_error`
+(502) only when PeTTa's own adapter is the one that notices it — **inline mode**
+(`PLN_WORKER_POOL_SIZE=0`), or a part of `run_query_parts` that starts after the shared budget is already
+spent. With the default pooled executor the executor's OWN deadline (the same `PLN_QUERY_TIMEOUT_SECONDS`,
+started earlier) fires first and the caller gets **504** `pln_timeout`; the CPU-time backstop above then
+ends the now-orphaned PeTTa child a little later, with nobody left to read its answer.
+
+**What PeTTa changes in an answer.** `true`/`false` are spelled `True`/`False`
+as on hyperon (the one normaliser, `normalise_result`; the raw strings stay in
+`PettaRuntime.last_raw`). Numbers keep PeTTa's rendering (`3`, `1.0e-05`); every
+parser in the repo accepts both. A stored call such as
+`(Effect A B Pos (stv 0.7 (evidence-confidence RCT_Human)))` is reduced to
+`(stv 0.7 1.0)` in the KB text before the load, from the tier table in the same
+text, because PeTTa does not evaluate a call stored in a fact (hyperon is not
+touched). Results come back in assertion order where hyperon often returns the
+reverse.
+
+`pln_query_time_ms`/`query_time_ms` (every response that reports one) now also includes, for hyperon, the
+cost of `import hyperon` and constructing `MeTTa()` — previously excluded. Measured in a fresh process:
+about 15-17 ms on the first query, 11-12 ms on later ones (import stays cached, construction does not); a
+few ms either way does not change what the service answers, only this one timing field.
+
+**What is refused under petta, and how.** `/metta/run`, `/query` and the chat
+tab reject a program that uses `add-atom`, `remove-atom`, a `(= …)`
+definition, `assert`, `test`, `halt`, `import!`, `git-import!`,
+`cached-import!`, `include`, `py-call`, `py-atom`, `py-dot`, `shell`,
+`load_metta_file`, `load_metta_file_cached`, `process_metta_string`,
+`new-space`, `bind!`, `call`, `callPredicate`, `assertaPredicate`,
+`assertzPredicate`, `retractPredicate` or `import_prolog_function`: they
+change PeTTa's process-global space (and `remove-atom` retracts every
+identical copy), halt the process, or reach the host — the last several are
+PeTTa's own "call any Prolog predicate by name" doors, the same shape of
+escape as `py-call` under a different name. The check is by symbol, so
+`(let $f add-atom …)` is refused too; a pattern that merely reads equations,
+`(match &self (= (f $x) $v) …)`, is not. `PettaRuntime.run_program` and
+`PettaSession` refuse the same forms in `kb_text` and in a session's text as
+well as in an expression.
+
+That text scan is a fast, friendly 422/`kind="refused"` for the literal
+spelling — it is **not** the actual security boundary. A symbol PeTTa builds
+at run time (`(let $f (atom_concat "add" "-atom") ($f &self …))`) never
+appears as the token `add-atom` in any text a scan can read, and PeTTa's own
+dispatcher treats a function's identity as an ordinary runtime value, so that
+symbol runs all the same. The real boundary is inside the engine: right after
+each forked child's `PeTTa()` consults `main.pl`/`helper.pl`, before anything
+is loaded or run, it redefines every one of the predicates above directly in
+Prolog (`_install_petta_sandbox`) — `add-atom`/`remove-atom` keep their real
+behaviour while an ordinary KB's own facts load, and are refused only while a
+`!` form is actually being evaluated; every other predicate above has no
+legitimate role in loading or running this repo's knowledge bases and is
+refused unconditionally, for the whole life of the child. This holds no
+matter how the program's text spells or constructs the call, and regardless
+of which Python code path concatenated the caller's bytes into `kb_text`, an
+expression, or a session. Under hyperon the validator is unchanged.
+
+
 ## Examples
 
 ```bash
@@ -1444,6 +1557,7 @@ listener within the intended private network.
 ```bash
 python3 -m pytest tests/ -q          # everything: ~470 tests, ~90 s
 python3 -m pytest tests/ -q -m slow  # only the ones that drive a real engine
+python3 -m pytest tests/ -q -m petta  # the real-PeTTa tests (skipped when PeTTa is not installed)
 ```
 
 `tests/` is the matrix; each module's docstring says which finding it guards

@@ -1,0 +1,36 @@
+# PLN_RUNTIME=petta pytest tests --ignore=tests/test_metta_runtime.py, run against commit 4fff9d8 plus
+# this PR's adapter changes (before the engine-level sandbox existed): 53 failed vs the 32-failure hyperon
+# baseline (docs/petta_migration/baseline/hyperon_failures_47130aa.txt) -- 22 NEW failures below, 1 baseline
+# failure no longer failing (tests/test_human_evidence.py::test_the_runtime_kb_still_answers_the_query_that_aborted_the_interpreter).
+#
+# This is dialect-fix input for a LATER stage, not a gate this PR is held to (the hard rule is the HYPERON
+# failure set staying identical to the baseline file above; this file is PLN_RUNTIME=petta, a different,
+# still-experimental configuration). Causes, from the review that produced this list: hyperon-only abort
+# probes that no longer abort under petta (~10 tests: test_human_evidence_route, test_patient_stack,
+# test_generic_stack, test_linage2 -- the control the test exists to exercise is void under a different
+# engine), a `collapse`/match answer-order difference (PeTTa: assertion order; hyperon: often reverse),
+# `2` vs `2.0`, one timing-plan assertion, and `allow_definitions` being refused by design under petta.
+# None is a hang, a crash, or a security issue; this PR's own `-m petta` suite (22 tests, all passing)
+# covers the security properties the engine-level sandbox added after this list was produced.
+tests/test_caller_patients.py::test_a_deliberate_redefinition_is_still_possible_when_asked_for
+tests/test_generic_stack.py::test_the_full_stack_still_aborts_the_control
+tests/test_human_evidence_route.py::test_the_routed_program_answers_what_the_full_space_aborts_on[!(human-evidence &self Berberine)-(NoHumanEvidenceRecord Berberine]
+tests/test_human_evidence_route.py::test_the_routed_program_answers_what_the_full_space_aborts_on[!(human-evidence &self Metformin)-(HumanEvidence Bannister2014_Metformin_Survival Metformin]
+tests/test_human_evidence_route.py::test_the_routed_program_answers_what_the_full_space_aborts_on[!(human-evidence &self Omega3)-(HumanEvidenceCrossReferenced Omega3]
+tests/test_human_evidence_route.py::test_the_routed_program_answers_what_the_full_space_aborts_on[!(human-evidence &self Rapamycin)-(NoHumanEvidenceRecord Rapamycin]
+tests/test_linage2.py::test_the_shared_space_survives_a_patient_with_a_linage2_result
+tests/test_patient_stack.py::test_a_built_in_patient_is_answered_to_the_digit_as_it_was_recorded[Patient001_dx]
+tests/test_patient_stack.py::test_a_built_in_patient_is_answered_to_the_digit_as_it_was_recorded[Patient001_one_Fisetin]
+tests/test_patient_stack.py::test_a_built_in_patient_is_answered_to_the_digit_as_it_was_recorded[Patient001_one_Omega3]
+tests/test_patient_stack.py::test_a_built_in_patient_is_answered_to_the_digit_as_it_was_recorded[Patient001_one_Resveratrol]
+tests/test_patient_stack.py::test_a_built_in_patient_is_answered_to_the_digit_as_it_was_recorded[Patient001_supp]
+tests/test_patient_stack.py::test_a_built_in_patient_is_answered_to_the_digit_as_it_was_recorded[Patient002_supp]
+tests/test_patient_stack.py::test_a_single_new_marker_gives_exactly_the_weak_prior_and_tier_of_its_edge
+tests/test_patient_stack.py::test_an_elevated_rdw_and_a_low_albumin_are_witnesses_for_chronic_inflammation
+tests/test_patient_stack.py::test_diagnosing_with_no_cause_list_searches_the_default_causes_and_finds_the_metabolic_one
+tests/test_patient_stack.py::test_listing_patient_facts_with_a_session_patient_loaded_does_not_abort
+tests/test_patient_stack.py::test_the_built_in_patient_forms_that_aborted_now_answer[Patient001-!(rank-interventions-for-patient &self {P} (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)]
+tests/test_patient_stack.py::test_the_built_in_patient_forms_that_aborted_now_answer[Patient001-!(recommend-supplements-patient &self {P})]
+tests/test_patient_stack.py::test_the_built_in_patient_forms_that_aborted_now_answer[Patient002-!(recommend-supplements-patient &self {P})]
+tests/test_patient_stack.py::test_the_default_causes_answer_each_built_in_patient_and_leave_the_three_argument_form_alone[Patient001-CellularSenescence]
+tests/test_patient_stack.py::test_the_single_supplement_form_costs_one_evaluation_not_two

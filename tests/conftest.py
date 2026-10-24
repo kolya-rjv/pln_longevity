@@ -23,6 +23,11 @@ def pytest_configure(config):
         "slow: spawns a worker process or runs a real MeTTa query; still fast "
         "(a few seconds) but heavier than a pure unit test.",
     )
+    config.addinivalue_line(
+        "markers",
+        "petta: runs the REAL PeTTa runtime (SWI-Prolog + janus + the pinned checkout) in a forked "
+        "child; skipped when PeTTa is not installed. Select with -m petta.",
+    )
 
 
 @pytest.fixture(autouse=True)
