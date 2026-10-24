@@ -61,7 +61,10 @@ HTTP/Gradio surfaces stay.
    Caller expressions under petta pass three layers: a text refusal, an engine allowlist of builtins (everything PeTTa registers that is
    not on the list is replaced by a thrower in the child), and a scrubbed child (no API keys, a private scratch directory, closed
    descriptors, resource limits). Two adversarial reviews found real bypasses; all blocking and major findings were fixed and tested.
-   **petta is opt-in and must not be exposed to untrusted callers until a second, independent security review of the final state.**
+   A third independent review (commit 2b641c9) found no route to the environment, files, network or another request's space, and one
+   denial-of-service lever (a tiny allowed program grew a child past 1 GB); that is now bounded by `PETTA_MEMORY_LIMIT_MB` (an in-child
+   watchdog; `RLIMIT_AS` where the kernel honours it, never run on a real Linux kernel). **petta is opt-in. Before it faces callers the
+   operator does not trust, put a container or cgroup memory cap around the whole service and test `RLIMIT_AS` on Linux.**
 3b. Test harness. Done: `tests/runtime_harness.py` and `tests/runtime_compare.py`; 15 modules that drove hyperon directly now run on both
    runtimes; 13 hyperon-only crash probes are skipped under petta, each with a petta-only companion.
 4. Dialect and order differences. Done at the test level. Result order inside tuples and last-bit float sums differ between runtimes; where
