@@ -1,0 +1,5583 @@
+{
+ "_environment": {
+  "control_demo_sha256": "7097e74b988f0cd5",
+  "hyperon": "0.2.10",
+  "petta_commit": "fea83178",
+  "platform": "macOS-26.5.1-arm64-arm-64bit",
+  "python": "3.12.10",
+  "script_sha256": "d64db6cb03be437e",
+  "swipl": "SWI-Prolog version 10.0.2 for arm64-darwin",
+  "vendor/lib_pln_fork.metta": "4b01b7c66c529453",
+  "vendor/lib_pln_restricted.metta": "2f8bda09221cbf09"
+ },
+ "_measured_by": "python scripts/pln_number_table.py lane --lane R1",
+ "_wall_s": 8.7,
+ "closure_hops": {
+  "1": [
+   1.0,
+   1.0
+  ],
+  "2": [
+   0.9999999999999998,
+   1.0000000000000004
+  ],
+  "3": [
+   0.9999999999999998,
+   1.0000000000000004
+  ],
+  "4": [
+   0.9999999999999997,
+   1.0000000000000002
+  ],
+  "5": [
+   0.9999999999999992,
+   1.0000000000000002
+  ]
+ },
+ "closure_stats": {
+  "confidence_digits_differ": 72,
+  "duplicates": 0,
+  "extra": 0,
+  "extra_examples": [],
+  "max_dc": 0.06823374999999998,
+  "max_ds": 2.220446049250313e-16,
+  "missing": 0,
+  "missing_examples": [],
+  "pairs": 100,
+  "ratio_c": [
+   1.0,
+   1.5241579027587258
+  ],
+  "ratio_s": [
+   0.9999999999999992,
+   1.0000000000000004
+  ],
+  "reference": 100,
+  "sign_differs": 0,
+  "strength_digits_differ": 39
+ },
+ "drugage": {
+  "compounds": {
+   "Ethanol": {
+    "paper": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.1628296358308915,
+       0.21
+      ],
+      [
+       "Neg",
+       0.7683576557794765,
+       0.21
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.21,
+      "net": 0.12716088418920285,
+      "sign": "Neg",
+      "strength": 0.6055280199485851
+     }
+    },
+    "paper_neither": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.1628296358308915,
+       0.21
+      ],
+      [
+       "Neg",
+       0.7683576557794765,
+       0.21
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.21,
+      "net": 0.12716088418920285,
+      "sign": "Neg",
+      "strength": 0.6055280199485851
+     }
+    },
+    "paper_protective": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.1628296358308915,
+       0.21
+      ],
+      [
+       "Neg",
+       0.7683576557794765,
+       0.21
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.21,
+      "net": 0.12716088418920285,
+      "sign": "Neg",
+      "strength": 0.6055280199485851
+     }
+    },
+    "papers": 1,
+    "row": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.12604141172236732,
+       0.3471074380165289
+      ],
+      [
+       "Neg",
+       0.7254764058691345,
+       0.9300265721877767
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.9300265721877767,
+      "net": 0.630962423446642,
+      "sign": "Neg",
+      "strength": 0.6784348343535799
+     }
+    },
+    "rows": 52,
+    "source": "fixture"
+   },
+   "Metformin": {
+    "paper": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.10484138219207338,
+       0.9258694426946923
+      ],
+      [
+       "Neg",
+       0.2420145455240352,
+       0.9435681296216843
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.9435681296216843,
+      "net": 0.13128777995983965,
+      "sign": "Neg",
+      "strength": 0.13913969308446056
+     }
+    },
+    "paper_neither": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.3752281533356447,
+       0.7772686522562008
+      ],
+      [
+       "Neg",
+       0.38318661068037296,
+       0.9435681296216843
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.9435681296216843,
+      "net": 0.06990959250397244,
+      "sign": "Neg",
+      "strength": 0.07409066744549977
+     }
+    },
+    "paper_protective": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.3752281533356447,
+       0.7772686522562008
+      ],
+      [
+       "Neg",
+       0.2420145455240352,
+       0.9435681296216843
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.7772686522562008,
+      "net": -0.06329586897042375,
+      "sign": "Pos",
+      "strength": 0.08143370864976086
+     }
+    },
+    "papers": 16,
+    "row": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.1660292426383373,
+       0.9423919204410779
+      ],
+      [
+       "Neg",
+       0.3034900655038348,
+       0.9714774089853817
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.9714774089853817,
+      "net": 0.1383691256691488,
+      "sign": "Neg",
+      "strength": 0.1424316452336885
+     }
+    },
+    "rows": 54,
+    "source": "fixture"
+   },
+   "MixCompound": {
+    "paper": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.0599999999999999,
+       0.9090909090909091
+      ],
+      [
+       "Neg",
+       0.263050153531218,
+       0.9494655004859086
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.9494655004859086,
+      "net": 0.19521159112995856,
+      "sign": "Neg",
+      "strength": 0.20560156322694714
+     }
+    },
+    "paper_neither": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.5999999999999999,
+       0.5
+      ],
+      [
+       "Neg",
+       0.5049115913555993,
+       0.9073083778966132
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.9073083778966132,
+      "net": 0.15811051693404649,
+      "sign": "Neg",
+      "strength": 0.17426326129666025
+     }
+    },
+    "paper_protective": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.5999999999999999,
+       0.5
+      ],
+      [
+       "Neg",
+       0.263050153531218,
+       0.9494655004859086
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.5,
+      "net": -0.05024295432458692,
+      "sign": "Pos",
+      "strength": 0.10048590864917384
+     }
+    },
+    "papers": 5,
+    "row": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.0599999999999999,
+       0.9090909090909091
+      ],
+      [
+       "Neg",
+       0.263050153531218,
+       0.9494655004859086
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.9494655004859086,
+      "net": 0.19521159112995856,
+      "sign": "Neg",
+      "strength": 0.20560156322694714
+     }
+    },
+    "rows": 5,
+    "source": "mix"
+   },
+   "Rapamycin": {
+    "paper": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 6,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 4,
+      "st0": 4,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Neg",
+       0.3826716576781468,
+       0.9779049200090909
+      ]
+     ],
+     "links": 2,
+     "net": {
+      "confidence": 0.9779049200090909,
+      "net": 0.3742164967914944,
+      "sign": "Neg",
+      "strength": 0.3826716576781468
+     }
+    },
+    "paper_neither": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 6,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 4,
+      "st0": 4,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Neg",
+       0.3826716576781468,
+       0.9779049200090909
+      ]
+     ],
+     "links": 2,
+     "net": {
+      "confidence": 0.9779049200090909,
+      "net": 0.3742164967914944,
+      "sign": "Neg",
+      "strength": 0.3826716576781468
+     }
+    },
+    "paper_protective": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 6,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 4,
+      "st0": 4,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Neg",
+       0.3826716576781468,
+       0.9779049200090909
+      ]
+     ],
+     "links": 2,
+     "net": {
+      "confidence": 0.9779049200090909,
+      "net": 0.3742164967914944,
+      "sign": "Neg",
+      "strength": 0.3826716576781468
+     }
+    },
+    "papers": 18,
+    "row": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 6,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 4,
+      "st0": 4,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Neg",
+       0.3771416385919176,
+       0.9936457235094022
+      ]
+     ],
+     "links": 2,
+     "net": {
+      "confidence": 0.9936457235094022,
+      "net": 0.37474517634418747,
+      "sign": "Neg",
+      "strength": 0.3771416385919176
+     }
+    },
+    "rows": 37,
+    "source": "fixture"
+   },
+   "Resveratrol": {
+    "paper": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.09403021263121396,
+       0.9229534991378187
+      ],
+      [
+       "Neg",
+       0.24536262058178898,
+       0.9711464565264504
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.9711464565264504,
+      "net": 0.15149752576939624,
+      "sign": "Neg",
+      "strength": 0.1559986392899638
+     }
+    },
+    "paper_neither": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.3894603568931828,
+       0.7430770998506262
+      ],
+      [
+       "Neg",
+       0.3383460031698774,
+       0.9606423809394371
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.9606423809394371,
+      "net": 0.03563043755947726,
+      "sign": "Neg",
+      "strength": 0.03709022032177399
+     }
+    },
+    "paper_protective": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.3894603568931828,
+       0.7430770998506262
+      ],
+      [
+       "Neg",
+       0.24536262058178898,
+       0.9711464565264504
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.7430770998506262,
+      "net": -0.05111603296492784,
+      "sign": "Pos",
+      "strength": 0.06878967603119947
+     }
+    },
+    "papers": 37,
+    "row": {
+     "complete": true,
+     "cost": {
+      "attempts": 1,
+      "beliefs": 11,
+      "bq": 256,
+      "cap": 1024,
+      "complete": true,
+      "st": 8,
+      "st0": 8,
+      "tq": 256,
+      "unattributed": 0
+     },
+     "derivations": [
+      [
+       "Pos",
+       0.05816854759578242,
+       0.9811857843433154
+      ],
+      [
+       "Neg",
+       0.18413629076046004,
+       0.9887980774559075
+      ]
+     ],
+     "links": 3,
+     "net": {
+      "confidence": 0.9887980774559075,
+      "net": 0.12499945829692563,
+      "sign": "Neg",
+      "strength": 0.12641555555866218
+     }
+    },
+    "rows": 170,
+    "source": "fixture"
+   }
+  },
+  "python_twin": {
+   "Ethanol": {
+    "legacy": {
+     "confidence": 0.189,
+     "net": 0.14323728813559322,
+     "sign": "Neg",
+     "strength": 0.7578692493946732
+    },
+    "paper": {
+     "items": [
+      [
+       "Neg",
+       0.7683576557794765,
+       0.189,
+       1
+      ],
+      [
+       "Pos",
+       0.16282963583089158,
+       0.189,
+       1
+      ]
+     ],
+     "net": 0.11444479577028255
+    },
+    "paper_neither": {
+     "items": [
+      [
+       "Neg",
+       0.7683576557794765,
+       0.189,
+       1
+      ],
+      [
+       "Pos",
+       0.16282963583089158,
+       0.189,
+       1
+      ]
+     ],
+     "net": 0.11444479577028255
+    },
+    "paper_protective": {
+     "items": [
+      [
+       "Neg",
+       0.7683576557794765,
+       0.189,
+       1
+      ],
+      [
+       "Pos",
+       0.16282963583089158,
+       0.189,
+       1
+      ]
+     ],
+     "net": 0.11444479577028255
+    },
+    "papers": 1,
+    "row": {
+     "items": [
+      [
+       "Neg",
+       0.7254764058691344,
+       0.8370239149689991,
+       50
+      ],
+      [
+       "Pos",
+       0.12604141172236746,
+       0.312396694214876,
+       2
+      ]
+     ],
+     "net": 0.5678661811019777
+    },
+    "rows": 52
+   },
+   "Metformin": {
+    "legacy": {
+     "confidence": 0.81,
+     "net": 0.0,
+     "sign": "Neg",
+     "strength": 0.0
+    },
+    "paper": {
+     "items": [
+      [
+       "Neg",
+       0.24201454552403506,
+       0.8492113166595159,
+       14
+      ],
+      [
+       "Pos",
+       0.10484138219207341,
+       0.8332824984252231,
+       7
+      ]
+     ],
+     "net": 0.11815900196385555
+    },
+    "paper_neither": {
+     "items": [
+      [
+       "Neg",
+       0.3831866106803728,
+       0.8492113166595159,
+       14
+      ],
+      [
+       "Pos",
+       0.3752281533356447,
+       0.6995417870305807,
+       6
+      ]
+     ],
+     "net": 0.06291863325357505
+    },
+    "paper_protective": {
+     "items": [
+      [
+       "Neg",
+       0.24201454552403506,
+       0.8492113166595159,
+       14
+      ],
+      [
+       "Pos",
+       0.3752281533356447,
+       0.6995417870305807,
+       6
+      ]
+     ],
+     "net": -0.056966282073381475
+    },
+    "papers": 16,
+    "row": {
+     "items": [
+      [
+       "Neg",
+       0.30349006550383467,
+       0.8743296680868435,
+       38
+      ],
+      [
+       "Pos",
+       0.1660292426383373,
+       0.8481527283969701,
+       21
+      ]
+     ],
+     "net": 0.12453221310223384
+    },
+    "rows": 54
+   },
+   "MixCompound": {
+    "legacy": {
+     "confidence": 0.81,
+     "net": 0.405,
+     "sign": "Neg",
+     "strength": 0.5
+    },
+    "paper": {
+     "items": [
+      [
+       "Neg",
+       0.263050153531218,
+       0.8545189504373177,
+       4
+      ],
+      [
+       "Pos",
+       0.059999999999999984,
+       0.8181818181818181,
+       2
+      ]
+     ],
+     "net": 0.17569043201696263
+    },
+    "paper_neither": {
+     "items": [
+      [
+       "Neg",
+       0.5049115913555992,
+       0.8165775401069519,
+       3
+      ],
+      [
+       "Pos",
+       0.6,
+       0.45,
+       1
+      ]
+     ],
+     "net": 0.1422994652406417
+    },
+    "paper_protective": {
+     "items": [
+      [
+       "Neg",
+       0.263050153531218,
+       0.8545189504373177,
+       4
+      ],
+      [
+       "Pos",
+       0.6,
+       0.45,
+       1
+      ]
+     ],
+     "net": -0.04521865889212831
+    },
+    "papers": 5,
+    "row": {
+     "items": [
+      [
+       "Neg",
+       0.263050153531218,
+       0.8545189504373177,
+       4
+      ],
+      [
+       "Pos",
+       0.059999999999999984,
+       0.8181818181818181,
+       2
+      ]
+     ],
+     "net": 0.17569043201696263
+    },
+    "rows": 5
+   },
+   "Rapamycin": {
+    "legacy": {
+     "confidence": 0.81,
+     "net": 0.3190909090909091,
+     "sign": "Neg",
+     "strength": 0.3939393939393939
+    },
+    "paper": {
+     "items": [
+      [
+       "Neg",
+       0.38267165767814665,
+       0.8801144280081818,
+       18
+      ]
+     ],
+     "net": 0.3367948471123448
+    },
+    "paper_neither": {
+     "items": [
+      [
+       "Neg",
+       0.38267165767814665,
+       0.8801144280081818,
+       18
+      ]
+     ],
+     "net": 0.3367948471123448
+    },
+    "paper_protective": {
+     "items": [
+      [
+       "Neg",
+       0.38267165767814665,
+       0.8801144280081818,
+       18
+      ]
+     ],
+     "net": 0.3367948471123448
+    },
+    "papers": 18,
+    "row": {
+     "items": [
+      [
+       "Neg",
+       0.3771416385919176,
+       0.894281151158462,
+       37
+      ]
+     ],
+     "net": 0.33727065870976874
+    },
+    "rows": 37
+   },
+   "Resveratrol": {
+    "legacy": {
+     "confidence": 0.81,
+     "net": 0.0,
+     "sign": "Neg",
+     "strength": 0.0
+    },
+    "paper": {
+     "items": [
+      [
+       "Neg",
+       0.24536262058178895,
+       0.8740318108738053,
+       35
+      ],
+      [
+       "Pos",
+       0.09403021263121404,
+       0.8306581492240368,
+       10
+      ]
+     ],
+     "net": 0.1363477731924565
+    },
+    "paper_neither": {
+     "items": [
+      [
+       "Neg",
+       0.33834600316987734,
+       0.8645781428454934,
+       32
+      ],
+      [
+       "Pos",
+       0.3894603568931828,
+       0.6687693898655636,
+       8
+      ]
+     ],
+     "net": 0.032067393803529465
+    },
+    "paper_protective": {
+     "items": [
+      [
+       "Neg",
+       0.24536262058178895,
+       0.8740318108738053,
+       35
+      ],
+      [
+       "Pos",
+       0.3894603568931828,
+       0.6687693898655636,
+       8
+      ]
+     ],
+     "net": -0.04600442966843507
+    },
+    "papers": 37,
+    "row": {
+     "items": [
+      [
+       "Neg",
+       0.18413629076046004,
+       0.8899182697103168,
+       112
+      ],
+      [
+       "Pos",
+       0.05816854759578246,
+       0.8830672059089839,
+       81
+      ]
+     ],
+     "net": 0.11249951246723303
+    },
+    "rows": 170
+   }
+  }
+ },
+ "drugage_wall_s": 6.2,
+ "feedback": {
+  "costs": {
+   "CellularSenescence": {
+    "attempts": 1,
+    "beliefs": 19,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 10,
+    "st0": 10,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "ChronicInflammation": {
+    "attempts": 1,
+    "beliefs": 23,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 14,
+    "st0": 14,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "DasatinibPlusQuercetin": {
+    "attempts": 1,
+    "beliefs": 22,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 12,
+    "st0": 12,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "Omega3": {
+    "attempts": 1,
+    "beliefs": 26,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 16,
+    "st0": 16,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "SASP": {
+    "attempts": 1,
+    "beliefs": 21,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 12,
+    "st0": 12,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "Spermidine": {
+    "attempts": 1,
+    "beliefs": 24,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 13,
+    "st0": 13,
+    "tq": 256,
+    "unattributed": 0
+   }
+  },
+  "error": null,
+  "pairs": [
+   {
+    "chain": [
+     "AgeAccelGrim",
+     "AllCauseMortality"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.5,
+      0.85
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "AgeAccelGrim",
+     "CongestiveHeartFailure"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.5,
+      0.85
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "AgeAccelGrim",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.5,
+      0.85
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Autophagy",
+     "CellularSenescence"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.6,
+      0.65
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Autophagy",
+     "CellularSenescence",
+     "SASP"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.51,
+      0.42250000000000004
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Autophagy",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.43349999999999994,
+      0.27462500000000006
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Autophagy",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "CRP"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.34679999999999994,
+      0.17850625000000006
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Autophagy",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "DNAmGDF15"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.281775,
+      0.17850625000000006
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Autophagy",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "LowSerumAlbumin"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.23842499999999997,
+      0.16477500000000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Autophagy",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "RDW"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.21674999999999997,
+      0.16477500000000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Autophagy",
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.357,
+      0.27462500000000006
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Autophagy",
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.21419999999999997,
+      0.23343125000000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Berberine",
+     "InsulinResistance"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.65,
+      0.85
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Berberine",
+     "InsulinResistance",
+     "FastingGlucose"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.52,
+      0.5525
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Berberine",
+     "InsulinResistance",
+     "FastingGlucose",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.2860000000000001,
+      0.33149999999999996
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Berberine",
+     "InsulinResistance",
+     "HbA1c"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.45499999999999996,
+      0.5525
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Berberine",
+     "InsulinResistance",
+     "Triglycerides"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.325,
+      0.51
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "CellularSenescence",
+     "SASP"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.85,
+      0.65
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.7225,
+      0.42250000000000004
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "CRP"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.5780000000000001,
+      0.27462500000000006
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "DNAmGDF15"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.46962500000000007,
+      0.27462500000000006
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "LowSerumAlbumin"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.3973750000000001,
+      0.2535
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "RDW"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.3612500000000001,
+      0.2535
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.5950000000000001,
+      0.42250000000000004
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.357,
+      0.359125
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "ChronicInflammation",
+     "CRP"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.8,
+      0.65
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "ChronicInflammation",
+     "CellularSenescence"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.5,
+      0.65
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "ChronicInflammation",
+     "CellularSenescence",
+     "SASP"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.42499999999999993,
+      0.42250000000000004
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "ChronicInflammation",
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.29749999999999993,
+      0.27462500000000006
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "ChronicInflammation",
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.17849999999999996,
+      0.23343125000000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "ChronicInflammation",
+     "DNAmGDF15"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.65,
+      0.65
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "ChronicInflammation",
+     "LowSerumAlbumin"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.55,
+      0.6
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "ChronicInflammation",
+     "RDW"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.5,
+      0.6
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DNAmPAI1",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.6,
+      0.85
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DasatinibPlusQuercetin",
+     "CellularSenescence"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.7,
+      0.65
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DasatinibPlusQuercetin",
+     "CellularSenescence",
+     "SASP"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.595,
+      0.42250000000000004
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DasatinibPlusQuercetin",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.50575,
+      0.27462500000000006
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DasatinibPlusQuercetin",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "CRP"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.40459999999999996,
+      0.17850625000000006
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DasatinibPlusQuercetin",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "DNAmGDF15"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.3287375,
+      0.17850625000000006
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DasatinibPlusQuercetin",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "LowSerumAlbumin"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.27816250000000003,
+      0.16477500000000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DasatinibPlusQuercetin",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "RDW"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.25287499999999996,
+      0.16477500000000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DasatinibPlusQuercetin",
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.4165,
+      0.27462500000000006
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DasatinibPlusQuercetin",
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.24989999999999998,
+      0.23343125000000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DeregulatedNutrientSensing",
+     "InsulinResistance"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.8,
+      0.65
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DeregulatedNutrientSensing",
+     "InsulinResistance",
+     "FastingGlucose"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.6400000000000001,
+      0.42250000000000004
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DeregulatedNutrientSensing",
+     "InsulinResistance",
+     "FastingGlucose",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.35200000000000015,
+      0.2535
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DeregulatedNutrientSensing",
+     "InsulinResistance",
+     "HbA1c"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.5600000000000002,
+      0.42250000000000004
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "DeregulatedNutrientSensing",
+     "InsulinResistance",
+     "Triglycerides"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.4,
+      0.39
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "FastingGlucose",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.55,
+      0.6
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Fisetin",
+     "CellularSenescence"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.65,
+      0.5
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Fisetin",
+     "CellularSenescence",
+     "SASP"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.5525000000000001,
+      0.325
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Fisetin",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.469625,
+      0.21125000000000002
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Fisetin",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "CRP"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.3757,
+      0.13731250000000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Fisetin",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "DNAmGDF15"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.30525625,
+      0.13731250000000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Fisetin",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "LowSerumAlbumin"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.25829375000000004,
+      0.12675
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Fisetin",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "RDW"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.23481249999999998,
+      0.12675
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Fisetin",
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.38675000000000004,
+      0.21125000000000002
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Fisetin",
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.23205,
+      0.1795625
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "InsulinResistance",
+     "FastingGlucose"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.8,
+      0.65
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "InsulinResistance",
+     "FastingGlucose",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.4400000000000001,
+      0.39
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "InsulinResistance",
+     "HbA1c"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.7,
+      0.65
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "InsulinResistance",
+     "Triglycerides"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.5,
+      0.6
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Metformin",
+     "InsulinResistance"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.75,
+      0.85
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Metformin",
+     "InsulinResistance",
+     "FastingGlucose"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.6,
+      0.5525
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Metformin",
+     "InsulinResistance",
+     "FastingGlucose",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.33000000000000007,
+      0.33149999999999996
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Metformin",
+     "InsulinResistance",
+     "HbA1c"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.525,
+      0.5525
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Metformin",
+     "InsulinResistance",
+     "Triglycerides"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.375,
+      0.51
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "MitochondrialDysfunction",
+     "DNAmGDF15"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.75,
+      0.65
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "NMN",
+     "MitochondrialDysfunction"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.55,
+      0.7
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "NMN",
+     "MitochondrialDysfunction",
+     "DNAmGDF15"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.41250000000000003,
+      0.45499999999999996
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Omega3",
+     "ChronicInflammation"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.6,
+      0.85
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Omega3",
+     "ChronicInflammation",
+     "CRP"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.48000000000000004,
+      0.5525
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Omega3",
+     "ChronicInflammation",
+     "CellularSenescence"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.29999999999999993,
+      0.5525
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Omega3",
+     "ChronicInflammation",
+     "CellularSenescence",
+     "SASP"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.25499999999999995,
+      0.359125
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Omega3",
+     "ChronicInflammation",
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.17849999999999994,
+      0.23343125000000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Omega3",
+     "ChronicInflammation",
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.10709999999999996,
+      0.19841656250000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Omega3",
+     "ChronicInflammation",
+     "DNAmGDF15"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.38999999999999996,
+      0.5525
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Omega3",
+     "ChronicInflammation",
+     "LowSerumAlbumin"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.33,
+      0.51
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Omega3",
+     "ChronicInflammation",
+     "RDW"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.29999999999999993,
+      0.51
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Resveratrol",
+     "CellularSenescence"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.5,
+      0.35
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Resveratrol",
+     "CellularSenescence",
+     "SASP"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.425,
+      0.22749999999999998
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Resveratrol",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.36124999999999996,
+      0.14787499999999998
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Resveratrol",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "CRP"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.289,
+      0.09611874999999999
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Resveratrol",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "DNAmGDF15"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.23481249999999998,
+      0.09611874999999999
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Resveratrol",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "LowSerumAlbumin"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.19868750000000002,
+      0.08872499999999998
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Resveratrol",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "RDW"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.18062499999999995,
+      0.08872499999999998
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Resveratrol",
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.29749999999999993,
+      0.14787499999999998
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Resveratrol",
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.17849999999999996,
+      0.12569374999999997
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "SASP",
+     "ChronicInflammation"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.85,
+      0.65
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "SASP",
+     "ChronicInflammation",
+     "CRP"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.68,
+      0.42250000000000004
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "SASP",
+     "ChronicInflammation",
+     "CellularSenescence"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.425,
+      0.42250000000000004
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "SASP",
+     "ChronicInflammation",
+     "DNAmGDF15"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.5525000000000002,
+      0.42250000000000004
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "SASP",
+     "ChronicInflammation",
+     "LowSerumAlbumin"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.4675000000000001,
+      0.39
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "SASP",
+     "ChronicInflammation",
+     "RDW"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.425,
+      0.39
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "SASP",
+     "DNAmPAI1"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.7,
+      0.65
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "SASP",
+     "DNAmPAI1",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.42,
+      0.5525
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "SmokingCessation",
+     "SmokingPackYears"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.39,
+      0.6
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "SmokingCessation",
+     "SmokingPackYears",
+     "DNAmPACKYRS"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.312,
+      0.36
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "SmokingPackYears",
+     "DNAmPACKYRS"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.8,
+      0.6
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Spermidine",
+     "Autophagy"
+    ],
+    "results": [
+     [
+      "Pos",
+      0.8,
+      0.5
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Spermidine",
+     "Autophagy",
+     "CellularSenescence"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.4800000000000001,
+      0.325
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Spermidine",
+     "Autophagy",
+     "CellularSenescence",
+     "SASP"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.408,
+      0.21125000000000002
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Spermidine",
+     "Autophagy",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.34679999999999994,
+      0.13731250000000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Spermidine",
+     "Autophagy",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "CRP"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.27743999999999985,
+      0.08925312500000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Spermidine",
+     "Autophagy",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "DNAmGDF15"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.22541999999999993,
+      0.08925312500000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Spermidine",
+     "Autophagy",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "LowSerumAlbumin"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.19074000000000002,
+      0.08238750000000002
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Spermidine",
+     "Autophagy",
+     "CellularSenescence",
+     "SASP",
+     "ChronicInflammation",
+     "RDW"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.17340000000000003,
+      0.08238750000000002
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Spermidine",
+     "Autophagy",
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.28559999999999997,
+      0.13731250000000003
+     ]
+    ]
+   },
+   {
+    "chain": [
+     "Spermidine",
+     "Autophagy",
+     "CellularSenescence",
+     "SASP",
+     "DNAmPAI1",
+     "CoronaryHeartDisease"
+    ],
+    "results": [
+     [
+      "Neg",
+      0.17135999999999998,
+      0.11671562500000002
+     ]
+    ]
+   }
+  ],
+  "program_cost": {
+   "beliefs": 26,
+   "bq": 256,
+   "cap": 1024,
+   "complete": true,
+   "derive_runs": 40,
+   "derive_s": 0.7068,
+   "sources": 20,
+   "st": 16,
+   "tq": 256,
+   "unattributed": 0
+  },
+  "status": "ok",
+  "terminates": true,
+  "vs_reference": {
+   "confidence_digits_differ": 80,
+   "duplicates": 0,
+   "extra": 0,
+   "extra_examples": [],
+   "max_dc": 0.06823545584375001,
+   "max_ds": 2.220446049250313e-16,
+   "missing": 0,
+   "missing_examples": [],
+   "pairs": 109,
+   "ratio_c": [
+    1.0,
+    1.5241579027587258
+   ],
+   "ratio_s": [
+    0.9999999999999996,
+    1.0000000000000004
+   ],
+   "reference": 109,
+   "sign_differs": 0,
+   "strength_digits_differ": 46
+  },
+  "wall_s": 1.167
+ },
+ "feedback_wall_s": 1.2,
+ "label": "pln-R1",
+ "lane": "R1",
+ "orderings": {
+  "diagnose": {
+   "Patient001": {
+    "c_CS": 0.6961374656640626,
+    "s_CS": 0.5950000000000001
+   },
+   "population": {
+    "c_CS": 0.6961374656640626,
+    "c_MD": 0.65,
+    "coverage": 3.0,
+    "mass_CS": 0.5390915156250001,
+    "s_CS": 0.5950000000000001
+   }
+  },
+  "n_groups_with_results": 45,
+  "orderings": [
+   {
+    "holds": true,
+    "id": 1,
+    "name": "population ranking [D+Q, Fisetin, Spermidine], Elamipretide absent",
+    "values": "D+Q > Fisetin > Spermidine"
+   },
+   {
+    "holds": true,
+    "id": 2,
+    "name": "5-pool population ranking [Metformin, Berberine, D+Q, Fisetin, Spermidine]",
+    "values": "Metformin > Berberine > D+Q > Fisetin > Spermidine"
+   },
+   {
+    "holds": false,
+    "id": 3,
+    "name": "Patient001 personalised order [D+Q, Fisetin, Metformin, Berberine, Spermidine]",
+    "values": "D+Q > Fisetin > Metformin > Spermidine > Berberine"
+   },
+   {
+    "holds": true,
+    "id": 4,
+    "name": "Patient002 personalised order [Metformin, Berberine, D+Q, Fisetin, Spermidine]",
+    "values": "Metformin > Berberine > D+Q > Fisetin > Spermidine"
+   },
+   {
+    "holds": true,
+    "id": 5,
+    "name": "relevance to Patient001's markers: D+Q > Fisetin > Spermidine > 0 = Elamipretide",
+    "values": "D+Q 0.2453, Fisetin 0.1752, Spermidine 0.0841, Elamipretide 0"
+   },
+   {
+    "holds": true,
+    "id": 6,
+    "name": "relevance is patient specific: Patient002 Metformin and Berberine > 0.4, Patient001 Metformin = 0",
+    "values": "P002 Metformin 0.6216, P002 Berberine 0.5387, P001 Metformin 0"
+   },
+   {
+    "holds": true,
+    "id": 7,
+    "name": "diagnosis ranks by coverage: [CS, CI, MD] with coverage [3, 2, 1] (population, Patient001, default causes)",
+    "values": "Ce/Ch/Mi 321; Ce/Ch/Mi 321; Ce/Ch/Mi 321"
+   },
+   {
+    "holds": true,
+    "id": 8,
+    "name": "counterfactual: senescence moves the clock more than inflammation and is less certain (c(B) < c(A) <= 0.65)",
+    "values": "|dB| 0.2219 > |dA| 0.1219; c(B) 0.3638 < c(A) 0.6500 <= 0.65"
+   },
+   {
+    "holds": true,
+    "id": 9,
+    "name": "senolytic lever = 0.70 of senescence's effect, lowest confidence",
+    "values": "dQ/dB 0.700000; c(D+Q) 0.2128 < c(B) 0.3638"
+   },
+   {
+    "holds": true,
+    "id": 10,
+    "name": "supplements for Patient001: Omega3 in tier 1, NMN scores above Fisetin",
+    "values": "Omega3 tier 1: True; NMN 0.1877 vs Fisetin 0.1752"
+   },
+   {
+    "holds": true,
+    "id": 11,
+    "name": "risk: reduction(senescence) > reduction(inflammation) > reduction(insulin resistance) = 0, confidence(senescence) < confidence(inflammation)",
+    "values": "reductions 0.00770 > 0.00429 > 0; confidence 0.3638 < 0.6500"
+   },
+   {
+    "holds": true,
+    "id": 12,
+    "name": "confidence by chain length: D+Q (4 edges) > Fisetin (4) > Spermidine (5), all below a single link's 0.65",
+    "values": "c: D+Q 0.2334 > Fisetin 0.1796 > Spermidine 0.1167, all < 0.65"
+   }
+  ],
+  "personalised": {
+   "Patient001": [
+    {
+     "c": 0.23343125000000003,
+     "name": "DasatinibPlusQuercetin",
+     "s": 0.24989999999999998,
+     "score": 0.30362110898437505,
+     "sign": "Neg"
+    },
+    {
+     "c": 0.1795625,
+     "name": "Fisetin",
+     "s": 0.23205,
+     "score": 0.216872220703125,
+     "sign": "Neg"
+    },
+    {
+     "c": 0.33149999999999996,
+     "name": "Metformin",
+     "s": 0.33000000000000007,
+     "score": 0.109395,
+     "sign": "Neg"
+    },
+    {
+     "c": 0.11671562500000002,
+     "name": "Spermidine",
+     "s": 0.17135999999999998,
+     "score": 0.1040986659375,
+     "sign": "Neg"
+    },
+    {
+     "c": 0.33149999999999996,
+     "name": "Berberine",
+     "s": 0.2860000000000001,
+     "score": 0.09480900000000002,
+     "sign": "Neg"
+    }
+   ],
+   "Patient002": [
+    {
+     "c": 0.33149999999999996,
+     "name": "Metformin",
+     "s": 0.33000000000000007,
+     "score": 0.7309575,
+     "sign": "Neg"
+    },
+    {
+     "c": 0.33149999999999996,
+     "name": "Berberine",
+     "s": 0.2860000000000001,
+     "score": 0.6334965,
+     "sign": "Neg"
+    },
+    {
+     "c": 0.23343125000000003,
+     "name": "DasatinibPlusQuercetin",
+     "s": 0.24989999999999998,
+     "score": 0.058334469375,
+     "sign": "Neg"
+    },
+    {
+     "c": 0.1795625,
+     "name": "Fisetin",
+     "s": 0.23205,
+     "score": 0.041667478125000004,
+     "sign": "Neg"
+    },
+    {
+     "c": 0.11671562500000002,
+     "name": "Spermidine",
+     "s": 0.17135999999999998,
+     "score": 0.0200003895,
+     "sign": "Neg"
+    }
+   ]
+  },
+  "relevance": {
+   "relevance_Patient001_DasatinibPlusQuercetin": "0.24528663960937505",
+   "relevance_Patient001_Elamipretide": "0.0",
+   "relevance_Patient001_Fisetin": "0.17520474257812502",
+   "relevance_Patient001_Metformin": "0.0",
+   "relevance_Patient001_Omega3": "0.48067499999999996",
+   "relevance_Patient001_Resveratrol": "0.09434101523437498",
+   "relevance_Patient001_Spermidine": "0.08409827643750001",
+   "relevance_Patient002_Berberine": "0.5386875",
+   "relevance_Patient002_Metformin": "0.6215625"
+  }
+ },
+ "patient": {
+  "chains": [
+   {
+    "a": "SASP",
+    "c": "CoronaryHeartDisease",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 15,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 8,
+     "st0": 8,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "explain": [
+     [
+      [
+       "SASP",
+       "DNAmPAI1",
+       "CoronaryHeartDisease"
+      ],
+      "Pos",
+      0.42,
+      0.5525
+     ]
+    ],
+    "id": "SASP->CHD",
+    "infer": [
+     [
+      "Pos",
+      0.42,
+      0.5525
+     ]
+    ],
+    "pin": {
+     "c": 0.49725,
+     "expr": [
+      "0.42",
+      "0.65*0.85*0.9"
+     ],
+     "s": 0.42,
+     "sign": "Pos",
+     "test": "test_one_hop_propagation"
+    },
+    "smoke": true
+   },
+   {
+    "a": "CellularSenescence",
+    "c": "CoronaryHeartDisease",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 17,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 9,
+     "st0": 9,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "explain": [
+     [
+      [
+       "CellularSenescence",
+       "SASP",
+       "DNAmPAI1",
+       "CoronaryHeartDisease"
+      ],
+      "Pos",
+      0.357,
+      0.359125
+     ]
+    ],
+    "id": "CS->CHD",
+    "infer": [
+     [
+      "Pos",
+      0.357,
+      0.359125
+     ]
+    ],
+    "pin": {
+     "c": 0.29089125000000005,
+     "expr": [
+      "0.357",
+      "0.65*0.65*0.85*0.9*0.9"
+     ],
+     "s": 0.357,
+     "sign": "Pos",
+     "test": "test_novel_cross_source_inference_harmful"
+    },
+    "smoke": true
+   },
+   {
+    "a": "DasatinibPlusQuercetin",
+    "c": "CoronaryHeartDisease",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 20,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 11,
+     "st0": 11,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "explain": [
+     [
+      [
+       "DasatinibPlusQuercetin",
+       "CellularSenescence",
+       "SASP",
+       "DNAmPAI1",
+       "CoronaryHeartDisease"
+      ],
+      "Neg",
+      0.24989999999999998,
+      0.23343125000000003
+     ]
+    ],
+    "id": "D+Q->CHD",
+    "infer": [
+     [
+      "Neg",
+      0.24989999999999998,
+      0.23343125000000003
+     ]
+    ],
+    "pin": {
+     "c": 0.17017138125000003,
+     "expr": [
+      "0.2499",
+      "0.65**3*0.85*0.9**3"
+     ],
+     "s": 0.2499,
+     "sign": "Neg",
+     "test": "test_protective_intervention_flips_sign"
+    },
+    "smoke": true
+   },
+   {
+    "a": "Fisetin",
+    "c": "CoronaryHeartDisease",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 20,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 11,
+     "st0": 11,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "explain": [
+     [
+      [
+       "Fisetin",
+       "CellularSenescence",
+       "SASP",
+       "DNAmPAI1",
+       "CoronaryHeartDisease"
+      ],
+      "Neg",
+      0.23205,
+      0.1795625
+     ]
+    ],
+    "id": "Fisetin->CHD",
+    "infer": [
+     [
+      "Neg",
+      0.23205,
+      0.1795625
+     ]
+    ],
+    "pin": {
+     "c": 0.13090106250000003,
+     "expr": [
+      "0.23205",
+      "0.5*0.65*0.65*0.85*0.9**3"
+     ],
+     "s": 0.23205,
+     "sign": "Neg",
+     "test": "test_fisetin_protective_weaker_than_dq"
+    },
+    "smoke": true
+   },
+   {
+    "a": "Spermidine",
+    "c": "CoronaryHeartDisease",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 22,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 12,
+     "st0": 12,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "explain": [
+     [
+      [
+       "Spermidine",
+       "Autophagy",
+       "CellularSenescence",
+       "SASP",
+       "DNAmPAI1",
+       "CoronaryHeartDisease"
+      ],
+      "Neg",
+      0.17135999999999998,
+      0.11671562500000002
+     ]
+    ],
+    "id": "Spermidine->CHD",
+    "infer": [
+     [
+      "Neg",
+      0.17135999999999998,
+      0.11671562500000002
+     ]
+    ],
+    "pin": {
+     "c": 0.0765771215625,
+     "expr": [
+      "0.17136",
+      "0.5*0.65**3*0.85*0.9**4"
+     ],
+     "s": 0.17136,
+     "sign": "Neg",
+     "test": "test_spermidine_longer_chain_lower_confidence"
+    },
+    "smoke": true
+   },
+   {
+    "a": "Metformin",
+    "c": "CoronaryHeartDisease",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 12,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 7,
+     "st0": 7,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "explain": [
+     [
+      [
+       "Metformin",
+       "InsulinResistance",
+       "FastingGlucose",
+       "CoronaryHeartDisease"
+      ],
+      "Neg",
+      0.33000000000000007,
+      0.33149999999999996
+     ]
+    ],
+    "id": "Metformin->CHD",
+    "infer": [
+     [
+      "Neg",
+      0.33000000000000007,
+      0.33149999999999996
+     ]
+    ],
+    "pin": {
+     "c": 0.268515,
+     "expr": [
+      "0.33",
+      "0.85*0.65*0.60*0.9**2"
+     ],
+     "s": 0.33,
+     "sign": "Neg",
+     "test": "test_patient_grounding::test_metabolic_axis_reaches_chd"
+    },
+    "smoke": false
+   },
+   {
+    "a": "Berberine",
+    "c": "CoronaryHeartDisease",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 12,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 7,
+     "st0": 7,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "explain": [
+     [
+      [
+       "Berberine",
+       "InsulinResistance",
+       "FastingGlucose",
+       "CoronaryHeartDisease"
+      ],
+      "Neg",
+      0.2860000000000001,
+      0.33149999999999996
+     ]
+    ],
+    "id": "Berberine->CHD",
+    "infer": [
+     [
+      "Neg",
+      0.2860000000000001,
+      0.33149999999999996
+     ]
+    ],
+    "pin": {
+     "c": 0.268515,
+     "expr": [
+      "0.286",
+      "0.85*0.65*0.60*0.9**2"
+     ],
+     "s": 0.286,
+     "sign": "Neg",
+     "test": "same mechanism as Metformin (rank_population_5pool)"
+    },
+    "smoke": false
+   },
+   {
+    "a": "DNAmPAI1",
+    "c": "CoronaryHeartDisease",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 3,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 2,
+     "st0": 2,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "explain": [
+     [
+      [
+       "DNAmPAI1",
+       "CoronaryHeartDisease"
+      ],
+      "Pos",
+      0.6,
+      0.85
+     ]
+    ],
+    "id": "DNAmPAI1->CHD (record)",
+    "infer": [
+     [
+      "Pos",
+      0.6,
+      0.85
+     ]
+    ],
+    "pin": {
+     "c": 0.85,
+     "expr": [
+      "0.6",
+      "0.85"
+     ],
+     "s": 0.6,
+     "sign": "Pos",
+     "test": "test_direct_link_is_calibrated_and_signed"
+    },
+    "smoke": false
+   },
+   {
+    "a": "DasatinibPlusQuercetin",
+    "c": "AllCauseMortality",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 20,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 11,
+     "st0": 11,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "explain": [],
+    "id": "D+Q->AllCauseMortality",
+    "infer": [],
+    "pin": null,
+    "smoke": false
+   }
+  ],
+  "closure": {
+   "pairs": [
+    {
+     "chain": [
+      "AgeAccelGrim",
+      "AllCauseMortality"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.5,
+       0.85
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "AgeAccelGrim",
+      "CongestiveHeartFailure"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.5,
+       0.85
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "AgeAccelGrim",
+      "CoronaryHeartDisease"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.5,
+       0.85
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Autophagy",
+      "CellularSenescence"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.6,
+       0.65
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Autophagy",
+      "CellularSenescence",
+      "SASP"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.51,
+       0.42250000000000004
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Autophagy",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.43349999999999994,
+       0.27462500000000006
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Autophagy",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "CRP"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.34679999999999994,
+       0.17850625000000006
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Autophagy",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "DNAmGDF15"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.281775,
+       0.17850625000000006
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Autophagy",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "LowSerumAlbumin"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.23842499999999997,
+       0.16477500000000003
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Autophagy",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "RDW"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.21674999999999997,
+       0.16477500000000003
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Autophagy",
+      "CellularSenescence",
+      "SASP",
+      "DNAmPAI1"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.357,
+       0.27462500000000006
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Autophagy",
+      "CellularSenescence",
+      "SASP",
+      "DNAmPAI1",
+      "CoronaryHeartDisease"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.21419999999999997,
+       0.23343125000000003
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Berberine",
+      "InsulinResistance"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.65,
+       0.85
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Berberine",
+      "InsulinResistance",
+      "FastingGlucose"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.52,
+       0.5525
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Berberine",
+      "InsulinResistance",
+      "FastingGlucose",
+      "CoronaryHeartDisease"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.2860000000000001,
+       0.33149999999999996
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Berberine",
+      "InsulinResistance",
+      "HbA1c"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.45499999999999996,
+       0.5525
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Berberine",
+      "InsulinResistance",
+      "Triglycerides"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.325,
+       0.51
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "CellularSenescence",
+      "SASP"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.85,
+       0.65
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.7225,
+       0.42250000000000004
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "CRP"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.5780000000000001,
+       0.27462500000000006
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "DNAmGDF15"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.46962500000000007,
+       0.27462500000000006
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "LowSerumAlbumin"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.3973750000000001,
+       0.2535
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "RDW"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.3612500000000001,
+       0.2535
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "CellularSenescence",
+      "SASP",
+      "DNAmPAI1"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.5950000000000001,
+       0.42250000000000004
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "CellularSenescence",
+      "SASP",
+      "DNAmPAI1",
+      "CoronaryHeartDisease"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.357,
+       0.359125
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "ChronicInflammation",
+      "CRP"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.8,
+       0.65
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "ChronicInflammation",
+      "DNAmGDF15"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.65,
+       0.65
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "ChronicInflammation",
+      "LowSerumAlbumin"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.55,
+       0.6
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "ChronicInflammation",
+      "RDW"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.5,
+       0.6
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DNAmPAI1",
+      "CoronaryHeartDisease"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.6,
+       0.85
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DasatinibPlusQuercetin",
+      "CellularSenescence"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.7,
+       0.65
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DasatinibPlusQuercetin",
+      "CellularSenescence",
+      "SASP"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.595,
+       0.42250000000000004
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DasatinibPlusQuercetin",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.50575,
+       0.27462500000000006
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DasatinibPlusQuercetin",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "CRP"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.40459999999999996,
+       0.17850625000000006
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DasatinibPlusQuercetin",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "DNAmGDF15"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.3287375,
+       0.17850625000000006
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DasatinibPlusQuercetin",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "LowSerumAlbumin"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.27816250000000003,
+       0.16477500000000003
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DasatinibPlusQuercetin",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "RDW"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.25287499999999996,
+       0.16477500000000003
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DasatinibPlusQuercetin",
+      "CellularSenescence",
+      "SASP",
+      "DNAmPAI1"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.4165,
+       0.27462500000000006
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DasatinibPlusQuercetin",
+      "CellularSenescence",
+      "SASP",
+      "DNAmPAI1",
+      "CoronaryHeartDisease"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.24989999999999998,
+       0.23343125000000003
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DeregulatedNutrientSensing",
+      "InsulinResistance"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.8,
+       0.65
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DeregulatedNutrientSensing",
+      "InsulinResistance",
+      "FastingGlucose"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.6400000000000001,
+       0.42250000000000004
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DeregulatedNutrientSensing",
+      "InsulinResistance",
+      "FastingGlucose",
+      "CoronaryHeartDisease"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.35200000000000015,
+       0.2535
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DeregulatedNutrientSensing",
+      "InsulinResistance",
+      "HbA1c"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.5600000000000002,
+       0.42250000000000004
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "DeregulatedNutrientSensing",
+      "InsulinResistance",
+      "Triglycerides"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.4,
+       0.39
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "FastingGlucose",
+      "CoronaryHeartDisease"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.55,
+       0.6
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Fisetin",
+      "CellularSenescence"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.65,
+       0.5
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Fisetin",
+      "CellularSenescence",
+      "SASP"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.5525000000000001,
+       0.325
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Fisetin",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.469625,
+       0.21125000000000002
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Fisetin",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "CRP"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.3757,
+       0.13731250000000003
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Fisetin",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "DNAmGDF15"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.30525625,
+       0.13731250000000003
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Fisetin",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "LowSerumAlbumin"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.25829375000000004,
+       0.12675
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Fisetin",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "RDW"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.23481249999999998,
+       0.12675
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Fisetin",
+      "CellularSenescence",
+      "SASP",
+      "DNAmPAI1"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.38675000000000004,
+       0.21125000000000002
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Fisetin",
+      "CellularSenescence",
+      "SASP",
+      "DNAmPAI1",
+      "CoronaryHeartDisease"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.23205,
+       0.1795625
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "InsulinResistance",
+      "FastingGlucose"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.8,
+       0.65
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "InsulinResistance",
+      "FastingGlucose",
+      "CoronaryHeartDisease"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.4400000000000001,
+       0.39
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "InsulinResistance",
+      "HbA1c"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.7,
+       0.65
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "InsulinResistance",
+      "Triglycerides"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.5,
+       0.6
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Metformin",
+      "InsulinResistance"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.75,
+       0.85
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Metformin",
+      "InsulinResistance",
+      "FastingGlucose"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.6,
+       0.5525
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Metformin",
+      "InsulinResistance",
+      "FastingGlucose",
+      "CoronaryHeartDisease"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.33000000000000007,
+       0.33149999999999996
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Metformin",
+      "InsulinResistance",
+      "HbA1c"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.525,
+       0.5525
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Metformin",
+      "InsulinResistance",
+      "Triglycerides"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.375,
+       0.51
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "MitochondrialDysfunction",
+      "DNAmGDF15"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.75,
+       0.65
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "NMN",
+      "MitochondrialDysfunction"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.55,
+       0.7
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "NMN",
+      "MitochondrialDysfunction",
+      "DNAmGDF15"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.41250000000000003,
+       0.45499999999999996
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Omega3",
+      "ChronicInflammation"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.6,
+       0.85
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Omega3",
+      "ChronicInflammation",
+      "CRP"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.48000000000000004,
+       0.5525
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Omega3",
+      "ChronicInflammation",
+      "DNAmGDF15"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.38999999999999996,
+       0.5525
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Omega3",
+      "ChronicInflammation",
+      "LowSerumAlbumin"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.33,
+       0.51
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Omega3",
+      "ChronicInflammation",
+      "RDW"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.29999999999999993,
+       0.51
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Resveratrol",
+      "CellularSenescence"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.5,
+       0.35
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Resveratrol",
+      "CellularSenescence",
+      "SASP"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.425,
+       0.22749999999999998
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Resveratrol",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.36124999999999996,
+       0.14787499999999998
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Resveratrol",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "CRP"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.289,
+       0.09611874999999999
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Resveratrol",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "DNAmGDF15"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.23481249999999998,
+       0.09611874999999999
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Resveratrol",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "LowSerumAlbumin"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.19868750000000002,
+       0.08872499999999998
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Resveratrol",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "RDW"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.18062499999999995,
+       0.08872499999999998
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Resveratrol",
+      "CellularSenescence",
+      "SASP",
+      "DNAmPAI1"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.29749999999999993,
+       0.14787499999999998
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Resveratrol",
+      "CellularSenescence",
+      "SASP",
+      "DNAmPAI1",
+      "CoronaryHeartDisease"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.17849999999999996,
+       0.12569374999999997
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "SASP",
+      "ChronicInflammation"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.85,
+       0.65
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "SASP",
+      "ChronicInflammation",
+      "CRP"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.68,
+       0.42250000000000004
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "SASP",
+      "ChronicInflammation",
+      "DNAmGDF15"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.5525000000000002,
+       0.42250000000000004
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "SASP",
+      "ChronicInflammation",
+      "LowSerumAlbumin"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.4675000000000001,
+       0.39
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "SASP",
+      "ChronicInflammation",
+      "RDW"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.425,
+       0.39
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "SASP",
+      "DNAmPAI1"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.7,
+       0.65
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "SASP",
+      "DNAmPAI1",
+      "CoronaryHeartDisease"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.42,
+       0.5525
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "SmokingCessation",
+      "SmokingPackYears"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.39,
+       0.6
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "SmokingCessation",
+      "SmokingPackYears",
+      "DNAmPACKYRS"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.312,
+       0.36
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "SmokingPackYears",
+      "DNAmPACKYRS"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.8,
+       0.6
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Spermidine",
+      "Autophagy"
+     ],
+     "results": [
+      [
+       "Pos",
+       0.8,
+       0.5
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Spermidine",
+      "Autophagy",
+      "CellularSenescence"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.4800000000000001,
+       0.325
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Spermidine",
+      "Autophagy",
+      "CellularSenescence",
+      "SASP"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.408,
+       0.21125000000000002
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Spermidine",
+      "Autophagy",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.34679999999999994,
+       0.13731250000000003
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Spermidine",
+      "Autophagy",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "CRP"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.27743999999999985,
+       0.08925312500000003
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Spermidine",
+      "Autophagy",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "DNAmGDF15"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.22541999999999993,
+       0.08925312500000003
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Spermidine",
+      "Autophagy",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "LowSerumAlbumin"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.19074000000000002,
+       0.08238750000000002
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Spermidine",
+      "Autophagy",
+      "CellularSenescence",
+      "SASP",
+      "ChronicInflammation",
+      "RDW"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.17340000000000003,
+       0.08238750000000002
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Spermidine",
+      "Autophagy",
+      "CellularSenescence",
+      "SASP",
+      "DNAmPAI1"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.28559999999999997,
+       0.13731250000000003
+      ]
+     ]
+    },
+    {
+     "chain": [
+      "Spermidine",
+      "Autophagy",
+      "CellularSenescence",
+      "SASP",
+      "DNAmPAI1",
+      "CoronaryHeartDisease"
+     ],
+     "results": [
+      [
+       "Neg",
+       0.17135999999999998,
+       0.11671562500000002
+      ]
+     ]
+    }
+   ],
+   "unparsed": 0
+  },
+  "composite": [
+   {
+    "atoms": [
+     "((scored DasatinibPlusQuercetin 0.058334469375 (signed Neg (stv 0.24989999999999998 0.23343125000000003))) (scored Fisetin 0.041667478125000004 (signed Neg (stv 0.23205 0.1795625))) (scored Spermidine 0.0200003895 (signed Neg (stv 0.17135999999999998 0.11671562500000002))))"
+    ],
+    "query": "!(rank-interventions &self (DasatinibPlusQuercetin Fisetin Spermidine Elamipretide) CoronaryHeartDisease)",
+    "tag": "rank_population"
+   },
+   {
+    "atoms": [
+     "((scored Metformin 0.109395 (signed Neg (stv 0.33000000000000007 0.33149999999999996))) (scored Berberine 0.09480900000000002 (signed Neg (stv 0.2860000000000001 0.33149999999999996))) (scored DasatinibPlusQuercetin 0.058334469375 (signed Neg (stv 0.24989999999999998 0.23343125000000003))) (scored Fisetin 0.041667478125000004 (signed Neg (stv 0.23205 0.1795625))) (scored Spermidine 0.0200003895 (signed Neg (stv 0.17135999999999998 0.11671562500000002))))"
+    ],
+    "query": "!(rank-interventions &self (DasatinibPlusQuercetin Fisetin Spermidine Metformin Berberine) CoronaryHeartDisease)",
+    "tag": "rank_population_5pool"
+   },
+   {
+    "atoms": [
+     "((scored DasatinibPlusQuercetin 0.30362110898437505 (signed Neg (stv 0.24989999999999998 0.23343125000000003))) (scored Fisetin 0.216872220703125 (signed Neg (stv 0.23205 0.1795625))) (scored Metformin 0.109395 (signed Neg (stv 0.33000000000000007 0.33149999999999996))) (scored Spermidine 0.1040986659375 (signed Neg (stv 0.17135999999999998 0.11671562500000002))) (scored Berberine 0.09480900000000002 (signed Neg (stv 0.2860000000000001 0.33149999999999996))))"
+    ],
+    "query": "!(rank-interventions-for-patient &self Patient001 (DasatinibPlusQuercetin Fisetin Spermidine Metformin Berberine) CoronaryHeartDisease)",
+    "tag": "rank_for_Patient001_5pool"
+   },
+   {
+    "atoms": [
+     "((scored Metformin 0.7309575 (signed Neg (stv 0.33000000000000007 0.33149999999999996))) (scored Berberine 0.6334965 (signed Neg (stv 0.2860000000000001 0.33149999999999996))) (scored DasatinibPlusQuercetin 0.058334469375 (signed Neg (stv 0.24989999999999998 0.23343125000000003))) (scored Fisetin 0.041667478125000004 (signed Neg (stv 0.23205 0.1795625))) (scored Spermidine 0.0200003895 (signed Neg (stv 0.17135999999999998 0.11671562500000002))))"
+    ],
+    "query": "!(rank-interventions-for-patient &self Patient002 (DasatinibPlusQuercetin Fisetin Spermidine Metformin Berberine) CoronaryHeartDisease)",
+    "tag": "rank_for_Patient002_5pool"
+   },
+   {
+    "atoms": [
+     "((scored DasatinibPlusQuercetin 0.30362110898437505 (signed Neg (stv 0.24989999999999998 0.23343125000000003))) (scored Metformin 0.109395 (signed Neg (stv 0.33000000000000007 0.33149999999999996))) (scored Berberine 0.09480900000000002 (signed Neg (stv 0.2860000000000001 0.33149999999999996))))"
+    ],
+    "query": "!(rank-interventions-for-patient &self Patient001 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+    "tag": "rank_for_Patient001_4pool"
+   },
+   {
+    "atoms": [
+     "((scored Metformin 0.7309575 (signed Neg (stv 0.33000000000000007 0.33149999999999996))) (scored Berberine 0.6334965 (signed Neg (stv 0.2860000000000001 0.33149999999999996))) (scored DasatinibPlusQuercetin 0.058334469375 (signed Neg (stv 0.24989999999999998 0.23343125000000003))))"
+    ],
+    "query": "!(rank-interventions-for-patient &self Patient002 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+    "tag": "rank_for_Patient002_4pool"
+   },
+   {
+    "atoms": [
+     "((scored Metformin 0.109395 (signed Neg (stv 0.33000000000000007 0.33149999999999996))) (scored Berberine 0.09480900000000002 (signed Neg (stv 0.2860000000000001 0.33149999999999996))) (scored DasatinibPlusQuercetin 0.058334469375 (signed Neg (stv 0.24989999999999998 0.23343125000000003))))"
+    ],
+    "query": "!(rank-interventions-for-patient &self Patient003 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+    "tag": "rank_for_Patient003_4pool"
+   },
+   {
+    "atoms": [
+     "((scored DasatinibPlusQuercetin 0.30362110898437505 (signed Neg (stv 0.24989999999999998 0.23343125000000003))) (scored Fisetin 0.216872220703125 (signed Neg (stv 0.23205 0.1795625))) (scored Spermidine 0.1040986659375 (signed Neg (stv 0.17135999999999998 0.11671562500000002))))"
+    ],
+    "query": "!(rank-interventions-for-patient &self Patient001 (DasatinibPlusQuercetin Fisetin Spermidine Elamipretide) CoronaryHeartDisease)",
+    "tag": "rank_for_Patient001_pop_pool"
+   },
+   {
+    "atoms": [
+     "0.24528663960937505"
+    ],
+    "query": "!(patient-relevance &self Patient001 DasatinibPlusQuercetin)",
+    "tag": "relevance_Patient001_DasatinibPlusQuercetin"
+   },
+   {
+    "atoms": [
+     "0.17520474257812502"
+    ],
+    "query": "!(patient-relevance &self Patient001 Fisetin)",
+    "tag": "relevance_Patient001_Fisetin"
+   },
+   {
+    "atoms": [
+     "0.08409827643750001"
+    ],
+    "query": "!(patient-relevance &self Patient001 Spermidine)",
+    "tag": "relevance_Patient001_Spermidine"
+   },
+   {
+    "atoms": [
+     "0.0"
+    ],
+    "query": "!(patient-relevance &self Patient001 Elamipretide)",
+    "tag": "relevance_Patient001_Elamipretide"
+   },
+   {
+    "atoms": [
+     "0.0"
+    ],
+    "query": "!(patient-relevance &self Patient001 Metformin)",
+    "tag": "relevance_Patient001_Metformin"
+   },
+   {
+    "atoms": [
+     "0.48067499999999996"
+    ],
+    "query": "!(patient-relevance &self Patient001 Omega3)",
+    "tag": "relevance_Patient001_Omega3"
+   },
+   {
+    "atoms": [
+     "0.09434101523437498"
+    ],
+    "query": "!(patient-relevance &self Patient001 Resveratrol)",
+    "tag": "relevance_Patient001_Resveratrol"
+   },
+   {
+    "atoms": [
+     "0.6215625"
+    ],
+    "query": "!(patient-relevance &self Patient002 Metformin)",
+    "tag": "relevance_Patient002_Metformin"
+   },
+   {
+    "atoms": [
+     "0.5386875"
+    ],
+    "query": "!(patient-relevance &self Patient002 Berberine)",
+    "tag": "relevance_Patient002_Berberine"
+   },
+   {
+    "atoms": [
+     "((Hypothesis CellularSenescence (stv 0.5950000000000001 0.6961374656640626) 3 0.5390915156250001 (SupportedBy (DNAmPAI1 DNAmGDF15 CRP))) (Hypothesis ChronicInflammation (stv 0.8 0.8775) 2 0.9425000000000001 (SupportedBy (DNAmGDF15 CRP))) (Hypothesis MitochondrialDysfunction (stv 0.75 0.65) 1 0.48750000000000004 (SupportedBy (DNAmGDF15))))"
+    ],
+    "query": "!(diagnose &self (CellularSenescence MitochondrialDysfunction ChronicInflammation) (DNAmPAI1 DNAmGDF15 CRP))",
+    "tag": "diagnose_population"
+   },
+   {
+    "atoms": [
+     "((Hypothesis CellularSenescence (stv 0.5950000000000001 0.6961374656640626) 3 0.5390915156250001 (SupportedBy (DNAmPAI1 DNAmGDF15 CRP))))"
+    ],
+    "query": "!(diagnose &self (CellularSenescence GenomicInstability) (DNAmPAI1 DNAmGDF15 CRP))",
+    "tag": "diagnose_unconnected"
+   },
+   {
+    "atoms": [
+     "((Hypothesis CellularSenescence (stv 0.5950000000000001 0.6961374656640626) 3 0.5390915156250001 (SupportedBy (DNAmPAI1 DNAmGDF15 CRP))) (Hypothesis ChronicInflammation (stv 0.8 0.8775) 2 0.9425000000000001 (SupportedBy (DNAmGDF15 CRP))) (Hypothesis MitochondrialDysfunction (stv 0.75 0.65) 1 0.48750000000000004 (SupportedBy (DNAmGDF15))))"
+    ],
+    "query": "!(diagnose-patient &self Patient001 (CellularSenescence MitochondrialDysfunction ChronicInflammation))",
+    "tag": "diagnose_patient_Patient001"
+   },
+   {
+    "atoms": [
+     "()"
+    ],
+    "query": "!(diagnose-patient &self Patient002 (CellularSenescence MitochondrialDysfunction ChronicInflammation))",
+    "tag": "diagnose_patient_Patient002"
+   },
+   {
+    "atoms": [
+     "((Hypothesis DeregulatedNutrientSensing (stv 0.6400000000000001 0.6664937500000001) 2 0.5070000000000001 (SupportedBy (FastingGlucose HbA1c))))"
+    ],
+    "query": "!(diagnose-patient &self Patient002 (CellularSenescence DeregulatedNutrientSensing MitochondrialDysfunction))",
+    "tag": "diagnose_patient002_metabolic"
+   },
+   {
+    "atoms": [
+     "((Hypothesis CellularSenescence (stv 0.5950000000000001 0.6961374656640626) 3 0.5390915156250001 (SupportedBy (DNAmPAI1 DNAmGDF15 CRP))) (Hypothesis ChronicInflammation (stv 0.8 0.8775) 2 0.9425000000000001 (SupportedBy (DNAmGDF15 CRP))) (Hypothesis MitochondrialDysfunction (stv 0.75 0.65) 1 0.48750000000000004 (SupportedBy (DNAmGDF15))))"
+    ],
+    "query": "!(diagnose-patient &self Patient001)",
+    "tag": "diagnose_patient_default_P001"
+   },
+   {
+    "atoms": [
+     "(Counterfactual ChronicInflammation AgeAccelGrim (expected-delta -0.12187500000000001) (signed Neg (stv 0.12187500000000001 0.65)) (Via (DNAmGDF15)))"
+    ],
+    "query": "!(counterfactual-patient &self Patient001 ChronicInflammation)",
+    "tag": "cf_Patient001_ChronicInflammation"
+   },
+   {
+    "atoms": [
+     "(Counterfactual CellularSenescence AgeAccelGrim (expected-delta -0.22192968750000003) (signed Neg (stv 0.22192968750000003 0.36382787253141835)) (Via (DNAmGDF15 DNAmPAI1)))"
+    ],
+    "query": "!(counterfactual-patient &self Patient001 CellularSenescence)",
+    "tag": "cf_Patient001_CellularSenescence"
+   },
+   {
+    "atoms": [
+     "(Counterfactual InsulinResistance AgeAccelGrim (expected-delta 0.0) (signed Neg (stv 0.0 0.0)) (Via ()))"
+    ],
+    "query": "!(counterfactual-patient &self Patient001 InsulinResistance)",
+    "tag": "cf_Patient001_InsulinResistance"
+   },
+   {
+    "atoms": [
+     "(Counterfactual CRP AgeAccelGrim (expected-delta -0.12187500000000001) (signed Neg (stv 0.12187500000000001 0.65)) (Via (DNAmGDF15)))"
+    ],
+    "query": "!(counterfactual-patient &self Patient001 CRP)",
+    "tag": "cf_Patient001_CRP"
+   },
+   {
+    "atoms": [
+     "(Counterfactual DasatinibPlusQuercetin AgeAccelGrim (expected-delta -0.15535078125000001) (signed Neg (stv 0.15535078125000001 0.21283930543087975)) (Via (DNAmGDF15 DNAmPAI1)))"
+    ],
+    "query": "!(counterfactual-patient &self Patient001 DasatinibPlusQuercetin)",
+    "tag": "cf_Patient001_DasatinibPlusQuercetin"
+   },
+   {
+    "atoms": [
+     "(Counterfactual Metformin AgeAccelGrim (expected-delta 0.0) (signed Neg (stv 0.0 0.0)) (Via ()))"
+    ],
+    "query": "!(counterfactual-patient &self Patient001 Metformin)",
+    "tag": "cf_Patient001_Metformin"
+   },
+   {
+    "atoms": [],
+    "query": "!(counterfactual-patient &self Patient001 Elamipretide)",
+    "tag": "cf_Patient001_Elamipretide"
+   },
+   {
+    "atoms": [
+     "(Counterfactual SmokingCessation AgeAccelGrim (expected-delta -0.08190000000000001) (signed Neg (stv 0.08190000000000001 0.324)) (Via (DNAmPACKYRS)))"
+    ],
+    "query": "!(counterfactual-patient &self Patient003 SmokingCessation)",
+    "tag": "cf_Patient003_SmokingCessation"
+   },
+   {
+    "atoms": [
+     "(Counterfactual SmokingPackYears AgeAccelGrim (expected-delta -0.21000000000000002) (signed Neg (stv 0.21000000000000002 0.6)) (Via (DNAmPACKYRS)))"
+    ],
+    "query": "!(counterfactual-patient &self Patient003 SmokingPackYears)",
+    "tag": "cf_Patient003_SmokingPackYears"
+   },
+   {
+    "atoms": [
+     "(Counterfactual SmokingCessation AgeAccelGrim (expected-delta 0.0) (signed Neg (stv 0.0 0.0)) (Via ()))"
+    ],
+    "query": "!(counterfactual-patient &self Patient001 SmokingCessation)",
+    "tag": "cf_Patient001_SmokingCessation"
+   },
+   {
+    "atoms": [
+     "(Decomposition Patient001 (Components ((Component DNAmGDF15 (z 1.5) (weight 0.125) (contribution 0.1875) (DrivenBy (MitochondrialDysfunction CellularSenescence ChronicInflammation))) (Component DNAmPAI1 (z 1.8) (weight 0.125) (contribution 0.225) (DrivenBy (CellularSenescence))))) (attributed 0.4125) (residual 1.1875))"
+    ],
+    "query": "!(decompose-grimage &self Patient001)",
+    "tag": "decompose_Patient001"
+   },
+   {
+    "atoms": [
+     "(stv 0.5950000000000001 0.42250000000000004)"
+    ],
+    "query": "!(pos-transmission &self CellularSenescence DNAmPAI1)",
+    "tag": "pos_transmission_CS_PAI1"
+   },
+   {
+    "atoms": [
+     "(stv 0.46962500000000007 0.27462500000000006)"
+    ],
+    "query": "!(pos-transmission &self CellularSenescence DNAmGDF15)",
+    "tag": "pos_transmission_CS_GDF15"
+   },
+   {
+    "atoms": [],
+    "query": "!(pos-transmission &self CRP DNAmGDF15)",
+    "tag": "pos_transmission_CRP_GDF15"
+   },
+   {
+    "atoms": [
+     "(RiskPrediction Patient001 CoronaryHeartDisease (point 0.12605177716424967) (ci 0.096429609530651 0.15567394479784832) (confidence 0.765) (baseline 0.08) (multiplier 1.5756472145531208))"
+    ],
+    "query": "!(predict-risk-patient &self Patient001)",
+    "tag": "risk_Patient001"
+   },
+   {
+    "atoms": [
+     "(RiskPrediction Patient002 CoronaryHeartDisease (point 0.2170334555640622) (ci 0.1660305935065076 0.2680363176216168) (confidence 0.765) (baseline 0.15) (multiplier 1.4468897037604147))"
+    ],
+    "query": "!(predict-risk-patient &self Patient002)",
+    "tag": "risk_Patient002"
+   },
+   {
+    "atoms": [
+     "(RiskPrediction Patient003 CoronaryHeartDisease (point 0.23634708218296813) (ci 0.18080551786997062 0.29188864649596563) (confidence 0.765) (baseline 0.15) (multiplier 1.5756472145531208))"
+    ],
+    "query": "!(predict-risk-patient &self Patient003)",
+    "tag": "risk_Patient003"
+   },
+   {
+    "atoms": [
+     "(ProjectedRisk ChronicInflammation CoronaryHeartDisease (point 0.12176098475222903) (reduction 0.004290792412020641) (delta-clock -0.12187500000000001) (confidence 0.65) (Via (DNAmGDF15)))"
+    ],
+    "query": "!(project-risk-patient &self Patient001 ChronicInflammation)",
+    "tag": "project_Patient001_ChronicInflammation"
+   },
+   {
+    "atoms": [
+     "(ProjectedRisk CellularSenescence CoronaryHeartDisease (point 0.1183478073576214) (reduction 0.007703969806628269) (delta-clock -0.22192968750000003) (confidence 0.36382787253141835) (Via (DNAmGDF15 DNAmPAI1)))"
+    ],
+    "query": "!(project-risk-patient &self Patient001 CellularSenescence)",
+    "tag": "project_Patient001_CellularSenescence"
+   },
+   {
+    "atoms": [
+     "(ProjectedRisk InsulinResistance CoronaryHeartDisease (point 0.12605177716424967) (reduction 0.0) (delta-clock 0.0) (confidence 0.0) (Via ()))"
+    ],
+    "query": "!(project-risk-patient &self Patient001 InsulinResistance)",
+    "tag": "project_Patient001_InsulinResistance"
+   },
+   {
+    "atoms": [
+     "(ProjectedRisk SmokingCessation CoronaryHeartDisease (point 0.23091003826731654) (reduction 0.005437043915651585) (delta-clock -0.08190000000000001) (confidence 0.324) (Via (DNAmPACKYRS)))"
+    ],
+    "query": "!(project-risk-patient &self Patient003 SmokingCessation)",
+    "tag": "project_Patient003_SmokingCessation"
+   },
+   {
+    "atoms": [
+     "(SupplementRecommendation Patient001 (Tier1HighConfidence ((SuppRec Omega3 (tier Tier1HighConfidence) (score 0.48067499999999996) (evidence MultipleHumanTrials 0.85) (safety GenerallyWellTolerated 1.0) (Targets (DNAmGDF15 CRP))))) (Tier2Promising ((SuppRec NMN (tier Tier2Promising) (score 0.1876875) (evidence SingleHumanTrial 0.7) (safety GenerallyWellTolerated 1.0) (Targets (DNAmGDF15))) (SuppRec Fisetin (tier Tier2Promising) (score 0.17520474257812502) (evidence AnimalStudies_Single 0.5) (safety GenerallyWellTolerated 1.0) (Targets (DNAmPAI1 DNAmGDF15 CRP))))) (NotRecommended ((SuppRec Resveratrol (tier NotRecommended) (score 0.09434101523437498) (evidence ITP_Negative 0.9) (safety GenerallyWellTolerated 1.0) (Targets (DNAmPAI1 DNAmGDF15 CRP))))) (Interactions ()))"
+    ],
+    "query": "!(recommend-supplements-patient &self Patient001)",
+    "tag": "supplements_Patient001"
+   },
+   {
+    "atoms": [
+     "(SupplementRecommendation Patient002 (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.43095) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (FastingGlucose HbA1c))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ((InteractionFlag Berberine Metformin \"Shared AMPK activation \u2014 additive glucose lowering; monitor and consult MD\"))))"
+    ],
+    "query": "!(recommend-supplements-patient &self Patient002)",
+    "tag": "supplements_Patient002"
+   },
+   {
+    "atoms": [],
+    "query": "!(infer &self SmokingCessation CoronaryHeartDisease)",
+    "tag": "infer_SmokingCessation_CHD"
+   },
+   {
+    "atoms": [],
+    "query": "!(infer &self DasatinibPlusQuercetin AllCauseMortality)",
+    "tag": "infer_DQ_AllCauseMortality"
+   },
+   {
+    "atoms": [],
+    "query": "!(infer &self Rapamycin CoronaryHeartDisease)",
+    "tag": "infer_Rapamycin_CHD"
+   },
+   {
+    "atoms": [
+     "(Chain (DasatinibPlusQuercetin CellularSenescence SASP DNAmPAI1 CoronaryHeartDisease) (signed Neg (stv 0.24989999999999998 0.23343125000000003)))"
+    ],
+    "query": "!(explain &self DasatinibPlusQuercetin CoronaryHeartDisease)",
+    "tag": "explain_DQ_CHD"
+   }
+  ],
+  "costs": {
+   "AgeAccelGrim": {
+    "attempts": 1,
+    "beliefs": 7,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 4,
+    "st0": 4,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "Autophagy": {
+    "attempts": 1,
+    "beliefs": 20,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 11,
+    "st0": 11,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "Berberine": {
+    "attempts": 1,
+    "beliefs": 12,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 7,
+    "st0": 7,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "CellularSenescence": {
+    "attempts": 1,
+    "beliefs": 17,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 9,
+    "st0": 9,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "ChronicInflammation": {
+    "attempts": 1,
+    "beliefs": 9,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 5,
+    "st0": 5,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "DNAmPAI1": {
+    "attempts": 1,
+    "beliefs": 3,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 2,
+    "st0": 2,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "DasatinibPlusQuercetin": {
+    "attempts": 1,
+    "beliefs": 20,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 11,
+    "st0": 11,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "DeregulatedNutrientSensing": {
+    "attempts": 1,
+    "beliefs": 11,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 6,
+    "st0": 6,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "FastingGlucose": {
+    "attempts": 1,
+    "beliefs": 3,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 2,
+    "st0": 2,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "Fisetin": {
+    "attempts": 1,
+    "beliefs": 20,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 11,
+    "st0": 11,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "InsulinResistance": {
+    "attempts": 1,
+    "beliefs": 9,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 5,
+    "st0": 5,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "Metformin": {
+    "attempts": 1,
+    "beliefs": 12,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 7,
+    "st0": 7,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "MitochondrialDysfunction": {
+    "attempts": 1,
+    "beliefs": 3,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 2,
+    "st0": 2,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "NMN": {
+    "attempts": 1,
+    "beliefs": 6,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 4,
+    "st0": 4,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "Omega3": {
+    "attempts": 1,
+    "beliefs": 12,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 7,
+    "st0": 7,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "Resveratrol": {
+    "attempts": 1,
+    "beliefs": 20,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 11,
+    "st0": 11,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "SASP": {
+    "attempts": 1,
+    "beliefs": 15,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 8,
+    "st0": 8,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "SmokingCessation": {
+    "attempts": 1,
+    "beliefs": 6,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 4,
+    "st0": 4,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "SmokingPackYears": {
+    "attempts": 1,
+    "beliefs": 3,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 2,
+    "st0": 2,
+    "tq": 256,
+    "unattributed": 0
+   },
+   "Spermidine": {
+    "attempts": 1,
+    "beliefs": 22,
+    "bq": 256,
+    "cap": 1024,
+    "complete": true,
+    "st": 12,
+    "st0": 12,
+    "tq": 256,
+    "unattributed": 0
+   }
+  },
+  "nofalse": [
+   {
+    "a": "DasatinibPlusQuercetin",
+    "c": "AllCauseMortality",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 20,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 11,
+     "st0": 11,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "infer": [],
+    "why": "test_no_false_chain"
+   },
+   {
+    "a": "SmokingCessation",
+    "c": "CoronaryHeartDisease",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 6,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 4,
+     "st0": 4,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "infer": [],
+    "why": "test_the_smoking_axis_still_does_not_reach_chd_through_infer"
+   },
+   {
+    "a": "Rapamycin",
+    "c": "CoronaryHeartDisease",
+    "cost": null,
+    "infer": [],
+    "why": "test_rapamycin_is_still_unreachable_by_inference"
+   },
+   {
+    "a": "Elamipretide",
+    "c": "CoronaryHeartDisease",
+    "cost": null,
+    "infer": [],
+    "why": "ranking drops the unconnected candidate"
+   },
+   {
+    "a": "CRP",
+    "c": "DNAmGDF15",
+    "cost": null,
+    "infer": [],
+    "why": "no induction: a shared cause does not link its effects"
+   },
+   {
+    "a": "Metformin",
+    "c": "CellularSenescence",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 12,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 7,
+     "st0": 7,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "infer": [],
+    "why": "no inversion"
+   },
+   {
+    "a": "CoronaryHeartDisease",
+    "c": "CellularSenescence",
+    "cost": null,
+    "infer": [],
+    "why": "no inversion"
+   },
+   {
+    "a": "ChronicInflammation",
+    "c": "CoronaryHeartDisease",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 9,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 5,
+     "st0": 5,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "infer": [],
+    "why": "CHD_REACHING_CAUSES excludes it"
+   },
+   {
+    "a": "MitochondrialDysfunction",
+    "c": "CoronaryHeartDisease",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 3,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 2,
+     "st0": 2,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "infer": [],
+    "why": "CHD_REACHING_CAUSES excludes it"
+   },
+   {
+    "a": "SmokingPackYears",
+    "c": "CoronaryHeartDisease",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 3,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 2,
+     "st0": 2,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "infer": [],
+    "why": "CHD_REACHING_CAUSES excludes it"
+   },
+   {
+    "a": "CellularSenescence",
+    "c": "AgeAccelGrim",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 17,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 9,
+     "st0": 9,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "infer": [],
+    "why": "no Effect reaches AgeAccelGrim"
+   },
+   {
+    "a": "DNAmPAI1",
+    "c": "AgeAccelGrim",
+    "cost": {
+     "attempts": 1,
+     "beliefs": 3,
+     "bq": 256,
+     "cap": 1024,
+     "complete": true,
+     "st": 2,
+     "st0": 2,
+     "tq": 256,
+     "unattributed": 0
+    },
+    "infer": [],
+    "why": "no Effect reaches AgeAccelGrim"
+   },
+   {
+    "a": "CoronaryHeartDisease",
+    "c": "CoronaryHeartDisease",
+    "cost": null,
+    "infer": [],
+    "why": "self pair"
+   }
+  ],
+  "program_cost": {
+   "beliefs": 22,
+   "bq": 256,
+   "cap": 1024,
+   "complete": true,
+   "derive_runs": 40,
+   "derive_s": 0.4855,
+   "sources": 20,
+   "st": 12,
+   "tq": 256,
+   "unattributed": 0
+  },
+  "queries": 111,
+  "wall_s": 0.961
+ },
+ "patient_wall_s": 1.3,
+ "spec": {
+  "chainer": "pln",
+  "label": "pln-R1",
+  "runtime": "petta",
+  "settings": {
+   "chain_confidence": "native"
+  }
+ }
+}

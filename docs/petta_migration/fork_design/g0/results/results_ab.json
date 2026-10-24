@@ -1,0 +1,341 @@
+{
+ "checks": [
+  {
+   "check": "run.sh pln_roman on the UNFILTERED vendored (copy, import line edited) library: every pinned `test` passes",
+   "expected": "1 pass, 0 fail, exit 0",
+   "measured": "1 pass, 0 fail, exit 0, 0.44 s",
+   "ok": true
+  },
+  {
+   "check": "run.sh pln_tuffy on the UNFILTERED vendored (copy, import line edited) library: every pinned `test` passes",
+   "expected": "1 pass, 0 fail, exit 0",
+   "measured": "1 pass, 0 fail, exit 0, 0.41 s",
+   "ok": true
+  },
+  {
+   "check": "run.sh pln_direct on the UNFILTERED vendored (copy, import line edited) library: every pinned `test` passes",
+   "expected": "3 pass, 0 fail, exit 0",
+   "measured": "3 pass, 0 fail, exit 0, 0.39 s",
+   "ok": true
+  },
+  {
+   "check": "run.sh pln_tuffy on the RESTRICTED artifact (copy, import line edited) library: every pinned `test` passes",
+   "expected": "1 pass, 0 fail, exit 0",
+   "measured": "1 pass, 0 fail, exit 0, 0.37 s",
+   "ok": true
+  },
+  {
+   "check": "run.sh pln_direct on the RESTRICTED artifact (copy, import line edited) library: every pinned `test` passes",
+   "expected": "3 pass, 0 fail, exit 0",
+   "measured": "3 pass, 0 fail, exit 0, 0.37 s",
+   "ok": true
+  },
+  {
+   "check": "negative control: pln_roman on the RESTRICTED artifact fails (no Deduction rule)",
+   "expected": "1 fail",
+   "measured": "0 pass, 1 fail",
+   "ok": true
+  },
+  {
+   "check": "pln_roman through PeTTa's Python interface on the UNFILTERED vendored library: pinned value, Python comparison",
+   "expected": "stv 0.5 0.9473684210526316, stamp (1, 2, 3, 4) (exact)",
+   "measured": "((stv 0.5 0.9473684210526316) (1 2 3 4))",
+   "ok": true
+  },
+  {
+   "check": "pln_tuffy through PeTTa's Python interface on the UNFILTERED vendored library: pinned value, Python comparison",
+   "expected": "stv 0.5199204545454544 0.8290782204129108, stamp (1, 2, 4, 9, 10) (exact)",
+   "measured": "((stv 0.5199204545454544 0.8290782204129108) (1 2 4 9 10))",
+   "ok": true
+  },
+  {
+   "check": "pln_direct formulas (Truth_ModusPonens chains + Truth_Revision fold) on the unfiltered library, Python comparison",
+   "expected": "0.51/0.8432620011567381 (x2), 0.5198/0.7923434575206812",
+   "measured": "(((grandfather a c) (stv 0.51 0.8432620011567381))) ; (((grandfather a c) (stv 0.51 0.8432620011567381))) ; (((old a) (stv 0.5198 0.7923434575206812)))",
+   "ok": true
+  },
+  {
+   "check": "pln_direct formulas (Truth_ModusPonens chains + Truth_Revision fold) on the restricted library, Python comparison",
+   "expected": "0.51/0.8432620011567381 (x2), 0.5198/0.7923434575206812",
+   "measured": "(((grandfather a c) (stv 0.51 0.8432620011567381))) ; (((grandfather a c) (stv 0.51 0.8432620011567381))) ; (((old a) (stv 0.5198 0.7923434575206812)))",
+   "ok": true
+  },
+  {
+   "check": "pln_tuffy through the production adapter session on the RESTRICTED artifact: pinned value, Python comparison",
+   "expected": "stv 0.5199204545454544 0.8290782204129108, stamp (1 2 4 9 10) (exact)",
+   "measured": "((stv 0.5199204545454544 0.8290782204129108) (1 2 4 9 10))",
+   "ok": true
+  },
+  {
+   "check": "pln_direct revision fold of the two routes, adapter session (restricted)",
+   "expected": "stv 0.51 0.8432620011567381 (<=1e-15)",
+   "measured": "('stv', 0.51, 0.843262001156738)",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] Truth_ModusPonens (stv 0.5 0.8) (stv 0.5 0.8) = (0.26, 0.64)",
+   "expected": "stv 0.26 0.64 (<=1e-15)",
+   "measured": "['(stv 0.26 0.6400000000000001)']",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] leak e = strength of Truth_ModusPonens (stv 0 1) (stv 0 1) is 0.02",
+   "expected": "0.02",
+   "measured": "['(stv 0.02 1.0)']",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] (Truth_Revision (stv 0.5 1.0) (stv 0.5 0.5)) gives NO result (empty, no exception)",
+   "expected": "[]",
+   "measured": "[]",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] (Truth_Revision (stv 0.5 0.5) (stv 0.5 1.0)) gives NO result (empty, no exception)",
+   "expected": "[]",
+   "measured": "[]",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] (Truth_Revision (stv 0.5 1.0) (stv 0.5 1.0)) gives NO result (empty, no exception)",
+   "expected": "[]",
+   "measured": "[]",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] Truth_Revision with c capped at 0.999999 gives a result",
+   "expected": "one stv",
+   "measured": "['(stv 0.5 0.999999000001)']",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] Truth_Revision fold of the 4 MixCompound rows = hand-typed arithmetic (<=1e-15) = decision row 5 (0.263050 / 0.949466)",
+   "expected": "stv 0.263050 0.949466",
+   "measured": "['(stv 0.263050153531218 0.9494655004859086)']",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] PriorityRank matches (Sentence ((State X) (stv 1.0 1.0)) (0))",
+   "expected": "1.0",
+   "measured": "['1.0']",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] PriorityRankNeg matches the same sentence",
+   "expected": "-1.0",
+   "measured": "['-1.0']",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] PriorityRank matches an (End X) term with a two-id stamp",
+   "expected": "0.65",
+   "measured": "['0.65']",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] ConfidenceRank matches ((stv 1.0 1.0) (0))",
+   "expected": "1.0",
+   "measured": "['1.0']",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] StampDisjoint (0) (1 2) true; (0) (0) false; (0 3) (0 4) false",
+   "expected": "true/false/false",
+   "measured": "[['True'], ['False'], ['False']]",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] BestCandidate PriorityRank picks the premise (stamp (0), c 1.0) first",
+   "expected": "the premise sentence",
+   "measured": "['(Sentence ((State A) (stv 1.0 1.0)) (0))']",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] ModusPonens rule fires on (State A) with an Implication (State A) (State B): exactly one result",
+   "expected": "((State B) (stv 0.706 0.65))",
+   "measured": "['((State B) (stv 0.706 0.65))']",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] ModusPonens derives (Not (End B)) for a Neg record link",
+   "expected": "((Not (End B)) (stv 0.706 0.65))",
+   "measured": "['((Not (End B)) (stv 0.706 0.65))']",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] NotElimination derives (End B) with 1 - s, same c",
+   "expected": "((End B) (stv 0.294 0.65))",
+   "measured": "['((End B) (stv 0.29400000000000004 0.65))']",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] a record (End B) never continues a chain: no MP with Implication (State B) ..",
+   "expected": "[]",
+   "measured": "[]",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] PLN.Derive (normal) returns exactly one result of shape ($Tasks $Beliefs)",
+   "expected": "1 result, 2-tuple",
+   "measured": "1 result(s): (() ((Sentence ((Implication (State A) (State B)) (stv 0.7 0.9)) (1)) (Sentence ((State A) (stv 1.0 ",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] PLN.Derive (empty tasks) returns exactly one result of shape ($Tasks $Beliefs)",
+   "expected": "1 result, 2-tuple",
+   "measured": "1 result(s): (() ((Sentence ((Implication (State A) (State B)) (stv 0.7 0.9)) (1))))",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] PLN.Derive (steps > maxsteps) returns exactly one result of shape ($Tasks $Beliefs)",
+   "expected": "1 result, 2-tuple",
+   "measured": "1 result(s): (((Sentence ((State A) (stv 1.0 1.0)) (0))) ((Sentence ((State A) (stv 1.0 1.0)) (0))))",
+   "ok": true
+  },
+  {
+   "check": "[restricted/adapter] PLN.Derive (K = 256) returns exactly one result of shape ($Tasks $Beliefs)",
+   "expected": "1 result, 2-tuple",
+   "measured": "1 result(s): (() ((Sentence ((Implication (State A) (State B)) (stv 0.7 0.9)) (1)) (Sentence ((State A) (stv 1.0 ",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] Truth_ModusPonens (stv 0.5 0.8) (stv 0.5 0.8) = (0.26, 0.64)",
+   "expected": "stv 0.26 0.64 (<=1e-15)",
+   "measured": "['(stv 0.26 0.6400000000000001)']",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] leak e = strength of Truth_ModusPonens (stv 0 1) (stv 0 1) is 0.02",
+   "expected": "0.02",
+   "measured": "['(stv 0.02 1.0)']",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] (Truth_Revision (stv 0.5 1.0) (stv 0.5 0.5)) gives NO result (empty, no exception)",
+   "expected": "[]",
+   "measured": "[]",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] (Truth_Revision (stv 0.5 0.5) (stv 0.5 1.0)) gives NO result (empty, no exception)",
+   "expected": "[]",
+   "measured": "[]",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] (Truth_Revision (stv 0.5 1.0) (stv 0.5 1.0)) gives NO result (empty, no exception)",
+   "expected": "[]",
+   "measured": "[]",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] Truth_Revision with c capped at 0.999999 gives a result",
+   "expected": "one stv",
+   "measured": "['(stv 0.5 0.999999000001)']",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] Truth_Revision fold of the 4 MixCompound rows = hand-typed arithmetic (<=1e-15) = decision row 5 (0.263050 / 0.949466)",
+   "expected": "stv 0.263050 0.949466",
+   "measured": "['(stv 0.263050153531218 0.9494655004859086)']",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] PriorityRank matches (Sentence ((State X) (stv 1.0 1.0)) (0))",
+   "expected": "1.0",
+   "measured": "['1.0']",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] PriorityRankNeg matches the same sentence",
+   "expected": "-1.0",
+   "measured": "['-1.0']",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] PriorityRank matches an (End X) term with a two-id stamp",
+   "expected": "0.65",
+   "measured": "['0.65']",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] ConfidenceRank matches ((stv 1.0 1.0) (0))",
+   "expected": "1.0",
+   "measured": "['1.0']",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] StampDisjoint (0) (1 2) true; (0) (0) false; (0 3) (0 4) false",
+   "expected": "true/false/false",
+   "measured": "[['true'], ['false'], ['false']]",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] BestCandidate PriorityRank picks the premise (stamp (0), c 1.0) first",
+   "expected": "the premise sentence",
+   "measured": "['(Sentence ((State A) (stv 1.0 1.0)) (0))']",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] ModusPonens rule fires on (State A) with an Implication (State A) (State B): exactly one result",
+   "expected": "((State B) (stv 0.706 0.65))",
+   "measured": "['((State B) (stv 0.706 0.65))']",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] ModusPonens derives (Not (End B)) for a Neg record link",
+   "expected": "((Not (End B)) (stv 0.706 0.65))",
+   "measured": "['((Not (End B)) (stv 0.706 0.65))']",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] NotElimination derives (End B) with 1 - s, same c",
+   "expected": "((End B) (stv 0.294 0.65))",
+   "measured": "['((End B) (stv 0.29400000000000004 0.65))']",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] a record (End B) never continues a chain: no MP with Implication (State B) ..",
+   "expected": "[]",
+   "measured": "[]",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] PLN.Derive (normal) returns exactly one result of shape ($Tasks $Beliefs)",
+   "expected": "1 result, 2-tuple",
+   "measured": "1 result(s): (() ((Sentence ((Implication (State A) (State B)) (stv 0.7 0.9)) (1)) (Sentence ((State A) (stv 1.0 ",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] PLN.Derive (empty tasks) returns exactly one result of shape ($Tasks $Beliefs)",
+   "expected": "1 result, 2-tuple",
+   "measured": "1 result(s): (() ((Sentence ((Implication (State A) (State B)) (stv 0.7 0.9)) (1))))",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] PLN.Derive (steps > maxsteps) returns exactly one result of shape ($Tasks $Beliefs)",
+   "expected": "1 result, 2-tuple",
+   "measured": "1 result(s): (((Sentence ((State A) (stv 1.0 1.0)) (0))) ((Sentence ((State A) (stv 1.0 1.0)) (0))))",
+   "ok": true
+  },
+  {
+   "check": "[unfiltered/PeTTa python interface] PLN.Derive (K = 256) returns exactly one result of shape ($Tasks $Beliefs)",
+   "expected": "1 result, 2-tuple",
+   "measured": "1 result(s): (() ((Sentence ((Implication (State A) (State B)) (stv 0.7 0.9)) (1)) (Sentence ((State A) (stv 1.0 ",
+   "ok": true
+  },
+  {
+   "check": "per-step trace: vendored and restricted print no SELECTED line, the unpatched upstream file prints one per selection",
+   "expected": "0 / 0 / >=1, result still printed",
+   "measured": "{'vendored': (0, True), 'restricted': (0, True), 'upstream bundled (unpatched)': (4, True)}",
+   "ok": true
+  },
+  {
+   "check": "the one hunk is neutral: 40 PLN.Derive runs give byte-identical result strings on the unpatched upstream file and the vendored file; the restricted artifact (adapter) gives the same strings",
+   "expected": "identical, identical",
+   "measured": "True, True",
+   "ok": true
+  }
+ ],
+ "data": {}
+}

@@ -27,6 +27,12 @@ under hyperon the validator behaves exactly as it always did:
    declaration for, say, `add-translator-rule!` must not read as "this is a
    real, callable predicate the query may use" just because it is
    grounded/declared SOMEWHERE in the merged `inventory`.
+
+One more check applies only under PLN_CHAINER=pln (core/pln_chainer.py); under the default chainer the
+validator behaves exactly as it always did:
+
+6. the text does not write `PLNAnswer`, the table the pln chainer derives its `infer`/`explain` answers into.
+   A caller's `extra_atoms` or query that wrote it would forge an answer.
 """
 from __future__ import annotations
 
@@ -37,6 +43,7 @@ from typing import List, Optional, Sequence
 from core.metta_runtime import (
     PETTA_ALLOWED_FUN_NAMES, PETTA_KNOWN_FUN_NAMES, petta_refused_forms, selected_runtime_name,
 )
+from core.pln_chainer import answer_head_refusal, audit_symbols
 from ontology.inventory import RuntimeInventory
 from ontology.registry import OntologyRegistry
 
@@ -216,6 +223,10 @@ def validate(
     if not _balanced_parens(metta_query):
         issues.append("Unbalanced parentheses in MeTTa query.")
 
+    forged = answer_head_refusal(metta_query)
+    if forged:
+        issues.append(forged)
+
     petta_selected = selected_runtime_name(runtime) == "petta"
     if petta_selected:
         refused = petta_refused_forms(metta_query)
@@ -231,8 +242,9 @@ def validate(
     if inventory is not None or not registry.is_empty():
         variable_names = {v.lstrip("$") for v in _VARIABLE_RE.findall(metta_query)}
         unknown: list[str] = []
+        pln_audit = audit_symbols() if "PLN" in metta_query else frozenset()    # PLN_CHAINER=pln: the step's audit atoms
         for tok in sorted(set(_SYMBOL_RE.findall(scrubbed))):
-            if tok in _BUILTINS or tok in variable_names:
+            if tok in _BUILTINS or tok in variable_names or tok in pln_audit:
                 continue
             if inventory is not None and inventory.knows_symbol(tok):
                 continue

@@ -72,6 +72,18 @@ What PeTTa changes (and what this module does about it)
    friendly 422 and nothing more — a name PeTTa builds at run time (`atom_concat`) never appears in any of that
    text. The table of routes, and the one place each is closed, is under "the engine-level sandbox" below.
 
+The chainer hook (PLN_CHAINER=pln)
+----------------------------------
+`run_program(..., after_load=step)` lets ONE caller run a step inside the PeTTa child, after the KB is loaded and
+before the space is locked. `core.pln_chainer` is that caller: its step loads the vendored PLN library, derives the
+`infer`/`explain` answers for every source in the KB with patham9's `PLN.Derive`, and adds them to the space as
+facts (the space accepts no `add-atom` once locked, and consumers bind the source of an `infer` while they
+evaluate, so the answers have to be there before the first query). The step receives the engine (`.run(text)`,
+`.load(text)`), runs inside the sandbox like any program, and may return a small JSON-able summary, which comes
+back as `last_run["chain"]`. If it raises, the request fails with `MettaRuntimeError(kind="chain")`. Nothing
+else uses the hook; without it (every request under PLN_CHAINER=legacy) this module behaves exactly as before.
+HyperonRuntime and sessions have no hook: a request that asks for one on hyperon is refused.
+
 Sessions
 --------
 `runtime.session(kb_text)` is for tests and tools, not for production requests: a stateful interpreter that
@@ -167,9 +179,11 @@ class Runtime(Protocol):
         """Can this runtime run here? Must not import the engine into the calling process."""
 
     def run_program(self, kb_text: str, expressions: Sequence[str],
-                    deadline_s: Optional[float] = None) -> list[list[str]]:
+                    deadline_s: Optional[float] = None, *,
+                    after_load: Optional[Callable[[Any], Optional[dict]]] = None) -> list[list[str]]:
         """Load `kb_text` into a fresh interpreter, evaluate each `!` expression, return the result atoms
-        of each as strings. Raises MettaRuntimeError."""
+        of each as strings. Raises MettaRuntimeError. `after_load` is the chainer hook (see "The chainer hook"
+        in the module docstring): PeTTa only, and a runtime that cannot honour it refuses it."""
 
     def session(self, kb_text: str) -> Session:
         """A stateful interpreter with `kb_text` loaded (tests and tools)."""
@@ -1223,7 +1237,7 @@ def _error_message(stage: str, exc: BaseException, index: Optional[int] = None) 
 
 def _program_child(conn: Connection, factory: EngineFactory, petta_home: str, stack_limit_mb: int,
                    kb_text: str, expressions: list[str], deadline_s: Optional[float],
-                   parent_pid: int) -> None:
+                   parent_pid: int, after_load: Optional[Callable[[Any], Optional[dict]]] = None) -> None:
     """The forked child of `PettaRuntime.run_program`: one load, one call per expression, one message."""
     try:
         _child_prepare(deadline_s, parent_pid=parent_pid, keep_fds=(conn.fileno(),))
@@ -1243,6 +1257,18 @@ def _program_child(conn: Connection, factory: EngineFactory, petta_home: str, st
         except BaseException as exc:            # noqa: BLE001 - any exception during a load is a failed load
             _send(conn, _error_message("load", exc))
             return
+    # ---- the chainer hook (PLN_CHAINER=pln): after the load, before the lock; see "The chainer hook" above ----
+    chain: Optional[dict] = None
+    chain_s = 0.0
+    if after_load is not None:
+        tc = time.perf_counter()
+        try:
+            chain = after_load(engine)
+        except BaseException as exc:            # noqa: BLE001 - a chainer that did not finish fails the request
+            _send(conn, _error_message("chain", exc))
+            return
+        chain_s = time.perf_counter() - tc
+    # ---- end of the chainer hook ----
     try:
         engine.lock()                           # from here on nothing a program does may change the space
     except BaseException as exc:                # noqa: BLE001
@@ -1257,9 +1283,12 @@ def _program_child(conn: Connection, factory: EngineFactory, petta_home: str, st
             _send(conn, _error_message("expression", exc, index))
             return
     t3 = time.perf_counter()
-    _send(conn, {"kind": "result", "groups": groups,
-                 "stats": {"engine_s": round(t1 - t0, 4), "load_s": round(t2 - t1, 4),
-                           "queries_s": round(t3 - t2, 4), "peak_rss_mb": _peak_rss_mb()}})
+    stats = {"engine_s": round(t1 - t0, 4), "load_s": round(t2 - t1 - chain_s, 4),
+             "queries_s": round(t3 - t2, 4), "peak_rss_mb": _peak_rss_mb()}
+    if after_load is not None:
+        stats["chain_s"] = round(chain_s, 4)
+        stats["chain"] = chain
+    _send(conn, {"kind": "result", "groups": groups, "stats": stats})
 
 
 def _run_text(engine: Any, text: str, tiers: Mapping[str, str]) -> tuple[list[list[str]], int]:
@@ -1377,9 +1406,13 @@ class HyperonRuntime:
             return False
 
     def run_program(self, kb_text: str, expressions: Sequence[str],
-                    deadline_s: Optional[float] = None) -> list[list[str]]:
+                    deadline_s: Optional[float] = None, *,
+                    after_load: Optional[Callable[[Any], Optional[dict]]] = None) -> list[list[str]]:
         """`deadline_s` is ignored: a GIL-holding Rust call cannot be preempted in process. The executor
-        enforces the request deadline by killing the worker."""
+        enforces the request deadline by killing the worker. `after_load` (the PeTTa chainer hook) is refused."""
+        if after_load is not None:
+            raise MettaRuntimeError("the PLN chainer hook needs PLN_RUNTIME=petta; hyperon has none",
+                                    kind="unavailable")
         try:
             from hyperon import MeTTa  # type: ignore
             normalized = "\n".join(_bang(e) for e in expressions)
@@ -1539,6 +1572,14 @@ class PettaRuntime:
                                      kind="unavailable", detail=text)
         if stage == "load":
             return MettaRuntimeError(f"PeTTa could not load the knowledge base: {kind_of}", kind="load", detail=text)
+        if stage == "chain":
+            # The chainer hook's own error text is written for a caller (core.pln_chainer.PlnChainerError); anything
+            # else it raised is an internal failure, named by its type. A PlnInputError is the PROGRAM's fault (a fact that
+            # cannot be chained, a graph too dense to derive): kind="refused", which the runner answers as a 422.
+            if message.get("type") == "PlnInputError":
+                return MettaRuntimeError(f"the PLN chainer refused the program: {text}", kind="refused", detail=text)
+            return MettaRuntimeError(f"the PLN chainer could not finish: {text}" if message.get("type") == "PlnChainerError"
+                                     else f"the PLN chainer failed: {kind_of}", kind="chain", detail=text)
         if stage == "refused":
             # `text` is `_RefusedBuiltin`'s own message: the refused head's name and nothing else (no
             # filesystem path, no Prolog internals) — safe to show a caller verbatim, so it is used as-is
@@ -1550,7 +1591,8 @@ class PettaRuntime:
 
     # -- the seam
     def run_program(self, kb_text: str, expressions: Sequence[str],
-                    deadline_s: Optional[float] = None) -> list[list[str]]:
+                    deadline_s: Optional[float] = None, *,
+                    after_load: Optional[Callable[[Any], Optional[dict]]] = None) -> list[list[str]]:
         exprs = [_bang(e) for e in expressions]
         for index, expr in enumerate(exprs):
             _refuse_if_forbidden(expr, f"expression {index + 1}")
@@ -1565,7 +1607,7 @@ class PettaRuntime:
         started = time.monotonic()
         deadline = None if budget is None else started + budget
         child = self._fork(_program_child, self._engine_factory, str(self.petta_home), self.stack_limit_mb,
-                           reduction.text, exprs, budget, os.getpid())
+                           reduction.text, exprs, budget, os.getpid(), after_load)
         self.last_pid = child.pid
         forked = time.monotonic()
         try:

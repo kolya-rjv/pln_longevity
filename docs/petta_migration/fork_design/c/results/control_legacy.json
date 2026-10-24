@@ -1,0 +1,52 @@
+{
+ "_environment": {
+  "petta_commit": "fea83178",
+  "platform": "macOS-26.5.1-arm64-arm-64bit",
+  "python": "3.12.10",
+  "script_sha256": "7097e74b988f0cd5",
+  "swipl": "SWI-Prolog version 10.0.2 for arm64-darwin",
+  "vendor/lib_pln_fork.metta": "4b01b7c66c529453",
+  "vendor/lib_pln_restricted.metta": "2f8bda09221cbf09"
+ },
+ "_measured_by": "python scripts/pln_control_demo.py run --part legacy",
+ "_wall_s": 2.4,
+ "contract_mode": {
+  "deadline_s": 30.0,
+  "error": "the PLN chainer refused the program: the derivation from SynRoot cannot be done: more than 16,384 distinct walks over 453 reachable links (each link used once) do not fit the largest queue (K=16,384);",
+  "estimated_beliefs": 41892,
+  "first_attempt_K": 16384,
+  "largest_K": 16384,
+  "rungs": [
+   256,
+   2048,
+   16384
+  ],
+  "status": "error",
+  "wall_s": 0.2
+ },
+ "legacy": {
+  "derivations": 20719,
+  "start_and_load_only_s_median": 0.21,
+  "status": "ok",
+  "wall_s_all": [
+   0.499,
+   0.521,
+   0.502
+  ],
+  "wall_s_median": 0.502
+ },
+ "network": {
+  "complete_run_selections": 26429,
+  "describe": "SYNTHETIC-L: seed 7, 1 root -> 6 nodes, then 8 layers of 26 nodes, each node linked to 3 random nodes of the next layer (and every node given a parent), 25 percent of links Neg, strengths U(0.2,0.9), confidences U(0.5,0.9)",
+  "diamond_nodes": 140,
+  "layers": 8,
+  "legacy_paths": 20719,
+  "links": 560,
+  "links_sha256": "9ea6b9ccc03a73ec",
+  "max_indegree": 9,
+  "name": "SYNTHETIC-L",
+  "neg_links": 156,
+  "nodes": 174,
+  "reachable_states": 173
+ }
+}

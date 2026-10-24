@@ -1,0 +1,87 @@
+; StructCompound: hand-built rows that exercise the grouping of the fold (not DrugAge data).
+;  PMID_2001  three rows, one direction, three significance labels      -> ONE Neg item, the Significant row
+;  PMID_2002  an ITP paper: male +14 (Neg), female -6 and -1 (Pos)      -> one Neg item AND one Pos item from ONE paper
+;  PMID_2003  a worm paper plus a row with no lifespan change           -> one Neg item; the empty row is unscorable
+;  (no PMID)  a yeast row                                               -> its own evidence unit
+;  PMID_2004  a fly paper that shortens lifespan                        -> second Pos item
+
+(InstanceOf DrugAgeRow_9101 Experiment)
+(UsesIntervention DrugAgeRow_9101 StructCompound)
+(UsesSpecies DrugAgeRow_9101 Mus_musculus)
+(HasSex DrugAgeRow_9101 Male)
+(ReportedIn DrugAgeRow_9101 PMID_2001)
+(AvgLifespanChangePercent DrugAgeRow_9101 5.0)
+(AvgLifespanSignificance DrugAgeRow_9101 NotSignificant)
+
+(InstanceOf DrugAgeRow_9102 Experiment)
+(UsesIntervention DrugAgeRow_9102 StructCompound)
+(UsesSpecies DrugAgeRow_9102 Mus_musculus)
+(HasSex DrugAgeRow_9102 Female)
+(ReportedIn DrugAgeRow_9102 PMID_2001)
+(AvgLifespanChangePercent DrugAgeRow_9102 12.0)
+(AvgLifespanSignificance DrugAgeRow_9102 Significant)
+
+(InstanceOf DrugAgeRow_9103 Experiment)
+(UsesIntervention DrugAgeRow_9103 StructCompound)
+(UsesSpecies DrugAgeRow_9103 Mus_musculus)
+(HasSex DrugAgeRow_9103 Male)
+(ReportedIn DrugAgeRow_9103 PMID_2001)
+(AvgLifespanChangePercent DrugAgeRow_9103 8.0)
+(AvgLifespanSignificance DrugAgeRow_9103 Unreported)
+
+(InstanceOf DrugAgeRow_9104 Experiment)
+(UsesIntervention DrugAgeRow_9104 StructCompound)
+(UsesSpecies DrugAgeRow_9104 Mus_musculus)
+(HasSex DrugAgeRow_9104 Male)
+(ReportedIn DrugAgeRow_9104 PMID_2002)
+(IsITPStudy DrugAgeRow_9104)
+(AvgLifespanChangePercent DrugAgeRow_9104 14.0)
+(AvgLifespanSignificance DrugAgeRow_9104 Significant)
+
+(InstanceOf DrugAgeRow_9105 Experiment)
+(UsesIntervention DrugAgeRow_9105 StructCompound)
+(UsesSpecies DrugAgeRow_9105 Mus_musculus)
+(HasSex DrugAgeRow_9105 Female)
+(ReportedIn DrugAgeRow_9105 PMID_2002)
+(IsITPStudy DrugAgeRow_9105)
+(AvgLifespanChangePercent DrugAgeRow_9105 -6.0)
+(AvgLifespanSignificance DrugAgeRow_9105 Significant)
+
+(InstanceOf DrugAgeRow_9106 Experiment)
+(UsesIntervention DrugAgeRow_9106 StructCompound)
+(UsesSpecies DrugAgeRow_9106 Mus_musculus)
+(HasSex DrugAgeRow_9106 Female)
+(ReportedIn DrugAgeRow_9106 PMID_2002)
+(IsITPStudy DrugAgeRow_9106)
+(AvgLifespanChangePercent DrugAgeRow_9106 -1.0)
+(AvgLifespanSignificance DrugAgeRow_9106 NotSignificant)
+
+(InstanceOf DrugAgeRow_9107 Experiment)
+(UsesIntervention DrugAgeRow_9107 StructCompound)
+(UsesSpecies DrugAgeRow_9107 Caenorhabditis_elegans)
+(HasSex DrugAgeRow_9107 Unknown)
+(ReportedIn DrugAgeRow_9107 PMID_2003)
+(AvgLifespanChangePercent DrugAgeRow_9107 30.0)
+(AvgLifespanSignificance DrugAgeRow_9107 Significant)
+
+(InstanceOf DrugAgeRow_9108 Experiment)
+(UsesIntervention DrugAgeRow_9108 StructCompound)
+(UsesSpecies DrugAgeRow_9108 Caenorhabditis_elegans)
+(HasSex DrugAgeRow_9108 Unknown)
+(ReportedIn DrugAgeRow_9108 PMID_2003)
+(AvgLifespanSignificance DrugAgeRow_9108 Unreported)
+
+(InstanceOf DrugAgeRow_9109 Experiment)
+(UsesIntervention DrugAgeRow_9109 StructCompound)
+(UsesSpecies DrugAgeRow_9109 Saccharomyces_cerevisiae)
+(HasSex DrugAgeRow_9109 Unknown)
+(AvgLifespanChangePercent DrugAgeRow_9109 50.0)
+(AvgLifespanSignificance DrugAgeRow_9109 Unreported)
+
+(InstanceOf DrugAgeRow_9110 Experiment)
+(UsesIntervention DrugAgeRow_9110 StructCompound)
+(UsesSpecies DrugAgeRow_9110 Drosophila_melanogaster)
+(HasSex DrugAgeRow_9110 Male)
+(ReportedIn DrugAgeRow_9110 PMID_2004)
+(AvgLifespanChangePercent DrugAgeRow_9110 -20.0)
+(AvgLifespanSignificance DrugAgeRow_9110 Significant)

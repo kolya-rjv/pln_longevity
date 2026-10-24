@@ -1,0 +1,4158 @@
+{
+ "patient": [
+  {
+   "chain": [
+    "AgeAccelGrim",
+    "AllCauseMortality"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "AgeAccelGrim",
+    "CongestiveHeartFailure"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "AgeAccelGrim",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.6,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.51,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.43349999999999994,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.357,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.34679999999999994,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.281775,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.23842499999999997,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.21674999999999997,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.21419999999999997,
+   "confidence": 0.17017138125000006
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance"
+   ],
+   "sign": "Neg",
+   "strength": 0.65,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Neg",
+   "strength": 0.52,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Neg",
+   "strength": 0.45499999999999996,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Neg",
+   "strength": 0.325,
+   "confidence": 0.459
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.2860000000000001,
+   "confidence": 0.268515
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Pos",
+   "strength": 0.85,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Pos",
+   "strength": 0.7225,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Pos",
+   "strength": 0.5950000000000001,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Pos",
+   "strength": 0.5780000000000001,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.46962500000000007,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Pos",
+   "strength": 0.3973750000000001,
+   "confidence": 0.20533500000000002
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Pos",
+   "strength": 0.3612500000000001,
+   "confidence": 0.20533500000000002
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.357,
+   "confidence": 0.29089125000000005
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.65,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Pos",
+   "strength": 0.55,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.6,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.7,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.595,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.50575,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.4165,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.40459999999999996,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.3287375,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.27816250000000003,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.25287499999999996,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.24989999999999998,
+   "confidence": 0.17017138125000006
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Pos",
+   "strength": 0.6400000000000001,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Pos",
+   "strength": 0.5600000000000002,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Pos",
+   "strength": 0.4,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.35200000000000015,
+   "confidence": 0.20533500000000002
+  },
+  {
+   "chain": [
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.55,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.65,
+   "confidence": 0.5
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.5525000000000001,
+   "confidence": 0.29250000000000004
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.469625,
+   "confidence": 0.17111250000000003
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.38675000000000004,
+   "confidence": 0.17111250000000003
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.3757,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.30525625,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.25829375000000004,
+   "confidence": 0.09240075000000002
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.23481249999999998,
+   "confidence": 0.09240075000000002
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.23205,
+   "confidence": 0.13090106250000003
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Pos",
+   "strength": 0.7,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.4400000000000001,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance"
+   ],
+   "sign": "Neg",
+   "strength": 0.75,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Neg",
+   "strength": 0.6,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Neg",
+   "strength": 0.525,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Neg",
+   "strength": 0.375,
+   "confidence": 0.459
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.33000000000000007,
+   "confidence": 0.268515
+  },
+  {
+   "chain": [
+    "MitochondrialDysfunction",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.75,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "NMN",
+    "MitochondrialDysfunction"
+   ],
+   "sign": "Neg",
+   "strength": 0.55,
+   "confidence": 0.7
+  },
+  {
+   "chain": [
+    "NMN",
+    "MitochondrialDysfunction",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.41250000000000003,
+   "confidence": 0.4095
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.6,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.48000000000000004,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.38999999999999996,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.33,
+   "confidence": 0.459
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.29999999999999993,
+   "confidence": 0.459
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.5,
+   "confidence": 0.35
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.425,
+   "confidence": 0.20475
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.36124999999999996,
+   "confidence": 0.11977874999999999
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.29749999999999993,
+   "confidence": 0.11977874999999999
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.289,
+   "confidence": 0.07007056875
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.23481249999999998,
+   "confidence": 0.07007056875
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.19868750000000002,
+   "confidence": 0.064680525
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.18062499999999995,
+   "confidence": 0.064680525
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.17849999999999996,
+   "confidence": 0.09163074374999998
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Pos",
+   "strength": 0.85,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Pos",
+   "strength": 0.7,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Pos",
+   "strength": 0.68,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.5525000000000002,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Pos",
+   "strength": 0.4675000000000001,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Pos",
+   "strength": 0.425,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.42,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "SmokingCessation",
+    "SmokingPackYears"
+   ],
+   "sign": "Neg",
+   "strength": 0.39,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "SmokingCessation",
+    "SmokingPackYears",
+    "DNAmPACKYRS"
+   ],
+   "sign": "Neg",
+   "strength": 0.312,
+   "confidence": 0.324
+  },
+  {
+   "chain": [
+    "SmokingPackYears",
+    "DNAmPACKYRS"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.5
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.4800000000000001,
+   "confidence": 0.29250000000000004
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.408,
+   "confidence": 0.17111250000000003
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.34679999999999994,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.28559999999999997,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.27743999999999985,
+   "confidence": 0.05855897531250002
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.22541999999999993,
+   "confidence": 0.05855897531250002
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.19074000000000002,
+   "confidence": 0.05405443875000001
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.17340000000000003,
+   "confidence": 0.05405443875000001
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.17135999999999998,
+   "confidence": 0.07657712156250002
+  }
+ ],
+ "linage2": [
+  {
+   "chain": [
+    "AgeAccelGrim",
+    "AllCauseMortality"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "AgeAccelGrim",
+    "CongestiveHeartFailure"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "AgeAccelGrim",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.6,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.51,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.43349999999999994,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.357,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.34679999999999994,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.281775,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.23842499999999997,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.21674999999999997,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.21419999999999997,
+   "confidence": 0.17017138125000006
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance"
+   ],
+   "sign": "Neg",
+   "strength": 0.65,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Neg",
+   "strength": 0.52,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Neg",
+   "strength": 0.45499999999999996,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Neg",
+   "strength": 0.325,
+   "confidence": 0.459
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.2860000000000001,
+   "confidence": 0.268515
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Pos",
+   "strength": 0.85,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Pos",
+   "strength": 0.7225,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Pos",
+   "strength": 0.5950000000000001,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Pos",
+   "strength": 0.5780000000000001,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.46962500000000007,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Pos",
+   "strength": 0.3973750000000001,
+   "confidence": 0.20533500000000002
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Pos",
+   "strength": 0.3612500000000001,
+   "confidence": 0.20533500000000002
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.357,
+   "confidence": 0.29089125000000005
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.65,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Pos",
+   "strength": 0.55,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.6,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.7,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.595,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.50575,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.4165,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.40459999999999996,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.3287375,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.27816250000000003,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.25287499999999996,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.24989999999999998,
+   "confidence": 0.17017138125000006
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Pos",
+   "strength": 0.6400000000000001,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Pos",
+   "strength": 0.5600000000000002,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Pos",
+   "strength": 0.4,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.35200000000000015,
+   "confidence": 0.20533500000000002
+  },
+  {
+   "chain": [
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.55,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.65,
+   "confidence": 0.5
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.5525000000000001,
+   "confidence": 0.29250000000000004
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.469625,
+   "confidence": 0.17111250000000003
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.38675000000000004,
+   "confidence": 0.17111250000000003
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.3757,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.30525625,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.25829375000000004,
+   "confidence": 0.09240075000000002
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.23481249999999998,
+   "confidence": 0.09240075000000002
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.23205,
+   "confidence": 0.13090106250000003
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Pos",
+   "strength": 0.7,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.4400000000000001,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "LinAgeAccel",
+    "AllCauseMortality"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance"
+   ],
+   "sign": "Neg",
+   "strength": 0.75,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Neg",
+   "strength": 0.6,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Neg",
+   "strength": 0.525,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Neg",
+   "strength": 0.375,
+   "confidence": 0.459
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.33000000000000007,
+   "confidence": 0.268515
+  },
+  {
+   "chain": [
+    "MitochondrialDysfunction",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.75,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Pos",
+   "strength": 0.85,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Pos",
+   "strength": 0.7,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Pos",
+   "strength": 0.68,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.5525000000000002,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Pos",
+   "strength": 0.4675000000000001,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Pos",
+   "strength": 0.425,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.42,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "SmokingCessation",
+    "CurrentTobaccoExposure"
+   ],
+   "sign": "Neg",
+   "strength": 0.95,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "SmokingCessation",
+    "SmokingPackYears"
+   ],
+   "sign": "Neg",
+   "strength": 0.39,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "SmokingCessation",
+    "SmokingPackYears",
+    "DNAmPACKYRS"
+   ],
+   "sign": "Neg",
+   "strength": 0.312,
+   "confidence": 0.324
+  },
+  {
+   "chain": [
+    "SmokingPackYears",
+    "DNAmPACKYRS"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.5
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.4800000000000001,
+   "confidence": 0.29250000000000004
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.408,
+   "confidence": 0.17111250000000003
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.34679999999999994,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.28559999999999997,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.27743999999999985,
+   "confidence": 0.05855897531250002
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.22541999999999993,
+   "confidence": 0.05855897531250002
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.19074000000000002,
+   "confidence": 0.05405443875000001
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.17340000000000003,
+   "confidence": 0.05405443875000001
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.17135999999999998,
+   "confidence": 0.07657712156250002
+  }
+ ],
+ "generic": [
+  {
+   "chain": [
+    "AgeAccelGrim",
+    "AllCauseMortality"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "AgeAccelGrim",
+    "CongestiveHeartFailure"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "AgeAccelGrim",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.6,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.51,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.43349999999999994,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.357,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.34679999999999994,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.281775,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.23842499999999997,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.21674999999999997,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.21419999999999997,
+   "confidence": 0.17017138125000006
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance"
+   ],
+   "sign": "Neg",
+   "strength": 0.65,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Neg",
+   "strength": 0.52,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Neg",
+   "strength": 0.45499999999999996,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Neg",
+   "strength": 0.325,
+   "confidence": 0.459
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.2860000000000001,
+   "confidence": 0.268515
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Pos",
+   "strength": 0.85,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Pos",
+   "strength": 0.7225,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Pos",
+   "strength": 0.5950000000000001,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Pos",
+   "strength": 0.5780000000000001,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.46962500000000007,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Pos",
+   "strength": 0.3973750000000001,
+   "confidence": 0.20533500000000002
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Pos",
+   "strength": 0.3612500000000001,
+   "confidence": 0.20533500000000002
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.357,
+   "confidence": 0.29089125000000005
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.65,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Pos",
+   "strength": 0.55,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.6,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.7,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.595,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.50575,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.4165,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.40459999999999996,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.3287375,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.27816250000000003,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.25287499999999996,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.24989999999999998,
+   "confidence": 0.17017138125000006
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Pos",
+   "strength": 0.6400000000000001,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Pos",
+   "strength": 0.5600000000000002,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Pos",
+   "strength": 0.4,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.35200000000000015,
+   "confidence": 0.20533500000000002
+  },
+  {
+   "chain": [
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.55,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.65,
+   "confidence": 0.5
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.5525000000000001,
+   "confidence": 0.29250000000000004
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.469625,
+   "confidence": 0.17111250000000003
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.38675000000000004,
+   "confidence": 0.17111250000000003
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.3757,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.30525625,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.25829375000000004,
+   "confidence": 0.09240075000000002
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.23481249999999998,
+   "confidence": 0.09240075000000002
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.23205,
+   "confidence": 0.13090106250000003
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Pos",
+   "strength": 0.7,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.4400000000000001,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "Lifespan",
+    "Mortality"
+   ],
+   "sign": "Neg",
+   "strength": 1.0,
+   "confidence": 1.0
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance"
+   ],
+   "sign": "Neg",
+   "strength": 0.75,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Neg",
+   "strength": 0.6,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Neg",
+   "strength": 0.525,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Neg",
+   "strength": 0.375,
+   "confidence": 0.459
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.33000000000000007,
+   "confidence": 0.268515
+  },
+  {
+   "chain": [
+    "MitochondrialDysfunction",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.75,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "NMN",
+    "MitochondrialDysfunction"
+   ],
+   "sign": "Neg",
+   "strength": 0.55,
+   "confidence": 0.7
+  },
+  {
+   "chain": [
+    "NMN",
+    "MitochondrialDysfunction",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.41250000000000003,
+   "confidence": 0.4095
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.6,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.48000000000000004,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.38999999999999996,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.33,
+   "confidence": 0.459
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.29999999999999993,
+   "confidence": 0.459
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.5,
+   "confidence": 0.35
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.425,
+   "confidence": 0.20475
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.36124999999999996,
+   "confidence": 0.11977874999999999
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.29749999999999993,
+   "confidence": 0.11977874999999999
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.289,
+   "confidence": 0.07007056875
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.23481249999999998,
+   "confidence": 0.07007056875
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.19868750000000002,
+   "confidence": 0.064680525
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.18062499999999995,
+   "confidence": 0.064680525
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.17849999999999996,
+   "confidence": 0.09163074374999998
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Pos",
+   "strength": 0.85,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Pos",
+   "strength": 0.7,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Pos",
+   "strength": 0.68,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.5525000000000002,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Pos",
+   "strength": 0.4675000000000001,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Pos",
+   "strength": 0.425,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.42,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "SmokingCessation",
+    "SmokingPackYears"
+   ],
+   "sign": "Neg",
+   "strength": 0.39,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "SmokingCessation",
+    "SmokingPackYears",
+    "DNAmPACKYRS"
+   ],
+   "sign": "Neg",
+   "strength": 0.312,
+   "confidence": 0.324
+  },
+  {
+   "chain": [
+    "SmokingPackYears",
+    "DNAmPACKYRS"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.5
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.4800000000000001,
+   "confidence": 0.29250000000000004
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.408,
+   "confidence": 0.17111250000000003
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.34679999999999994,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.28559999999999997,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.27743999999999985,
+   "confidence": 0.05855897531250002
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.22541999999999993,
+   "confidence": 0.05855897531250002
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.19074000000000002,
+   "confidence": 0.05405443875000001
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.17340000000000003,
+   "confidence": 0.05405443875000001
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.17135999999999998,
+   "confidence": 0.07657712156250002
+  }
+ ],
+ "feedback": [
+  {
+   "chain": [
+    "AgeAccelGrim",
+    "AllCauseMortality"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "AgeAccelGrim",
+    "CongestiveHeartFailure"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "AgeAccelGrim",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.6,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.51,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.43349999999999994,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.357,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.34679999999999994,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.281775,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.23842499999999997,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.21674999999999997,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.21419999999999997,
+   "confidence": 0.17017138125000006
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance"
+   ],
+   "sign": "Neg",
+   "strength": 0.65,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Neg",
+   "strength": 0.52,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Neg",
+   "strength": 0.45499999999999996,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Neg",
+   "strength": 0.325,
+   "confidence": 0.459
+  },
+  {
+   "chain": [
+    "Berberine",
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.2860000000000001,
+   "confidence": 0.268515
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Pos",
+   "strength": 0.85,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Pos",
+   "strength": 0.7225,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Pos",
+   "strength": 0.5950000000000001,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Pos",
+   "strength": 0.5780000000000001,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.46962500000000007,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Pos",
+   "strength": 0.3973750000000001,
+   "confidence": 0.20533500000000002
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Pos",
+   "strength": 0.3612500000000001,
+   "confidence": 0.20533500000000002
+  },
+  {
+   "chain": [
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.357,
+   "confidence": 0.29089125000000005
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "CellularSenescence"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.65,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Pos",
+   "strength": 0.55,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Pos",
+   "strength": 0.42499999999999993,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Pos",
+   "strength": 0.29749999999999993,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "ChronicInflammation",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.17849999999999996,
+   "confidence": 0.17017138125000006
+  },
+  {
+   "chain": [
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.6,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.7,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.595,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.50575,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.4165,
+   "confidence": 0.22244625000000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.40459999999999996,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.3287375,
+   "confidence": 0.13013105625000007
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.27816250000000003,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.25287499999999996,
+   "confidence": 0.12012097500000003
+  },
+  {
+   "chain": [
+    "DasatinibPlusQuercetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.24989999999999998,
+   "confidence": 0.17017138125000006
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Pos",
+   "strength": 0.6400000000000001,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Pos",
+   "strength": 0.5600000000000002,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Pos",
+   "strength": 0.4,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "DeregulatedNutrientSensing",
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.35200000000000015,
+   "confidence": 0.20533500000000002
+  },
+  {
+   "chain": [
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.55,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.65,
+   "confidence": 0.5
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.5525000000000001,
+   "confidence": 0.29250000000000004
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.469625,
+   "confidence": 0.17111250000000003
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.38675000000000004,
+   "confidence": 0.17111250000000003
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.3757,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.30525625,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.25829375000000004,
+   "confidence": 0.09240075000000002
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.23481249999999998,
+   "confidence": 0.09240075000000002
+  },
+  {
+   "chain": [
+    "Fisetin",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.23205,
+   "confidence": 0.13090106250000003
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Pos",
+   "strength": 0.7,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.4400000000000001,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance"
+   ],
+   "sign": "Neg",
+   "strength": 0.75,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "FastingGlucose"
+   ],
+   "sign": "Neg",
+   "strength": 0.6,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "HbA1c"
+   ],
+   "sign": "Neg",
+   "strength": 0.525,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "Triglycerides"
+   ],
+   "sign": "Neg",
+   "strength": 0.375,
+   "confidence": 0.459
+  },
+  {
+   "chain": [
+    "Metformin",
+    "InsulinResistance",
+    "FastingGlucose",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.33000000000000007,
+   "confidence": 0.268515
+  },
+  {
+   "chain": [
+    "MitochondrialDysfunction",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.75,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "NMN",
+    "MitochondrialDysfunction"
+   ],
+   "sign": "Neg",
+   "strength": 0.55,
+   "confidence": 0.7
+  },
+  {
+   "chain": [
+    "NMN",
+    "MitochondrialDysfunction",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.41250000000000003,
+   "confidence": 0.4095
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.6,
+   "confidence": 0.85
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.48000000000000004,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.29999999999999993,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.38999999999999996,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.33,
+   "confidence": 0.459
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.29999999999999993,
+   "confidence": 0.459
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.25499999999999995,
+   "confidence": 0.29089125000000005
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.17849999999999994,
+   "confidence": 0.17017138125000006
+  },
+  {
+   "chain": [
+    "Omega3",
+    "ChronicInflammation",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.10709999999999996,
+   "confidence": 0.13018110665625002
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.5,
+   "confidence": 0.35
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.425,
+   "confidence": 0.20475
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.36124999999999996,
+   "confidence": 0.11977874999999999
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.29749999999999993,
+   "confidence": 0.11977874999999999
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.289,
+   "confidence": 0.07007056875
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.23481249999999998,
+   "confidence": 0.07007056875
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.19868750000000002,
+   "confidence": 0.064680525
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.18062499999999995,
+   "confidence": 0.064680525
+  },
+  {
+   "chain": [
+    "Resveratrol",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.17849999999999996,
+   "confidence": 0.09163074374999998
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Pos",
+   "strength": 0.85,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Pos",
+   "strength": 0.7,
+   "confidence": 0.65
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Pos",
+   "strength": 0.68,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "CellularSenescence"
+   ],
+   "sign": "Pos",
+   "strength": 0.425,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Pos",
+   "strength": 0.5525000000000002,
+   "confidence": 0.38025000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Pos",
+   "strength": 0.4675000000000001,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Pos",
+   "strength": 0.425,
+   "confidence": 0.35100000000000003
+  },
+  {
+   "chain": [
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Pos",
+   "strength": 0.42,
+   "confidence": 0.49725
+  },
+  {
+   "chain": [
+    "SmokingCessation",
+    "SmokingPackYears"
+   ],
+   "sign": "Neg",
+   "strength": 0.39,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "SmokingCessation",
+    "SmokingPackYears",
+    "DNAmPACKYRS"
+   ],
+   "sign": "Neg",
+   "strength": 0.312,
+   "confidence": 0.324
+  },
+  {
+   "chain": [
+    "SmokingPackYears",
+    "DNAmPACKYRS"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.6
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy"
+   ],
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.5
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence"
+   ],
+   "sign": "Neg",
+   "strength": 0.4800000000000001,
+   "confidence": 0.29250000000000004
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP"
+   ],
+   "sign": "Neg",
+   "strength": 0.408,
+   "confidence": 0.17111250000000003
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation"
+   ],
+   "sign": "Neg",
+   "strength": 0.34679999999999994,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1"
+   ],
+   "sign": "Neg",
+   "strength": 0.28559999999999997,
+   "confidence": 0.10010081250000004
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "CRP"
+   ],
+   "sign": "Neg",
+   "strength": 0.27743999999999985,
+   "confidence": 0.05855897531250002
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "DNAmGDF15"
+   ],
+   "sign": "Neg",
+   "strength": 0.22541999999999993,
+   "confidence": 0.05855897531250002
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "LowSerumAlbumin"
+   ],
+   "sign": "Neg",
+   "strength": 0.19074000000000002,
+   "confidence": 0.05405443875000001
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "ChronicInflammation",
+    "RDW"
+   ],
+   "sign": "Neg",
+   "strength": 0.17340000000000003,
+   "confidence": 0.05405443875000001
+  },
+  {
+   "chain": [
+    "Spermidine",
+    "Autophagy",
+    "CellularSenescence",
+    "SASP",
+    "DNAmPAI1",
+    "CoronaryHeartDisease"
+   ],
+   "sign": "Neg",
+   "strength": 0.17135999999999998,
+   "confidence": 0.07657712156250002
+  }
+ ]
+}

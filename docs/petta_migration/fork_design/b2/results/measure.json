@@ -1,0 +1,1322 @@
+{
+ "calibration": {
+  "chain_discount": 0.9,
+  "halfsat": 20.0,
+  "sig_gates": {
+   "NotSignificant": 0.4,
+   "Significant": 1.0,
+   "Unreported": 0.6
+  }
+ },
+ "d3_within_paper_pick_through_this_fold": {
+  "Metformin": -0.040305279114376646,
+  "Rapamycin": 0.31670642167716345,
+  "Resveratrol": -0.03951815270653078
+ },
+ "ethanol": {
+  "build (present)": {
+   "compounds": 1043,
+   "legacy/any": {
+    "first": "C60_fullerene",
+    "of": 1035,
+    "rank": 259,
+    "score": 0.14323728813559322
+   },
+   "legacy/protective": {
+    "first": "C60_fullerene",
+    "of": 617,
+    "rank": 258,
+    "score": 0.14323728813559322
+   },
+   "paper/any": {
+    "first": "Spermidine",
+    "of": 1035,
+    "rank": 426,
+    "score": 0.11444479577028255
+   },
+   "paper/protective": {
+    "first": "Spermidine",
+    "of": 643,
+    "rank": 423,
+    "score": 0.11444479577028255
+   },
+   "row/any": {
+    "first": "Ethanol",
+    "of": 1035,
+    "rank": 1,
+    "score": 0.5678661811019777
+   },
+   "row/protective": {
+    "first": "Ethanol",
+    "of": 655,
+    "rank": 1,
+    "score": 0.5678661811019777
+   },
+   "rows": 3423
+  },
+  "sample (build absent)": {
+   "compounds": 41,
+   "legacy/any": {
+    "first": "Pineal_gland_extract",
+    "of": 41,
+    "rank": 7,
+    "score": 0.14323728813559322
+   },
+   "legacy/protective": {
+    "first": "Pineal_gland_extract",
+    "of": 20,
+    "rank": 7,
+    "score": 0.14323728813559322
+   },
+   "paper/any": {
+    "first": "Pineal_gland_extract",
+    "of": 41,
+    "rank": 11,
+    "score": 0.11444479577028255
+   },
+   "paper/protective": {
+    "first": "Pineal_gland_extract",
+    "of": 18,
+    "rank": 11,
+    "score": 0.11444479577028255
+   },
+   "row/any": {
+    "first": "Ethanol",
+    "of": 41,
+    "rank": 1,
+    "score": 0.5678661811019777
+   },
+   "row/protective": {
+    "first": "Ethanol",
+    "of": 20,
+    "rank": 1,
+    "score": 0.5678661811019777
+   },
+   "rows": 201
+  }
+ },
+ "null_conventions": {
+  "compounds_with_a_null_row": 70,
+  "default": "both",
+  "named": {
+   "Ethanol": {
+    "both": {
+     "direction": "protective",
+     "net": 0.11444479577028255,
+     "rank_of_1035": 426
+    },
+    "neither": {
+     "direction": "protective",
+     "net": 0.11444479577028255,
+     "rank_of_1035": 427
+    },
+    "null_rows": 0,
+    "protective": {
+     "direction": "protective",
+     "net": 0.11444479577028255,
+     "rank_of_1035": 420
+    },
+    "rows": 52
+   },
+   "Metformin": {
+    "both": {
+     "direction": "protective",
+     "net": 0.11815900196385555,
+     "rank_of_1035": 406
+    },
+    "neither": {
+     "direction": "protective",
+     "net": 0.06291863325357505,
+     "rank_of_1035": 600
+    },
+    "null_rows": 5,
+    "protective": {
+     "direction": "harmful",
+     "net": -0.056966282073381475,
+     "rank_of_1035": 892
+    },
+    "rows": 54
+   },
+   "Rapamycin": {
+    "both": {
+     "direction": "protective",
+     "net": 0.3367948471123448,
+     "rank_of_1035": 3
+    },
+    "neither": {
+     "direction": "protective",
+     "net": 0.3367948471123448,
+     "rank_of_1035": 4
+    },
+    "null_rows": 1,
+    "protective": {
+     "direction": "protective",
+     "net": 0.3367948471123448,
+     "rank_of_1035": 3
+    },
+    "rows": 37
+   },
+   "Resveratrol": {
+    "both": {
+     "direction": "protective",
+     "net": 0.1363477731924565,
+     "rank_of_1035": 322
+    },
+    "neither": {
+     "direction": "protective",
+     "net": 0.032067393803529465,
+     "rank_of_1035": 650
+    },
+    "null_rows": 23,
+    "protective": {
+     "direction": "harmful",
+     "net": -0.04600442966843507,
+     "rank_of_1035": 878
+    },
+    "rows": 170
+   }
+  },
+  "scorable": 1035,
+  "sign_flips": {
+   "both vs neither": {
+    "compounds": [
+     "Dimethyl_fumarate",
+     "Leucine",
+     "N6_benzyladenine",
+     "N_4_dafachronic_acid",
+     "Threonine",
+     "Vanadyl_sulfate"
+    ],
+    "count": 6
+   },
+   "both vs protective": {
+    "compounds": [
+     "Metformin",
+     "Resveratrol"
+    ],
+    "count": 2
+   },
+   "neither vs protective": {
+    "compounds": [
+     "Dimethyl_fumarate",
+     "Leucine",
+     "Metformin",
+     "N6_benzyladenine",
+     "N_4_dafachronic_acid",
+     "Resveratrol",
+     "Threonine",
+     "Vanadyl_sulfate"
+    ],
+    "count": 8
+   }
+  },
+  "top20": {
+   "both": [
+    "Spermidine",
+    "N_17alphaestradiol",
+    "Rapamycin",
+    "Reserpine",
+    "C60_fullerene",
+    "Astaxanthin",
+    "Pineal_gland_extract",
+    "Lithocholic_acid",
+    "Thioflavin_T",
+    "Mianserin",
+    "Psora_4",
+    "Tanespimycin",
+    "Baicalein",
+    "Phenformin",
+    "Electrolyzed_reduced_water",
+    "EUK_134",
+    "Indolepropionamide",
+    "Cranberry_extract",
+    "Tinospora_cordifolia_extract",
+    "Calcium_pantothenate"
+   ],
+   "neither": [
+    "Spermidine",
+    "C60_fullerene",
+    "N_17alphaestradiol",
+    "Rapamycin",
+    "Reserpine",
+    "Astaxanthin",
+    "Pineal_gland_extract",
+    "Lithocholic_acid",
+    "Thioflavin_T",
+    "Mianserin",
+    "Psora_4",
+    "Tanespimycin",
+    "Baicalein",
+    "Phenformin",
+    "Electrolyzed_reduced_water",
+    "EUK_134",
+    "Indolepropionamide",
+    "Cranberry_extract",
+    "Tinospora_cordifolia_extract",
+    "Calcium_pantothenate"
+   ],
+   "protective": [
+    "Spermidine",
+    "N_17alphaestradiol",
+    "Rapamycin",
+    "Reserpine",
+    "C60_fullerene",
+    "Astaxanthin",
+    "Pineal_gland_extract",
+    "Lithocholic_acid",
+    "Thioflavin_T",
+    "Mianserin",
+    "Psora_4",
+    "Tanespimycin",
+    "Baicalein",
+    "Phenformin",
+    "Electrolyzed_reduced_water",
+    "EUK_134",
+    "Indolepropionamide",
+    "Cranberry_extract",
+    "Tinospora_cordifolia_extract",
+    "Calcium_pantothenate"
+   ]
+  },
+  "top20_overlap": {
+   "both vs neither": 20,
+   "both vs protective": 20,
+   "neither vs protective": 20
+  }
+ },
+ "population": {
+  "compounds": 1043,
+  "compounds_above_the_150_row_cap": 1,
+  "compounds_with_1_row": 443,
+  "compounds_with_2plus_papers": 172,
+  "compounds_with_a_pooled_item": 160,
+  "compounds_with_both_directions": 235,
+  "max_rows_for_a_compound": 170,
+  "papers": 664,
+  "rows": 3423,
+  "scorable_compounds": 1035,
+  "scorable_rows": 3372,
+  "stamp_tokens": 1708
+ },
+ "ranking": {
+  "any": {
+   "fold_top20": [
+    [
+     1,
+     "Spermidine",
+     0.3601715265866209,
+     0.5302525252525253,
+     0.6792452830188678,
+     4,
+     0,
+     8,
+     0,
+     15
+    ],
+    [
+     2,
+     "N_17alphaestradiol",
+     0.3520659783764623,
+     0.40567273228563555,
+     0.8678571428571429,
+     3,
+     0,
+     6,
+     0,
+     4
+    ],
+    [
+     3,
+     "Rapamycin",
+     0.3367948471123448,
+     0.38267165767814665,
+     0.8801144280081818,
+     18,
+     0,
+     37,
+     0,
+     2
+    ],
+    [
+     4,
+     "Reserpine",
+     0.32809745306029836,
+     0.5902282224365155,
+     0.5558823529411765,
+     3,
+     0,
+     3,
+     0,
+     95
+    ],
+    [
+     5,
+     "C60_fullerene",
+     0.32727272727272727,
+     0.6545454545454545,
+     0.5,
+     2,
+     0,
+     3,
+     0,
+     1
+    ],
+    [
+     6,
+     "Astaxanthin",
+     0.3209647405016348,
+     0.3902228326549666,
+     0.8225165562913908,
+     4,
+     0,
+     6,
+     0,
+     3
+    ],
+    [
+     7,
+     "Pineal_gland_extract",
+     0.3200660699062233,
+     0.5020644233823112,
+     0.6375,
+     3,
+     0,
+     4,
+     0,
+     13
+    ],
+    [
+     8,
+     "Lithocholic_acid",
+     0.31670287638021366,
+     0.6907511295535522,
+     0.45849056603773597,
+     3,
+     0,
+     3,
+     0,
+     219
+    ],
+    [
+     9,
+     "Thioflavin_T",
+     0.3106634575136041,
+     0.665707408957723,
+     0.46666666666666673,
+     2,
+     0,
+     4,
+     0,
+     115
+    ],
+    [
+     10,
+     "Mianserin",
+     0.30406354134686847,
+     0.4947065553659367,
+     0.6146341463414635,
+     4,
+     1,
+     4,
+     1,
+     109
+    ],
+    [
+     11,
+     "Psora_4",
+     0.3030976287118137,
+     0.6494949186681722,
+     0.46666666666666673,
+     2,
+     0,
+     2,
+     0,
+     74
+    ],
+    [
+     12,
+     "Tanespimycin",
+     0.29650926983522646,
+     0.6353770067897709,
+     0.46666666666666673,
+     2,
+     0,
+     3,
+     0,
+     141
+    ],
+    [
+     13,
+     "Baicalein",
+     0.29595654823882284,
+     0.5036435623640884,
+     0.5876309564041906,
+     4,
+     0,
+     9,
+     0,
+     262
+    ],
+    [
+     14,
+     "Phenformin",
+     0.29458346531517265,
+     0.5400696864111498,
+     0.5454545454545455,
+     2,
+     0,
+     2,
+     0,
+     20
+    ],
+    [
+     15,
+     "Electrolyzed_reduced_water",
+     0.29138571673733604,
+     0.5241859454534087,
+     0.5558823529411765,
+     3,
+     0,
+     7,
+     0,
+     240
+    ],
+    [
+     16,
+     "EUK_134",
+     0.2908231368186875,
+     0.6231924360400445,
+     0.46666666666666673,
+     2,
+     0,
+     10,
+     0,
+     46
+    ],
+    [
+     17,
+     "Indolepropionamide",
+     0.2897697236684021,
+     0.9199038846615939,
+     0.315,
+     1,
+     0,
+     3,
+     0,
+     5
+    ],
+    [
+     18,
+     "Cranberry_extract",
+     0.2885698711641589,
+     0.469498599909941,
+     0.6146341463414635,
+     4,
+     0,
+     7,
+     0,
+     328
+    ],
+    [
+     19,
+     "Tinospora_cordifolia_extract",
+     0.27913321947053804,
+     0.8861372046683746,
+     0.315,
+     1,
+     0,
+     3,
+     0,
+     6
+    ],
+    [
+     20,
+     "Calcium_pantothenate",
+     0.2789733939260476,
+     0.5114512221977539,
+     0.5454545454545455,
+     2,
+     0,
+     3,
+     0,
+     24
+    ]
+   ],
+   "in_both": 1035,
+   "legacy_top20": [
+    [
+     1,
+     "C60_fullerene",
+     0.3681818181818182,
+     5
+    ],
+    [
+     2,
+     "Rapamycin",
+     0.3190909090909091,
+     3
+    ],
+    [
+     3,
+     "Astaxanthin",
+     0.30375,
+     6
+    ],
+    [
+     4,
+     "N_17alphaestradiol",
+     0.30375,
+     2
+    ],
+    [
+     5,
+     "Indolepropionamide",
+     0.2897697236684021,
+     17
+    ],
+    [
+     6,
+     "Tinospora_cordifolia_extract",
+     0.27913321947053804,
+     19
+    ],
+    [
+     7,
+     "Thymus_extract",
+     0.2625,
+     66
+    ],
+    [
+     8,
+     "Bis1_hydroxy_2266_tetramethyl_4_piperidinyl_decandioate",
+     0.2618802698145025,
+     26
+    ],
+    [
+     9,
+     "Dimethylaminoethyl_p_chlorophenoxyacetate",
+     0.25972515856236794,
+     34
+    ],
+    [
+     10,
+     "N_2_mercaptoethylamine_hydrochloride",
+     0.2543478260869565,
+     372
+    ],
+    [
+     11,
+     "Canagliflozin",
+     0.25137931034482763,
+     401
+    ],
+    [
+     12,
+     "Nordihydroguaiaretic_acid",
+     0.25137931034482763,
+     40
+    ],
+    [
+     13,
+     "Pineal_gland_extract",
+     0.25,
+     7
+    ],
+    [
+     14,
+     "Hydrogen_Sulphide",
+     0.24797872340425534,
+     33
+    ],
+    [
+     15,
+     "Spermidine",
+     0.24545454545454545,
+     1
+    ],
+    [
+     16,
+     "Carbonylcyanide_3_chlorophenylhydrazone",
+     0.23625000000000002,
+     41
+    ],
+    [
+     17,
+     "X203_anti_IL_11",
+     0.23571428571428574,
+     42
+    ],
+    [
+     18,
+     "Bacitracin",
+     0.2347452229299363,
+     44
+    ],
+    [
+     19,
+     "Aspirin",
+     0.23142857142857143,
+     310
+    ],
+    [
+     20,
+     "Phenformin",
+     0.2304878048780488,
+     14
+    ]
+   ],
+   "moved_more_than_100": 157,
+   "same_position_top20": 0,
+   "spearman_in_both": 0.9246210565359502,
+   "top_overlap": {
+    "10": 4,
+    "20": 9,
+    "50": 20
+   },
+   "universe_fold": 1035,
+   "universe_legacy": 1035
+  },
+  "compounds_scored": 1035,
+  "label_changes": {
+   "harmful->harmful": 152,
+   "harmful->protective": 27,
+   "no_effect->harmful": 7,
+   "no_effect->no_effect": 219,
+   "no_effect->protective": 13,
+   "protective->harmful": 14,
+   "protective->protective": 603
+  },
+  "protective": {
+   "fold_top20": [
+    [
+     1,
+     "Spermidine",
+     0.3601715265866209,
+     0.5302525252525253,
+     0.6792452830188678,
+     4,
+     0,
+     8,
+     0,
+     15
+    ],
+    [
+     2,
+     "N_17alphaestradiol",
+     0.3520659783764623,
+     0.40567273228563555,
+     0.8678571428571429,
+     3,
+     0,
+     6,
+     0,
+     4
+    ],
+    [
+     3,
+     "Rapamycin",
+     0.3367948471123448,
+     0.38267165767814665,
+     0.8801144280081818,
+     18,
+     0,
+     37,
+     0,
+     2
+    ],
+    [
+     4,
+     "Reserpine",
+     0.32809745306029836,
+     0.5902282224365155,
+     0.5558823529411765,
+     3,
+     0,
+     3,
+     0,
+     95
+    ],
+    [
+     5,
+     "C60_fullerene",
+     0.32727272727272727,
+     0.6545454545454545,
+     0.5,
+     2,
+     0,
+     3,
+     0,
+     1
+    ],
+    [
+     6,
+     "Astaxanthin",
+     0.3209647405016348,
+     0.3902228326549666,
+     0.8225165562913908,
+     4,
+     0,
+     6,
+     0,
+     3
+    ],
+    [
+     7,
+     "Pineal_gland_extract",
+     0.3200660699062233,
+     0.5020644233823112,
+     0.6375,
+     3,
+     0,
+     4,
+     0,
+     13
+    ],
+    [
+     8,
+     "Lithocholic_acid",
+     0.31670287638021366,
+     0.6907511295535522,
+     0.45849056603773597,
+     3,
+     0,
+     3,
+     0,
+     218
+    ],
+    [
+     9,
+     "Thioflavin_T",
+     0.3106634575136041,
+     0.665707408957723,
+     0.46666666666666673,
+     2,
+     0,
+     4,
+     0,
+     115
+    ],
+    [
+     10,
+     "Mianserin",
+     0.30406354134686847,
+     0.4947065553659367,
+     0.6146341463414635,
+     4,
+     1,
+     4,
+     1,
+     109
+    ],
+    [
+     11,
+     "Psora_4",
+     0.3030976287118137,
+     0.6494949186681722,
+     0.46666666666666673,
+     2,
+     0,
+     2,
+     0,
+     74
+    ],
+    [
+     12,
+     "Tanespimycin",
+     0.29650926983522646,
+     0.6353770067897709,
+     0.46666666666666673,
+     2,
+     0,
+     3,
+     0,
+     141
+    ],
+    [
+     13,
+     "Baicalein",
+     0.29595654823882284,
+     0.5036435623640884,
+     0.5876309564041906,
+     4,
+     0,
+     9,
+     0,
+     261
+    ],
+    [
+     14,
+     "Phenformin",
+     0.29458346531517265,
+     0.5400696864111498,
+     0.5454545454545455,
+     2,
+     0,
+     2,
+     0,
+     20
+    ],
+    [
+     15,
+     "Electrolyzed_reduced_water",
+     0.29138571673733604,
+     0.5241859454534087,
+     0.5558823529411765,
+     3,
+     0,
+     7,
+     0,
+     239
+    ],
+    [
+     16,
+     "EUK_134",
+     0.2908231368186875,
+     0.6231924360400445,
+     0.46666666666666673,
+     2,
+     0,
+     10,
+     0,
+     46
+    ],
+    [
+     17,
+     "Indolepropionamide",
+     0.2897697236684021,
+     0.9199038846615939,
+     0.315,
+     1,
+     0,
+     3,
+     0,
+     5
+    ],
+    [
+     18,
+     "Cranberry_extract",
+     0.2885698711641589,
+     0.469498599909941,
+     0.6146341463414635,
+     4,
+     0,
+     7,
+     0,
+     327
+    ],
+    [
+     19,
+     "Tinospora_cordifolia_extract",
+     0.27913321947053804,
+     0.8861372046683746,
+     0.315,
+     1,
+     0,
+     3,
+     0,
+     6
+    ],
+    [
+     20,
+     "Calcium_pantothenate",
+     0.2789733939260476,
+     0.5114512221977539,
+     0.5454545454545455,
+     2,
+     0,
+     3,
+     0,
+     24
+    ]
+   ],
+   "in_both": 603,
+   "legacy_top20": [
+    [
+     1,
+     "C60_fullerene",
+     0.3681818181818182,
+     5
+    ],
+    [
+     2,
+     "Rapamycin",
+     0.3190909090909091,
+     3
+    ],
+    [
+     3,
+     "Astaxanthin",
+     0.30375,
+     6
+    ],
+    [
+     4,
+     "N_17alphaestradiol",
+     0.30375,
+     2
+    ],
+    [
+     5,
+     "Indolepropionamide",
+     0.2897697236684021,
+     17
+    ],
+    [
+     6,
+     "Tinospora_cordifolia_extract",
+     0.27913321947053804,
+     19
+    ],
+    [
+     7,
+     "Thymus_extract",
+     0.2625,
+     66
+    ],
+    [
+     8,
+     "Bis1_hydroxy_2266_tetramethyl_4_piperidinyl_decandioate",
+     0.2618802698145025,
+     26
+    ],
+    [
+     9,
+     "Dimethylaminoethyl_p_chlorophenoxyacetate",
+     0.25972515856236794,
+     34
+    ],
+    [
+     10,
+     "N_2_mercaptoethylamine_hydrochloride",
+     0.2543478260869565,
+     371
+    ],
+    [
+     11,
+     "Canagliflozin",
+     0.25137931034482763,
+     399
+    ],
+    [
+     12,
+     "Nordihydroguaiaretic_acid",
+     0.25137931034482763,
+     40
+    ],
+    [
+     13,
+     "Pineal_gland_extract",
+     0.25,
+     7
+    ],
+    [
+     14,
+     "Hydrogen_Sulphide",
+     0.24797872340425534,
+     33
+    ],
+    [
+     15,
+     "Spermidine",
+     0.24545454545454545,
+     1
+    ],
+    [
+     16,
+     "Carbonylcyanide_3_chlorophenylhydrazone",
+     0.23625000000000002,
+     41
+    ],
+    [
+     17,
+     "X203_anti_IL_11",
+     0.23571428571428574,
+     42
+    ],
+    [
+     18,
+     "Bacitracin",
+     0.2347452229299363,
+     44
+    ],
+    [
+     19,
+     "Aspirin",
+     0.23142857142857143,
+     309
+    ],
+    [
+     20,
+     "Phenformin",
+     0.2304878048780488,
+     14
+    ]
+   ],
+   "moved_more_than_100": 81,
+   "same_position_top20": 0,
+   "spearman_in_both": 0.8598195568340152,
+   "top_overlap": {
+    "10": 4,
+    "20": 9,
+    "50": 20
+   },
+   "universe_fold": 643,
+   "universe_legacy": 617
+  },
+  "score_equal_to_legacy": 714
+ },
+ "table": {
+  "Ethanol": {
+   "d3_earlier_net": null,
+   "fold": {
+    "Neg": {
+     "confidence": 0.189,
+     "native_confidence": 0.21,
+     "papers": 1,
+     "rows": 50,
+     "score": 0.14521959694232106,
+     "strength": 0.7683576557794765
+    },
+    "Pos": {
+     "confidence": 0.189,
+     "native_confidence": 0.21,
+     "papers": 1,
+     "rows": 2,
+     "score": -0.03077480117203851,
+     "strength": 0.16282963583089158
+    },
+    "confidence": 0.189,
+    "direction": "protective",
+    "lead_row": "DrugAgeRow_28",
+    "net": 0.11444479577028255,
+    "sign": "Neg",
+    "strength": 0.605528019948585
+   },
+   "legacy": {
+    "confidence": 0.189,
+    "direction": "protective",
+    "row": "DrugAgeRow_9",
+    "score": 0.14323728813559322,
+    "sign": "Neg",
+    "strength": 0.7578692493946732
+   },
+   "papers": 1,
+   "pooled_revision_net_rejected": {
+    "confidence": 0.312396694214876,
+    "score": 0.0945824758432087,
+    "signed_strength": 0.3027640099742924
+   },
+   "rank_of_1035": {
+    "legacy": 259,
+    "paper": 426,
+    "row": 1
+   },
+   "row_as_unit": {
+    "Neg": {
+     "confidence": 0.8370239149689991,
+     "native_confidence": 0.9300265721877767,
+     "papers": 50,
+     "rows": 50,
+     "score": 0.6072411014582214,
+     "strength": 0.7254764058691344
+    },
+    "Pos": {
+     "confidence": 0.312396694214876,
+     "native_confidence": 0.3471074380165289,
+     "papers": 2,
+     "rows": 2,
+     "score": -0.039374920356243716,
+     "strength": 0.12604141172236746
+    },
+    "direction": "protective",
+    "net": 0.5678661811019777
+   },
+   "rows": 52
+  },
+  "Metformin": {
+   "d3_earlier_net": -0.0403,
+   "fold": {
+    "Neg": {
+     "confidence": 0.8492113166595159,
+     "native_confidence": 0.9435681296216843,
+     "papers": 14,
+     "rows": 38,
+     "score": 0.20552149085522017,
+     "strength": 0.24201454552403506
+    },
+    "Pos": {
+     "confidence": 0.8332824984252231,
+     "native_confidence": 0.9258694426946923,
+     "papers": 7,
+     "rows": 21,
+     "score": -0.08736248889136462,
+     "strength": 0.10484138219207341
+    },
+    "confidence": 0.8492113166595159,
+    "direction": "protective",
+    "lead_row": "DrugAgeRow_2051",
+    "net": 0.11815900196385555,
+    "sign": "Neg",
+    "strength": 0.1391396930844604
+   },
+   "legacy": {
+    "confidence": 0.81,
+    "direction": "no_effect",
+    "row": "DrugAgeRow_2051",
+    "score": 0.0,
+    "sign": "Neg",
+    "strength": 0.0
+   },
+   "papers": 16,
+   "pooled_revision_net_rejected": {
+    "confidence": 0.8702087342709105,
+    "score": 0.08154349784938782,
+    "signed_strength": 0.09370567616481998
+   },
+   "rank_of_1035": {
+    "legacy": 713,
+    "paper": 406,
+    "row": 464
+   },
+   "row_as_unit": {
+    "Neg": {
+     "confidence": 0.8743296680868435,
+     "native_confidence": 0.9714774089853817,
+     "papers": 38,
+     "rows": 38,
+     "score": 0.26535036823962216,
+     "strength": 0.30349006550383467
+    },
+    "Pos": {
+     "confidence": 0.8481527283969701,
+     "native_confidence": 0.9423919204410779,
+     "papers": 21,
+     "rows": 21,
+     "score": -0.14081815513738832,
+     "strength": 0.1660292426383373
+    },
+    "direction": "protective",
+    "net": 0.12453221310223384
+   },
+   "rows": 54
+  },
+  "Rapamycin": {
+   "d3_earlier_net": 0.3167,
+   "fold": {
+    "Neg": {
+     "confidence": 0.8801144280081818,
+     "native_confidence": 0.9779049200090909,
+     "papers": 18,
+     "rows": 37,
+     "score": 0.3367948471123448,
+     "strength": 0.38267165767814665
+    },
+    "Pos": null,
+    "confidence": 0.8801144280081818,
+    "direction": "protective",
+    "lead_row": "DrugAgeRow_1092",
+    "net": 0.3367948471123448,
+    "sign": "Neg",
+    "strength": 0.38267165767814665
+   },
+   "legacy": {
+    "confidence": 0.81,
+    "direction": "protective",
+    "row": "DrugAgeRow_1555",
+    "score": 0.3190909090909091,
+    "sign": "Neg",
+    "strength": 0.3939393939393939
+   },
+   "papers": 18,
+   "pooled_revision_net_rejected": null,
+   "rank_of_1035": {
+    "legacy": 2,
+    "paper": 3,
+    "row": 28
+   },
+   "row_as_unit": {
+    "Neg": {
+     "confidence": 0.894281151158462,
+     "native_confidence": 0.9936457235094022,
+     "papers": 37,
+     "rows": 37,
+     "score": 0.33727065870976874,
+     "strength": 0.3771416385919176
+    },
+    "Pos": null,
+    "direction": "protective",
+    "net": 0.33727065870976874
+   },
+   "rows": 37
+  },
+  "Resveratrol": {
+   "d3_earlier_net": -0.0395,
+   "fold": {
+    "Neg": {
+     "confidence": 0.8740318108738053,
+     "native_confidence": 0.9711464565264504,
+     "papers": 35,
+     "rows": 112,
+     "score": 0.21445473558784342,
+     "strength": 0.24536262058178895
+    },
+    "Pos": {
+     "confidence": 0.8306581492240368,
+     "native_confidence": 0.9229534991378187,
+     "papers": 10,
+     "rows": 81,
+     "score": -0.0781069623953869,
+     "strength": 0.09403021263121404
+    },
+    "confidence": 0.8740318108738053,
+    "direction": "protective",
+    "lead_row": "DrugAgeRow_1088",
+    "net": 0.1363477731924565,
+    "sign": "Neg",
+    "strength": 0.15599863928996366
+   },
+   "legacy": {
+    "confidence": 0.81,
+    "direction": "no_effect",
+    "row": "DrugAgeRow_1089",
+    "score": 0.0,
+    "sign": "Neg",
+    "strength": 0.0
+   },
+   "papers": 37,
+   "pooled_revision_net_rejected": {
+    "confidence": 0.8807020024091236,
+    "score": 0.13763252330905876,
+    "signed_strength": 0.15627592867118587
+   },
+   "rank_of_1035": {
+    "legacy": 720,
+    "paper": 322,
+    "row": 507
+   },
+   "row_as_unit": {
+    "Neg": {
+     "confidence": 0.8899182697103168,
+     "native_confidence": 0.9887980774559075,
+     "papers": 112,
+     "rows": 112,
+     "score": 0.1638662492644244,
+     "strength": 0.18413629076046004
+    },
+    "Pos": {
+     "confidence": 0.8830672059089839,
+     "native_confidence": 0.9811857843433154,
+     "papers": 81,
+     "rows": 81,
+     "score": -0.05136673679719136,
+     "strength": 0.05816854759578246
+    },
+    "direction": "protective",
+    "net": 0.11249951246723303
+   },
+   "rows": 170
+  }
+ },
+ "whole_build_fold_ms": 18.680808413773775,
+ "zero_rows": "both"
+}

@@ -1260,6 +1260,156 @@ that found nothing. The guard also records the refused name in a side channel
 "no answer" (not even when the program catches the exception itself).
 
 
+## The pln chainer (optional, PeTTa only)
+
+`infer` and `explain` multiply strengths and confidences along a path (`pln_deduction.metta`). With
+`PLN_CHAINER=pln` the same two questions are answered through **patham9's PLN**: every answer is a conclusion of the fork's
+`PLN.Derive` loop, run on the vendored library under `vendor/pln_fork/` (PeTTa's `lib/lib_pln.metta` @ fea83178, the fork's
+code ported by its author, MIT; one hunk, the per-step trace, is removed; the rule set is restricted to Revision, Modus
+Ponens and Negation-elimination by a form-level filter, `scripts/make_pln_restricted.py`). It is **opt-in,
+needs `PLN_RUNTIME=petta`, and is not the default**: the owner and Ben Goertzel sign that off later. With the default
+(`PLN_CHAINER=legacy`) nothing in this section applies and nothing changed.
+
+**What that does and does not mean.** The mapping is built so that the answers EQUAL the legacy ones: the reported strength is
+the product of the link strengths (recovered exactly from the difference of two Modus Ponens runs, whose fixed 0.02 leak
+cancels) and the reported confidence is the library's `c1*c2*...` times the legacy 0.9 for every extra hop. So a strength or a
+confidence under `pln` is the legacy number, not a new estimate. What the library contributes is the route enumeration (each
+LINK is used once on a route, so a feedback edge terminates), the stamp rule (a link is never counted twice on one route), the
+bounded, confidence-ranked queues and the proof that nothing was dropped. A piece of evidence behind two serial links (a paper
+behind two hops) is counted twice, as in the legacy chainer: the evidence ids are one per link.
+
+```bash
+PLN_RUNTIME=petta PLN_CHAINER=pln python app.py
+```
+
+| setting | values, default | meaning |
+|---|---|---|
+| `PLN_CHAINER` | `legacy` (default), `pln` | `pln` on any runtime but `petta` is a configuration error, not a fall-back |
+| `PLN_CHAIN_CONFIDENCE` | `legacy` (default), `native` | `legacy`: the library's confidence times `(chain-discount)` = 0.9 once per combination, so every pinned `(s, c)` and ordering holds. `native`: the library's own `c1*c2`; Patient001's personalised order then flips its 4th and 5th places and `diagnose`'s c(CellularSenescence) moves 0.625 to 0.696 |
+| `PLN_QUEUE_SIZE` | integer >= 16, 256 | K, the size of BOTH queues of `PLN.Derive` for the first attempt. A source whose walks need more starts at the first of 256, 2048, 16384 that fits; one that still drops something fails the request; one whose walks cannot fit 16384 at all is refused before any derivation (below) |
+| `PLN_MAX_STEPS` | integer, 0 | tasks one run may expand; 0 = 4 x K of the attempt; clamped to 1..1,000,000. Environment only: no request can set it |
+| `PLN_RULESET` | `restricted` (default), `full` | `full` is a **research lane**: all seventeen rules with uniform node probabilities on a fixed 150/100/400 budget. It concludes things no link licenses and its tables are `partial` by design; do not serve with it |
+
+These four are read only under `PLN_CHAINER=pln`. Under the default chainer a malformed value (an empty `PLN_QUEUE_SIZE=`, a typo) is
+ignored with a logged warning, so it cannot stop the legacy service from starting; under `pln` it is a configuration error at start.
+
+**What a request sees.** The same `(signed Pos|Neg (stv s c))` and `(Chain (n0 .. nk) (signed ..))` shapes, from the same
+`(infer &self A C)` and `(explain &self A C)` calls: no consumer changed. Every pinned sign, strength, confidence, chain and
+ordering holds (gate 6a: 100 patient, 86 LinAge2 and 101 generic pairs, and the 109 pairs with a feedback edge, each equal to
+the legacy chainer to 1e-12, none extra, none missing; the 50 composite queries of the contract equal the legacy chainer on the
+same runtime to 1.1e-16). What differs, and why:
+
+* **The last digit.** Strengths and confidences agree to rounding (largest difference 2.2e-16), not digit for digit, so an
+  exact-string golden of the legacy chainer cannot hold under `pln`. The pln goldens are separate files
+  (`tests/fixtures/pln_chainer/`); the legacy ones are untouched.
+* **The order of results.** Routes come back sorted by (hops, evidence ids), whatever order the atoms were written in. The legacy
+  chainer returns them in the order it enumerates them (the engine's match order, which differs between hyperon and PeTTa). The SET
+  of results is the same; the first one is not necessarily: with a Pos route and a Neg route to one target the two chainers can list them in
+  opposite orders. **Do not take the first result of `infer` as the answer**; read all of them. (One consumer in the knowledge base does take a
+  first result: `pos-transmission` uses the first positive route. A driver has one on the shipped graphs, so nothing changes; with a second positive
+  route injected it takes the shorter one under `pln` and the engine's match order under the legacy chainer, where hyperon and PeTTa already differ.)
+* **A cycle terminates, and costs.** The legacy chainer has no visited set and hangs on a feedback edge or a self-loop; here a derivation
+  uses each link once and answers are node-simple routes (a record, which is terminal, may close a route on any node, the source included:
+  `explain A A` over `A -> B` and a record `B -> A` is answered, as legacy answers it). The shipped graphs have no cycle; with the edge
+  ChronicInflammation to CellularSenescence the 100 old answers are unchanged and 9 pairs are new. But the library derives every WALK that
+  uses each link once, and on a cyclic graph those are far more than the routes: exponential in the number of cycles in the worst case (eight reversed
+  edges of the patient graph: 11 routes, 262 walks; a complete digraph of 5 nodes: more than 16,384), so a handful of cycles can make a request refuse or run
+  long. See "What a request costs".
+* **`explain` answers DrugAge compounds** (`explain &self <compound> Mortality`); the legacy one never had an equation for
+  them. Both read one table. `infer <compound> Lifespan` stays empty: a DrugAge link starts a chain, it is not an answer.
+* **DrugAge rows are pooled by paper** (`ontology/drugage_fold.py`): at most one protective and one harmful item per
+  compound, each with an evidence id of its own, in place of one result per row. A row that reports a change of exactly 0.0 (a reported
+  null) counts in BOTH directions, at strength 0 and its own confidence (the repo's reading: a well-run null is evidence of no effect either
+  way); a direction that would hold nothing but nulls pools to strength 0, adds nothing to the net and is not an item. A row stated twice with identical content is one row; one whose copies disagree is refused (below). `POST /drugage/rank` and
+  `GET /drugage/top` follow the chainer: under `pln` they rank by THE NET of a compound's two items, once per compound, with every row of
+  the compound (no row cap), and `/drugage/top` entries carry `papers_protective`, `papers_harmful`, `rows_protective`, `rows_harmful`
+  (the entry's own species, percentage and PMID are then the lead row of the pooled item, not the evidence for the score) and the response a `fold` block.
+  Under the default chainer both endpoints answer exactly what they always did, key for key.
+* **One result per route.** A diamond gives two results, parallel links of opposite sign or duplicates give one each (the
+  legacy chainer does the same).
+* **A caller's fact that cannot be chained is refused, not skipped.** A strength or confidence outside [0, 1] or not a number, an unknown
+  sign, a DrugAge row stated twice with different values, in the caller's `extra_atoms`: the request is `422 refused_form` naming the atoms
+  ("the program's own facts cannot be chained"). The legacy chainer chains whatever number it finds (`(stv 1.5 0.5)` gives a strength of 0.75);
+  silently leaving the link out would answer "no route", which this page defines as a real no. The same fault in a CURATED file is skipped and
+  listed (`PLNSkipped`) and the other links still chain.
+
+**How a request runs it.** `core.pln_runner` hands the assembled knowledge base and the program's expressions to `core.pln_chainer.prepare`, which
+(1) refuses a text that already writes `PLNAnswer`, (2) filters the legacy `(= (infer ..) ..)` and `(= (explain ..) ..)`
+equations out of the text (a form-level filter: under PeTTa an extra clause ADDS answers; `pln_deduction.metta` loses five forms,
+`drugage_calibration.metta` its third `infer` equation, nothing else changes, and no stack list does), (3) appends
+`pln_chainer.metta`, whose two equations read the answer table, and (4) hands `metta_runtime` a step to run in the PeTTa child
+after the load and before the space is locked (`run_program(..., after_load=step)`). The step reads every link off the space with
+the knowledge base's own functions (the `Effect` atoms, the hazard-ratio records through `calibrate-tv` and `hr->sign`, the DrugAge
+rows through `drugage-effect`), refuses the caller's unchainable facts, and then:
+
+* **works out which sources the program asks about.** Consumers bind the source while they evaluate (`(let $h (match $space (Inheritance
+  $hh HallmarkOfAging) $hh) (infer $space $h $b))`) and the space is read-only once the request starts, so the answers have to exist
+  before the first query. The step derives only the sources a program can ask about: the literal sources of its direct `infer`/`explain` calls;
+  none if nothing in it can reach them; and EVERY source whenever it cannot tell (a consumer function such as `score-candidate` or
+  `rank-interventions-for-patient`, an unbound or computed source, `infer` passed as a value, a program that reads `PLNAnswer` or `PLNStatus` itself). The functions
+  that can reach `infer` are found from the knowledge-base text, over-approximated, so the doubt always goes toward "every source". A narrower table is the
+  same answers, never fewer (checked source by source against the full table, and on the contract's 50 composite queries against the legacy chainer);
+* **plans the derivation from the links alone** (before the library is loaded) and refuses, in milliseconds, what a request cannot afford (below);
+* loads the library, and for every source runs `PLN.Derive` twice, with the intervention `(State A)` at strength 1.0 and at 0.0:
+  * node X is `(State X)`; a link is `((Implication (State A) (State B)) (stv q c))` with an evidence id of its own (a Neg link has
+    consequent `(Not (State B))`, a hazard-ratio record `(End B)`, so a record ends a chain and never continues one);
+  * `q = e + (1 - e) p` with `e = 0.02` read from the library (`Truth_ModusPonens (stv 0 1) (stv 0 1)`), so the DIFFERENCE of the
+    two runs is `(1 - e)^hops` times the product of the strengths, exact for every p in [0, 1] (the earlier `min(1, p + e)` shrinks
+    the `Lifespan -> Mortality (stv 1.0 1.0)` link); the reported strength is that difference divided by `(1 - e)^hops`;
+  * a route is named by its stamp (its set of evidence ids): the two runs are joined on it, the path is rebuilt from it, the sign is
+    the parity of the Neg links (cross-checked against the sign of the difference), the confidence is the library's `c` times
+    `0.9^(hops - 1)`;
+* adds the answers to the space as `PLNAnswer` facts, with the evidence table, before the first query. A caller's `extra_atoms` need no precompile: they are
+  part of the text the step reads.
+
+Node names are sent to the engine as opaque `n0, n1, ..`, so no compound name can collide with a form the sandbox refuses.
+
+**What a request costs, and what is refused up front.** One `PLN.Derive` run compares the selected task with every belief and walks the
+stamps, so its time grows with the square of the sentences it holds times the length of a stamp: a chain of n links costs about n^3.7 for ONE source
+(50 links 0.12 s, 100 links 1.4 s, 200 links 20 s), a layered graph with 1,092 routes 16 s, one with 3,279 routes 145 s. The step counts, from the links alone, how many
+distinct walks (each link used once) leave each source and models the seconds (`docs/petta_migration/fork_design/fix/COST_MODEL.md`: within +12 and -50 percent of 19
+measured graphs). In contract mode it **refuses with `422 refused_form`**, in milliseconds, a source whose walks cannot fit the largest queue ("more than 16,384
+distinct walks over 20 reachable links ..."), and a table whose modelled time is more than 80 percent of the request's budget (`PLN_QUERY_TIMEOUT_SECONDS`). A table that
+still runs out of time ends with a named `502` ("the derivation used up the request's time budget after n of m source(s)") before the 60 s kill. Measured here: a complete
+digraph of 5 nodes (20 links, 650 bytes) was killed at the deadline and is now refused in 0.2 s; a question about one source of a 200-link chain at a 40 s budget likewise;
+a 363-route layered graph with a question about one source took 15.5 s and takes 3.0 s (the two runs of that one source). On the patient stack (fresh PeTTa child per request, median of 9; the legacy chainer on the same runtime takes 0.395 s): a program with no `infer` costs +0.014 s, a question about one source +0.06 s, one that needs every source (a consumer, an unbound source) +0.12 s (ratio 1.04, 1.16 and 1.3; 44 ms of it is loading the library).
+
+**Completeness, and what fails.** A run is `complete` iff its task queue ran empty and its belief queue never reached K - 1; both
+queues have one size, otherwise a dropped task goes unseen. A source that is incomplete is retried at 8 K and 64 K; one that is
+still incomplete fails the request: `502`, code `runtime_error`, message "the PLN chainer could not finish: the derivation for X did
+not finish ...". No partial table is ever answered from. A caller text that writes `PLNAnswer` is `422` (`refused_form` from the
+runner, an issue from the validator). A caller fact that cannot be chained, or a graph that cannot be derived, is `422` as above. A chainer
+that raises anything else is a `502` naming its type.
+
+**The audit atoms.** Next to the answers the step writes, for the request to query (`/metta/run` accepts these three heads under
+`pln`; the queries are printed without their `!` because every `!(...)` line on this page is run against the default chainer by
+`tests/test_prompt_size.py`, where these atoms do not exist):
+
+```
+(match &self (PLNEvidence $id $kind $where $tier) ($id $kind $where $tier))
+;; (4 curated "mechanistic_bridges.metta:106" AnimalStudies_Replicated)  (1 record "grim_age_lu2019_evidence.metta:22" MultipleHumanTrials)
+;; (1 caller "extra_atoms:22" None)  (3 drugage "P2 (PMID_1)" None)  (4 drugage "P0, P1 (PMID_1, PMID_2)" None)
+(match &self (PLNStatus $source $status $k) ($source $status $k))      ;; (Spermidine complete 256)   -- one per source that was derived
+(match &self (PLNSkipped $from $to $reason) ($from $to $reason))       ;; ("A" "B" StrengthOutOfRange)   -- a curated link that could not be chained
+```
+
+An evidence id is one link: a curated `Effect` atom (file:line and the evidence tier it was written with), a hazard-ratio record, a
+DrugAge entry or pooled group (rows and PMIDs), or a caller fact. An id is never shared by two links: the library refuses to
+combine premises that share one, so a shared id on two serial links would silently lose the chain. Each answer's `PLNAnswer` carries
+the ids of its route. `PLNAnswer` may not be WRITTEN by a caller (the validator refuses the symbol and the step refuses a space that already holds one);
+it can be read, for instance through a variable head next to an `infer` of the same program, and then returns the rows `infer` reads (a program that never asks for an answer has none derived). `PLNEvidence` and `PLNSkipped` are written for every
+program; `PLNStatus` and `PLNAnswer` only for the sources that were derived.
+
+**Not done.** `GET /health` does not report the chainer. A PeTTa `session()` (the test harness) and hyperon have no step: the
+chainer runs in `run_program` only, which is every request. The default is untouched: `PLN_CHAINER=legacy` hands the runtime exactly
+the text and the call it always got (`tests/test_pln_chainer.py` asserts it).
+
+```bash
+pytest tests/test_pln_chainer.py tests/test_pln_fixes.py tests/test_drugage_fold.py -q   # 274 tests, about 75 s; the PeTTa ones skip without PeTTa
+python scripts/regen_pln_chainer_goldens.py                  # rewrite tests/fixtures/pln_chainer/ after a deliberate change
+```
+
+
 ## Examples
 
 ```bash

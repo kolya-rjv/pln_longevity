@@ -1,0 +1,21 @@
+{"case": ["chain", 30], "L": 30, "S": 30, "avg_len": 15.5, "K": 256, "B": 61, "seconds": 0.027, "complete": true}
+{"case": ["chain", 60], "L": 60, "S": 60, "avg_len": 30.5, "K": 512, "B": 121, "seconds": 0.224, "complete": true}
+{"case": ["chain", 90], "L": 90, "S": 90, "avg_len": 45.5, "K": 1024, "B": 181, "seconds": 0.963, "complete": true}
+{"case": ["chain", 120], "L": 120, "S": 120, "avg_len": 60.5, "K": 1024, "B": 241, "seconds": 2.79, "complete": true}
+{"case": ["chain", 150], "L": 150, "S": 150, "avg_len": 75.5, "K": 1024, "B": 301, "seconds": 6.531, "complete": true}
+{"case": ["negchain", 100], "L": 100, "S": 100, "avg_len": 50.5, "K": 1024, "B": 251, "seconds": 3.058, "complete": true}
+{"case": ["layered", 4, 5, 3], "L": 36, "S": 120, "avg_len": 3.55, "K": 1024, "B": 193, "seconds": 0.128, "complete": true}
+{"case": ["layered", 5, 6, 3], "L": 51, "S": 363, "avg_len": 4.52, "K": 2048, "B": 586, "seconds": 1.357, "complete": true}
+{"case": ["layered", 6, 6, 3], "L": 57, "S": 363, "avg_len": 4.52, "K": 2048, "B": 624, "seconds": 1.503, "complete": true}
+{"case": ["layered", 7, 6, 3], "L": 60, "S": 363, "avg_len": 4.52, "K": 2048, "B": 640, "seconds": 1.653, "complete": true}
+{"case": ["layered", 8, 6, 3], "L": 81, "S": 363, "avg_len": 4.52, "K": 2048, "B": 628, "seconds": 1.438, "complete": true}
+{"case": ["layered", 6, 7, 3], "L": 75, "S": 1092, "avg_len": 5.51, "K": 8192, "B": 1819, "seconds": 15.63, "complete": true}
+{"case": ["layered", 5, 8, 3], "L": 81, "S": 3279, "avg_len": 6.5, "K": 16384, "B": 4908, "seconds": 144.948, "complete": true}
+{"case": ["digraph", 4], "L": 12, "S": 442, "avg_len": 6.1, "K": 2048, "B": 455, "seconds": 1.245, "complete": true}
+{"case": ["ring_chords", 8, 6], "L": 14, "S": 99, "avg_len": 6.41, "K": 512, "B": 200, "seconds": 0.237, "complete": true}
+{"case": ["ring_chords", 10, 9], "L": 19, "S": 196, "avg_len": 8.92, "K": 1024, "B": 430, "seconds": 1.545, "complete": true}
+{"case": ["ring_chords", 10, 12], "L": 22, "S": 704, "avg_len": 9.23, "K": 4096, "B": 1736, "seconds": 28.304, "complete": true}
+{"case": ["ring_chords", 12, 12], "L": 24, "S": 165, "avg_len": 8.98, "K": 1024, "B": 288, "seconds": 0.62, "complete": true}
+{"case": ["ring_chords", 12, 16, 5], "L": 28, "S": 1286, "avg_len": 10.85, "K": 8192, "B": 3779, "seconds": 174.031, "complete": true}
+
+[exited with code 144]

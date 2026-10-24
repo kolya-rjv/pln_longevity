@@ -42,6 +42,15 @@ HTTP/Gradio surfaces stay.
 - On the heavy stacks PeTTa answers faster than hyperon (patient stack 0.38 s against 1.05 s, LinAge2 0.48 s against 2.10 s); a trivial
   program costs 0.14 s of fixed start-up per fresh process.
 - Design of the chainer: `docs/petta_migration/fork_design/` (decision, three designs, two adversarial reviews).
+- The `pln` chainer (Phase 6) is built, was reviewed twice (engineering and semantics lenses) and the 18 findings were fixed (2026-10-24, `docs/petta_migration/fork_design/fix/NOTES.md`):
+  `PLN_CHAINER=pln` (opt-in, PeTTa only, never a default) answers `infer`/`explain` through patham9's `PLN.Derive`; its answers equal the legacy ones to 2.2e-16 on the 100 patient, 86 LinAge2 and
+  101 generic pairs, on the 109 pairs of a feedback edge and on the 50 composite queries (`fork_design/NUMBER_TABLE.md`, six lanes). The mapping is built to make them equal, so what the library contributes is
+  the route enumeration, the stamp rule, the bounded queues and the completeness proof, not new numbers. A request pays +0.014 s (no `infer`), +0.06 s (one source) or +0.125 s (every source) over the legacy
+  chainer on the same runtime; a program whose graph the library cannot derive in a request's time is refused in milliseconds (422) instead of being killed at the deadline (`fork_design/fix/COST_MODEL.md`);
+  a caller fact that cannot be chained is a 422, not a silent "no route". The DrugAge paper-level fold is wired into the ranking (one entry per compound, by the NET of its two directions, every row, no cap).
+- The one decision of the fix phase the owner and Ben should look at: a DrugAge row that reports a change of exactly 0.0 (a null) counts on BOTH sides by default. Filed on the protective side only, as
+  the first build did, it made Resveratrol and Metformin slightly harmful (-0.0460, -0.0570); counted on both sides they are +0.1363 and +0.1182, dropped +0.0321 and +0.0629 (`fork_design/b2/notes.md`).
+- Suites on this state (measured 2026-10-24): hyperon default (`PLN_RUNTIME=hyperon PLN_CHAINER=legacy`) 2552 passed and 32 failed, 22 skipped, the failing ids identical to `docs/petta_migration/baseline/hyperon_failures_47130aa.txt`; `PLN_RUNTIME=petta` (legacy chainer) 2560 passed and 31 failed, the same ids minus the hyperon-only abort probe; the pln-lane tests (`test_pln_chainer`, `test_pln_fixes`, `test_drugage_fold`, `test_pln_vendor`, `test_pln_number_table`, `test_prompt_size`, `test_drugage_discovery`) 375 passed, in the default environment and with `PLN_RUNTIME=petta PLN_CHAINER=pln` exported; the 145 query shapes through the legacy chainer: classes unchanged (103 identical, 8 number_format_only, 4 ordering_only, 25 different, 3 error, 1 no_baseline), 0 of 177 raw strings differ from the kit's own run. A 40-mutant check of the fix tests: 40 killed.
 
 ## Phases
 
@@ -61,7 +70,8 @@ HTTP/Gradio surfaces stay.
 5. Retire the scoped-stack workaround: not done, and not needed while hyperon stays the default.
 6. patham9's PLN at the seam (`PLN_CHAINER=pln`), per `fork_design/decision.md` with the reviewers' corrections: strengths stored as
    `q = 0.02 + 0.98 p` and reported as `|s1 - s0| / 0.98^hops`; the DrugAge net of the two directions defined once; shared evidence ids only
-   for parallel evidence of one link; the generic stack in the equality gate; selections read by chunked resumption. In progress.
+   for parallel evidence of one link; the generic stack in the equality gate; selections read by chunked resumption. Built (G0, 6a, 6b, 6c), reviewed twice, fixed (the 18 findings,
+   `fork_design/fix/NOTES.md`), number table and control demonstration regenerated. Open: the owner's and Ben's decisions (null convention, confidence discount, which large network).
    Gate: stop for the owner's and Ben's sign-off before `pln` becomes the default.
 7. Deployment: out of scope until the owner says so. The server needs SWI-Prolog >= 9.3 and janus.
 
@@ -79,3 +89,5 @@ HTTP/Gradio surfaces stay.
 3. Which large network should the control be shown on?
 4. Induction and Abduction call sites pass the shared node's probability in the third slot while the formula expects it in
    the second. Intentional?
+5. A DrugAge row with a change of exactly 0.0 is a reported null. Does it count as evidence of no effect in both directions (the default), is it dropped, or does it count on the protective side only (the
+   sign convention's accident, which made Resveratrol and Metformin harmful)? And is pooling by `Truth_Revision` (the weight of evidence, not its agreement; papers as independent units) what you mean for DrugAge?

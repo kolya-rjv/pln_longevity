@@ -64,6 +64,88 @@ def _runtime_choice() -> str:
     return choice
 
 PLN_RUNTIME: str = _runtime_choice()
+
+# ── PLN chainer ────────────────────────────────────────────────────────────────
+# Which engine answers `infer` and `explain` (core/pln_chainer.py):
+#   legacy  the MeTTa equations of pln_deduction.metta (and DrugAge's third `infer` equation). The default, and
+#           exactly what the service always did; every setting below is ignored.
+#   pln     patham9's PLN (the vendored fork library, vendor/pln_fork/): each `infer`/`explain` answer is derived by
+#           his Modus Ponens, Negation-elimination and Revision formulas, his stamp rule and his confidence-ranked
+#           PLN.Derive queue, run inside the PeTTa child before the first query. OPT-IN, and it needs
+#           PLN_RUNTIME=petta (the library is PeTTa-only; hyperon never loads it). It does not become a default
+#           until the owner and Ben Goertzel sign it off. An unknown value, or `pln` on another runtime, is a
+#           configuration error, not a silent fall-back.
+def _chainer_choice() -> str:
+    choice = os.getenv("PLN_CHAINER", "legacy").strip().lower() or "legacy"
+    if choice not in ("legacy", "pln"):
+        raise ValueError(f"PLN_CHAINER must be legacy or pln; got {choice!r}")
+    if choice == "pln" and PLN_RUNTIME != "petta":
+        raise ValueError(f"PLN_CHAINER=pln needs PLN_RUNTIME=petta (patham9's PLN runs on PeTTa only); "
+                         f"PLN_RUNTIME is {PLN_RUNTIME!r}")
+    return choice
+
+PLN_CHAINER: str = _chainer_choice()
+
+# The settings below are read ONLY under PLN_CHAINER=pln. Under the default chainer a malformed value is ignored (the
+# default stands and a warning is logged), so a stray `PLN_QUEUE_SIZE=` in a compose file cannot stop the legacy service
+# from starting; under `pln` the same value is a configuration error, raised here at import.
+def _under_pln_only(name: str, default, read):
+    try:
+        return read()
+    except ValueError as exc:
+        if PLN_CHAINER == "pln":
+            raise
+        import logging
+        logging.getLogger(__name__).warning(
+            "%s=%r is ignored (%s); it is only read under PLN_CHAINER=pln", name, os.getenv(name), exc)
+        return default
+
+
+# How a chain's confidence is reported under PLN_CHAINER=pln:
+#   legacy  the library's own confidence (the product of the link confidences, Modus Ponens' c1*c2), times the
+#           legacy per-combination discount `(chain-discount)` = 0.9 read from pln_deduction.metta, once for every
+#           combination (hops - 1 times). Every pinned (s, c) and ordering of the legacy chainer holds. The default.
+#   native  the library's confidence as it stands, no discount. Patient001's personalised order flips its 4th and
+#           5th places and diagnose's c(CellularSenescence) moves outside its test tolerance (decision.md, row R1).
+def _chain_confidence_choice() -> str:
+    choice = os.getenv("PLN_CHAIN_CONFIDENCE", "legacy").strip().lower() or "legacy"
+    if choice not in ("legacy", "native"):
+        raise ValueError(f"PLN_CHAIN_CONFIDENCE must be legacy or native; got {choice!r}")
+    return choice
+
+PLN_CHAIN_CONFIDENCE: str = _under_pln_only("PLN_CHAIN_CONFIDENCE", "legacy", _chain_confidence_choice)
+
+# The derivation's two bounds (PLN_CHAINER=pln). PLN.Derive keeps two bounded priority queues: the tasks still to be
+# expanded and the beliefs derived so far; when one is full the lowest-confidence entry is dropped. The service sets
+# BOTH to one value K, because "the task queue ran empty and the belief queue never reached K - 1" is then a proof
+# that nothing was dropped (with the task queue smaller than the belief queue a cut goes unseen: measured, 11 of 11).
+#   PLN_QUEUE_SIZE  K of the first attempt, default 256 (the shipped graphs need less than 60). A source whose
+#                   sub-graph is larger starts at the first rung that fits; an attempt that did drop something is
+#                   repeated at 8 x K and then 64 x K (256, 2048, 16384); a source that still cannot finish fails
+#                   the request as a service error (HTTP 502), it is never answered from a partial table. A source
+#                   whose walks cannot fit the largest rung at all is refused up front, in milliseconds, with the
+#                   number of walks (core.pln_chainer.plan_sources).
+#   PLN_MAX_STEPS   how many tasks one run may expand; 0 (default) = 4 x K of the rung. A positive value fixes it
+#                   (clamped to 1..1,000,000). Read from the environment only: no request can set it.
+# The two sizes can differ, and an incomplete table can be returned flagged `partial`, only in the research lane
+# (core.pln_chainer.compute_table(..., settings=ChainSettings(task_queue=.., belief_queue=..))), never from a request.
+PLN_QUEUE_SIZE: int = _under_pln_only("PLN_QUEUE_SIZE", 256, lambda: max(16, int(os.getenv("PLN_QUEUE_SIZE", "256"))))
+PLN_MAX_STEPS: int = _under_pln_only("PLN_MAX_STEPS", 0, lambda: max(0, int(os.getenv("PLN_MAX_STEPS", "0"))))
+
+# The rule set of the library (PLN_CHAINER=pln):
+#   restricted  Revision, Modus Ponens and Negation-elimination: the rules whose conclusions follow the links of the graph,
+#               so a chain is never invented. The default, and the only one a service should run.
+#   full        all seventeen rules of the fork (inversion, induction, abduction, deduction, ...) with uniform node
+#               probabilities (p = 0.1, c = 0.9). A RESEARCH LANE: it concludes things outside the legacy closure (false
+#               chains) and loses true pairs in its budget; the tables count both. Set in the environment only, never by a
+#               request, and it is not a way to make the service "smarter".
+def _ruleset_choice() -> str:
+    choice = os.getenv("PLN_RULESET", "restricted").strip().lower() or "restricted"
+    if choice not in ("restricted", "full"):
+        raise ValueError(f"PLN_RULESET must be restricted or full; got {choice!r}")
+    return choice
+
+PLN_RULESET: str = _under_pln_only("PLN_RULESET", "restricted", _ruleset_choice)
 # The PeTTa checkout: it holds src/main.pl, python/helper.pl and python/petta/. scripts/setup_petta.sh clones
 # the pinned commit to <repo>/.petta/PeTTa, which is the default. Only read when PLN_RUNTIME needs PeTTa.
 PETTA_HOME: Path = Path(os.getenv("PETTA_HOME") or (ONTOLOGY_DIR / ".petta" / "PeTTa"))

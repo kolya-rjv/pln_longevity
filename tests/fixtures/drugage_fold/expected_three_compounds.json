@@ -1,0 +1,259 @@
+{
+ "Ethanol": {
+  "Neg": {
+   "confidence": 0.189,
+   "members": [
+    "DrugAgeRow_28"
+   ],
+   "native": 0.21,
+   "papers": [
+    "PMID_13369"
+   ],
+   "rows": 50,
+   "strength": 0.7683576557794765
+  },
+  "Pos": {
+   "confidence": 0.189,
+   "members": [
+    "DrugAgeRow_42"
+   ],
+   "native": 0.21,
+   "papers": [
+    "PMID_13369"
+   ],
+   "rows": 2,
+   "strength": 0.16282963583089158
+  },
+  "net": 0.11444479577028255,
+  "papers": 1,
+  "rows": 52
+ },
+ "Metformin": {
+  "Neg": {
+   "confidence": 0.8492113166595159,
+   "members": [
+    "DrugAgeRow_918",
+    "DrugAgeRow_1024",
+    "DrugAgeRow_1026",
+    "DrugAgeRow_1370",
+    "DrugAgeRow_1443",
+    "DrugAgeRow_1621",
+    "DrugAgeRow_1860",
+    "DrugAgeRow_2051",
+    "DrugAgeRow_2140",
+    "DrugAgeRow_2276",
+    "DrugAgeRow_2309",
+    "DrugAgeRow_2440",
+    "DrugAgeRow_2653",
+    "DrugAgeRow_2736"
+   ],
+   "native": 0.9435681296216843,
+   "papers": [
+    "PMID_18728386",
+    "PMID_20090912",
+    "PMID_20304770",
+    "PMID_23077661",
+    "PMID_23900241",
+    "PMID_24889636",
+    "PMID_25833406",
+    "PMID_27312235",
+    "PMID_27984722",
+    "PMID_29027899",
+    "PMID_29263362",
+    "PMID_30269951",
+    "PMID_31474368",
+    "PMID_32361753"
+   ],
+   "rows": 38,
+   "strength": 0.24201454552403495
+  },
+  "Pos": {
+   "confidence": 0.6995417870305807,
+   "members": [
+    "DrugAgeRow_1371",
+    "DrugAgeRow_1442",
+    "DrugAgeRow_1618",
+    "DrugAgeRow_2290",
+    "DrugAgeRow_2662",
+    "DrugAgeRow_3288"
+   ],
+   "native": 0.7772686522562008,
+   "papers": [
+    "PMID_23077661",
+    "PMID_23900241",
+    "PMID_24889636",
+    "PMID_29167747",
+    "PMID_31474368",
+    "PMID_33585467"
+   ],
+   "rows": 16,
+   "strength": 0.3752281533356447
+  },
+  "net": -0.056966282073381586,
+  "papers": 16,
+  "rows": 54
+ },
+ "Rapamycin": {
+  "Neg": {
+   "confidence": 0.880114428008182,
+   "members": [
+    "DrugAgeRow_985",
+    "DrugAgeRow_1023",
+    "DrugAgeRow_1092",
+    "DrugAgeRow_1230",
+    "DrugAgeRow_1306",
+    "DrugAgeRow_1422",
+    "DrugAgeRow_1547",
+    "DrugAgeRow_1554",
+    "DrugAgeRow_1571",
+    "DrugAgeRow_1962",
+    "DrugAgeRow_2026",
+    "DrugAgeRow_2089",
+    "DrugAgeRow_2141",
+    "DrugAgeRow_2359",
+    "DrugAgeRow_2441",
+    "DrugAgeRow_2608",
+    "DrugAgeRow_3017",
+    "DrugAgeRow_3250"
+   ],
+   "native": 0.977904920009091,
+   "papers": [
+    "PMID_19587680",
+    "PMID_20074526",
+    "PMID_20974732",
+    "PMID_22107964",
+    "PMID_22560223",
+    "PMID_23698443",
+    "PMID_24332851",
+    "PMID_24341993",
+    "PMID_24409289",
+    "PMID_26676933",
+    "PMID_27091134",
+    "PMID_27549339",
+    "PMID_28025308",
+    "PMID_29874838",
+    "PMID_30269951",
+    "PMID_30970250",
+    "PMID_33008901",
+    "PMID_33145977"
+   ],
+   "rows": 37,
+   "strength": 0.38267165767814676
+  },
+  "Pos": null,
+  "net": 0.3367948471123449,
+  "papers": 18,
+  "rows": 37
+ },
+ "Resveratrol": {
+  "Neg": {
+   "confidence": 0.8740318108738051,
+   "members": [
+    "DrugAgeRow_689",
+    "DrugAgeRow_738",
+    "DrugAgeRow_765",
+    "DrugAgeRow_770",
+    "DrugAgeRow_776",
+    "DrugAgeRow_790",
+    "DrugAgeRow_809",
+    "DrugAgeRow_888",
+    "DrugAgeRow_950",
+    "DrugAgeRow_1088",
+    "DrugAgeRow_1117",
+    "DrugAgeRow_1134",
+    "DrugAgeRow_1228",
+    "DrugAgeRow_1273",
+    "DrugAgeRow_1284",
+    "DrugAgeRow_1330",
+    "DrugAgeRow_1337",
+    "DrugAgeRow_1339",
+    "DrugAgeRow_1383",
+    "DrugAgeRow_1394",
+    "DrugAgeRow_1414",
+    "DrugAgeRow_1424",
+    "DrugAgeRow_1463",
+    "DrugAgeRow_1698",
+    "DrugAgeRow_1866",
+    "DrugAgeRow_1878",
+    "DrugAgeRow_2034",
+    "DrugAgeRow_2104",
+    "DrugAgeRow_2111",
+    "DrugAgeRow_2137",
+    "DrugAgeRow_2238",
+    "DrugAgeRow_2360",
+    "DrugAgeRow_2462",
+    "DrugAgeRow_2643",
+    "DrugAgeRow_2693"
+   ],
+   "native": 0.9711464565264502,
+   "papers": [
+    "PMID_12939617",
+    "PMID_15254550",
+    "PMID_15684413",
+    "PMID_16256736",
+    "PMID_16461283",
+    "PMID_17156081",
+    "PMID_17460219",
+    "PMID_17875315",
+    "PMID_19264118",
+    "PMID_20974732",
+    "PMID_21364612",
+    "PMID_21597195",
+    "PMID_22083438",
+    "PMID_22451473",
+    "PMID_22484922",
+    "PMID_22868943",
+    "PMID_22950425",
+    "PMID_22960591",
+    "PMID_23220248",
+    "PMID_23439553",
+    "PMID_23600385",
+    "PMID_23698443",
+    "PMID_24133070",
+    "PMID_25569124",
+    "PMID_25848933",
+    "PMID_25976661",
+    "PMID_27190265",
+    "PMID_27683245",
+    "PMID_27732590",
+    "PMID_27882602",
+    "PMID_28727758",
+    "PMID_29874838",
+    "PMID_30320257",
+    "PMID_31281576",
+    "PMID_31820364"
+   ],
+   "rows": 112,
+   "strength": 0.2453626205817891
+  },
+  "Pos": {
+   "confidence": 0.6687693898655636,
+   "members": [
+    "DrugAgeRow_848",
+    "DrugAgeRow_971",
+    "DrugAgeRow_1229",
+    "DrugAgeRow_1415",
+    "DrugAgeRow_1461",
+    "DrugAgeRow_1868",
+    "DrugAgeRow_2196",
+    "DrugAgeRow_2315"
+   ],
+   "native": 0.7430770998506262,
+   "papers": [
+    "PMID_17875315",
+    "PMID_19264118",
+    "PMID_22083438",
+    "PMID_23600385",
+    "PMID_24133070",
+    "PMID_25848933",
+    "PMID_28412652",
+    "PMID_29324667"
+   ],
+   "rows": 58,
+   "strength": 0.38946035689318276
+  },
+  "net": -0.04600442966843496,
+  "papers": 37,
+  "rows": 170
+ }
+}

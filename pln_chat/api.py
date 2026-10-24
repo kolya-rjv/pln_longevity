@@ -111,6 +111,7 @@ from core.executor import (
 )
 from core.drugage_router import (
     SCORE_SEMANTICS,
+    score_semantics,
     _row_out,
     drugage_top,
     DrugAgePoolTooLarge,
@@ -1942,6 +1943,12 @@ class DrugAgeTopEntry(BaseModel):
     avg_lifespan_change_percent: Optional[float] = None
     pmid: Optional[str] = None
     row_id: str
+    # Set ONLY by the paper-level fold (PLN_CHAINER=pln); absent from the JSON otherwise (the route excludes unset fields).
+    # The row fields above are then the LEAD row of the pooled item that carries the sign, not the evidence for the score.
+    papers_protective: Optional[int] = Field(default=None, description="Papers pooled into the protective item (fold only).")
+    papers_harmful: Optional[int] = Field(default=None, description="Papers pooled into the harmful item (fold only).")
+    rows_protective: Optional[int] = Field(default=None, description="Rows behind the protective item (fold only).")
+    rows_harmful: Optional[int] = Field(default=None, description="Rows behind the harmful item (fold only).")
 
 
 class DrugAgeTopResponse(BaseModel):
@@ -1971,6 +1978,9 @@ class DrugAgeTopResponse(BaseModel):
     source: str
     filters: dict
     semantics: dict
+    fold: Optional[dict] = Field(
+        default=None,
+        description="Set only by the paper-level fold (PLN_CHAINER=pln): its definitions. Absent from the JSON otherwise.")
 
 
 class HallmarkEvidenceOut(BaseModel):
@@ -2107,7 +2117,7 @@ class HumanEvidenceResponse(BaseModel):
     note: Optional[str] = None
 
 
-@app.get("/drugage/top", response_model=DrugAgeTopResponse)
+@app.get("/drugage/top", response_model=DrugAgeTopResponse, response_model_exclude_unset=True)
 def drugage_top_endpoint(
     n: int = 20,
     species: Optional[str] = None,
@@ -2172,6 +2182,8 @@ def drugage_top_endpoint(
                 avg_lifespan_change_percent=e.row.avg_change,
                 pmid=e.row.pmid,
                 row_id=e.row.row_id,
+                **({"papers_protective": e.papers_neg, "papers_harmful": e.papers_pos,
+                    "rows_protective": e.rows_neg, "rows_harmful": e.rows_pos} if top.fold is not None else {}),
             )
             for i, e in enumerate(top.entries, 1)
         ],
@@ -2183,7 +2195,8 @@ def drugage_top_endpoint(
         unscorable_rows=top.unscorable_rows,
         source=top.source,
         filters=top.filters,
-        semantics=SCORE_SEMANTICS,
+        semantics=score_semantics(),
+        **({"fold": top.fold} if top.fold is not None else {}),
     )
 
 
@@ -3819,7 +3832,7 @@ def drugage_rank(req: DrugAgeRankRequest) -> DrugAgeRankResponse:
         filtered_out=[ScoredCompoundOut(**s.as_dict()) for s in ranking.filtered_out],
         strategy=req.strategy,
         source=ranking.source,
-        semantics=SCORE_SEMANTICS,
+        semantics=score_semantics(),
         results=[
             PLNAtomOut(
                 atom=r.atom,

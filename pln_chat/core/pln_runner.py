@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Optional
 
 from config import ONTOLOGY_DIR, PLN_QUERY_TIMEOUT_SECONDS, PLN_RUNTIME_AVAILABLE
+from core import pln_chainer
 from core.metta_runtime import MettaRuntimeError, get_runtime
 
 # ── Scoped DrugAge inference stack ───────────────────────────────────────────────
@@ -817,9 +818,11 @@ def _runtime_run(
         # Concatenate every KB file's content into one block. A missing or
         # unreadable file is skipped rather than aborting the whole query.
         kb_blocks: list[str] = []
+        kb_names: list[str] = []
         for path in (kb_files or []):
             try:
                 kb_blocks.append(path.read_text(encoding="utf-8"))
+                kb_names.append(path.name)
             except OSError:
                 pass
         # A caller-supplied slice (e.g. a filtered set of DrugAge rows selected
@@ -827,6 +830,7 @@ def _runtime_run(
         # a query-scoped space is assembled without loading a whole ETL dump.
         if extra_atoms:
             kb_blocks.append(extra_atoms)
+            kb_names.append("extra_atoms")
         kb_text = "\n".join(kb_blocks)
 
         # Log the query (and which KB files were loaded) for debugging. The KB
@@ -843,6 +847,17 @@ def _runtime_run(
         try:
             runtime = get_runtime()
             runtime_name = runtime.name
+            # ---- PLN_CHAINER=pln (core/pln_chainer.py; opt-in, needs PeTTa): `infer`/`explain` are answered by
+            # patham9's PLN. The legacy equations are filtered out of the text, the equations that read the answer
+            # table are appended, and a step runs in the PeTTa child after the load. Under the default (legacy) none
+            # of this is touched: kb_text and the call below are exactly what they always were.
+            run_kwargs: dict = {}
+            if pln_chainer.chainer_mode() == "pln":
+                prepared = pln_chainer.prepare(list(zip(kb_names, kb_blocks)), expressions=expressions)
+                kb_text = prepared.kb_text
+                if prepared.step is not None:
+                    run_kwargs["after_load"] = prepared.step
+            # ---- end of PLN_CHAINER=pln ----
             # Only a runtime that can stop a program itself is given the shared budget: hyperon cannot
             # (the executor's kill is its deadline), and it keeps running a part however late it starts.
             remaining = _remaining_deadline() if getattr(runtime, "enforces_deadline", False) else None
@@ -850,8 +865,10 @@ def _runtime_run(
                 raise MettaRuntimeError(
                     "the request's time budget was used up before this part of the program could run",
                     kind="timeout")
+            if "after_load" in run_kwargs and remaining is not None:
+                run_kwargs["after_load"].deadline_s = remaining         # the step plans against the time this part has left
             start = time.monotonic()
-            raw: list[list[str]] = runtime.run_program(kb_text, expressions, deadline_s=remaining)
+            raw: list[list[str]] = runtime.run_program(kb_text, expressions, deadline_s=remaining, **run_kwargs)
             elapsed = int((time.monotonic() - start) * 1000)
         except Exception as run_exc:
             return PLNRunResult(
@@ -917,6 +934,45 @@ def run_query(
     return _stub_run(metta_query, confidence_threshold)
 
 
+#: no row cap (the pln path): the hyperon-era `MAX_ROWS` is a safety constant of the hyperon runtime, not a property of the evidence
+_NO_ROW_CAP = 10_000_000
+
+
+def _pln_selected() -> bool:
+    """Is `PLN_CHAINER=pln` in force (and valid)? A configuration the chainer would refuse counts as legacy here; the
+    refusal itself comes from the run."""
+    try:
+        return pln_chainer.chainer_mode() == "pln"
+    except pln_chainer.PlnChainerError:
+        return False
+
+
+def net_per_compound(scored: list["ScoredCompound"]) -> list["ScoredCompound"]:
+    """One entry per compound, by THE NET (ontology.drugage_fold.net_of_signed), from the derivations the engine gave.
+
+    Under the paper-level fold a compound has up to two derivations to Mortality, a protective (Neg) and a harmful (Pos)
+    one. The legacy ranking keeps the best of a compound's derivations, which here would drop the harmful item and rank
+    Resveratrol by its protective side only; the net subtracts them instead, with the same arithmetic the Python twin
+    (`top_compounds`) uses. A compound with one derivation keeps its atom untouched. Two derivations of one SIGN cannot come
+    from the fold (it pools them); should they (a research setting), the stronger one stands for the direction."""
+    from ontology.drugage_fold import net_of_signed
+    by: dict[str, dict[str, ScoredCompound]] = {}
+    for sc in scored:
+        per = by.setdefault(sc.compound, {})
+        cur = per.get(sc.sign)
+        if cur is None or sc.strength * sc.confidence > cur.strength * cur.confidence:
+            per[sc.sign] = sc
+    out: list[ScoredCompound] = []
+    for compound, per in by.items():
+        if len(per) == 1:
+            out.append(next(iter(per.values())))
+            continue
+        score, sign, strength, confidence = net_of_signed([(sg, sc.strength, sc.confidence) for sg, sc in per.items()])
+        atom = f"(scored {compound} {score!r} (signed {sign} (stv {strength!r} {confidence!r})))"
+        out.append(ScoredCompound(compound, score, sign, strength, confidence, atom))
+    return out
+
+
 def run_drugage_ranking(
     compounds: list[str],
     *,
@@ -956,13 +1012,20 @@ def run_drugage_ranking(
     tuple (the long-standing contract the formatter and tests parse), followed by
     one atom per scored compound. selected_rows carries the provenance of exactly
     which rows were injected.
+
+    Under ``PLN_CHAINER=pln`` (core/pln_chainer.py) the ranking is by THE NET of ontology/drugage_fold.py: the slice holds
+    EVERY row of the requested compounds (``best_per_compound`` is not used and the hyperon-era row cap does not apply, since
+    the fold pools a compound's rows by paper and needs all of them), the engine derives a protective and a harmful item per
+    compound, and each compound is listed once, by the net of its two. ``strategy="metta_sort"`` then ranks the same way
+    (the MeTTa insertion sort cannot combine two derivations of one compound).
     """
     from ontology.drugage_selector import MAX_ROWS, build_drugage_slice
 
+    pln = _pln_selected()
     slice_text, rows = build_drugage_slice(
         compounds,
-        best_per_compound=best_per_compound,
-        limit=limit if limit is not None else MAX_ROWS,
+        best_per_compound=False if pln else best_per_compound,
+        limit=limit if limit is not None else (_NO_ROW_CAP if pln else MAX_ROWS),
         source=source,
     )
     # Candidate atoms = the compounds actually present in the slice (a requested
@@ -971,7 +1034,7 @@ def run_drugage_ranking(
     if not cands:
         return PLNRunResult(status="empty", mode="runtime" if PLN_RUNTIME_AVAILABLE else "stub"), rows
 
-    if strategy == "metta_sort":
+    if strategy == "metta_sort" and not pln:
         query = f"!(rank-interventions &self ({' '.join(cands)}) {outcome})"
         result = run_query(
             query,
@@ -981,7 +1044,7 @@ def run_drugage_ranking(
         )
         return result, rows
 
-    if strategy != "linear":
+    if strategy not in ("linear", "metta_sort"):
         raise ValueError(f"unknown ranking strategy: {strategy!r}")
 
     # One expression per compound. `_normalize_query` splits them and hyperon
@@ -1002,11 +1065,14 @@ def run_drugage_ranking(
     # `infer` yields one derivation per matching row; best_per_compound keeps
     # that at one, but de-duplicate defensively so a widened slice cannot
     # produce two entries for the same compound.
-    by_compound: dict[str, ScoredCompound] = {}
-    for sc in scored:
-        best = by_compound.get(sc.compound)
-        if best is None or sc.score > best.score:
-            by_compound[sc.compound] = sc
+    if pln:
+        by_compound = {sc.compound: sc for sc in net_per_compound(scored)}
+    else:
+        by_compound = {}
+        for sc in scored:
+            best = by_compound.get(sc.compound)
+            if best is None or sc.score > best.score:
+                by_compound[sc.compound] = sc
     kept = [
         sc for sc in by_compound.values()
         if confidence_threshold <= 0 or sc.confidence >= confidence_threshold

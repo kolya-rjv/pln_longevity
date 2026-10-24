@@ -1,0 +1,352 @@
+{
+ "data": {
+  "patient_stack_files": 18,
+  "patient_stack_bytes": 207677,
+  "warmup_first_three_runs_s": [
+   0.0031,
+   0.003,
+   0.0034
+  ],
+  "warm_60_runs_repeats": [
+   {
+    "total_s": 0.0771,
+    "join_s": 0.0003
+   },
+   {
+    "total_s": 0.0762,
+    "join_s": 0.0003
+   },
+   {
+    "total_s": 0.076,
+    "join_s": 0.0003
+   },
+   {
+    "total_s": 0.0756,
+    "join_s": 0.0003
+   },
+   {
+    "total_s": 0.0753,
+    "join_s": 0.0003
+   }
+  ],
+  "warm_per_run_eval_s": {
+   "n": 300,
+   "min": 0.0004,
+   "median": 0.0008,
+   "mean": 0.0012,
+   "p90": 0.0025,
+   "max": 0.0033,
+   "total": 0.3451
+  },
+  "warm_per_run_total_s": {
+   "n": 300,
+   "min": 0.0004,
+   "median": 0.0009,
+   "mean": 0.0013,
+   "p90": 0.0028,
+   "max": 0.0036,
+   "total": 0.3772
+  },
+  "warm_per_run_serialise_s": {
+   "n": 300,
+   "min": 0.0,
+   "median": 0.0,
+   "mean": 0.0,
+   "p90": 0.0,
+   "max": 0.0002,
+   "total": 0.0057
+  },
+  "warm_per_run_parse_s": {
+   "n": 300,
+   "min": 0.0,
+   "median": 0.0001,
+   "mean": 0.0001,
+   "p90": 0.0002,
+   "max": 0.0003,
+   "total": 0.0263
+  },
+  "warm_slowest_sources_s": [
+   [
+    0.0032,
+    "Spermidine"
+   ],
+   [
+    0.0029,
+    "Resveratrol"
+   ],
+   [
+    0.0028,
+    "Fisetin"
+   ],
+   [
+    0.0028,
+    "DasatinibPlusQuercetin"
+   ],
+   [
+    0.0028,
+    "Autophagy"
+   ]
+  ],
+  "warm_10_run_workload_s": {
+   "n": 7,
+   "min": 0.024,
+   "median": 0.0242,
+   "mean": 0.0242,
+   "p90": 0.0245,
+   "max": 0.0245,
+   "total": 0.1696
+  },
+  "selections_candidates": {
+   "DasatinibPlusQuercetin": 11,
+   "Fisetin": 11,
+   "Spermidine": 12,
+   "Metformin": 7,
+   "Berberine": 7
+  },
+  "selections_10_runs_total": 96,
+  "request_legacy_petta_patient_rank5": {
+   "wall": {
+    "n": 7,
+    "min": 0.3787,
+    "median": 0.3801,
+    "mean": 0.382,
+    "p90": 0.3915,
+    "max": 0.3915,
+    "total": 2.6742
+   },
+   "last_run": {
+    "total_s": 0.3721,
+    "fork_s": 0.0008,
+    "engine_s": 0.1424,
+    "load_s": 0.2224,
+    "queries_s": 0.0012,
+    "peak_rss_mb": 55.7
+   },
+   "expressions": 1
+  },
+  "request_pln_patient_rank5_10derive": {
+   "wall": {
+    "n": 7,
+    "min": 0.477,
+    "median": 0.4786,
+    "mean": 0.4783,
+    "p90": 0.4795,
+    "max": 0.4795,
+    "total": 3.3481
+   },
+   "last_run": {
+    "total_s": 0.469,
+    "fork_s": 0.001,
+    "engine_s": 0.1422,
+    "load_s": 0.2991,
+    "queries_s": 0.0213,
+    "peak_rss_mb": 71.6
+   },
+   "expressions": 11
+  },
+  "request_pln_patient_rank5_60derive": {
+   "wall": {
+    "n": 7,
+    "min": 0.5198,
+    "median": 0.5217,
+    "mean": 0.5218,
+    "p90": 0.5237,
+    "max": 0.5237,
+    "total": 3.6524
+   },
+   "last_run": {
+    "total_s": 0.513,
+    "fork_s": 0.001,
+    "engine_s": 0.145,
+    "load_s": 0.2992,
+    "queries_s": 0.0624,
+    "peak_rss_mb": 71.5
+   },
+   "expressions": 61
+  },
+  "request_pln_patient_rank5_60derive_plus_186_answer_atoms": {
+   "wall": {
+    "n": 7,
+    "min": 0.5252,
+    "median": 0.5257,
+    "mean": 0.5263,
+    "p90": 0.5287,
+    "max": 0.5287,
+    "total": 3.6844
+   },
+   "last_run": {
+    "total_s": 0.5128,
+    "fork_s": 0.001,
+    "engine_s": 0.1426,
+    "load_s": 0.3013,
+    "queries_s": 0.0623,
+    "peak_rss_mb": 72.6
+   },
+   "expressions": 61
+  },
+  "increment_186_answer_atoms_s": 0.004,
+  "legacy_answer_unchanged_with_library_loaded": true,
+  "request_legacy_petta_smoke2": {
+   "wall": {
+    "n": 7,
+    "min": 0.1957,
+    "median": 0.1961,
+    "mean": 0.1962,
+    "p90": 0.1967,
+    "max": 0.1967,
+    "total": 1.3734
+   },
+   "last_run": {
+    "total_s": 0.1927,
+    "fork_s": 0.0009,
+    "engine_s": 0.1433,
+    "load_s": 0.0445,
+    "queries_s": 0.0004,
+    "peak_rss_mb": 40.6
+   },
+   "expressions": 1
+  },
+  "request_pln_smoke2_1source_2derive": {
+   "wall": {
+    "n": 7,
+    "min": 0.2447,
+    "median": 0.2468,
+    "mean": 0.2467,
+    "p90": 0.2483,
+    "max": 0.2483,
+    "total": 1.7267
+   },
+   "last_run": {
+    "total_s": 0.2439,
+    "fork_s": 0.0009,
+    "engine_s": 0.1434,
+    "load_s": 0.09,
+    "queries_s": 0.0043,
+    "peak_rss_mb": 42.1
+   },
+   "expressions": 3
+  },
+  "request_pln_smoke2_all30sources_60derive": {
+   "wall": {
+    "n": 7,
+    "min": 0.3056,
+    "median": 0.3075,
+    "mean": 0.3076,
+    "p90": 0.3095,
+    "max": 0.3095,
+    "total": 2.1529
+   },
+   "last_run": {
+    "total_s": 0.3034,
+    "fork_s": 0.001,
+    "engine_s": 0.1441,
+    "load_s": 0.0901,
+    "queries_s": 0.0627,
+    "peak_rss_mb": 42.2
+   },
+   "expressions": 61
+  },
+  "request_trivial_program_fresh_process": {
+   "wall": {
+    "n": 7,
+    "min": 0.1469,
+    "median": 0.1479,
+    "mean": 0.148,
+    "p90": 0.149,
+    "max": 0.149,
+    "total": 1.0359
+   },
+   "last_run": {
+    "total_s": 0.1479,
+    "fork_s": 0.0009,
+    "engine_s": 0.1434,
+    "load_s": 0.0,
+    "queries_s": 0.0002,
+    "peak_rss_mb": 30.7
+   },
+   "expressions": 1
+  },
+  "request_library_load_only_fresh_process": {
+   "wall": {
+    "n": 7,
+    "min": 0.1888,
+    "median": 0.1903,
+    "mean": 0.1902,
+    "p90": 0.1913,
+    "max": 0.1913,
+    "total": 1.3317
+   },
+   "last_run": {
+    "total_s": 0.1903,
+    "fork_s": 0.001,
+    "engine_s": 0.1432,
+    "load_s": 0.0425,
+    "queries_s": 0.0001,
+    "peak_rss_mb": 32.1
+   },
+   "expressions": 1
+  },
+  "increment_rank5_10derive_s": 0.0985,
+  "increment_rank5_60derive_s": 0.1416,
+  "ratio_rank5_10derive": 1.259,
+  "ratio_rank5_60derive": 1.372,
+  "increment_pln_smoke2_1source_2derive_s": 0.0507,
+  "ratio_pln_smoke2_1source_2derive": 1.259,
+  "increment_pln_smoke2_all30sources_60derive_s": 0.1114,
+  "ratio_pln_smoke2_all30sources_60derive": 1.568,
+  "warm_legacy_rank5_query_s": {
+   "n": 30,
+   "min": 0.0008,
+   "median": 0.0008,
+   "mean": 0.0008,
+   "p90": 0.0008,
+   "max": 0.0009,
+   "total": 0.0238
+  },
+  "legacy_rank5_answer_len": 468,
+  "warm_legacy_infer_table_30_sources_s": {
+   "n": 10,
+   "min": 0.0062,
+   "median": 0.0062,
+   "mean": 0.0063,
+   "p90": 0.0071,
+   "max": 0.0071,
+   "total": 0.0632
+  },
+  "warm_legacy_infer_dq_chd_s": {
+   "n": 30,
+   "min": 0.0002,
+   "median": 0.0002,
+   "mean": 0.0002,
+   "p90": 0.0002,
+   "max": 0.0002,
+   "total": 0.0062
+  },
+  "scale_probe": {
+   "tree d=3 fan=3 links=39 K=256": {
+    "seconds": 0.025,
+    "beliefs": 92,
+    "tasks_left": 0,
+    "complete": true
+   },
+   "tree d=4 fan=4 links=340 K=2048": {
+    "seconds": 1.49,
+    "beliefs": 794,
+    "tasks_left": 0,
+    "complete": true
+   },
+   "tree d=5 fan=4 links=1364 K=2048": {
+    "seconds": 21.669,
+    "beliefs": 2047,
+    "tasks_left": 0,
+    "complete": false
+   },
+   "tree d=4 fan=5 links=780 K=2048": {
+    "seconds": 7.84,
+    "beliefs": 1821,
+    "tasks_left": 0,
+    "complete": true
+   }
+  }
+ }
+}

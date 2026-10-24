@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Optional
 
 from config import PLN_MAX_RANK_COMPOUNDS, PLN_RUNTIME_AVAILABLE
+from core import pln_chainer
 from core.pln_runner import (
     PLNAtomResult,
     PLNRunResult,
@@ -239,6 +240,51 @@ SCORE_SEMANTICS: dict = {
 }
 
 
+def pooled_provenance(rows: list[DrugAgeRow]) -> list[str]:
+    """One audit-trail bullet per compound for a ranking by THE NET: how many papers and rows stand behind each direction.
+    A pooled number has no single row behind it, so the one-row bullets of the legacy ranking would mislead."""
+    from ontology.drugage_fold import fold_rows
+    zero_rows = pln_chainer.settings_from_config().drugage_zero_rows
+    out: list[str] = []
+    for compound, f in sorted(fold_rows(rows, zero_rows=zero_rows).items()):
+        if f.net is None:
+            continue
+        parts = []
+        for label, item in (("protective", f.neg), ("harmful", f.pos)):
+            if item is None:
+                continue
+            pmids = [u for u in item.units if u.startswith("PMID")]
+            shown = ", ".join(pmids[:4]) + (f" +{len(pmids) - 4} more" if len(pmids) > 4 else "")
+            parts.append(f"{label}: {len(item.units)} paper(s), {item.rows_covered} row(s), strength {item.strength:.3g}, "
+                         f"confidence {item.confidence:.3g}" + (f" ({shown})" if shown else ""))
+        out.append(f"{compound} ← pooled by paper (Revision) — " + "; ".join(parts) + f" — net {f.net.score:+.4g}")
+    return out
+
+
+def pln_chainer_selected() -> bool:
+    """Is PLN_CHAINER=pln in force? (A configuration the chainer refuses counts as no here; the run reports it.)"""
+    try:
+        return pln_chainer.chainer_mode() == "pln"
+    except pln_chainer.PlnChainerError:
+        return False
+
+
+def score_semantics() -> dict:
+    """The `semantics` block of a DrugAge response. Under the default chainer it is `SCORE_SEMANTICS` itself, unchanged.
+    Under PLN_CHAINER=pln the same keys plus a `fold` block: a ranking there is by THE NET of the paper-level fold
+    (ontology/drugage_fold.py), and `representative_row_policy` then applies only inside one paper and direction."""
+    if not pln_chainer_selected():
+        return SCORE_SEMANTICS
+    from ontology.drugage_fold import semantics
+    zero_rows = pln_chainer.settings_from_config().drugage_zero_rows
+    return {**SCORE_SEMANTICS, "fold": {
+        **semantics(zero_rows),
+        "applies": "PLN_CHAINER=pln: a compound is listed once, by the net of its protective and its harmful item; "
+                   "`representative_row_policy` chooses ONE row inside a (paper, direction) group only, and `confidence` "
+                   "is the pooled confidence of the item that carries the sign (x 0.9)",
+    }}
+
+
 @dataclass
 class DrugAgeRanking:
     """Everything POST /drugage/rank needs, already structured.
@@ -361,9 +407,10 @@ def rank_drugage(
         selected = {r.compound for r in rows}
         all_rows = select_rows(load_rows(src), compounds=selected, limit=10_000)
 
+    provenance = pooled_provenance(rows) if pln_chainer_selected() else None
     return DrugAgeRanking(
         result=_render(result, kept, dropped, rows, unscorable, resolutions,
-                       confidence_threshold),
+                       confidence_threshold, provenance),
         resolutions=resolutions,
         ranked=kept,
         rows=all_rows,
@@ -381,8 +428,10 @@ def _render(
     unscorable: list[str],
     resolutions: list[Resolution],
     confidence_threshold: float,
+    provenance: Optional[list[str]] = None,
 ) -> PLNRunResult:
-    """Re-assemble the atom view (ranking tuple first) after filtering."""
+    """Re-assemble the atom view (ranking tuple first) after filtering. `provenance` replaces the one-bullet-per-row lines
+    (the pooled ranking has no single row behind a number)."""
     atoms: list[PLNAtomResult] = []
     if kept:
         tuple_atom = "(" + " ".join(s.atom for s in kept) + ")"
@@ -391,8 +440,11 @@ def _render(
             PLNAtomResult(s.atom, {"strength": s.strength, "confidence": s.confidence})
             for s in kept
         )
-    for row in sorted(rows, key=lambda r: r.compound):
-        atoms.append(PLNAtomResult(_provenance_line(row)))
+    if provenance is None:
+        for row in sorted(rows, key=lambda r: r.compound):
+            atoms.append(PLNAtomResult(_provenance_line(row)))
+    else:
+        atoms.extend(PLNAtomResult(line) for line in provenance)
 
     if unscorable:
         atoms.append(PLNAtomResult(
@@ -483,6 +535,8 @@ class DrugAgeTop:
     unscorable_rows: int = 0
     source: str = ""
     filters: dict = field(default_factory=dict)
+    #: set only by the paper-level fold (PLN_CHAINER=pln): the fold's definitions; None for the legacy ranking
+    fold: Optional[dict] = None
 
 
 def _representative(scores: list[RowScore]) -> RowScore:
@@ -514,8 +568,15 @@ def drugage_top(
     significant_only: bool = False,
     direction: str = "protective",
     source: Optional[Path] = None,
+    fold: Optional[bool] = None,
 ) -> DrugAgeTop:
     """Rank the whole DrugAge build by calibrated, signed effect on mortality.
+
+    `fold` chooses the ranking: False (and None under the default chainer) is the representative-row ranking described
+    below; True (and None under PLN_CHAINER=pln) ranks by THE NET of the paper-level fold, `ontology.drugage_fold.
+    top_compounds` -- the pure-Python twin of what the pln chainer derives in the engine (a test holds them equal) -- with
+    the same filters. Each entry's `row` is then the lead row of its pooled item, and `papers_neg/papers_pos/rows_neg/
+    rows_pos` say how many papers and rows stand behind each direction.
 
     This is the "strongest evidence overall" question the evaluation called the
     one people ask first and found unanswerable: the translator invented a
@@ -531,6 +592,11 @@ def drugage_top(
     """
     src = _resolve_top_source(source)
     rows = load_rows(src)
+    if fold is None:
+        fold = pln_chainer_selected()
+    if fold:
+        return _drugage_top_folded(rows, src, n=n, species=species, clade=clade, min_confidence=min_confidence,
+                                   itp_only=itp_only, significant_only=significant_only, direction=direction)
     knobs = load_knobs()
 
     if species:
@@ -591,6 +657,25 @@ def drugage_top(
             "direction": direction,
             "n": n,
         },
+    )
+
+
+def _drugage_top_folded(rows, src: Path, *, n, species, clade, min_confidence, itp_only, significant_only, direction) -> DrugAgeTop:
+    from ontology.drugage_fold import semantics, top_compounds
+    zero_rows = pln_chainer.settings_from_config().drugage_zero_rows
+    top = top_compounds(rows, n=n, species=species, clade=clade, min_confidence=min_confidence, itp_only=itp_only,
+                        significant_only=significant_only, direction=direction, fold=True, zero_rows=zero_rows)
+    return DrugAgeTop(
+        entries=top.entries,                       # NetScore: the fields of a RowScore the endpoint reads, plus the counts
+        total_compounds=top.total_compounds,
+        total_compounds_in_source=top.total_compounds_in_source,
+        unscorable_compounds=top.unscorable_compounds,
+        total_rows=top.total_rows,
+        scored_rows=top.scored_rows,
+        unscorable_rows=top.unscorable_rows,
+        source=str(src),
+        filters=top.filters,
+        fold=semantics(zero_rows),
     )
 
 
