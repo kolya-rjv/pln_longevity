@@ -17,7 +17,8 @@ things pipeline.md §4.6 / Table 2 say an LLM cannot do:
   (v)   PROVENANCE + DETERMINISM — each recommendation carries the elevated markers it
         targets, and identical inputs give identical output.
 
-Skipped automatically if `hyperon` is not installed.
+Runs on the selected runtime (PLN_RUNTIME: hyperon, the default, or petta; tests/runtime_harness.py)
+and is skipped automatically if that runtime is not installed.
 
 Run:  pytest tests/ -v       (from the repo root)
 """
@@ -25,11 +26,13 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
-hyperon = pytest.importorskip("hyperon")
-from hyperon import MeTTa  # noqa: E402
+from runtime_harness import Kb, new_kb, require_runtime
+
+require_runtime()
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -68,12 +71,10 @@ _REC_RE = re.compile(
 
 
 @pytest.fixture(scope="module")
-def kb() -> MeTTa:
+def kb() -> Iterator[Kb]:
     """A MeTTa interpreter with the full KB + Demo-6 layer in one space."""
-    text = "\n".join((REPO / f).read_text(encoding="utf-8") for f in KB_FILES)
-    m = MeTTa()
-    m.run(text)
-    return m
+    with new_kb(KB_FILES) as m:
+        yield m
 
 
 def _is_empty(res) -> bool:
@@ -81,7 +82,7 @@ def _is_empty(res) -> bool:
     return res == [[]] or all(len(g) == 0 for g in res)
 
 
-def _one(kb: MeTTa, query: str) -> str:
+def _one(kb: Kb, query: str) -> str:
     res = kb.run(query)
     assert res and res[0], f"no result for {query}: {res}"
     return str(res[0][0])

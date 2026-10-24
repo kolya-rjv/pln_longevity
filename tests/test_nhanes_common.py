@@ -70,6 +70,7 @@ from nhanes_common import (  # noqa: E402
     weighted_moments,
 )
 from nhanes_xport_writer import CHAR, NUM, ieee_to_ibm, write_xport  # noqa: E402
+from runtime_harness import new_kb, on_petta, require_runtime  # noqa: E402
 
 TOL = 1e-12
 
@@ -733,45 +734,59 @@ def test_a_mismatched_rule_head_returns_the_unreduced_expression_not_empty():
     """MeTTa semantics that the baseline lookup design depends on: relying on a rule head
     failing to match as a way of 'yielding nothing' is wrong -- the unreduced expression
     propagates into arithmetic. Only `match` or an explicit (superpose ()) yield nothing."""
-    hyperon = pytest.importorskip("hyperon")
-    from hyperon import MeTTa
+    require_runtime()
+    # PeTTa does not compile `(superpose ())`; the knowledge base says `(empty)` (patient_profile.metta), which
+    # hyperon also reads as "no result". The hyperon program stays the one this test was written with.
+    nothing = "(empty)" if on_petta() else "(superpose ())"
 
-    metta = MeTTa()
-    metta.run("""
+    with new_kb(extra_text=f"""
         (= (only-chd CoronaryHeartDisease $age) 0.08)
         (BaseRec R1 AllCauseMortality 0.11)
         (= (via-match $o) (match &self (BaseRec $r $o $v) $v))
-        (= (guarded $o) (if (== $o AllCauseMortality) 0.11 (superpose ())))
-    """)
+        (= (guarded $o) (if (== $o AllCauseMortality) 0.11 {nothing}))
+    """) as metta:
+        if on_petta():
+            # The measured difference: on PeTTa a known function with no clause for its arguments yields
+            # NOTHING (and so does arithmetic on it), where hyperon hands the call back unreduced.
+            assert metta.run("!(only-chd AllCauseMortality 61)")[0] == []
+            assert metta.run("!(* 2 (only-chd AllCauseMortality 61))")[0] == []
+        else:
+            mismatched = str(metta.run("!(only-chd AllCauseMortality 61)")[0][0])
+            assert mismatched == "(only-chd AllCauseMortality 61)"        # not empty
+            propagated = str(metta.run("!(* 2 (only-chd AllCauseMortality 61))")[0][0])
+            assert "only-chd" in propagated                              # and it spreads
 
-    mismatched = str(metta.run("!(only-chd AllCauseMortality 61)")[0][0])
-    assert mismatched == "(only-chd AllCauseMortality 61)"        # not empty
-    propagated = str(metta.run("!(* 2 (only-chd AllCauseMortality 61))")[0][0])
-    assert "only-chd" in propagated                              # and it spreads
-
-    assert metta.run("!(via-match CoronaryHeartDisease)")[0] == []
-    assert metta.run("!(guarded CoronaryHeartDisease)")[0] == []
-    assert float(str(metta.run("!(guarded AllCauseMortality)")[0][0])) == pytest.approx(0.11)
+        assert metta.run("!(via-match CoronaryHeartDisease)")[0] == []
+        assert metta.run("!(guarded CoronaryHeartDisease)")[0] == []
+        assert float(str(metta.run("!(guarded AllCauseMortality)")[0][0])) == pytest.approx(0.11)
 
 
 def test_log_math_fails_silently_so_the_guard_must_be_on_the_input():
     """A raw 0.0 on a log-scaled marker becomes -inf, which z->status reads as Low -- a
     fabricated finding. See docs/nhanes_integration.md section 4."""
-    hyperon = pytest.importorskip("hyperon")
-    from hyperon import MeTTa
+    require_runtime()
 
-    metta = MeTTa()
-    metta.run((REPO / "patient_profile.metta").read_text(encoding="utf-8"))
-
-    assert str(metta.run("!(log-math 10 0)")[0][0]) == "-inf"
-    assert str(metta.run("!(log-math 10 -5)")[0][0]) == "NaN"
-    # -inf is ordered, so it passes the Low comparison and invents a finding
-    assert str(metta.run("!(z->status (log-math 10 0))")[0][0]) == "Low"
-    # a correct guard on the raw value yields nothing instead
-    metta.run("(= (guarded-z $raw) (if (> $raw 0.0) (log-math 10 $raw) (superpose ())))")
-    assert metta.run("!(guarded-z 0.0)")[0] == []
-    assert metta.run("!(guarded-z -5.0)")[0] == []
-    assert float(str(metta.run("!(guarded-z 100.0)")[0][0])) == pytest.approx(2.0)
+    with new_kb(["patient_profile.metta"]) as metta:
+        if on_petta():
+            from core.metta_runtime import MettaRuntimeError
+            # PeTTa does not fail silently: the grounded arithmetic raises (float_overflow / undefined),
+            # so an unguarded 0.0 is a loud error and never a fabricated "Low".
+            for query in ("!(log-math 10 0)", "!(log-math 10 -5)", "!(z->status (log-math 10 0))"):
+                with pytest.raises(MettaRuntimeError) as raised:
+                    metta.run(query)
+                assert raised.value.kind == "expression", query
+            nothing = "(empty)"             # PeTTa does not compile `(superpose ())`
+        else:
+            assert str(metta.run("!(log-math 10 0)")[0][0]) == "-inf"
+            assert str(metta.run("!(log-math 10 -5)")[0][0]) == "NaN"
+            # -inf is ordered, so it passes the Low comparison and invents a finding
+            assert str(metta.run("!(z->status (log-math 10 0))")[0][0]) == "Low"
+            nothing = "(superpose ())"
+        # a correct guard on the raw value yields nothing instead
+        metta.run(f"(= (guarded-z $raw) (if (> $raw 0.0) (log-math 10 $raw) {nothing}))")
+        assert metta.run("!(guarded-z 0.0)")[0] == []
+        assert metta.run("!(guarded-z -5.0)")[0] == []
+        assert float(str(metta.run("!(guarded-z 100.0)")[0][0])) == pytest.approx(2.0)
 
 
 # ════════════════════════════ marker orientation ═══════════════════════════

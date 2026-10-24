@@ -33,6 +33,8 @@ httpx = pytest.importorskip("httpx")
 import api as api_module  # noqa: E402
 import core.executor as executor_module  # noqa: E402
 from core.patient_builder import PatientSpecError, build_patient  # noqa: E402
+from runtime_compare import on_petta  # noqa: E402
+from runtime_harness import require_runtime  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -117,8 +119,8 @@ def test_a_rule_definition_in_extra_atoms_is_rejected():
 def test_a_deliberate_redefinition_is_still_possible_when_asked_for(monkeypatch):
     from core.pln_runner import PLNAtomResult, PLNRunResult
 
-    monkeypatch.setattr(api_module, "run_query", Mock(return_value=PLNRunResult(
-        status="ok", results=[PLNAtomResult("(ok)")], mode="runtime")))
+    run_query = Mock(return_value=PLNRunResult(status="ok", results=[PLNAtomResult("(ok)")], mode="runtime"))
+    monkeypatch.setattr(api_module, "run_query", run_query)
     response = _request(
         "POST", "/metta/run",
         json={
@@ -127,6 +129,17 @@ def test_a_deliberate_redefinition_is_still_possible_when_asked_for(monkeypatch)
             "allow_definitions": True,
         },
     )
+    if on_petta():
+        # Refused by design: PeTTa's space is process-global, so a `(= ...)` would be a clause every later
+        # query sees. `allow_definitions` lifts the API's own guard (definition_in_extra_atoms) and nothing
+        # else; the PeTTa validator (core.metta_validator, pinned by tests/test_metta_runtime.py) still says
+        # no, before anything runs.
+        assert response.status_code == 422
+        detail = response.json()["detail"]
+        assert detail["code"] == "invalid_metta_query"
+        assert "Form(s) not allowed under the PeTTa runtime: =" in detail["issues"]
+        run_query.assert_not_called()
+        return
     assert response.status_code == 200
 
 
@@ -201,7 +214,7 @@ def test_marker_status_uses_the_kbs_threshold():
 
 @pytest.mark.slow
 def test_the_reported_question_now_gets_a_real_answer():
-    pytest.importorskip("hyperon")
+    require_runtime()
     from core.pln_runner import run_query
 
     built = build_patient(THE_REPORTED_PATIENT)
@@ -229,7 +242,7 @@ def test_the_reported_question_now_gets_a_real_answer():
 
 @pytest.mark.slow
 def test_a_caller_patient_leaves_the_builtin_patients_untouched():
-    pytest.importorskip("hyperon")
+    require_runtime()
     from core.pln_runner import run_query
 
     built = build_patient(THE_REPORTED_PATIENT)

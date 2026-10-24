@@ -13,7 +13,8 @@ Covers the two halves of the vertical slice:
 Same one-space strategy as tests/test_pln_deduction.py: build a MeTTa space from
 an explicit file list + a small row slice, assert on collapsed results.
 
-Skipped automatically if `hyperon` is not installed.
+Runs on the selected runtime (PLN_RUNTIME: hyperon, the default, or petta; tests/runtime_harness.py)
+and is skipped automatically if that runtime is not installed.
 Run:  pytest tests/ -v
 """
 from __future__ import annotations
@@ -22,11 +23,13 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
-hyperon = pytest.importorskip("hyperon")
-from hyperon import MeTTa  # noqa: E402
+from runtime_harness import Kb, new_kb, require_runtime
+
+require_runtime()
 
 REPO = Path(__file__).resolve().parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -141,20 +144,19 @@ def _stack_text() -> str:
 
 
 @pytest.fixture(scope="module")
-def kb() -> MeTTa:
+def kb() -> Iterator[Kb]:
     """DrugAge inference stack + the synthetic rows, in one shared space."""
-    m = MeTTa()
-    m.run(_stack_text() + "\n" + SYNTH)
-    return m
+    with new_kb(DRUGAGE_STACK, SYNTH) as m:
+        yield m
 
 
-def _num(kb: MeTTa, query: str) -> float:
+def _num(kb: Kb, query: str) -> float:
     res = kb.run(query)
     assert res and res[0], f"no result for {query}: {res}"
     return float(str(res[0][0]))
 
 
-def _effect(kb: MeTTa, query: str):
+def _effect(kb: Kb, query: str):
     res = kb.run(query)
     assert res and res[0], f"no result for {query}: {res}"
     m = _EFFECT.search(str(res[0][0]))
@@ -162,7 +164,7 @@ def _effect(kb: MeTTa, query: str):
     return m.group(1), m.group(2), float(m.group(3)), float(m.group(4))
 
 
-def _signed(kb: MeTTa, query: str):
+def _signed(kb: Kb, query: str):
     res = kb.run(query)
     assert res and res[0], f"no result for {query}: {res}"
     m = _SIGNED.search(str(res[0][0]))
@@ -170,7 +172,7 @@ def _signed(kb: MeTTa, query: str):
     return m.group(1), float(m.group(2)), float(m.group(3))
 
 
-def _ranked(kb: MeTTa, cands: str, outcome: str = "Mortality") -> list[tuple[str, float]]:
+def _ranked(kb: Kb, cands: str, outcome: str = "Mortality") -> list[tuple[str, float]]:
     res = kb.run(f"!(rank-interventions &self ({cands}) {outcome})")
     assert res and res[0], f"no ranking: {res}"
     out = str(res[0][0])

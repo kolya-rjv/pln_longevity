@@ -41,6 +41,7 @@ from core.pln_runner import (  # noqa: E402
     patient_layer_symbols,
     patient_stack,
 )
+from runtime_compare import assert_same_answers, petta_only  # noqa: E402
 
 #: programs that aborted the full shared stack (each seen live, or in the chat's replay of
 #: a stakeholder's session), with the number of answers the generic stack gives
@@ -151,11 +152,24 @@ def test_the_programs_that_aborted_the_full_stack_answer(program, n):
     assert out["rc"] == 0 and out["status"] == "ok" and len(out["atoms"]) == n, out
 
 
+@pytest.mark.hyperon_only                 # the control is a hyperon abort; PeTTa has none (the companion is below)
 @pytest.mark.slow
 def test_the_full_stack_still_aborts_the_control():
     """The control. If the full stack stops aborting, hyperon changed (#1081 released?): the
     generic stack is still correct, but re-measure, and the patient-stack note may be moot."""
     assert _run("full", ABORTED[0][0])["rc"] != 0
+
+
+@petta_only
+@pytest.mark.slow
+@pytest.mark.parametrize("program, n", ABORTED, ids=[f"aborted-{i}" for i in range(len(ABORTED))])
+def test_the_programs_that_aborted_the_full_stack_answer_in_it_on_petta(program, n):
+    """The PeTTa companion of the control above: PeTTa has no key-atom edge, so the FULL stack answers every
+    program that aborts it on hyperon, with the number of answers the generic stack gives and the same atoms
+    in the same order."""
+    full, routed = _run("full", program), _run("routed", program)
+    assert full["rc"] == 0 and full["status"] == "ok" and len(full["atoms"]) == n, full
+    assert_same_answers(full["atoms"], routed["atoms"], what="full stack vs the routed stack")
 
 
 # ═══════════════════════════ it changes no answer ═════════════════════════════

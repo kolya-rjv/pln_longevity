@@ -65,6 +65,7 @@ from ontology.gene_index import (  # noqa: E402
     gene_index,
     normalise_pmid,
 )
+from runtime_harness import new_kb, require_runtime  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 CELLAGE_SAMPLE = FIXTURES / "cellage_real_rows.metta"
@@ -334,7 +335,7 @@ def test_an_unclear_row_is_never_selected_for_lifting():
 
 @pytest.mark.slow
 def test_the_lift_turns_a_curated_row_into_a_calibrated_effect_link():
-    pytest.importorskip("hyperon")
+    require_runtime()
     result, rows, effects = run_cellage_effects(["TP53"], source=CELLAGE_SAMPLE)
 
     assert result.status == "ok"
@@ -354,7 +355,7 @@ def test_the_lift_turns_a_curated_row_into_a_calibrated_effect_link():
 
 @pytest.mark.slow
 def test_an_inhibiting_gene_lifts_to_the_opposite_sign():
-    pytest.importorskip("hyperon")
+    require_runtime()
     _result, _rows, effects = run_cellage_effects(["SIRT1"], source=CELLAGE_SAMPLE)
     assert effects
     assert {e.sign for e in effects} == {"Neg"}
@@ -364,7 +365,7 @@ def test_an_inhibiting_gene_lifts_to_the_opposite_sign():
 @pytest.mark.slow
 def test_each_lifted_link_carries_the_row_it_came_from():
     """Three identical links for TP53 are three ROWS, and must be legible as such."""
-    pytest.importorskip("hyperon")
+    require_runtime()
     _result, rows, effects = run_cellage_effects(["TP53"], source=CELLAGE_SAMPLE)
     assert len(effects) == len(rows)
     assert len({e.row_id for e in effects}) == len(effects)
@@ -375,8 +376,7 @@ def test_each_lifted_link_carries_the_row_it_came_from():
 @pytest.mark.slow
 def test_the_confidence_really_comes_from_epistemic_calibration():
     """Retune the tier, retune the layer. A literal would not move."""
-    pytest.importorskip("hyperon")
-    from hyperon import MeTTa
+    require_runtime()
 
     rows = selector.select_rows(selector.load_rows(CELLAGE_SAMPLE), ["TP53"])
     assert rows
@@ -394,9 +394,8 @@ def test_the_confidence_really_comes_from_epistemic_calibration():
         blocks.append(text)
     retuned = "\n".join(blocks)
 
-    metta = MeTTa()
-    metta.run(retuned + "\n" + selector.slice_metta(rows))
-    out = str(metta.run(f"!(cellage-effect &self {rows[0].row_id})"))
+    with new_kb(extra_text=retuned + "\n" + selector.slice_metta(rows)) as metta:
+        out = str(metta.run(f"!(cellage-effect &self {rows[0].row_id})"))
     lifted = parse_cellage_effects(out)
     assert lifted, out
     assert lifted[0].confidence == pytest.approx(0.99)
@@ -404,7 +403,7 @@ def test_the_confidence_really_comes_from_epistemic_calibration():
 
 @pytest.mark.slow
 def test_a_gene_with_no_curated_row_lifts_nothing_and_says_why():
-    pytest.importorskip("hyperon")
+    require_runtime()
     result, rows, effects = run_cellage_effects(["GHR"], source=CELLAGE_SAMPLE)
     assert rows == []
     assert effects == []
@@ -414,7 +413,7 @@ def test_a_gene_with_no_curated_row_lifts_nothing_and_says_why():
 @pytest.mark.slow
 def test_the_inference_endpoint_never_presents_the_etl_truth_values():
     """build/cellage_genes.metta carries (Causes … (stv 0.82 0.70)). Not ours."""
-    pytest.importorskip("hyperon")
+    require_runtime()
     _index()
     body = _get("/genes/TP53?infer=true").json()
     inference = body["inference"]
@@ -436,7 +435,7 @@ def test_inference_is_opt_in_and_absent_by_default():
 
 @pytest.mark.slow
 def test_a_gene_outside_cellage_reports_why_it_cannot_be_lifted():
-    pytest.importorskip("hyperon")
+    require_runtime()
     _index()
     inference = _get("/genes/GHR?infer=true").json()["inference"]
     assert inference["available"] is False
@@ -456,7 +455,7 @@ def test_the_slice_falls_back_to_the_committed_fixture_without_a_build(monkeypat
 
 def test_a_fixture_backed_answer_says_it_is_a_sample(monkeypatch):
     """25 rows of 927 must never be presented as the corpus."""
-    pytest.importorskip("hyperon")
+    require_runtime()
     _index()
     monkeypatch.setattr(selector, "BUILD_CELLAGE", Path("/nonexistent/cellage.metta"))
     inference = _get("/genes/TP53?infer=true").json()["inference"]

@@ -21,7 +21,8 @@ tests are about the distinctions it exists to preserve:
   * evidence already recorded elsewhere in the KB (omega-3) is cross-referenced,
     not duplicated, so one body of evidence cannot be counted twice.
 
-Skipped automatically if `hyperon` / `fastapi` are not installed.
+Runs on the selected runtime (PLN_RUNTIME: hyperon, the default, or petta; tests/runtime_harness.py)
+and is skipped automatically if that runtime / `fastapi` are not installed.
 
 Run from the repository root:
     pytest tests/test_human_evidence.py -q
@@ -32,6 +33,7 @@ import ast
 import re
 import sys
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
@@ -311,18 +313,18 @@ def test_the_whole_table_lists_every_record_and_the_cross_reference():
 
 # ── and the engine agrees (real MeTTa) ───────────────────────────────────────
 
-hyperon = pytest.importorskip("hyperon")
-from hyperon import MeTTa  # noqa: E402
+from runtime_harness import Kb, new_kb, require_runtime  # noqa: E402
+
+require_runtime()
 
 
 @pytest.fixture(scope="module")
-def kb() -> MeTTa:
-    m = MeTTa()
-    m.run("\n".join((REPO / f).read_text(encoding="utf-8") for f in KB_FILES))
-    return m
+def kb() -> Iterator[Kb]:
+    with new_kb(KB_FILES) as m:
+        yield m
 
 
-def _run(m: MeTTa, query: str) -> list[str]:
+def _run(m: Kb, query: str) -> list[str]:
     return [str(atom) for result in m.run(query) for atom in result]
 
 

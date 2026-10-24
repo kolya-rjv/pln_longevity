@@ -38,6 +38,8 @@ from core.executor import (  # noqa: E402
     PLNWorkerCrashed,
     run_offloaded,
 )
+from runtime_compare import on_petta  # noqa: E402
+from runtime_harness import require_runtime  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -93,7 +95,7 @@ def test_executor_stats_describe_the_active_mode(inline):
 
 @pytest.mark.slow
 def test_a_real_query_runs_in_a_worker_process(pooled):
-    pytest.importorskip("hyperon")
+    require_runtime()
     result = run_offloaded(
         "run_query",
         {
@@ -108,7 +110,7 @@ def test_a_real_query_runs_in_a_worker_process(pooled):
 
 @pytest.mark.slow
 def test_a_runaway_query_is_abandoned_at_the_deadline_and_the_pool_recovers(pooled):
-    pytest.importorskip("hyperon")
+    require_runtime()
     started = time.monotonic()
     with pytest.raises(PLNExecutionTimeout):
         run_offloaded(
@@ -146,7 +148,7 @@ def test_a_timeout_kills_only_the_query_that_timed_out(pooled):
     budget, was SIGKILLed by an unrelated caller's 1-second timeout and the
     victim got a 500 blaming a hyperon abort that never happened to them.
     """
-    pytest.importorskip("hyperon")
+    require_runtime()
     import threading
 
     outcome: dict = {}
@@ -157,8 +159,10 @@ def test_a_timeout_kills_only_the_query_that_timed_out(pooled):
                 "run_query",
                 {
                     # ~1.5 s of real work (measured), so it is still running
-                    # when the other query hits its 1 s deadline.
-                    "metta_query": "!(slow 14)",
+                    # when the other query hits its 1 s deadline. The same naive Fibonacci is
+                    # 14 deep on hyperon (1.1 s) and 32 deep on PeTTa (1.5 s; 14 takes a few
+                    # milliseconds there, over before the other query is even sent).
+                    "metta_query": f"!(slow {32 if on_petta() else 14})",
                     "kb_files": [],
                     "extra_atoms": "(= (slow $n) (if (< $n 2) 1 (+ (slow (- $n 1)) (slow (- $n 2)))))",
                 },
@@ -193,7 +197,7 @@ def test_a_timeout_kills_only_the_query_that_timed_out(pooled):
 @pytest.mark.slow
 def test_the_event_loop_keeps_serving_while_a_query_runs(pooled):
     """The headline finding: /health must not queue behind a MeTTa call."""
-    pytest.importorskip("hyperon")
+    require_runtime()
     durations: list[float] = []
 
     def hammer_health():

@@ -10,13 +10,23 @@ Three checks, no MeTTa evaluation (which would need the Hyperon runtime):
    empty predicate is well-formed and returns nothing, which is the single most
    confusing failure mode the 2026-09-18 API evaluation reported.
 
-A fourth check applies only when the selected runtime is PeTTa (PLN_RUNTIME=petta);
+Two more checks apply only when the selected runtime is PeTTa (PLN_RUNTIME=petta);
 under hyperon the validator behaves exactly as it always did:
 
 4. the program uses none of the forms PeTTa must not be given
-   (`core.metta_runtime.PETTA_REFUSED_FORMS`): `add-atom`, `remove-atom` and a
-   `(= ...)` definition change PeTTa's process-global space, `assert` and `test`
-   halt the process, `import!`, `py-call`, `shell` ... reach the host.
+   (`core.metta_runtime.PETTA_REFUSED_FORMS`, the literal-spelling text scan
+   derived from `PETTA_ALLOWED_FUN_NAMES`'s allowlist): `add-atom`,
+   `remove-atom` and a `(= ...)` definition change PeTTa's process-global
+   space, `assert` and `test` halt the process, `import!`, `py-call`,
+   `shell` ... reach the host;
+5. a query HEAD that names one of those same unallowed PeTTa builtins is
+   rejected even when `registry`/`inventory` call the symbol "known" —
+   `with_injected`/`merged_inventory` harvest a caller's own `extra_atoms`
+   into the same structures a trusted `.metta` file populates, with no
+   record of which one declared a given name once merged, so a bare type
+   declaration for, say, `add-translator-rule!` must not read as "this is a
+   real, callable predicate the query may use" just because it is
+   grounded/declared SOMEWHERE in the merged `inventory`.
 """
 from __future__ import annotations
 
@@ -24,7 +34,9 @@ import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence
 
-from core.metta_runtime import petta_refused_forms, selected_runtime_name
+from core.metta_runtime import (
+    PETTA_ALLOWED_FUN_NAMES, PETTA_KNOWN_FUN_NAMES, petta_refused_forms, selected_runtime_name,
+)
 from ontology.inventory import RuntimeInventory
 from ontology.registry import OntologyRegistry
 
@@ -82,6 +94,13 @@ _STRING_RE = re.compile(r'"[^"]*"')
 # The head of each top-level application in the query — i.e. the predicates and
 # functions the query actually calls.
 _HEAD_RE = re.compile(r"\(\s*([A-Za-z][A-Za-z0-9_\-]*)")
+# The same, for the PeTTa check below, with a trailing `!`: PeTTa's own naming convention for a
+# mutating/effectful builtin (`add-translator-rule!`, `change-state!`, `bind!`, `import!`, `println!`, ...),
+# and exactly the shape of name that check exists to catch — `_HEAD_RE` would turn
+# `(add-translator-rule! ...)`'s head into `add-translator-rule`, which matches nothing in
+# PETTA_KNOWN_FUN_NAMES and would never be flagged. Kept apart from `_HEAD_RE` so that the hyperon path
+# reads exactly the heads it always read, whatever a name ends in.
+_PETTA_HEAD_RE = re.compile(r"\(\s*([A-Za-z][A-Za-z0-9_\-]*!?)")
 
 
 @dataclass
@@ -197,7 +216,8 @@ def validate(
     if not _balanced_parens(metta_query):
         issues.append("Unbalanced parentheses in MeTTa query.")
 
-    if selected_runtime_name(runtime) == "petta":
+    petta_selected = selected_runtime_name(runtime) == "petta"
+    if petta_selected:
         refused = petta_refused_forms(metta_query)
         if refused:
             issues.append(
@@ -229,15 +249,45 @@ def validate(
                 f"Symbol(s) not found in loaded ontology: {', '.join(sorted(unknown))}"
             )
 
+    #: A head PeTTa itself registers but this adapter does not allow to run — see
+    #: `core.metta_runtime.PETTA_ALLOWED_FUN_NAMES`'s docstring for the full reasoning.
+    _petta_unallowed_builtins = PETTA_KNOWN_FUN_NAMES - PETTA_ALLOWED_FUN_NAMES
     if inventory is not None:
-        for head in sorted(set(_HEAD_RE.findall(metta_query))):
+        petta_builtin_heads: list[str] = []
+        for head in sorted(set((_PETTA_HEAD_RE if petta_selected else _HEAD_RE).findall(metta_query))):
             if head in _BUILTINS:
+                continue
+            # A symbol is "known" here because SOME .metta text declared it — the trusted KB files, or
+            # the caller's own `extra_atoms` (`core.patient_context.with_injected`/`merged_inventory`
+            # harvest both into the SAME `registry`/`inventory` this function is handed, with no
+            # provenance kept once merged). `inventory.declared_only`/`functions` cannot tell "a real KB
+            # rule" apart from "a bare `(: name (-> …))` the caller just wrote" — both populate the same
+            # dict entry. Under PeTTa that distinction matters for one specific case: a name that is ALSO
+            # one of PeTTa's own builtins outside `PETTA_ALLOWED_FUN_NAMES` is not an ordinary
+            # declared-but-empty predicate a caller could have legitimately introduced — it is a form the
+            # engine itself refuses to run, and MUST NOT validate merely as "well-formed, returns nothing"
+            # (it does not return nothing: `_install_petta_sandbox` refuses it). A caller declaring such a
+            # symbol via `extra_atoms` — exactly how the verifier's own reproduction made an otherwise
+            # "unknown symbol" head read as known to this function — must not make it validate as callable.
+            if petta_selected and head in _petta_unallowed_builtins:
+                petta_builtin_heads.append(head)
                 continue
             # `declared_only` is checked FIRST: a declared predicate is also in
             # `functions` (it carries a `(-> …)` signature), and skipping on
             # that would hide exactly the case this check exists for.
             if head in inventory.declared_only:
                 ungrounded.append(head)
+        if petta_builtin_heads:
+            # Independent of (and a stronger statement than) the `petta_refused_forms` scan above: that
+            # scan already catches every one of these as a literal token anywhere in `metta_query`; this
+            # catches the same names specifically in HEAD position, so the result does not depend on
+            # `inventory`/`registry` ever treating one of them as a legitimate, callable, declared-only
+            # predicate just because something — trusted KB or caller `extra_atoms` alike — declared it.
+            issues.append(
+                "Head(s) name a PeTTa builtin outside the allowed set, not a predicate this knowledge "
+                "base defines — declaring a type for one of these does not make it callable: "
+                + ", ".join(sorted(petta_builtin_heads))
+            )
         if ungrounded:
             warnings.append(
                 "Declared but EMPTY in the runtime knowledge base — this query "

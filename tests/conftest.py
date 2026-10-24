@@ -28,6 +28,11 @@ def pytest_configure(config):
         "petta: runs the REAL PeTTa runtime (SWI-Prolog + janus + the pinned checkout) in a forked "
         "child; skipped when PeTTa is not installed. Select with -m petta.",
     )
+    config.addinivalue_line(
+        "markers",
+        "hyperon_only: asserts a behaviour only hyperon has (a hyperon abort, an unreduced call, hyperon's "
+        "answer order); skipped under PLN_RUNTIME=petta.",
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -47,3 +52,14 @@ def _no_live_patient_extraction(monkeypatch):
 
     monkeypatch.setattr(patient_extract.OpenAIExtractor, "_request", _refuse)
     yield
+
+
+def pytest_collection_modifyitems(config, items):
+    """Under PLN_RUNTIME=petta, skip what is marked `hyperon_only` (tests/runtime_harness.py)."""
+    from core.metta_runtime import selected_runtime_name
+    if selected_runtime_name() != "petta":
+        return
+    skip = pytest.mark.skip(reason="asserts a hyperon behaviour")
+    for item in items:
+        if "hyperon_only" in item.keywords:
+            item.add_marker(skip)

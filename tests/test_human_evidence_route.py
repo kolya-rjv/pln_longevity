@@ -26,6 +26,7 @@ pytest.importorskip("fastapi")
 import api as api_module  # noqa: E402
 from core.pln_runner import (HUMAN_EVIDENCE_FILES, human_evidence_stack, is_human_evidence_program,  # noqa: E402
                              patient_stack)
+from runtime_compare import assert_same_answers, petta_only  # noqa: E402
 
 
 @pytest.mark.parametrize("program, expected", [
@@ -73,14 +74,18 @@ def _run(kb_files: list[Path], query: str) -> dict:
     return out
 
 
-@pytest.mark.slow
-@pytest.mark.parametrize("query, needle", [
+QUERIES = [
     ("!(human-evidence &self Metformin)", "(HumanEvidence Bannister2014_Metformin_Survival Metformin"),
     ("!(human-evidence &self Rapamycin)", "(NoHumanEvidenceRecord Rapamycin"),
     ("!(human-evidence &self Berberine)", "(NoHumanEvidenceRecord Berberine"),
     ("!(human-evidence &self Omega3)", "(HumanEvidenceCrossReferenced Omega3"),
     ("!(human-evidence-interventions &self)", "Metformin"),
-])
+]
+
+
+@pytest.mark.hyperon_only                 # the control is a hyperon abort; PeTTa has none (the companion is below)
+@pytest.mark.slow
+@pytest.mark.parametrize("query, needle", QUERIES)
 def test_the_routed_program_answers_what_the_full_space_aborts_on(query, needle):
     runtime = api_module._runtime_kb_paths()
     routed = _run(api_module._generic_kb(query), query)
@@ -89,3 +94,18 @@ def test_the_routed_program_answers_what_the_full_space_aborts_on(query, needle)
     if "interventions" not in query:                     # the control: the full space does abort on the per-drug form
         assert control["rc"] != 0, (
             "the full stack no longer aborts on this form: the route is still correct, re-measure whether it is needed")
+
+
+@petta_only
+@pytest.mark.slow
+@pytest.mark.parametrize("query, needle", QUERIES)
+def test_the_routed_program_and_the_full_space_both_answer_on_petta(query, needle):
+    """The PeTTa companion of the test above. The routed program gives the same answer as there; PeTTa has no
+    head-symbol edge, so the FULL space answers too, with the same atoms in the same order. The route is not
+    needed on PeTTa and is not wrong either."""
+    runtime = api_module._runtime_kb_paths()
+    routed = _run(api_module._generic_kb(query), query)
+    assert routed["rc"] == 0 and routed["status"] == "ok" and needle in " ".join(routed["atoms"])
+    full = _run(runtime, query)
+    assert full["rc"] == 0 and full["status"] == "ok", full
+    assert_same_answers(full["atoms"], routed["atoms"], what="the full space vs the routed stack")

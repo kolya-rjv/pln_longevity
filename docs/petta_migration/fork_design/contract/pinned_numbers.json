@@ -1,0 +1,495 @@
+{
+ "about": "Composite legacy outputs (patient stack, real hyperon 0.2.10, repo 47130aa), with the test that pins each. \"results\" = hyperon result groups as printed.",
+ "entries": [
+  {
+   "tag": "rank_population",
+   "query": "!(rank-interventions &self (DasatinibPlusQuercetin Fisetin Spermidine Elamipretide) CoronaryHeartDisease)",
+   "pinned_by": "tests/test_pln_deduction.py::test_rank_interventions_orders_by_protection (order only, Elamipretide omitted); ::test_rank_interventions_is_order_independent",
+   "results": [
+    [
+     "((scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Fisetin 0.030375591553125008 (signed Neg (stv 0.23205 0.13090106250000003))) (scored Spermidine 0.013122255550950002 (signed Neg (stv 0.17135999999999998 0.07657712156250002))))"
+    ]
+   ]
+  },
+  {
+   "tag": "rank_population_5pool",
+   "query": "!(rank-interventions &self (DasatinibPlusQuercetin Fisetin Spermidine Metformin Berberine) CoronaryHeartDisease)",
+   "pinned_by": "no direct pin; context for the personalised orders",
+   "results": [
+    [
+     "((scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Fisetin 0.030375591553125008 (signed Neg (stv 0.23205 0.13090106250000003))) (scored Spermidine 0.013122255550950002 (signed Neg (stv 0.17135999999999998 0.07657712156250002))))"
+    ]
+   ]
+  },
+  {
+   "tag": "rank_for_Patient001_5pool",
+   "query": "!(rank-interventions-for-patient &self Patient001 (DasatinibPlusQuercetin Fisetin Spermidine Metformin Berberine) CoronaryHeartDisease)",
+   "pinned_by": "tests/test_patient_grounding.py::test_personalization_reorders_across_patients (full order); ::test_metformin_ranks_above_berberine_same_mechanism",
+   "results": [
+    [
+     "((scored DasatinibPlusQuercetin 0.2306046747621094 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Fisetin 0.16471762483007815 (signed Neg (stv 0.23205 0.13090106250000003))) (scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))) (scored Spermidine 0.07115801392659378 (signed Neg (stv 0.17135999999999998 0.07657712156250002))))"
+    ]
+   ]
+  },
+  {
+   "tag": "rank_for_Patient002_5pool",
+   "query": "!(rank-interventions-for-patient &self Patient002 (DasatinibPlusQuercetin Fisetin Spermidine Metformin Berberine) CoronaryHeartDisease)",
+   "pinned_by": "tests/test_patient_grounding.py::test_personalization_reorders_across_patients (full order); ::test_metformin_ranks_above_berberine_same_mechanism",
+   "results": [
+    [
+     "((scored Metformin 0.6480162000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.56161404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Fisetin 0.030375591553125008 (signed Neg (stv 0.23205 0.13090106250000003))) (scored Spermidine 0.013122255550950002 (signed Neg (stv 0.17135999999999998 0.07657712156250002))))"
+    ]
+   ]
+  },
+  {
+   "tag": "rank_for_Patient001_4pool",
+   "query": "!(rank-interventions-for-patient &self Patient001 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+   "pinned_by": "tests/fixtures/patient_stack_builtin_golden.json via tests/test_patient_stack.py::test_a_built_in_patient_is_answered_to_the_digit_as_it_was_recorded (EXACT string)",
+   "results": [
+    [
+     "((scored DasatinibPlusQuercetin 0.2306046747621094 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))))"
+    ]
+   ]
+  },
+  {
+   "tag": "rank_for_Patient002_4pool",
+   "query": "!(rank-interventions-for-patient &self Patient002 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+   "pinned_by": "tests/fixtures/patient_stack_builtin_golden.json via tests/test_patient_stack.py::test_a_built_in_patient_is_answered_to_the_digit_as_it_was_recorded (EXACT string)",
+   "results": [
+    [
+     "((scored Metformin 0.6480162000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.56161404 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+    ]
+   ]
+  },
+  {
+   "tag": "rank_for_Patient003_4pool",
+   "query": "!(rank-interventions-for-patient &self Patient003 (Metformin Berberine CaloricRestriction DasatinibPlusQuercetin) CoronaryHeartDisease)",
+   "pinned_by": "tests/fixtures/patient_stack_builtin_golden.json via tests/test_patient_stack.py::test_a_built_in_patient_is_answered_to_the_digit_as_it_was_recorded (EXACT string)",
+   "results": [
+    [
+     "((scored Metformin 0.08860995000000002 (signed Neg (stv 0.33000000000000007 0.268515))) (scored Berberine 0.07679529000000002 (signed Neg (stv 0.28600000000000003 0.268515))) (scored DasatinibPlusQuercetin 0.042525828174375 (signed Neg (stv 0.24989999999999998 0.17017138125000003))))"
+    ]
+   ]
+  },
+  {
+   "tag": "rank_for_Patient001_pop_pool",
+   "query": "!(rank-interventions-for-patient &self Patient001 (DasatinibPlusQuercetin Fisetin Spermidine Elamipretide) CoronaryHeartDisease)",
+   "pinned_by": "tests/test_patient_grounding.py::test_personalized_ranking_order_and_omission; tests/test_patient_stack.py::test_patient001s_captured_outputs (score 0.2306046747621094, abs 1e-12); tests/test_hallmark_targeting.py::test_the_patient_facing_outputs_did_not_move",
+   "results": [
+    [
+     "((scored DasatinibPlusQuercetin 0.2306046747621094 (signed Neg (stv 0.24989999999999998 0.17017138125000003))) (scored Fisetin 0.16471762483007815 (signed Neg (stv 0.23205 0.13090106250000003))) (scored Spermidine 0.07115801392659378 (signed Neg (stv 0.17135999999999998 0.07657712156250002))))"
+    ]
+   ]
+  },
+  {
+   "tag": "relevance_Patient001_DasatinibPlusQuercetin",
+   "query": "!(patient-relevance &self Patient001 DasatinibPlusQuercetin)",
+   "pinned_by": "tests/test_patient_grounding.py::test_patient_relevance_ranks_by_targeting_the_patients_markers (dq > fis > spr > 0; Elamipretide approx 0)",
+   "results": [
+    [
+     "0.1880788465877344"
+    ]
+   ]
+  },
+  {
+   "tag": "relevance_Patient001_Fisetin",
+   "query": "!(patient-relevance &self Patient001 Fisetin)",
+   "pinned_by": "tests/test_patient_grounding.py::test_patient_relevance_ranks_by_targeting_the_patients_markers (dq > fis > spr > 0; Elamipretide approx 0)",
+   "results": [
+    [
+     "0.13434203327695315"
+    ]
+   ]
+  },
+  {
+   "tag": "relevance_Patient001_Spermidine",
+   "query": "!(patient-relevance &self Patient001 Spermidine)",
+   "pinned_by": "tests/test_patient_grounding.py::test_patient_relevance_ranks_by_targeting_the_patients_markers (dq > fis > spr > 0; Elamipretide approx 0)",
+   "results": [
+    [
+     "0.05803575837564377"
+    ]
+   ]
+  },
+  {
+   "tag": "relevance_Patient001_Elamipretide",
+   "query": "!(patient-relevance &self Patient001 Elamipretide)",
+   "pinned_by": "tests/test_patient_grounding.py::test_patient_relevance_ranks_by_targeting_the_patients_markers (dq > fis > spr > 0; Elamipretide approx 0)",
+   "results": [
+    [
+     "0.0"
+    ]
+   ]
+  },
+  {
+   "tag": "relevance_Patient001_Metformin",
+   "query": "!(patient-relevance &self Patient001 Metformin)",
+   "pinned_by": "context",
+   "results": [
+    [
+     "0.0"
+    ]
+   ]
+  },
+  {
+   "tag": "relevance_Patient001_Omega3",
+   "query": "!(patient-relevance &self Patient001 Omega3)",
+   "pinned_by": "context",
+   "results": [
+    [
+     "0.43260750000000003"
+    ]
+   ]
+  },
+  {
+   "tag": "relevance_Patient001_Resveratrol",
+   "query": "!(patient-relevance &self Patient001 Resveratrol)",
+   "pinned_by": "context",
+   "results": [
+    [
+     "0.07233801791835938"
+    ]
+   ]
+  },
+  {
+   "tag": "relevance_Patient002_Metformin",
+   "query": "!(patient-relevance &self Patient002 Metformin)",
+   "pinned_by": "tests/test_patient_grounding.py::test_metformin_relevance_is_patient_specific (> 0.4); tests/test_supplement_recommendation.py::test_safety_derates_the_score",
+   "results": [
+    [
+     "0.5594062500000001"
+    ]
+   ]
+  },
+  {
+   "tag": "relevance_Patient002_Berberine",
+   "query": "!(patient-relevance &self Patient002 Berberine)",
+   "pinned_by": "tests/test_patient_grounding.py::test_metformin_relevance_is_patient_specific (> 0.4); tests/test_supplement_recommendation.py::test_safety_derates_the_score",
+   "results": [
+    [
+     "0.48481875"
+    ]
+   ]
+  },
+  {
+   "tag": "diagnose_population",
+   "query": "!(diagnose &self (CellularSenescence MitochondrialDysfunction ChronicInflammation) (DNAmPAI1 DNAmGDF15 CRP))",
+   "pinned_by": "tests/test_pln_deduction.py::test_diagnosis_ranks_by_coverage ([CS, CI, MD], coverage [3,2,1]); ::test_diagnosis_provenance_and_tv (s(CS)=0.595, c(MD)=0.65, marker sets)",
+   "results": [
+    [
+     "((Hypothesis CellularSenescence (stv 0.595 0.6253054502923161) 3.0 0.45928900265625006 (SupportedBy (CRP DNAmGDF15 DNAmPAI1))) (Hypothesis ChronicInflammation (stv 0.8 0.8775) 2.0 0.9425000000000001 (SupportedBy (CRP DNAmGDF15))) (Hypothesis MitochondrialDysfunction (stv 0.75 0.65) 1.0 0.48750000000000004 (SupportedBy (DNAmGDF15))))"
+    ]
+   ]
+  },
+  {
+   "tag": "diagnose_unconnected",
+   "query": "!(diagnose &self (CellularSenescence GenomicInstability) (DNAmPAI1 DNAmGDF15 CRP))",
+   "pinned_by": "tests/test_pln_deduction.py::test_diagnosis_omits_unconnected_hypotheses",
+   "results": [
+    [
+     "((Hypothesis CellularSenescence (stv 0.595 0.6253054502923161) 3.0 0.45928900265625006 (SupportedBy (CRP DNAmGDF15 DNAmPAI1))))"
+    ]
+   ]
+  },
+  {
+   "tag": "diagnose_patient_Patient001",
+   "query": "!(diagnose-patient &self Patient001 (CellularSenescence MitochondrialDysfunction ChronicInflammation))",
+   "pinned_by": "tests/test_patient_grounding.py (order, coverage, s=0.595, c approx 0.625 abs 1e-2); golden JSON (EXACT string)",
+   "results": [
+    [
+     "((Hypothesis CellularSenescence (stv 0.595 0.6253054502923161) 3.0 0.45928900265625006 (SupportedBy (CRP DNAmGDF15 DNAmPAI1))) (Hypothesis ChronicInflammation (stv 0.8 0.8775) 2.0 0.9425000000000001 (SupportedBy (CRP DNAmGDF15))) (Hypothesis MitochondrialDysfunction (stv 0.75 0.65) 1.0 0.48750000000000004 (SupportedBy (DNAmGDF15))))"
+    ]
+   ]
+  },
+  {
+   "tag": "diagnose_patient_Patient002",
+   "query": "!(diagnose-patient &self Patient002 (CellularSenescence MitochondrialDysfunction ChronicInflammation))",
+   "pinned_by": "tests/test_patient_grounding.py (order, coverage, s=0.595, c approx 0.625 abs 1e-2); golden JSON (EXACT string)",
+   "results": [
+    [
+     "()"
+    ]
+   ]
+  },
+  {
+   "tag": "diagnose_patient002_metabolic",
+   "query": "!(diagnose-patient &self Patient002 (CellularSenescence DeregulatedNutrientSensing MitochondrialDysfunction))",
+   "pinned_by": "tests/test_patient_grounding.py::test_diagnose_patient002_finds_metabolic_cause",
+   "results": [
+    [
+     "((Hypothesis DeregulatedNutrientSensing (stv 0.6400000000000001 0.6159099375) 2.0 0.45630000000000004 (SupportedBy (HbA1c FastingGlucose))))"
+    ]
+   ]
+  },
+  {
+   "tag": "diagnose_patient_default_P001",
+   "query": "!(diagnose-patient &self Patient001)",
+   "pinned_by": "tests/test_patient_stack.py default-causes tests",
+   "results": [
+    [
+     "((Hypothesis CellularSenescence (stv 0.595 0.6253054502923161) 3.0 0.45928900265625006 (SupportedBy (CRP DNAmGDF15 DNAmPAI1))) (Hypothesis ChronicInflammation (stv 0.8 0.8775) 2.0 0.9425000000000001 (SupportedBy (CRP DNAmGDF15))) (Hypothesis MitochondrialDysfunction (stv 0.75 0.65) 1.0 0.48750000000000004 (SupportedBy (DNAmGDF15))))"
+    ]
+   ]
+  },
+  {
+   "tag": "cf_Patient001_ChronicInflammation",
+   "query": "!(counterfactual-patient &self Patient001 ChronicInflammation)",
+   "pinned_by": "tests/test_counterfactual.py",
+   "results": [
+    [
+     "(Counterfactual ChronicInflammation AgeAccelGrim (expected-delta -0.12187500000000001) (signed Neg (stv 0.12187500000000001 0.65)) (Via (DNAmGDF15)))"
+    ]
+   ]
+  },
+  {
+   "tag": "cf_Patient001_CellularSenescence",
+   "query": "!(counterfactual-patient &self Patient001 CellularSenescence)",
+   "pinned_by": "tests/test_counterfactual.py",
+   "results": [
+    [
+     "(Counterfactual CellularSenescence AgeAccelGrim (expected-delta -0.22192968749999997) (signed Neg (stv 0.22192968749999997 0.31763845825852793)) (Via (DNAmPAI1 DNAmGDF15)))"
+    ]
+   ]
+  },
+  {
+   "tag": "cf_Patient001_InsulinResistance",
+   "query": "!(counterfactual-patient &self Patient001 InsulinResistance)",
+   "pinned_by": "tests/test_counterfactual.py",
+   "results": [
+    [
+     "(Counterfactual InsulinResistance AgeAccelGrim (expected-delta 0.0) (signed Neg (stv 0.0 0.0)) (Via ()))"
+    ]
+   ]
+  },
+  {
+   "tag": "cf_Patient001_CRP",
+   "query": "!(counterfactual-patient &self Patient001 CRP)",
+   "pinned_by": "tests/test_counterfactual.py",
+   "results": [
+    [
+     "(Counterfactual CRP AgeAccelGrim (expected-delta -0.12187500000000001) (signed Neg (stv 0.12187500000000001 0.65)) (Via (DNAmGDF15)))"
+    ]
+   ]
+  },
+  {
+   "tag": "cf_Patient001_DasatinibPlusQuercetin",
+   "query": "!(counterfactual-patient &self Patient001 DasatinibPlusQuercetin)",
+   "pinned_by": "tests/test_counterfactual.py",
+   "results": [
+    [
+     "(Counterfactual DasatinibPlusQuercetin AgeAccelGrim (expected-delta -0.15535078125000001) (signed Neg (stv 0.15535078125000001 0.1858184980812388)) (Via (DNAmPAI1 DNAmGDF15)))"
+    ]
+   ]
+  },
+  {
+   "tag": "cf_Patient001_Metformin",
+   "query": "!(counterfactual-patient &self Patient001 Metformin)",
+   "pinned_by": "tests/test_counterfactual.py",
+   "results": [
+    [
+     "(Counterfactual Metformin AgeAccelGrim (expected-delta 0.0) (signed Neg (stv 0.0 0.0)) (Via ()))"
+    ]
+   ]
+  },
+  {
+   "tag": "cf_Patient001_Elamipretide",
+   "query": "!(counterfactual-patient &self Patient001 Elamipretide)",
+   "pinned_by": "tests/test_counterfactual.py::test_unconnected_lever_is_omitted (empty)",
+   "results": [
+    []
+   ]
+  },
+  {
+   "tag": "cf_Patient003_SmokingCessation",
+   "query": "!(counterfactual-patient &self Patient003 SmokingCessation)",
+   "pinned_by": "tests/test_smoking_lever.py::test_the_lever_returns_a_real_delta_through_the_packyears_component (delta -0.0819, conf 0.324, rel 1e-6)",
+   "results": [
+    [
+     "(Counterfactual SmokingCessation AgeAccelGrim (expected-delta -0.08190000000000001) (signed Neg (stv 0.08190000000000001 0.324)) (Via (DNAmPACKYRS)))"
+    ]
+   ]
+  },
+  {
+   "tag": "cf_Patient003_SmokingPackYears",
+   "query": "!(counterfactual-patient &self Patient003 SmokingPackYears)",
+   "pinned_by": "tests/test_smoking_lever.py::test_the_intervention_and_the_driver_differ_by_exactly_the_cessation_prior (ratios 0.39 and 0.54)",
+   "results": [
+    [
+     "(Counterfactual SmokingPackYears AgeAccelGrim (expected-delta -0.21000000000000002) (signed Neg (stv 0.21000000000000002 0.6)) (Via (DNAmPACKYRS)))"
+    ]
+   ]
+  },
+  {
+   "tag": "cf_Patient001_SmokingCessation",
+   "query": "!(counterfactual-patient &self Patient001 SmokingCessation)",
+   "pinned_by": "tests/test_smoking_lever.py::test_a_patient_with_no_packyears_measurement_honestly_gets_zero",
+   "results": [
+    [
+     "(Counterfactual SmokingCessation AgeAccelGrim (expected-delta 0.0) (signed Neg (stv 0.0 0.0)) (Via ()))"
+    ]
+   ]
+  },
+  {
+   "tag": "decompose_Patient001",
+   "query": "!(decompose-grimage &self Patient001)",
+   "pinned_by": "tests/test_counterfactual.py (components, contributions 0.225 / 0.1875, residual 1.6-0.4125, DrivenBy sets)",
+   "results": [
+    [
+     "(Decomposition Patient001 (Components ((Component DNAmPAI1 (z 1.8) (weight 0.125) (contribution 0.225) (DrivenBy (CellularSenescence))) (Component DNAmGDF15 (z 1.5) (weight 0.125) (contribution 0.1875) (DrivenBy (MitochondrialDysfunction CellularSenescence ChronicInflammation))))) (attributed 0.4125) (residual 1.1875))"
+    ]
+   ]
+  },
+  {
+   "tag": "pos_transmission_CS_PAI1",
+   "query": "!(pos-transmission &self CellularSenescence DNAmPAI1)",
+   "pinned_by": "context: the hop transmission the counterfactual reads",
+   "results": [
+    [
+     "(stv 0.595 0.38025000000000003)"
+    ]
+   ]
+  },
+  {
+   "tag": "pos_transmission_CS_GDF15",
+   "query": "!(pos-transmission &self CellularSenescence DNAmGDF15)",
+   "pinned_by": "context",
+   "results": [
+    [
+     "(stv 0.46962499999999996 0.22244625000000004)"
+    ]
+   ]
+  },
+  {
+   "tag": "pos_transmission_CRP_GDF15",
+   "query": "!(pos-transmission &self CRP DNAmGDF15)",
+   "pinned_by": "tests/test_counterfactual.py::test_crp_lever_routes_through_shared_cause_not_a_direct_edge (empty)",
+   "results": [
+    []
+   ]
+  },
+  {
+   "tag": "risk_Patient001",
+   "query": "!(predict-risk-patient &self Patient001)",
+   "pinned_by": "tests/test_risk_prediction.py; golden JSON (EXACT string); P001 point 0.12605177716424967 abs 1e-12 (test_patient_stack, test_hallmark_targeting)",
+   "results": [
+    [
+     "(RiskPrediction Patient001 CoronaryHeartDisease (point 0.12605177716424967) (ci 0.096429609530651 0.15567394479784832) (confidence 0.765) (baseline 0.08) (multiplier 1.5756472145531208))"
+    ]
+   ]
+  },
+  {
+   "tag": "risk_Patient002",
+   "query": "!(predict-risk-patient &self Patient002)",
+   "pinned_by": "tests/test_risk_prediction.py; golden JSON (EXACT string); P001 point 0.12605177716424967 abs 1e-12 (test_patient_stack, test_hallmark_targeting)",
+   "results": [
+    [
+     "(RiskPrediction Patient002 CoronaryHeartDisease (point 0.2170334555640622) (ci 0.1660305935065076 0.2680363176216168) (confidence 0.765) (baseline 0.15) (multiplier 1.4468897037604147))"
+    ]
+   ]
+  },
+  {
+   "tag": "risk_Patient003",
+   "query": "!(predict-risk-patient &self Patient003)",
+   "pinned_by": "tests/test_risk_prediction.py; golden JSON (EXACT string); P001 point 0.12605177716424967 abs 1e-12 (test_patient_stack, test_hallmark_targeting)",
+   "results": [
+    [
+     "(RiskPrediction Patient003 CoronaryHeartDisease (point 0.23634708218296813) (ci 0.18080551786997062 0.29188864649596563) (confidence 0.765) (baseline 0.15) (multiplier 1.5756472145531208))"
+    ]
+   ]
+  },
+  {
+   "tag": "project_Patient001_ChronicInflammation",
+   "query": "!(project-risk-patient &self Patient001 ChronicInflammation)",
+   "pinned_by": "tests/test_risk_prediction.py (b > a > c approx 0; confidence b < a)",
+   "results": [
+    [
+     "(ProjectedRisk ChronicInflammation CoronaryHeartDisease (point 0.12176098475222903) (reduction 0.004290792412020641) (delta-clock -0.12187500000000001) (confidence 0.65) (Via (DNAmGDF15)))"
+    ]
+   ]
+  },
+  {
+   "tag": "project_Patient001_CellularSenescence",
+   "query": "!(project-risk-patient &self Patient001 CellularSenescence)",
+   "pinned_by": "tests/test_risk_prediction.py (b > a > c approx 0; confidence b < a)",
+   "results": [
+    [
+     "(ProjectedRisk CellularSenescence CoronaryHeartDisease (point 0.1183478073576214) (reduction 0.007703969806628269) (delta-clock -0.22192968749999997) (confidence 0.31763845825852793) (Via (DNAmPAI1 DNAmGDF15)))"
+    ]
+   ]
+  },
+  {
+   "tag": "project_Patient001_InsulinResistance",
+   "query": "!(project-risk-patient &self Patient001 InsulinResistance)",
+   "pinned_by": "tests/test_risk_prediction.py (b > a > c approx 0; confidence b < a)",
+   "results": [
+    [
+     "(ProjectedRisk InsulinResistance CoronaryHeartDisease (point 0.12605177716424967) (reduction 0.0) (delta-clock 0.0) (confidence 0.0) (Via ()))"
+    ]
+   ]
+  },
+  {
+   "tag": "project_Patient003_SmokingCessation",
+   "query": "!(project-risk-patient &self Patient003 SmokingCessation)",
+   "pinned_by": "tests/test_smoking_lever.py::test_the_clock_reduction_becomes_an_absolute_risk_reduction (point 0.23091 abs 1e-4, reduction 0.00544 abs 1e-4, conf 0.324)",
+   "results": [
+    [
+     "(ProjectedRisk SmokingCessation CoronaryHeartDisease (point 0.23091003826731654) (reduction 0.005437043915651585) (delta-clock -0.08190000000000001) (confidence 0.324) (Via (DNAmPACKYRS)))"
+    ]
+   ]
+  },
+  {
+   "tag": "supplements_Patient001",
+   "query": "!(recommend-supplements-patient &self Patient001)",
+   "pinned_by": "tests/test_supplement_recommendation.py; golden JSON (EXACT string)",
+   "results": [
+    [
+     "(SupplementRecommendation Patient001 (Tier1HighConfidence ((SuppRec Omega3 (tier Tier1HighConfidence) (score 0.43260750000000003) (evidence MultipleHumanTrials 0.85) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15))))) (Tier2Promising ((SuppRec NMN (tier Tier2Promising) (score 0.16891875) (evidence SingleHumanTrial 0.7) (safety GenerallyWellTolerated 1.0) (Targets (DNAmGDF15))) (SuppRec Fisetin (tier Tier2Promising) (score 0.13434203327695315) (evidence AnimalStudies_Single 0.5) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15 DNAmPAI1))))) (NotRecommended ((SuppRec Resveratrol (tier NotRecommended) (score 0.07233801791835938) (evidence ITP_Negative 0.9) (safety GenerallyWellTolerated 1.0) (Targets (CRP DNAmGDF15 DNAmPAI1))))) (Interactions ()))"
+    ]
+   ]
+  },
+  {
+   "tag": "supplements_Patient002",
+   "query": "!(recommend-supplements-patient &self Patient002)",
+   "pinned_by": "tests/test_supplement_recommendation.py; golden JSON (EXACT string)",
+   "results": [
+    [
+     "(SupplementRecommendation Patient002 (Tier1HighConfidence ((SuppRec Berberine (tier Tier1HighConfidence) (score 0.38785500000000006) (evidence MultipleHumanTrials 0.85) (safety UseWithCaution 0.8) (Targets (HbA1c FastingGlucose))))) (Tier2Promising ()) (NotRecommended ()) (Interactions ((InteractionFlag Berberine Metformin \"Shared AMPK activation \u2014 additive glucose lowering; monitor and consult MD\"))))"
+    ]
+   ]
+  },
+  {
+   "tag": "infer_SmokingCessation_CHD",
+   "query": "!(infer &self SmokingCessation CoronaryHeartDisease)",
+   "pinned_by": "tests/test_smoking_lever.py::test_the_smoking_axis_still_does_not_reach_chd_through_infer (empty)",
+   "results": [
+    []
+   ]
+  },
+  {
+   "tag": "infer_DQ_AllCauseMortality",
+   "query": "!(infer &self DasatinibPlusQuercetin AllCauseMortality)",
+   "pinned_by": "tests/test_pln_deduction.py::test_no_false_chain (empty)",
+   "results": [
+    []
+   ]
+  },
+  {
+   "tag": "infer_Rapamycin_CHD",
+   "query": "!(infer &self Rapamycin CoronaryHeartDisease)",
+   "pinned_by": "tests/test_hallmark_targeting.py::test_rapamycin_is_still_unreachable_by_inference (empty)",
+   "results": [
+    []
+   ]
+  },
+  {
+   "tag": "explain_DQ_CHD",
+   "query": "!(explain &self DasatinibPlusQuercetin CoronaryHeartDisease)",
+   "pinned_by": "tests/test_pln_deduction.py::test_explain_returns_signed_path (exact Chain node list)",
+   "results": [
+    [
+     "(Chain (DasatinibPlusQuercetin CellularSenescence SASP DNAmPAI1 CoronaryHeartDisease) (signed Neg (stv 0.24989999999999998 0.17017138125000003)))"
+    ]
+   ]
+  }
+ ]
+}

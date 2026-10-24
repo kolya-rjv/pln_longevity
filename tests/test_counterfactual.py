@@ -17,7 +17,8 @@ uses) and assert Demo 4's headline properties:
     never via a fictitious CRP -> GrimAge edge; a metabolic lever reaches no clock
     surrogate (honest ~0); an edge-less lever (Elamipretide) is omitted, not placed.
 
-Skipped automatically if `hyperon` is not installed.
+Runs on the selected runtime (PLN_RUNTIME: hyperon, the default, or petta; tests/runtime_harness.py) and is
+skipped automatically if that runtime is not installed.
 
 Run:  pytest tests/ -v       (from the repo root)
 """
@@ -25,11 +26,13 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
-hyperon = pytest.importorskip("hyperon")
-from hyperon import MeTTa  # noqa: E402
+from runtime_harness import Kb, new_kb, require_runtime
+
+require_runtime()
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -63,12 +66,10 @@ _CF_RE = re.compile(
 
 
 @pytest.fixture(scope="module")
-def kb() -> MeTTa:
+def kb() -> Iterator[Kb]:
     """A MeTTa interpreter with the full KB + counterfactual layer in one space."""
-    text = "\n".join((REPO / f).read_text(encoding="utf-8") for f in KB_FILES)
-    m = MeTTa()
-    m.run(text)
-    return m
+    with new_kb(KB_FILES) as m:
+        yield m
 
 
 def _is_empty(res) -> bool:
@@ -76,13 +77,13 @@ def _is_empty(res) -> bool:
     return res == [[]] or all(len(g) == 0 for g in res)
 
 
-def _one(kb: MeTTa, query: str) -> str:
+def _one(kb: Kb, query: str) -> str:
     res = kb.run(query)
     assert res and res[0], f"no result for {query}: {res}"
     return str(res[0][0])
 
 
-def _counterfactual(kb: MeTTa, lever: str, outcome: str = "AgeAccelGrim") -> dict:
+def _counterfactual(kb: Kb, lever: str, outcome: str = "AgeAccelGrim") -> dict:
     """Run counterfactual-patient and parse the single result into a dict."""
     out = _one(kb, f"!(counterfactual-patient &self Patient001 {lever})")
     m = _CF_RE.search(out)

@@ -941,6 +941,7 @@ def _guard_prompt_size(system_prompt: str, message: str, history: list[dict],
 #: DrugAge build are not "a successful query that happened to be empty".
 _PLN_ERROR_STATUS: dict[str, int] = {
     "runtime_error":         502,
+    "refused_form":          422,   # PeTTa only: the caller's program asked for something the runtime does not run
     "drugage_build_missing": 503,   # the service is not ready, not the caller's fault
 }
 

@@ -30,6 +30,7 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
@@ -247,25 +248,23 @@ def test_the_prompt_no_longer_tells_the_translator_to_avoid_the_predicate():
 
 # ── and the engine agrees (real MeTTa) ───────────────────────────────────────
 
-hyperon = pytest.importorskip("hyperon")
-from hyperon import MeTTa  # noqa: E402
+from runtime_harness import Kb, new_kb, require_runtime  # noqa: E402
+
+require_runtime()
 
 _NUM = r"([-\d.eE]+)"
 
 
 @pytest.fixture(scope="module")
-def metta():
+def metta() -> Iterator[Kb]:
     """The full runtime stack, loaded into one space as pln_runner does."""
     files = {p.name: p for p in api_module._runtime_kb_paths()}
-    m = MeTTa()
-    for name in api_module._INFERENCE_STACK:
-        path = files.get(name)
-        if path is not None:
-            m.run(path.read_text(encoding="utf-8"))
-    return m
+    stack = [files[name] for name in api_module._INFERENCE_STACK if name in files]
+    with new_kb(stack, separate=True) as m:      # one `run` per file, as before
+        yield m
 
 
-def _run(m, query: str) -> list[str]:
+def _run(m: Kb, query: str) -> list[str]:
     return [str(atom) for result in m.run(query) for atom in result]
 
 

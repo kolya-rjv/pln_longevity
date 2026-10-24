@@ -58,7 +58,9 @@ import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 
-pytest.importorskip("hyperon", reason="the PLN runtime is not installed")
+from runtime_harness import hyperon_only, require_runtime  # noqa: E402
+
+require_runtime(reason="the PLN runtime is not installed")
 
 import api as api_module  # noqa: E402  (conftest puts pln_chat on sys.path)
 
@@ -66,18 +68,18 @@ import api as api_module  # noqa: E402  (conftest puts pln_chat on sys.path)
 #: exercise of the inference stack: patient -> markers -> deduction -> risk.
 CANARY_QUERY = "!(predict-risk-patient &self Patient001)"
 
+#: The probe's child process builds its interpreter through the harness: on hyperon that is a real
+#: `MeTTa()` loaded with one `run` per file and one for `extra` (what this script always did), and the
+#: probe still dies by abort() where it always did; on PeTTa it is a PeTTa session, which does not abort.
 _CHILD = r"""
 import json
 import sys
-from pathlib import Path
-from hyperon import MeTTa
+
+sys.path.insert(0, sys.argv[4])
+from runtime_harness import new_kb
 
 paths, query, extra = json.loads(sys.argv[1]), sys.argv[2], sys.argv[3]
-metta = MeTTa()
-for path in paths:
-    metta.run(Path(path).read_text(encoding="utf-8"))
-if extra:
-    metta.run(extra)
+metta = new_kb(paths, extra, separate=True)
 result = metta.run(query)
 if not result or not result[0]:
     print("EMPTY")
@@ -91,7 +93,8 @@ def _run(query: str = CANARY_QUERY, extra: str = "",
     """Load what the app loads for `query` (plus `extra`) and run it, out of process."""
     paths = api_module._generic_kb(query) if kb is None else kb
     return subprocess.run(
-        [sys.executable, "-c", _CHILD, json.dumps([str(p) for p in paths]), query, extra],
+        [sys.executable, "-c", _CHILD, json.dumps([str(p) for p in paths]), query, extra,
+         str(Path(__file__).resolve().parent)],
         capture_output=True, text=True, timeout=300,
     )
 
@@ -167,6 +170,7 @@ def test_atom_count_is_not_the_limit():
     )
 
 
+@hyperon_only
 def test_distinct_head_symbols_are_the_limit():
     """256 new head symbols, 256 atoms, and the interpreter dies.
 

@@ -33,6 +33,9 @@ pytest.importorskip("fastapi")
 import api as api_module  # noqa: E402
 from core.patient_context import names_a_patient, patient_atoms_for, reads_patients  # noqa: E402
 from core.pln_runner import PATIENT_STACK_EXCLUDED, patient_stack  # noqa: E402
+from runtime_compare import (  # noqa: E402
+    assert_same_answers, contains, on_petta, petta_only, startswith,
+)
 
 CALLER = ("(InstanceOf Caller_Me PatientProfile)\n(PatientAge Caller_Me 58)\n(PatientSex Caller_Me Male)\n"
           "(PatientSmoking Caller_Me CurrentSmoker)\n(MeasuredZ Caller_Me AgeAccelGrim 0.9375)\n"
@@ -53,7 +56,9 @@ def _run(stack: str, query: str, extra: str = "") -> dict:
         "kb = api._runtime_kb_paths()",
         "kb = patient_stack(kb) if sys.argv[1] == 'patient' else kb",
         "r = run_query(sys.argv[2], kb_files=kb, extra_atoms=sys.argv[3] or None)",
-        "print('RESULT ' + json.dumps({'status': r.status, 'atoms': [x.atom for x in r.results]}))",
+        "from core.metta_runtime import get_runtime",
+        "queries_s = getattr(get_runtime(), 'last_run', {}).get('queries_s')       # PeTTa only; hyperon has none",
+        "print('RESULT ' + json.dumps({'status': r.status, 'atoms': [x.atom for x in r.results], 'queries_s': queries_s}))",
     ])
     started = time.monotonic()
     done = subprocess.run([sys.executable, "-c", probe, stack, query, extra],
@@ -126,6 +131,7 @@ def test_patient001s_captured_outputs_are_what_a_patient_now_sees():
 
 # ═══════════════════════════ it answers what aborted ══════════════════════════
 
+@pytest.mark.hyperon_only                 # the control is a hyperon abort; PeTTa has none (the companion is below)
 @pytest.mark.slow
 @pytest.mark.parametrize("patient, form", [
     ("Patient001", RANK), ("Patient001", SUPPLEMENTS), ("Patient002", SUPPLEMENTS),
@@ -187,15 +193,12 @@ def test_a_program_that_reads_patient_facts_is_recognised(program, reads):
     assert patient_atoms_for(program, "(PatientAge Caller_Me 58)") == ("(PatientAge Caller_Me 58)" if reads else None)
 
 
-@pytest.mark.slow
-def test_listing_patient_facts_with_a_session_patient_loaded_does_not_abort():
-    """It used to: a generic program ran in the FULL space with the session patient's
-    atoms, and enumerating MeasuredZ there panics hyperon (trie.rs:179). Routed as
-    production routes it now, it answers and lists the caller too."""
-    q = "!(match &self (MeasuredZ $p CRP $z) ($p $z))"
-    caller = CALLER.format(z="1.2")
-    full = _run("full", q, caller)
-    assert full["rc"] != 0, "control: the full space no longer aborts here — the guard is still right"
+LISTING = "!(match &self (MeasuredZ $p CRP $z) ($p $z))"
+
+
+def _the_listing_is_routed_to_the_patient_stack_and_lists_the_caller(q: str, caller: str) -> dict:
+    """The half of the next two tests that does not depend on the engine's edge: where the program runs,
+    what it is given, and that it answers and lists the caller too. Returns the routed run."""
     assert api_module._generic_kb(q) == patient_stack(api_module._runtime_kb_paths())
     routed = _run("patient", q, patient_atoms_for(q, caller) or "")
     assert routed["rc"] == 0 and any("Caller_Me" in a for a in routed["atoms"])
@@ -203,6 +206,33 @@ def test_listing_patient_facts_with_a_session_patient_loaded_does_not_abort():
     generic = "!(infer &self Metformin CoronaryHeartDisease)"
     assert patient_atoms_for(generic, caller) is None
     assert api_module._generic_kb(generic) == generic_stack(api_module._runtime_kb_paths())
+    return routed
+
+
+@pytest.mark.hyperon_only                 # the control is a hyperon abort; PeTTa has none (the companion is below)
+@pytest.mark.slow
+def test_listing_patient_facts_with_a_session_patient_loaded_does_not_abort():
+    """It used to: a generic program ran in the FULL space with the session patient's
+    atoms, and enumerating MeasuredZ there panics hyperon (trie.rs:179). Routed as
+    production routes it now, it answers and lists the caller too."""
+    q = LISTING
+    caller = CALLER.format(z="1.2")
+    full = _run("full", q, caller)
+    assert full["rc"] != 0, "control: the full space no longer aborts here — the guard is still right"
+    _the_listing_is_routed_to_the_patient_stack_and_lists_the_caller(q, caller)
+
+
+@petta_only
+@pytest.mark.slow
+def test_listing_patient_facts_with_a_session_patient_loaded_answers_in_both_spaces_on_petta():
+    """The PeTTa companion of the test above: the full space does not abort on PeTTa, it lists the same facts
+    the patient stack lists (the session patient included), in the same order; the routing is as before."""
+    q = LISTING
+    caller = CALLER.format(z="1.2")
+    full = _run("full", q, caller)
+    assert full["rc"] == 0 and full["status"] == "ok" and any("Caller_Me" in a for a in full["atoms"]), full
+    routed = _the_listing_is_routed_to_the_patient_stack_and_lists_the_caller(q, caller)
+    assert_same_answers(full["atoms"], routed["atoms"], what="the full space vs the patient stack")
 
 
 
@@ -234,7 +264,25 @@ def test_a_built_in_patient_is_answered_to_the_digit_as_it_was_recorded(name):
     case = GOLDEN[name]
     out = _run("patient", case["query"])
     assert out["rc"] == 0 and out["status"] == ("ok" if case["atoms"] else "empty")     # empty: nothing relevant
-    assert out["atoms"] == case["atoms"]
+    assert_same_answers(out["atoms"], case["atoms"], what=name)         # == on hyperon (tests/runtime_compare.py)
+
+
+@petta_only
+@pytest.mark.slow
+@pytest.mark.parametrize("patient, form, golden", [
+    ("Patient001", RANK, "Patient001_rank"), ("Patient001", SUPPLEMENTS, "Patient001_supp"),
+    ("Patient002", SUPPLEMENTS, "Patient002_supp"),
+])
+def test_the_built_in_patient_forms_that_abort_hyperon_answer_in_both_stacks_on_petta(patient, form, golden):
+    """The PeTTa companion of test_the_built_in_patient_forms_that_aborted_now_answer. PeTTa has no head-symbol
+    edge: the patient stack gives the recorded answer (to the digit, orders aside: tests/runtime_compare.py)
+    and the FULL stack answers too, with the same atoms. The routing is correct either way."""
+    q = form.format(P=patient)
+    scoped, full = _run("patient", q), _run("full", q)
+    assert scoped["rc"] == 0 and scoped["status"] == "ok"
+    assert_same_answers(scoped["atoms"], GOLDEN[golden]["atoms"], what=golden)
+    assert full["rc"] == 0 and full["status"] == "ok", f"the full stack does not answer {q} on PeTTa: {full}"
+    assert_same_answers(full["atoms"], scoped["atoms"], what="full stack vs patient stack")
 
 
 @pytest.mark.slow
@@ -286,8 +334,8 @@ def test_diagnosing_with_no_cause_list_searches_the_default_causes_and_finds_the
     assert two["atoms"] == _run("patient", f"!(diagnose-patient &self Caller_Me {DEFAULT_CAUSES})",
                                 TAB_SMOKER)["atoms"]
     assert re.findall(r"\(Hypothesis (\w+) ", two["atoms"][0])[0] == "InsulinResistance"
-    assert "(Hypothesis InsulinResistance (stv 0.8 0.8775) 2.0 " in two["atoms"][0]
-    assert "(SupportedBy (HbA1c FastingGlucose))" in two["atoms"][0]
+    assert contains(two["atoms"][0], "(Hypothesis InsulinResistance (stv 0.8 0.8775) 2.0 ")
+    assert contains(two["atoms"][0], "(SupportedBy (HbA1c FastingGlucose))")
     # the control: the list the translator used to copy does not reach these two labs
     assert _run("patient", f"!(diagnose-patient &self Caller_Me {THREE_HALLMARKS})",
                 TAB_SMOKER)["atoms"] == ["()"]
@@ -302,7 +350,7 @@ def test_the_default_causes_answer_each_built_in_patient_and_leave_the_three_arg
     assert re.findall(r"\(Hypothesis (\w+) ", two["atoms"][0])[0] == first
     assert two["atoms"] == _run("patient", f"!(diagnose-patient &self {patient} {DEFAULT_CAUSES})")["atoms"]
     three = GOLDEN[f"{patient}_dx"]
-    assert _run("patient", three["query"])["atoms"] == three["atoms"]
+    assert_same_answers(_run("patient", three["query"])["atoms"], three["atoms"], what=f"{patient}_dx")
 
 
 @pytest.mark.slow
@@ -360,7 +408,7 @@ def test_an_elevated_rdw_and_a_low_albumin_are_witnesses_for_chronic_inflammatio
     diag = _run("patient", "!(diagnose-patient &self Caller_Me)", atoms)
     assert diag["rc"] == 0 and diag["atoms"][0].startswith("((Hypothesis ChronicInflammation (stv 0.5")
     first = diag["atoms"][0].split("(Hypothesis CellularSenescence")[0]
-    assert " 2.0 " in first                                          # coverage 2
+    assert contains(first, " 2.0 ")                                  # coverage 2
     assert set(re.search(r"\(SupportedBy \(([^)]*)\)\)", first).group(1).split()) == {"RDW", "LowSerumAlbumin"}
     plan = _run("patient", SUPPLEMENTS.format(P="Caller_Me"), atoms)["atoms"][0]
     assert "(SuppRec Omega3" in plan
@@ -440,7 +488,28 @@ def test_a_flag_needs_a_recommended_supplement_and_a_relevant_supplement_needs_n
 @pytest.mark.slow
 def test_the_single_supplement_form_costs_one_evaluation_not_two():
     """A second equation re-ran supplement-rec for every call: double the latency for every patient, with or
-    without a medication. One let-forced equation costs a fraction of the five-supplement plan."""
+    without a medication. One let-forced equation costs a fraction of the five-supplement plan.
+
+    What is measured is the evaluation, as a ratio to the five-supplement plan. On hyperon the evaluation is
+    seconds (5.1 s for the plan, 2.1 s for one supplement, 4.1 s with the old second equation: ratios 0.42
+    and 0.81) and dominates the process, so the wall clock of the whole process is the measure, unchanged.
+    On PeTTa the evaluation is a few milliseconds beside 0.4 s of process start and KB load, so the
+    wall clock cannot show it (0.8 s against 0.8 s); the child's own evaluation time (`queries_s`, the
+    adapter's `last_run`) is used instead, with enough inert labs for it to be measurable (3000: 32 ms
+    for the plan, 11 ms for one supplement, 22 ms with the old second equation: ratios 0.36 and 0.68).
+    Hence a 0.55 threshold there, and the best of four interleaved runs of each form."""
+    if on_petta():
+        atoms = TAB_SMOKER + "\n" + "\n".join(f"(MeasuredZ Caller_Me InertLab{i:04d} 0.3)" for i in range(1, 3001))
+        plan_runs, one_runs = [], []
+        for _ in range(4):                  # interleaved, so a busy machine slows both forms alike
+            plan_runs.append(_run("patient", SUPPLEMENTS.format(P="Caller_Me"), atoms))
+            one_runs.append(_run("patient", "!(supplement-for-patient &self Caller_Me Berberine)", atoms))
+        for r in plan_runs + one_runs:
+            assert r["status"] == "ok" and r["queries_s"] is not None, r
+        assert all(len(r["atoms"]) == 1 for r in one_runs)
+        plan, one = min(r["queries_s"] for r in plan_runs), min(r["queries_s"] for r in one_runs)
+        assert one < 0.55 * plan, f"one supplement {one * 1000:.1f} ms vs the plan {plan * 1000:.1f} ms of evaluation"
+        return
     atoms = TAB_SMOKER + "\n" + INERT_LABS
     plan = _run("patient", SUPPLEMENTS.format(P="Caller_Me"), atoms)
     one = _run("patient", "!(supplement-for-patient &self Caller_Me Berberine)", atoms)
@@ -531,4 +600,4 @@ def test_a_single_new_marker_gives_exactly_the_weak_prior_and_tier_of_its_edge()
     for line, cause in (("(MeasuredZ Caller_Me Triglycerides 1.58)", "InsulinResistance"),
                         ("(MeasuredZ Caller_Me RDW 2.7)", "ChronicInflammation")):
         out = _run("patient", "!(diagnose-patient &self Caller_Me)", base + line)["atoms"][0]
-        assert out.startswith(f"((Hypothesis {cause} (stv 0.5 0.6) 1.0 0.3"), (cause, out)
+        assert startswith(out, f"((Hypothesis {cause} (stv 0.5 0.6) 1.0 0.3"), (cause, out)

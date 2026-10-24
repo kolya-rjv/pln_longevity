@@ -32,6 +32,7 @@ import asyncio
 import re
 import sys
 from pathlib import Path
+from typing import Iterator
 from unittest.mock import Mock
 
 import pytest
@@ -517,8 +518,9 @@ def test_nothing_is_written_to_disk_by_a_preview(monkeypatch):
 
 # ── the proof: the rules consume the canonical block ─────────────────────────
 
-hyperon = pytest.importorskip("hyperon")
-from hyperon import MeTTa  # noqa: E402
+from runtime_harness import Kb, new_kb, require_runtime  # noqa: E402
+
+require_runtime()
 
 #: Dependency-ordered, matching each file's own header. drugage_calibration is
 #: what supplies the Lifespan -> Mortality sign adapter the ranking needs.
@@ -544,11 +546,9 @@ _SIGNED_RE = re.compile(r"\(signed\s+(Pos|Neg)\s+\(stv\s+([-\d.eE]+)\s+([-\d.eE]
 
 
 @pytest.fixture(scope="module")
-def kb_with_taurine() -> MeTTa:
-    text = "\n".join((REPO / f).read_text(encoding="utf-8") for f in KB_FILES)
-    engine = MeTTa()
-    engine.run(text + "\n" + CANONICAL_TAURINE_BLOCK)
-    return engine
+def kb_with_taurine() -> Iterator[Kb]:
+    with new_kb(KB_FILES, CANONICAL_TAURINE_BLOCK) as engine:
+        yield engine
 
 
 def _empty(res) -> bool:
@@ -610,12 +610,10 @@ def test_the_provenance_edge_is_queryable(kb_with_taurine):
 @pytest.mark.slow
 def test_the_evaluations_own_block_stays_inert(kb_with_taurine):
     """The control. Same engine, the schema the evaluation actually got."""
-    engine = MeTTa()
-    text = "\n".join((REPO / f).read_text(encoding="utf-8") for f in KB_FILES)
-    engine.run(text + "\n" + THE_EVALUATIONS_BLOCK.replace("Taurine", "Taurine2"))
-    assert _empty(engine.run("!(infer &self Taurine2 Mortality)"))
-    assert _empty(engine.run("!(explain &self Taurine2 Mortality)"))
-    assert _empty(engine.run("!(hallmarks-of &self Taurine2)"))
+    with new_kb(KB_FILES, THE_EVALUATIONS_BLOCK.replace("Taurine", "Taurine2")) as engine:
+        assert _empty(engine.run("!(infer &self Taurine2 Mortality)"))
+        assert _empty(engine.run("!(explain &self Taurine2 Mortality)"))
+        assert _empty(engine.run("!(hallmarks-of &self Taurine2)"))
 
 
 # ── the closed list is a claim about the repository; check it ────────────────

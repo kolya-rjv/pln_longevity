@@ -1,4 +1,4 @@
-"""Smoke tests for the calibration + PLN deduction layers against live hyperon.
+"""Smoke tests for the calibration + PLN deduction layers against the live engine (hyperon or PeTTa).
 
 These load the real .metta knowledge-base files into one shared MeTTa space
 (the same one-space strategy pln_chat/core/pln_runner.py uses) and assert that:
@@ -10,7 +10,8 @@ These load the real .metta knowledge-base files into one shared MeTTa space
   * a novel cross-source inference is derived with an auditable path;
   * unconnected concepts yield NO chain (no false positives).
 
-Skipped automatically if `hyperon` is not installed.
+Runs on the selected runtime (PLN_RUNTIME: hyperon, the default, or petta; tests/runtime_harness.py)
+and is skipped automatically if that runtime is not installed.
 
 Run:  pytest tests/ -v       (from the repo root)
 """
@@ -18,11 +19,13 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
-hyperon = pytest.importorskip("hyperon")
-from hyperon import MeTTa  # noqa: E402
+from runtime_harness import Kb, new_kb, require_runtime
+
+require_runtime()
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -47,15 +50,13 @@ _SIGNED = re.compile(r"\(signed\s+(Pos|Neg)\s+" + _STV + r"\)")
 
 
 @pytest.fixture(scope="module")
-def kb() -> MeTTa:
+def kb() -> Iterator[Kb]:
     """A MeTTa interpreter with the full KB loaded into one shared space."""
-    text = "\n".join((REPO / f).read_text(encoding="utf-8") for f in KB_FILES)
-    m = MeTTa()
-    m.run(text)
-    return m
+    with new_kb(KB_FILES) as m:
+        yield m
 
 
-def _stv(kb: MeTTa, query: str) -> tuple[float, float]:
+def _stv(kb: Kb, query: str) -> tuple[float, float]:
     """Run a query expected to return exactly one (stv s c); return (s, c)."""
     res = kb.run(query)
     assert res and res[0], f"no result for {query}: {res}"
@@ -64,7 +65,7 @@ def _stv(kb: MeTTa, query: str) -> tuple[float, float]:
     return float(m.group(1)), float(m.group(2))
 
 
-def _signed(kb: MeTTa, query: str) -> tuple[str, float, float]:
+def _signed(kb: Kb, query: str) -> tuple[str, float, float]:
     """Run a query expected to return one (signed <Sign> (stv s c))."""
     res = kb.run(query)
     assert res and res[0], f"no result for {query}: {res}"
@@ -188,7 +189,7 @@ def test_rank_score_signs(kb, query, expect_sign):
     assert score == pytest.approx(expect_sign * 0.2)
 
 
-def _ranked_order(kb: MeTTa, cands: str, outcome: str) -> list[str]:
+def _ranked_order(kb: Kb, cands: str, outcome: str) -> list[str]:
     """Return the intervention names in ranked order from rank-interventions."""
     res = kb.run(f"!(rank-interventions &self ({cands}) {outcome})")
     assert res and res[0], f"no ranking returned: {res}"
@@ -223,7 +224,7 @@ _HYP_RE = re.compile(
 )
 
 
-def _diagnose(kb: MeTTa, hyps: str, obs: str) -> list[dict]:
+def _diagnose(kb: Kb, hyps: str, obs: str) -> list[dict]:
     """Run diagnose and parse the ranked hypothesis records, in returned order."""
     res = kb.run(f"!(diagnose &self ({hyps}) ({obs}))")
     assert res and res[0], f"no diagnosis returned: {res}"

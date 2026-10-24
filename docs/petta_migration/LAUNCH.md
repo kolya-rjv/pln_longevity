@@ -1,191 +1,81 @@
-# PeTTa migration: launch brief
+# PeTTa migration: plan and status
 
-Written 2026-10-23 from a read-only feasibility study (seven agents, two of them adversarial reviewers).
-Launch with:
-
-    ultracode: run the PeTTa migration in docs/petta_migration/LAUNCH.md
+Branch `petta-migration` (a git work tree at `../pln_longevity_petta`, derived from linage2 @ 47130aa). linage2 is untouched.
+Updated 2026-10-24. The first version of this brief was written before anything ran; this one records what ran.
 
 ## Goal
 
-Move the app's MeTTa runtime from hyperon-experimental 0.2.10 to PeTTa (MeTTa compiled to SWI-Prolog), and put
-trueagi-io/PLN (lib_pln) behind the `infer`/`explain` seam as a selectable chainer. This answers Ben Goertzel's
-request to use "the PLN version from patham9 github on the PeTTa Atomspace". It is complementary to the
-existing architecture: the LLM translator, the procedures and the HTTP/Gradio surfaces stay.
+Run the app's MeTTa on PeTTa (MeTTa compiled to SWI-Prolog) instead of hyperon 0.2.10, and put patham9's PLN behind the
+`infer`/`explain` seam as a selectable chainer. This answers Ben Goertzel's request to use "the PLN version from patham9
+github on the PeTTa Atomspace", complementary to the existing architecture: the LLM translator, the procedures and the
+HTTP/Gradio surfaces stay.
 
-## Inputs
+## Decisions (the owner chose the first; the rest were delegated on 2026-10-24)
 
-- `docs/petta_migration/feasibility/01_verdict.md` is the synthesis: compatibility table, phases, risks.
-- `02_review_engineering.md` and `03_review_upstream.md` are the adversarial reviews. **Where they conflict with
-  the verdict, the reviews win**; their corrections are folded into the phase plan below.
-- `10_metta_constructs.md`, `11_python_coupling.md`, `12_petta_facts.md`, `13_pln_lib_facts.md` are the
-  file:line maps of the KB dialect, the Python coupling, PeTTa and lib_pln.
-- Background memory notes (read when relevant), under
-  `/Users/kolya/.claude/projects/-Users-kolya-PycharmProjects-pln-longevity/memory/`:
-  `linage2-shared-stack-pair-abort.md` (why the scoped stacks exist), `deployed-server-root-etl-abort.md`,
-  `server-log-replay-method.md`, `stakeholder-ben-pln-inference.md`.
+| Question | Decision | Why |
+|---|---|---|
+| Which PLN | patham9/PLN main (55f1751, 15 Aug 2025), in the form that runs on PeTTa: PeTTa's `lib/lib_pln.metta` @ fea83178, which is the fork's code ported to PeTTa by its author (63 of 81 forms identical, formulas identical). The newer trueagi-io/PLN rewrite (March 2026) is cloned for comparison only. | The fork's own examples cannot run on PeTTa: its `PLN.Init` is a Python hook that needs the hyperon CLI and a Chicken Scheme compiler. |
+| Runtime default | hyperon stays the default (`PLN_RUNTIME=hyperon`); petta is opt-in until the owner retires hyperon. | Every commit keeps the known 32 failures and nothing else. |
+| Rule set | Restricted: Modus Ponens, Not-elimination, Revision. Full 17 rules only as a comparison lane. | Inversion, induction and abduction create conclusions between unconnected pairs and can outrank deduction. |
+| Base rates | None for the restricted set. Uniform p = 0.1, confidence 0.9 only in the comparison lanes. | Modus Ponens never looks up a node probability. |
+| Confidence | Keep the legacy 0.9 per extra hop as a shim (`PLN_CHAIN_CONFIDENCE=legacy`); the fork's native c1*c2 is a switch. | Native confidence flips two pinned orderings. |
+| DrugAge evidence unit | The paper (PMID), not the row. | Fifty-two ethanol rows come from one paper and would pool to confidence 0.93. |
+| Feedback edges | Allowed in curated data under `pln` (it terminates); legacy still hangs. | |
+| Large network | Not curated in this run. The control is shown on the shipped network plus a feedback edge and on a labelled synthetic layered network. Ben picks the real one. | The shipped 30-node graph never binds the control. |
 
-## Authorized by launching this brief
+## What ran (2026-10-24, on this Mac)
 
-- Create branch `petta-migration` from linage2 @ 47130aa and commit to it, one or more commits per phase.
-- `brew install swi-prolog` (Homebrew ships 10.0.2; PeTTa needs >= 9.3).
-- `.venv/bin/pip install janus-swi sexpdata`.
-- A setup script, `scripts/setup_petta.sh`, that clones PeTTa @ `fea83178af3722666d2948d074591d10a3134f56`
-  and trueagi-io/PLN @ `4405956947c4b53c7ff01bd565aa3b114bc970a1` into a gitignored `.petta/` directory,
-  with PLN at `.petta/PeTTa/repos/PLN` as its README expects. Run that script.
+- SWI-Prolog 10.0.2 (Homebrew), `janus-swi` 1.5.3 in the project venv. PeTTa's Python bridge starts in 0.15 s.
+- PeTTa's bundled PLN examples reproduce their pinned values exactly (pln_tuffy, pln_roman, plntest, plntestdirect).
+- Every stack loads on PeTTa in at most 0.31 s with 40 to 80 MB. A fresh process per query costs about 0.2 s of start-up.
+  The study's worry about load cost and a warm-worker redesign does not apply.
+- Three source changes make the knowledge base load and run (commit 4fff9d8), with the hyperon suite unchanged:
+  `(superpose ())` to `(empty)` on 20 lines, one nested conjunction flattened, and `%Undefined%` signatures for the
+  polymorphic functions `link-effect`, `infer`, `explain`, `supp-evidence-cat`, `supp-safety-label`.
+- 25 stored `(evidence-confidence T)` calls are reduced to numbers at load time by the PeTTa adapter, not in the sources.
+- 145 recorded query shapes, PeTTa against hyperon: 103 identical; the rest differ in result order inside a tuple
+  (PeTTa returns facts in assertion order, hyperon in reverse) or in integer rendering (`3` against `3.0`); 3 probe errors
+  are edge cases the knowledge base already guards (`log 0`, `car-atom ()`, `(superpose ())`).
+- The suite on the final state (measured by the orchestrator, 2026-10-24): hyperon 2201 passed and 32 failed, the failing ids identical to
+  `docs/petta_migration/baseline/hyperon_failures_47130aa.txt`; `PLN_RUNTIME=petta` 2209 passed and 31 failed, the same ids minus one
+  hyperon-abort probe that passes on petta by nature. Run time on petta is shorter (291 s against 425 s).
+- On the heavy stacks PeTTa answers faster than hyperon (patient stack 0.38 s against 1.05 s, LinAge2 0.48 s against 2.10 s); a trivial
+  program costs 0.14 s of fixed start-up per fresh process.
+- Design of the chainer: `docs/petta_migration/fork_design/` (decision, three designs, two adversarial reviews).
 
-## Not authorized (stop and ask)
+## Phases
 
-- Touching linage2, main or any other branch; merging; pushing.
-- Deploying to the server or changing it. The deployed UI is used by stakeholders.
-- Making lib_pln the default chainer. That needs the owner's and Ben's sign-off on the number table.
-- Any install beyond the list above, including Docker.
+1. Spike. Done. Gate passed (commit 4fff9d8 and the kit in `scripts/petta_spike`).
+2. Load fixes. Done for the hyperon-neutral ones. The stored-call reduction lives in the adapter.
+3. Runtime adapter `pln_chat/core/metta_runtime.py`. Done (93fb137 and the parity commit): `PLN_RUNTIME=hyperon|petta|auto`, a fresh
+   forked process per KB load, load verification, deadline kill, result normalisation, `/health.runtime_name`.
+   Caller expressions under petta pass three layers: a text refusal, an engine allowlist of builtins (everything PeTTa registers that is
+   not on the list is replaced by a thrower in the child), and a scrubbed child (no API keys, a private scratch directory, closed
+   descriptors, resource limits). Two adversarial reviews found real bypasses; all blocking and major findings were fixed and tested.
+   **petta is opt-in and must not be exposed to untrusted callers until a second, independent security review of the final state.**
+3b. Test harness. Done: `tests/runtime_harness.py` and `tests/runtime_compare.py`; 15 modules that drove hyperon directly now run on both
+   runtimes; 13 hyperon-only crash probes are skipped under petta, each with a petta-only companion.
+4. Dialect and order differences. Done at the test level. Result order inside tuples and last-bit float sums differ between runtimes; where
+   a test pinned them, the hyperon assertion is untouched and the petta side compares canonically with a justified allow-list.
+   Open finding: grounded `log-math` raises on petta where hyperon returns -inf/NaN (the knowledge base already guards its inputs).
+5. Retire the scoped-stack workaround: not done, and not needed while hyperon stays the default.
+6. patham9's PLN at the seam (`PLN_CHAINER=pln`), per `fork_design/decision.md` with the reviewers' corrections: strengths stored as
+   `q = 0.02 + 0.98 p` and reported as `|s1 - s0| / 0.98^hops`; the DrugAge net of the two directions defined once; shared evidence ids only
+   for parallel evidence of one link; the generic stack in the equality gate; selections read by chunked resumption. In progress.
+   Gate: stop for the owner's and Ben's sign-off before `pln` becomes the default.
+7. Deployment: out of scope until the owner says so. The server needs SWI-Prolog >= 9.3 and janus.
 
-## Hard rules
+## Rules
 
-- **Dual runtime until the owner retires hyperon.** Every commit keeps the full suite green on hyperon.
-  `PLN_RUNTIME=hyperon|petta` selects the runtime; hyperon stays the default on this branch.
-- **No pinned number changes under `PLN_CHAINER=legacy`.** lib_pln numbers get their own pins under
-  `PLN_CHAINER=pln`.
-- **PeTTa state is process-global.** One KB load per process, always. See Phase 3.
-- Never execute upstream code except the pinned PeTTa runtime, lib_pln and their own test scripts.
+- Hyperon stays green: the failure set stays identical to `docs/petta_migration/baseline/hyperon_failures_47130aa.txt`.
+- Never push, never deploy, never touch linage2 or the main checkout.
+- The owner authorised running PeTTa and the pinned checkouts in `.petta/` on 2026-10-24. Nothing else downloaded is executed.
 
-## Phases and gates
+## Questions for Ben
 
-Proceed automatically when every gate passes. Stop and report when a gate fails or a decision is listed.
-
-### 1. Spike (sequential, one agent)
-
-Install as authorized. Then:
-
-1. Run lib_pln's own examples and `test.sh` through `run.sh`, and through Python `PeTTa().process_metta_string`.
-2. Load each stack (generic, patient, human evidence, LinAge2, one DrugAge slice) as one string and as a temp
-   file through `load_metta_file_cached`. Record the first error per stack.
-3. In a scratch copy only, apply the Phase 2 load fixes, then run the five smoke queries in
-   `pln_deduction.metta` section 5 and compare with the expected answers written there.
-4. Run every taught translator shape (the 46 entries of `pln_chat/prompts/few_shot_examples.json` and the form
-   families in `system_prompt.txt`) through a throwaway adapter. Record each failure with PeTTa's error text.
-5. Measure per stack: `consult(main.pl)` time, cold load, cached replay, RSS, and per-query latency next to
-   hyperon on the same probes. Also measure fork after a child-only import, the janus GIL behaviour, how
-   floats, ints and booleans print, and answer order at the seven first-answer sites (verdict section 2, item 7).
-
-**Gate.** Janus-backed PeTTa runs on this Mac. The smoke answers appear after only the Phase 2 fixes. lib_pln
-main's own examples run on the pinned PeTTa, or each failure has a fix. No routed probe is more than five times
-slower than on hyperon with the load included; if one is, stop for the owner's decision.
-
-### 2. Load-unblock sweep (sequential, one agent)
-
-PeTTa aborts a whole load at the first form it cannot compile, and every test module loads files from several
-clusters. So these fixes land before any parallel work:
-
-- Replace the 20 code lines of `(superpose ())` in 8 root files with `(empty)`. Both runtimes have `(empty)`.
-- Pick one strategy for the 25 facts that store an unevaluated `(stv s (evidence-confidence T))` call
-  (mechanistic_bridges 19, supplement_evidence 3, lifestyle_evidence 2, linage2_core 1) and for their writer
-  in `pln_chat/ontology/expansion_schema.py`. PeTTa does not evaluate values bound from a space. Either reduce
-  the call in the three lifter rules or store numbers generated from the tier table, with a test that keeps the
-  tier table the source of truth.
-- Flatten the nested conjunction at `cellage_calibration.metta:160-163`.
-
-**Gate.** The full suite is green on hyperon, and every stack loads on PeTTa without an exception.
-
-### 3. Runtime adapter and test harness (sequential, one or two agents)
-
-- `pln_chat/core/metta_runtime.py`: a protocol both runtimes satisfy, `MettaRuntimeError`, and
-  `PLN_RUNTIME`. `_hyperon_run` becomes `_runtime_run`, the single execution site.
-- **Fresh process per KB load under PeTTa.** `run_query_parts` (`pln_runner.py:709-723`) loads two stacks back to
-  back in one process; offload each part to its own child. Inline mode (`PLN_WORKER_POOL_SIZE=0`) must fork
-  internally or be refused under PeTTa. A second load in one process duplicates every clause and multiplies
-  recursive answers.
-- **Load verification.** A form that fails to compile raises through janus, but the forms before it stay
-  loaded. Treat any exception during a load as a failed load and discard the process. Check that the expected
-  function heads exist. A query that fails without raising comes back as `[]` and is an empty answer.
-- One call per `!` expression, to keep per-expression result groups.
-- Normalise result strings. PeTTa prints `true`/`false` in lowercase, keeps ints as ints and writes `1.0e-5`
-  style floats. Every parser accepts both renderings.
-- Cached loads: write each stack's concatenation to a temp file keyed by a content hash, load it with
-  `load_metta_file_cached`, then add per-query atoms with `process_metta_string`.
-- Validator under PeTTa: refuse `add-atom`, `remove-atom` and `(= …)` from `/metta/run`, plus the `assert` and
-  `test` heads, which can `halt(1)` the process. Re-check the three builtin lists: `new-space` is absent,
-  `unify` exists only in lib_he, and `fst`/`snd` exist only in lib_roman.
-- Do not build a long-lived warm worker that adds and removes per-query atoms. PeTTa's `remove-atom` retracts
-  every identical copy, so it can delete KB facts.
-- Test harness: one runtime fixture, per-call process isolation under PeTTa, and runtime markers, so that
-  `PLN_RUNTIME=petta pytest` runs end to end.
-
-**Gate.** The suite is green on hyperon. Under PeTTa it runs end to end without hangs and produces a written
-failure list. `/health` keys and `routed` values are unchanged.
-
-### 4. Dialect fixes (parallel, up to nine agents in worktrees)
-
-Use the nine clusters in verdict section 3, Phase 3. Each cluster owns semantic fixes and its own pins, not
-loadability, which Phase 2 settled. Each is verified by its test modules on both runtimes.
-
-**Gate.** All 38 test modules are green on PeTTa, except the hyperon-only abort probes, which are quarantined
-behind a marker. UI/API parity tests are green, and the spike's breakage table is empty.
-
-### 5. Retire the scoped-stack workaround (sequential, judgment)
-
-As verdict section 3, Phase 4. Before deleting the abort-probe modules, move the routing-agreement tests out of
-them (`tests/test_generic_stack.py:126-136, 165-172`, `tests/test_patient_stack.py:93-106`). Keep the DrugAge
-and CellAge slices, which exist for semantic reasons.
-
-**Gate.** The routing-agreement tests give byte-identical answers from one stack, within the Phase 1 latency
-threshold. If not, keep the stacks, but note that under PeTTa a mixed request then costs two loads.
-
-### 6. lib_pln at the infer/explain seam (design sequential, build parallel)
-
-- Vendor lib_pln @ 4405956 with the per-step `println! SELECTED` removed. Add `PLN_CHAINER=legacy|pln`,
-  with legacy as the default.
-- Map links with an up/down node split, `A-up` and `A-down`, so the Pos/Neg sign survives. Simpler mappings fail:
-  `Implication A (Not B)` never chains.
-- Use one evidence id per source record (curated Effect atom, hazard-ratio record, DrugAge row), so that revision
-  merges a compound's rows instead of keeping one.
-- Give every node a base rate strictly above zero, uniform to start. Without one, a node takes part in no
-  syllogistic inference. A zero base rate raises a division error.
-- **Build two rule-set modes and compare them.** Full lib_pln runs inversion, induction and abduction on every
-  task. Those beliefs can outrank deduction in `PLN.Query` and create conclusions between unconnected pairs, for
-  example DasatinibPlusQuercetin to AllCauseMortality, which `test_no_false_chain` pins as empty. Upstream's own
-  `examples/DeductionRevision.metta` returns a non-deduction answer. Deduction-plus-revision mode is the
-  restricted alternative.
-- Derive once per request or per child, then look terms up. `PLN.Query` reruns the whole closure on every call,
-  and the procedures call `infer` dozens of times per request.
-- Write adapters that return today's `(signed Pos|Neg (stv s c))` and `(Chain …)`. Rebuild the chain from stamps
-  only in deduction-only mode: in full mode a stamp cannot tell deduction from induction.
-- Write a number table: every pinned (s, c) before and after, in both modes. Cover orderings, the no-false-chain
-  pair, a feedback edge that must terminate, a compound with mixed-sign rows, and a multi-row DrugAge compound.
-  lib_pln deduction is not associative, so record the step and queue settings next to every number.
-
-**Gate.** Stop for the owner's and Ben's sign-off before making `pln` the default.
-
-## Out of scope for this run
-
-- Deployment, which needs server access and the owner's go.
-- The large network Ben's point is about: DrugAge rows, hallmark targeting and GenAge/CellAge links as PLN
-  sentences, with their base rates. That is curation and waits for Ben's choice of network.
-
-## Report at every stop
-
-Report what passed, and what failed with the exact error text. Include a table of measurements next to the
-hyperon baseline, the commits made, and the decisions needed from the owner.
-
-## Questions to send Ben now
-
-1. Which PLN: trueagi-io/PLN main (March 2026), the older lib_pln bundled with PeTTa, or patham9's fork?
-2. Should inversion, induction and abduction run on a causal effect graph, given that they create conclusions
-   between unconnected pairs and can outrank deduction? Or should the chainer be deduction plus revision?
-3. Is a uniform base rate acceptable to start? Every node needs one, and non-uniform priors make the inversion
-   rule's copied strength wrong.
-4. Which large network should the control be shown on, and is lib_pln's confidence-ranked queue the control he
-   means?
-
-## Effort
-
-| Phase | Agent-phases |
-|---|---|
-| 1 Spike | 1 |
-| 2 Load-unblock sweep | 1 |
-| 3 Adapter and harness | 3–4 |
-| 4 Dialect clusters | 9, in parallel |
-| 5 Retire scoped stacks | 2 |
-| 6 lib_pln seam | 4–5 |
-
-Deployment adds one or two agent-phases. The large network is open-ended and bound by curation.
+1. Is confidence ranking the control you mean, or should the application supply its own priority (effect times confidence)?
+2. Is the per-hop 0.9 discount a PLN concept, or is Modus Ponens' c1*c2 (and Deduction's minimum) the intended behaviour?
+   Is the fixed 0.02 in Modus Ponens the intended floor for P(B | not A)?
+3. Which large network should the control be shown on?
+4. Induction and Abduction call sites pass the shared node's probability in the third slot while the formula expects it in
+   the second. Intentional?

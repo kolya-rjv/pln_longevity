@@ -358,6 +358,9 @@ class PLNRunResult:
     #: can pick a status code without grepping the message.
     #:   runtime_error       — the MeTTa runtime raised (hyperon: an exception; PeTTa: a failed load,
     #:                          an expression that raised, a process that died or hit its deadline)
+    #:   refused_form       — PeTTa only: the program asked for something the PeTTa runtime does not run
+    #:                          (a form outside its allowed set, a change to the space, a call by name); the
+    #:                          caller's program is at fault, not the service
     #:   drugage_build_missing — build/drugage_etl.metta has not been generated
     error_code: Optional[str] = None
     #: Which MeTTa runtime produced a "runtime"-mode result ("hyperon" | "petta"); None for stub results and
@@ -853,7 +856,8 @@ def _runtime_run(
         except Exception as run_exc:
             return PLNRunResult(
                 status="error", mode="runtime", error=str(run_exc),
-                error_code="runtime_error", runtime_name=runtime_name,
+                error_code="refused_form" if getattr(run_exc, "kind", "") == "refused" else "runtime_error",
+                runtime_name=runtime_name,
             )
 
         results: list[PLNAtomResult] = []

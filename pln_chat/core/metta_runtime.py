@@ -54,22 +54,23 @@ What PeTTa changes (and what this module does about it)
    during the load is therefore a failed load, and since the process is the unit of state it is simply
    discarded. `_PettaEngine.load` also treats a load goal that FAILS WITHOUT raising as a failed load (by
    calling the janus goal directly instead of PeTTa's own wrapper, which turns that into `[]`, the same as
-   a good load of a KB with no `!` forms) — defensively: no malformed KB tried against this PeTTa commit
-   (13 probed, from unbalanced parentheses to a bad `superpose`) actually fails this way, every one raises
-   instead, so this branch has no known trigger and is untested. Kept because a goal failing silently and
-   being read as "loaded cleanly" would be a worse failure mode than a branch that never fires.
+   a good load of a KB with no `!` forms). No malformed KB tried against this PeTTa commit (13 probed, from
+   unbalanced parentheses to a bad `superpose`) fails this way — every one raises — but a goal failing silently
+   and being read as "loaded cleanly" is the worse failure mode, and the branch is tested against a double of
+   janus. (janus answers a failed goal with `{"truth": False}`, a non-empty dict: every check of an answer
+   here reads `["truth"]`, never the dict's own truthiness.)
 4. A query that fails without raising comes back as `[]`: an empty answer, as on hyperon.
 5. Facts and solutions come back in assertion order where hyperon often returns the reverse.
-6. `assert` and `test` call `halt(1)`; `add-atom` and `remove-atom` change the process-global space
-   (`remove-atom` retracts every identical copy); a runtime-added `(= ...)` becomes a global clause;
-   `import!`, `py-call`, `shell`, `callPredicate` (and friends — PeTTa's own "call any Prolog predicate by
-   name" doors), ... reach the host. `core.metta_validator` and `PettaRuntime`/`PettaSession` (via
-   `petta_refused_forms`/`petta_refused_forms_in_kb`) all refuse the LITERAL spelling, in `kb_text`, an
-   expression and a session's text alike — a fast, friendly 422 for the common case, and nothing more: a
-   symbol PeTTa builds at run time (`atom_concat`) never appears as a token in any of that text, so none
-   of these scans can see it. `_install_petta_sandbox` is the actual boundary: it redefines the dangerous
-   predicates inside the Prolog engine itself, so the restriction holds regardless of how the program's
-   text spells or constructs the call that reaches them.
+6. A program can make PeTTa call a Prolog predicate by a name the program chooses (`maplist getenv`,
+   `(match read_file_to_string ...)`, `call`, `translatePredicate`, `callPredicate`, ...), change the process-global
+   space (`add-atom`; `remove-atom` retracts every identical copy), halt the process (`assert`, `test`) or reach
+   the host (`import!`, `py-call`, `shell`). `_install_petta_sandbox` closes each of those routes inside the engine,
+   once per forked child, whatever the text spells and however it arrived; `_child_prepare` takes from the child
+   what a program has no use for (the server's environment, descriptors and working directory). The literal
+   spelling is also refused up front by `core.metta_validator` and by `PettaRuntime`/`PettaSession`
+   (`petta_refused_forms`/`petta_refused_forms_in_kb`), reading symbols the way PeTTa's own reader does: a fast,
+   friendly 422 and nothing more — a name PeTTa builds at run time (`atom_concat`) never appears in any of that
+   text. The table of routes, and the one place each is closed, is under "the engine-level sandbox" below.
 
 Sessions
 --------
@@ -88,8 +89,11 @@ import logging
 import math
 import os
 import re
+import secrets
+import shutil
 import signal
 import sys
+import tempfile
 import threading
 import time
 import warnings
@@ -103,6 +107,8 @@ __all__ = [
     "get_runtime", "reset_runtime_cache", "selected_runtime_name", "runtime_available_for",
     "normalise_result", "reduce_stored_calls", "read_tier_table", "Reduction",
     "split_top_level_forms", "petta_refused_forms", "petta_refused_forms_in_kb", "PETTA_REFUSED_FORMS",
+    "PETTA_KNOWN_FUN_NAMES", "PETTA_ALLOWED_FUN_NAMES", "PETTA_ENGINE_INTERNAL_FUN_NAMES",
+    "petta_strip_comments", "petta_tokens",
     "RUNTIME_NAMES",
 ]
 
@@ -172,9 +178,9 @@ class Runtime(Protocol):
 # ── text scanning ─────────────────────────────────────────────────────────────
 
 #: a "string", a ;comment, a parenthesis, or a bare token
-_SCAN_RE = re.compile(r'"(?:[^"\\]|\\.)*"|;[^\n]*|[()]|[^\s()";]+')
+_SCAN_RE = re.compile(r'"(?:[^"\\]|\\[\s\S])*"|;[^\n]*|[()]|[^\s()";]+')
 #: a "string", a parenthesis, or a bare token: the grammar of a RESULT, which has no comments
-_RESULT_TOKEN_RE = re.compile(r'"(?:[^"\\]|\\.)*"|[()]|[^\s()"]+')
+_RESULT_TOKEN_RE = re.compile(r'"(?:[^"\\]|\\[\s\S])*"|[()]|[^\s()"]+')
 _NUMBER_TOKEN_RE = re.compile(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
 
 
@@ -336,24 +342,150 @@ def reduce_stored_calls(kb_text: str, tiers: Optional[Mapping[str, str]] = None)
     return Reduction("".join(pieces), reduced, tuple(dict.fromkeys(unresolved)))
 
 
-# ── what the PeTTa runtime does not run ───────────────────────────────────────
+# ── what the PeTTa runtime does not run: an ALLOWLIST, not a denylist ────────
 
-#: Forms refused under PLN_RUNTIME=petta. `add-atom`, `remove-atom` and a `(= ...)` definition change the
-#: process-global space (`remove-atom` retracts every identical copy; a runtime-added `=` becomes a global
-#: clause); `assert` and `test` call halt(1); the rest reach the host or load code. `cached-import!` is
-#: `import!`'s cached variant. `callPredicate`/`assertaPredicate`/`assertzPredicate`/`retractPredicate`/
-#: `import_prolog_function`/`call` are PeTTa's own "call any Prolog predicate by name" doors (documented in
-#: metta.pl's "Prolog interop" section) — the same shape of escape as `py-call`, just without the name.
+#: Every name `src/metta.pl` registers as `fun/1` in the pinned PeTTa checkout (HEAD 93fb137's
+#: `maplist(register_fun, [...])`) — PeTTa's own notion of "callable from MeTTa". A denylist of
+#: individually-named "dangerous" forms misses whatever it does not know to name: an independent review
+#: found `add-translator-rule!` reachable this way (it is `fun/1`-registered, lets a program register an
+#: arbitrary symbol as a translator hook — `metta.pl:433-437` — so that every LATER occurrence of that
+#: symbol as a head calls it directly as a Prolog goal during translation) and reproduced it with a
+#: harmless canary through `PettaRuntime` and over HTTP `/metta/run`; it was on no refusal list anywhere
+#: in this module. `_install_petta_sandbox` does not trust this frozen snapshot at run time — it enumerates
+#: the LIVE `fun/1` facts of the engine it just constructed and guards every one not in
+#: `PETTA_ALLOWED_FUN_NAMES`, so a name this constant has never seen (an upstream PeTTa version that
+#: renames, re-arities or ADDS a `fun/1` entry) is refused the same way as any other non-allowed name,
+#: automatically, rather than needing this list updated first or being silently trusted meanwhile; see
+#: that function's docstring. `PETTA_KNOWN_FUN_NAMES` itself is this checkout's complete list (148 names),
+#: kept for documentation and tests: a test asserts it still matches the live registry, so a version drift is
+#: caught and reviewed rather than only silently guarded. Six of the names have no backing Prolog predicate at
+#: all — `let`, `let*`, `concat`, `get-mettatype`, `mm2-exec`, `set_hook` are `fun/1`-registered but clauseless
+#: in this checkout, confirmed against a live, unsandboxed dump: nothing to guard, nothing a program can call.
+PETTA_KNOWN_FUN_NAMES: frozenset[str] = frozenset({
+    "!=", "#*", "#+", "#-", "#//", "#<", "#=", "#>", "#\\=", "#div", "#max", "#min", "#mod", "%", "*", "+",
+    "-", "/", "<", "<=", "=", "==", "=?", "=alpha", ">", ">=", "@<", "@<=", "@>", "@>=", "Predicate",
+    "abs-math", "acos-math", "add-atom", "add-translator-rule!", "alpha-unique-atom", "and", "append",
+    "argv", "asin-math", "assert", "assertaPredicate", "assertzPredicate", "atan-math", "atom_chars",
+    "atom_concat", "bind!", "cached-import!", "callPredicate", "car-atom", "cdr-atom", "ceil-math",
+    "change-state!", "concat", "cons", "cons-atom", "copy_term", "cos", "cos-math", "current-time",
+    "decons", "decons-atom", "empty", "eval", "exclude-item", "exists_file", "exp", "filter-atom", "first",
+    "first-from-pair", "floor-math", "foldl", "foldl-atom", "format-time", "get-atoms", "get-metatype",
+    "get-mettatype", "get-state", "get-type", "id", "implies", "import!", "import_prolog_function",
+    "index-atom", "intersection-atom", "is-alpha-member", "is-expr", "is-ground", "is-member", "is-space",
+    "is-var", "isinf-math", "isnan-math", "last", "length", "let", "let*", "library", "library-import!",
+    "list_to_set", "log", "log-math", "map-atom", "maplist", "match", "max", "max-atom", "member", "min",
+    "min-atom", "mm2-exec", "msort", "not", "or", "parse", "pow-math", "println!", "py-call",
+    "random-float", "random-int", "readln!", "reduce", "remove-atom", "remove-translator-rule!", "repr",
+    "repra", "retractPredicate", "reverse", "round-math", "second-from-pair", "set_hook", "sin",
+    "sin-math", "size-atom", "sort", "sort-atom", "sqrt", "sqrt-math", "sread", "subtraction-atom",
+    "superpose", "tan-math", "term_hash", "test", "trunc-math", "union-atom", "unique-atom", "xor",
+})
+
+#: The subset of `PETTA_KNOWN_FUN_NAMES` a program may call under `PLN_RUNTIME=petta`, exactly as PeTTa defines
+#: them: pure arithmetic, comparison, logic, list/tuple, string/repr and type-introspection builtins, `eval`
+#: and `reduce`, and the two space-READ forms (`match`, `get-atoms`) every taught few-shot query, every tracked
+#: `.metta` file's rules and the ontology/router generators are built from. None of these mutate `&self`,
+#: touch the filesystem, the network, a process, or any process-global state — and `match`, `get-atoms`,
+#: `eval` and `reduce` are the ones that turn a program's data into a call, which is why the sandbox also
+#: constrains what they are given (`_install_petta_sandbox`).
+#: `add-atom`/`remove-atom` are NOT here — they stay on the flagged path (`_SANDBOX_FLAGGED_PREDICATES`):
+#: needed verbatim while a KB loads, refused while a `!` form runs. `PETTA_ENGINE_INTERNAL_FUN_NAMES` below
+#: are not here either. Everything else `PETTA_KNOWN_FUN_NAMES` holds — `change-state!`, `get-state`,
+#: `bind!`, `assert`, `test` (halt the process), `add-translator-rule!`/`remove-translator-rule!` (registers a
+#: symbol PeTTa then calls directly, by name, the next time it is a head), `callPredicate`/`assertaPredicate`/
+#: `assertzPredicate`/`retractPredicate`/`import_prolog_function`/`Predicate` (PeTTa's "call any Prolog
+#: predicate by name" doors), `import!`/`cached-import!`/`library-import!`/`library`, `py-call`, and every
+#: name with no legitimate caller anywhere in this repo (`argv`, `repra`, ...) — is refused by
+#: `_install_petta_sandbox`, by construction, because it is simply not in this set; nothing had to be
+#: named as "known-dangerous" for that to happen.
+PETTA_ALLOWED_FUN_NAMES: frozenset[str] = frozenset({
+    "!=", "#*", "#+", "#-", "#//", "#<", "#=", "#>", "#\\=", "#div", "#max", "#min", "#mod", "%", "*", "+",
+    "-", "/", "<", "<=", "=", "==", "=?", "=alpha", ">", ">=", "@<", "@<=", "@>", "@>=", "abs-math",
+    "acos-math", "alpha-unique-atom", "and", "append", "asin-math", "atan-math", "atom_chars",
+    "atom_concat", "car-atom", "cdr-atom", "ceil-math", "cons", "cons-atom", "copy_term", "cos",
+    "cos-math", "current-time", "decons", "decons-atom", "empty", "eval", "exclude-item",
+    "exp", "filter-atom", "first", "first-from-pair", "floor-math", "foldl-atom", "format-time",
+    "get-atoms", "get-type", "id", "implies", "index-atom", "intersection-atom", "is-alpha-member",
+    "is-expr", "is-ground", "is-member", "is-space", "is-var", "isinf-math", "isnan-math", "last",
+    "length", "list_to_set", "log", "log-math", "map-atom", "match", "max", "max-atom",
+    "member", "min", "min-atom", "msort", "not", "or", "parse", "pow-math", "println!", "random-float",
+    "random-int", "readln!", "reduce", "repr", "reverse", "round-math", "second-from-pair",
+    "sin", "sin-math", "size-atom", "sort", "sort-atom", "sqrt", "sqrt-math", "subtraction-atom",
+    "superpose", "tan-math", "term_hash", "trunc-math", "union-atom", "unique-atom", "xor", "get-metatype",
+})
+
+#: `fun/1`-registered names PeTTa's OWN code calls as plain Prolog predicates on every load and every query,
+#: by the same name and a matching arity, so the predicates cannot be redefined, and which are nonetheless
+#: not for a program: `maplist` and `foldl` call whatever predicate their first argument names (with
+#: `getenv` or `directory_files` there, a program reads the server's environment and directories — the
+#: independent review reproduced both over HTTP), `sread` parses text and `exists_file` is a file-existence
+#: oracle. They are therefore not in `PETTA_ALLOWED_FUN_NAMES`, and `_install_petta_sandbox` does not redefine
+#: them either: it takes them off the `fun/1` list, the one place the translator and `reduce/2` look to decide
+#: that a symbol is a function. After that `(maplist f $xs)` is data, as it is for any symbol that names
+#: no function, and the engine's own Prolog calls to `maplist/3`, `foldl/4`, `sread/2` and `exists_file/1`
+#: are untouched. (The translator's compiled `map`/`foldl` pseudo-lambdas call them directly, not through
+#: `fun/1`, and the full suite runs on this.)
+PETTA_ENGINE_INTERNAL_FUN_NAMES: frozenset[str] = frozenset({"maplist", "foldl", "sread", "exists_file"})
+
+#: `fun/1`-registered names with NO backing Prolog predicate in this checkout at all (confirmed against a
+#: live, unsandboxed dump: `arity/2` holds no fact for any of them) — pure compiler forms (`let`, `let*`)
+#: inlined into the translator, or legacy/optional registrations nothing in this repo ever defines
+#: (`concat`, `get-mettatype`, `mm2-exec`, `set_hook`). `_install_petta_sandbox`'s engine-level guard
+#: already skips these (nothing to redefine), and they are excluded here too: `let`/`let*` are ordinary,
+#: pervasive MeTTa syntax (every KB file and most taught few-shot queries use one or both), so putting
+#: them in the TEXT-scan refusal list below would 422 nearly every real program, for a name that was never
+#: callable as a predicate in the first place.
+_PETTA_CLAUSELESS_FUN_NAMES: frozenset[str] = frozenset({
+    "let", "let*", "concat", "get-mettatype", "mm2-exec", "set_hook",
+})
+
+#: Forms refused under PLN_RUNTIME=petta, for the TEXT scan (`petta_refused_forms`/`_refuse_if_forbidden`):
+#: every `PETTA_KNOWN_FUN_NAMES` name NOT in `PETTA_ALLOWED_FUN_NAMES` and not clauseless (this is what
+#: makes `add-translator-rule!`/`remove-translator-rule!` — and anything else not explicitly allowed —
+#: refused at the fast, pre-engine 422 too, not only at `_install_petta_sandbox`'s engine-level boundary),
+#: plus a handful of forms that are NOT `fun/1`-registered at all (reachable only through the
+#: generic-dispatch primitives — `call`, `callPredicate`+`Predicate`, `match`'s own Space-as-predicate-name
+#: dispatch — kept here for the same fast-path friendliness the previous list already gave `shell`/`halt`/
+#: `py-atom`/`py-dot`/`git-import!`/`include`/`load_metta_file`/`load_metta_file_cached`/
+#: `process_metta_string`/`new-space`; none of these tokens collide with ordinary KB prose — checked
+#: against every tracked `.metta` file, both prompt files and every test fixture). `=` keeps its existing,
+#: narrower meaning (a TOP-LEVEL `(= ...)` only — see `petta_refused_forms`'s docstring); it is not a
+#: `fun/1` name at all, it is MeTTa's definition syntax.
 #: This text scan is a friendly, fast 422 for the literal spelling; it is NOT the security boundary for any
 #: of these forms — `_install_petta_sandbox` is (a symbol built at runtime by `atom_concat` never appears in
 #: the text this function reads, so it cannot be caught here; see that function's docstring).
-PETTA_REFUSED_FORMS: tuple[str, ...] = (
-    "add-atom", "remove-atom", "=", "assert", "test", "halt", "import!", "git-import!", "cached-import!",
-    "include", "py-call", "py-atom", "py-dot", "shell", "load_metta_file", "load_metta_file_cached",
-    "process_metta_string", "new-space", "bind!", "call", "callPredicate", "assertaPredicate",
-    "assertzPredicate", "retractPredicate", "import_prolog_function",
-)
+PETTA_REFUSED_FORMS: tuple[str, ...] = tuple(sorted(
+    (PETTA_KNOWN_FUN_NAMES - PETTA_ALLOWED_FUN_NAMES - _PETTA_CLAUSELESS_FUN_NAMES) | {
+        "=", "halt", "git-import!", "include", "py-atom", "py-dot", "shell", "load_metta_file",
+        "load_metta_file_cached", "process_metta_string", "new-space", "call", "translatePredicate",
+    }
+))
 _REFUSED_ANYWHERE = frozenset(PETTA_REFUSED_FORMS) - {"="}
+
+
+#: PeTTa's own reading of program text, as far as a symbol scan needs it. Two stages decide what a symbol IS:
+#:   `filereader.pl`'s `strip/3` removes `;` comments (and the newline that ends one, so a comment can join the
+#:   text on either side of it into one token) while tracking "strings" — a `"` ANYWHERE toggles, a backslash
+#:   escapes only inside one; then `parser.pl`'s `sexpr//3` reads a form: a token is a run of anything but
+#:   whitespace and parentheses, so a `"` in the MIDDLE of a token is an ordinary character, and a string
+#:   literal can only START an element. A scan that tokenises the way a programmer reads (a quote starts a
+#:   string wherever it stands) sees `a"b add-atom c"d` as `a`, one string and `d`; PeTTa reads the three atoms
+#:   `a"b`, `add-atom` and `c"d`. These two expressions are that reading; `tests/test_metta_runtime.py` checks
+#:   them against the engine's own reader on a corpus of nasty texts.
+_PETTA_STRIP_RE = re.compile(r'"(?:[^"\\]|\\[\s\S])*"|;[^\n]*\n?')
+_PETTA_TOKEN_RE = re.compile(r'(?P<string>"(?:[^"\\]|\\[\s\S])*")|(?P<paren>[()])|(?P<symbol>[^\s()]+)')
+
+
+def petta_strip_comments(text: str) -> str:
+    """`text` as PeTTa's `strip/3` leaves it: every `;` comment gone together with its newline, strings intact."""
+    if ";" not in text:
+        return text
+    return _PETTA_STRIP_RE.sub(lambda m: m.group() if m.group()[0] == '"' else "", text)
+
+
+def petta_tokens(text: str) -> list[tuple[str, str]]:
+    """('string' | 'paren' | 'symbol', text) for each token PeTTa's reader sees in `text`, comments aside."""
+    return [(m.lastgroup, m.group()) for m in _PETTA_TOKEN_RE.finditer(petta_strip_comments(text))]
 
 
 def petta_refused_forms(text: str) -> list[str]:
@@ -363,24 +495,23 @@ def petta_refused_forms(text: str) -> list[str]:
     ($f &self x))` reaches `add-atom` without ever writing it as a head. `=` is refused only as the head of a
     TOP-LEVEL form, which is a definition; inside a pattern `(match &self (= (f $x) $v) ...)` reads the
     equations and defines nothing (two taught few-shot examples do that).
+
+    Symbols are the ones PeTTa's own reader finds (see `petta_tokens`). This scan is a fast, friendly refusal
+    for the literal spelling and nothing more: a symbol built at run time never appears in the text at all,
+    and the engine (`_install_petta_sandbox`) refuses what the program does, whatever it is spelled like.
     """
     found: set[str] = set()
     depth = 0
     previous = ""
-    for m in _SCAN_RE.finditer(text):
-        tok = m.group()
-        first = tok[0]
-        if first == ";" or first == '"':
+    for kind, tok in petta_tokens(text):
+        if kind == "string":
             continue
-        if tok == "(":
-            depth += 1
-        elif tok == ")":
-            depth = max(0, depth - 1)
-        else:
-            if tok in _REFUSED_ANYWHERE:
-                found.add(tok)
-            elif tok == "=" and previous == "(" and depth == 1:
-                found.add("=")
+        if kind == "paren":
+            depth = depth + 1 if tok == "(" else max(0, depth - 1)
+        elif tok in _REFUSED_ANYWHERE:
+            found.add(tok)
+        elif tok == "=" and previous == "(" and depth == 1:
+            found.add("=")
         previous = tok
     return sorted(found)
 
@@ -394,14 +525,7 @@ def petta_refused_forms_in_kb(text: str) -> list[str]:
     A caller-supplied `=` REDEFINITION is `core.metta_validator.validate`'s job: it checks the caller's own
     query/`extra_atoms` text specifically, before it is concatenated into a `kb_text` that also holds the
     trusted ontology files, where `petta_refused_forms`'s top-level check still applies."""
-    found: set[str] = set()
-    for m in _SCAN_RE.finditer(text):
-        tok = m.group()
-        if tok[0] in ';"':
-            continue
-        if tok in _REFUSED_ANYWHERE:
-            found.add(tok)
-    return sorted(found)
+    return sorted({tok for kind, tok in petta_tokens(text) if kind == "symbol" and tok in _REFUSED_ANYWHERE})
 
 
 def _refuse_if_forbidden(text: str, where: str, *, scan: Callable[[str], list[str]] = petta_refused_forms) -> None:
@@ -421,103 +545,267 @@ def _refuse_if_forbidden(text: str, where: str, *, scan: Callable[[str], list[st
 
 
 # ── the engine-level sandbox (closes what the text scan above cannot) ─────────
+#
+# What a program can make PeTTa call, and what stops it. Every way a MeTTa program reaches a Prolog predicate
+# by a name IT chooses, read off the pinned checkout (`src/translator.pl`, `src/spaces.pl`, `src/metta.pl`,
+# `src/typecheck/builtin_registry.pl`), and the single place each is closed. The text scan is not on this list:
+# it only gives the literal spelling a friendly 422, and a program that builds a name at run time never
+# contains the literal.
+#
+#   dynamic dispatch   `($f ...)` with `$f` bound at run time: `translator.pl`'s `reduce/2` calls it only when
+#   `reduce/2`,        `fun($f)` holds — the one fact the translator and `reduce/2` both ask. Every `fun/1`
+#   `apply_fn*`        name that is not allowed is redefined to throw; `maplist`, `foldl`, `sread` and
+#                      `exists_file` (PeTTa calls them itself) are taken OFF `fun/1`, so they are data.
+#   compiler forms     `call` and `translatePredicate` build `Goal =.. [F|Args]` from the program's own data
+#   `manual_call`,     and run it with no `fun/1` check; they can also be reached without ever writing the
+#   `translate_`       name (`atom_concat`, `cons-atom`, then `eval` of the list, which compiles it). They
+#   `predicate`        are chosen by `builtin_registry:special_builtin_form/3`, which is wrapped so the form
+#                      is refused unless the target it names is a `fun/1` function (PeTTa's own rewrites of
+#                      `unique`, `union`, ... produce `(call (superpose ...))` and keep working).
+#   spaces             `match` and `get-atoms` turn the program's Space argument into a predicate name:
+#                      `Term =.. [Space, Rel|Args], call(Term)`, so `(match getenv (HOME $v) $v)` is a call
+#                      of `getenv/2` (and `read_file_to_string`, `directory_files`, ... likewise).
+#                      `space_call/1` and `get-atoms/2` accept only the name of a space, an atom that begins
+#                      with `&` — PeTTa's own `is-space` test.
+#   space mutation     `add-atom`, `remove-atom` and the `-proven` pair the translator emits for a typed
+#                      space refuse while a `!` form runs (`process_form/4` is wrapped to say so); the
+#                      engine's own `add_sexp/2` and `remove_sexp/2` stay open, because PeTTa's runtime
+#                      specialiser calls them while it compiles a query.
+#   Prolog by name     `callPredicate`, `Predicate`, `assertzPredicate`, ... and `shell`/`halt`: refused.
+#
+# Not closed, and why: an OS-level confinement (a seccomp or sandbox_init profile) differs per platform and
+# cannot be tested on more than one here; `_child_prepare` removes what a process holds that a program should
+# not reach (the environment, the parent's descriptors, the working directory), but a host predicate that
+# some future PeTTa version lets a program name is stopped by this list only if it is on it.
 
-#: `add-atom`/`remove-atom` materialise every ordinary ground fact while an ordinary KB loads
-#: (`filereader.pl`'s `process_form` calls them directly for every non-`!` top-level form), so they keep
-#: their real behaviour there and are refused only while `petta_sandbox_on` is in effect: around evaluating
-#: a `!` form, never around `engine.load` or a session's plain-fact text. See `_install_petta_sandbox`.
-_SANDBOX_DELEGATING_PREDICATES: tuple[tuple[str, int], ...] = (
-    ("add-atom", 3), ("remove-atom", 3),
+#: `add-atom`/`remove-atom` materialise every ordinary ground fact while a KB loads (`filereader.pl`'s
+#: `process_form` calls them for every non-`!` form), so they keep their real behaviour there and refuse only
+#: while the flag is set. The flag is set around each `!` form by the `process_form/4` wrapper (so a `!` form
+#: hidden in `kb_text`/`extra_atoms` is covered the same as an expression), and set for good once a
+#: `run_program` child has loaded its KB.
+_SANDBOX_FLAGGED_PREDICATES: tuple[tuple[str, int], ...] = (
+    ("add-atom", 3), ("remove-atom", 3), ("add-atom-proven", 3), ("remove-atom-proven", 3),
 )
 
-#: No ordinary KB load or any taught few-shot query uses any of these (checked against every tracked
-#: `.metta` file and `prompts/few_shot_examples.json`), so they are refused unconditionally, for the whole
-#: life of the child — during `engine.load` too, which closes this for `kb_text` the same as for an
-#: expression or a session's text. `shell`/`callPredicate`/`assertaPredicate`/`assertzPredicate`/
-#: `retractPredicate`/`import_prolog_function` are PeTTa's generic "call any Prolog predicate by name"
-#: doors (`metta.pl`'s "Prolog interop" section): reachable even when the MeTTa-level name the caller wrote
-#: is not `py-call`/`shell` at all (`(callPredicate (Predicate (shell $Cmd 0)))` never writes the word
-#: `shell` next to `call`), so they are refused here too, not only `py-call`/`shell` themselves.
-_SANDBOX_ALWAYS_PREDICATES: tuple[tuple[str, int], ...] = (
-    ("py-call", 2), ("py-call", 3),
-    ("shell", 1), ("shell", 2), ("shell", 3),
-    ("halt", 1),
-    ("import!", 3), ("library-import!", 3), ("cached-import!", 3),
-    ("bind!", 3),
-    ("assert", 2), ("test", 3),
-    ("callPredicate", 2), ("assertaPredicate", 2), ("assertzPredicate", 2), ("retractPredicate", 2),
-    ("import_prolog_function", 2),
+#: Non-`fun/1` Prolog predicates guarded unconditionally: `shell` and `halt` are real SWI predicates, never
+#: registered as a MeTTa builtin, so enumerating `fun/1` never surfaces them. With the doors above closed
+#: they are unreachable from a program; they stay as a second line. Deliberately NOT extended to every
+#: dangerous predicate SWI ships (`open`, `delete_file`, `process_create`, `getenv`, ...): PeTTa and janus call
+#: several of them on every load, so redefining them breaks the engine, and a predicate no program can name is
+#: not made safer by it.
+_SANDBOX_NONFUN_ALWAYS_PREDICATES: tuple[tuple[str, int], ...] = (
+    ("shell", 1), ("shell", 2), ("shell", 3), ("halt", 1),
 )
 
-#: Prolog consulted once per child, right after `PeTTa()` has loaded `main.pl`/`helper.pl`. Defines the
-#: sandbox flag and the two helpers `_install_petta_sandbox` drives; does not touch any predicate itself
-#: (that happens per-entry below, so one failing entry never takes the whole setup down with it).
+#: The closure-call shortcuts of `translator.pl`: they call the function a `partial(F, Args)` closure names.
+_SANDBOX_CLOSURE_PREDICATES: tuple[tuple[str, int], ...] = (
+    ("apply_fn1", 3), ("apply_fn2", 4), ("apply_fn3", 5), ("apply_fnN", 3),
+)
+
+#: Prolog consulted once per child, right after `PeTTa()` has loaded `main.pl`/`helper.pl`. `@FLAG@` and
+#: `@NOTE@` are replaced by per-child random names, and so are the private names the original predicates are
+#: copied to (`_install_petta_sandbox`), so none of the sandbox's state has a name to guess.
 _SANDBOX_SETUP_SRC = r"""
-:- nb_setval(petta_sandbox_blocking, false).
-petta_sandbox_on  :- nb_setval(petta_sandbox_blocking, true).
-petta_sandbox_off :- nb_setval(petta_sandbox_blocking, false).
-petta_sandbox_blocked :- nb_current(petta_sandbox_blocking, true).
+%The state lives in a flag and a dynamic predicate, not in global variables: nb_setval/nb_getval are
+%thread-local in SWI-Prolog, and PeTTa's `hyperpose` runs its branches in threads of their own, which would
+%see the sandbox switched off (an `add-atom` in a branch mutated the space) and a refusal noted nowhere
+%the main thread can read it. Flags and the clauses of a dynamic predicate are shared by every thread.
+:- dynamic '@NOTE@'/2.
+petta_sandbox_blocked :- flag('@FLAG@', N, N), N > 0.
+petta_sandbox_lock :- flag('@FLAG@', _, 1000000).
+petta_sandbox_clear_refusal :- retractall('@NOTE@'(_, _)).
+petta_sandbox_last_refusal(Name, Why) :- '@NOTE@'(Name, Why), !.
 
-%Copies Name/Arity's existing clauses under a private name, then replaces Name/Arity with a dispatcher that
-%throws while the sandbox flag is set and otherwise calls the private copy - the real predicate, unchanged.
-petta_sandbox_guard_delegating(Name, Arity) :-
+%Records the refused name and the reason (builtin | mutation | space | target) where neither a catch/3 nor
+%backtracking can unwind it, then throws. translator.pl's reduce/2 (a dynamically dispatched head) wraps its call in
+%catch(_, _, fail), which turns the throw into an ordinary failure: the containing expression has no solution
+%and would read as "no answer". The note survives that, and _PettaEngine._raise_if_refused reads it after
+%every call.
+petta_sandbox_refuse(Name, Why) :-
+    ignore(retractall('@NOTE@'(_, _))),
+    assertz('@NOTE@'(Name, Why)),
+    throw(error(permission_error(call, Name), petta_sandbox)).
+
+%Runs Goal once with the flag raised, and lowers it again, however Goal ends.
+petta_sandbox_blocking_call(Goal) :-
+    setup_call_cleanup(flag('@FLAG@', N, N + 1), once(Goal), flag('@FLAG@', M, M - 1)).
+
+%Every name PeTTa itself treats as a MeTTa builtin - read once per child to compute the allowlist complement
+%from the LIVE registry, not a frozen Python guess at it.
+petta_sandbox_fun_names(Out) :- findall(N, user:fun(N), Out).
+%Every arity Name is actually CALLABLE at, not just the ones PeTTa's own `arity/2` recorded: register_fun's
+%own scan (metta.pl) excludes an arity <= 2 for any name that is ALSO a Prolog OPERATOR (`current_op(_,_,N)`),
+%which is why `arity('/',2)` is absent even though SWI's `/` IS callable at that arity - `reduce/2`, PeTTa's
+%own dispatcher, checks `current_predicate/1` directly, not `arity/2`, so an excluded arity is still reached.
+%Bounded at 9: no name in this checkout resolves above it (confirmed against the live registry by a test).
+petta_sandbox_reachable_arities(Name, Out) :-
+    findall(A, (between(0, 9, A), current_predicate(Name/A)), Out).
+%Whether Name/Arity resolves to library(yall) - SWI's generic "apply a goal, closing over free variables"
+%mechanism (`/`, `>>`), exported for lambdas and NOT limited to a fixed arity. PeTTa's own `/` (division,
+%metta.pl, arity 3) and yall's `/` share one name by accident; yall's import brings every OTHER arity of it
+%along, so an allowed, purely-arithmetic name can still carry a generic call-by-name door at arities nobody
+%meant to allow. Checked by origin, not by arity, so this also catches an arity this checkout does not use yet.
+petta_sandbox_is_generic_apply(Name, Arity) :-
     functor(Head, Name, Arity),
-    atom_concat('$petta_orig$', Name, OrigName),
-    functor(OrigHead, OrigName, Arity),
-    OrigHead =.. [OrigName|Args],
-    Head =.. [Name|Args],
-    findall(clause(OrigHead, Body), clause(Head, Body), Clauses),
-    Clauses \== [],
-    redefine_system_predicate(OrigName/Arity),
-    forall(member(clause(OH, Body), Clauses), assertz((OH :- Body))),
-    redefine_system_predicate(Name/Arity),
-    abolish(Name/Arity),
-    assertz((Head :- ( petta_sandbox_blocked
-                       -> throw(error(permission_error(call, Name), petta_sandbox))
-                        ; call(OrigHead) ))).
+    predicate_property(user:Head, imported_from(yall)).
 
-%Replaces Name/Arity with a predicate that always throws - no delegation, because none of these have any
-%legitimate caller in this repo's knowledge bases (see _SANDBOX_ALWAYS_PREDICATES above).
+%Copies Module:Name/Arity's clauses under a private name.
+petta_sandbox_copy(M, Name, Arity, OrigName) :-
+    functor(Head, Name, Arity), Head =.. [Name|Args],
+    OrigHead =.. [OrigName|Args],
+    findall(OrigHead-Body, clause(M:Head, Body), Clauses),
+    Clauses \== [],
+    forall(member(OH-B, Clauses), assertz(M:(OH :- B))).
+
+%Replaces Name/Arity with a predicate that throws while the flag is set and otherwise runs the original.
+petta_sandbox_guard_flagged(M, Name, Arity, OrigName) :-
+    petta_sandbox_copy(M, Name, Arity, OrigName),
+    functor(Head, Name, Arity), Head =.. [Name|Args], OrigHead =.. [OrigName|Args],
+    abolish(M:Name/Arity),
+    assertz(M:(Head :- ( user:petta_sandbox_blocked -> user:petta_sandbox_refuse(Name, mutation) ; OrigHead ))).
+
+%Replaces Name/Arity with a predicate that always throws: none of these has a legitimate caller in a KB.
 petta_sandbox_guard_always(Name, Arity) :-
     functor(Head, Name, Arity),
     redefine_system_predicate(Name/Arity),
     ignore(catch(abolish(Name/Arity), _, true)),
-    assertz((Head :- throw(error(permission_error(call, Name), petta_sandbox)))).
+    assertz((Head :- petta_sandbox_refuse(Name, builtin))).
+
+%A program may name a space only the way PeTTa's own is-space/2 does: an atom beginning with '&'.
+petta_sandbox_space_name(Space) :- atom(Space), sub_atom(Space, 0, 1, _, '&').
+
+%spaces.pl: every `match` goes through space_call/1, which calls whatever predicate the Space argument named.
+petta_sandbox_guard_space_call :-
+    abolish(space_call/1),
+    assertz((space_call(Term) :-
+                (   callable(Term), functor(Term, Name, _), petta_sandbox_space_name(Name)
+                ->  catch(Term, E, space_missing(E, Term))
+                ;   petta_sandbox_refuse(match, space) ))).
+
+%`get-atoms` lists the clauses of whatever predicate its first argument names.
+petta_sandbox_guard_space_arg(Name, Arity, OrigName) :-
+    petta_sandbox_copy(user, Name, Arity, OrigName),
+    functor(Head, Name, Arity), Head =.. [Name, Space|Rest], OrigHead =.. [OrigName, Space|Rest],
+    abolish(Name/Arity),
+    assertz((Head :- ( petta_sandbox_space_name(Space) -> OrigHead ; petta_sandbox_refuse(Name, space) ))).
+
+%Compiler forms that build a goal from the program's own data (see the table above). Allowed only when the
+%target they name is a function PeTTa knows, which is what every ordinary call needs and every rewrite of
+%PeTTa's own (`unique`, `union`, ...: `(call (superpose ...))`) satisfies.
+petta_sandbox_goal_hook(manual_call).
+petta_sandbox_goal_hook(translate_predicate).
+petta_sandbox_goal_target([Expr]) :- nonvar(Expr), Expr = [Target|_], atom(Target), user:fun(Target).
+
+petta_sandbox_guard_hooks(OrigName) :-
+    petta_sandbox_copy(builtin_registry, special_builtin_form, 3, OrigName),
+    abolish(builtin_registry:special_builtin_form/3),
+    Orig =.. [OrigName, F, Args, Hook],
+    assertz(builtin_registry:(special_builtin_form(F, Args, Hook) :-
+                (   nonvar(Hook), user:petta_sandbox_goal_hook(Hook)
+                ->  Orig,
+                    (   user:petta_sandbox_goal_target(Args) -> true ; user:petta_sandbox_refuse(F, target) )
+                ;   Orig ))).
+
+%A closure PeTTa builds for an under-applied function is `partial(F, Args)`, and the closure-call shortcuts
+%(apply_fn1/2/3/N) call F without asking whether it is a function. PeTTa only ever builds one for a function;
+%nothing in the allowed set lets a program write one (repra, which parsed text into a term, is not allowed),
+%but this is the sink a forged term would reach, so it asks.
+petta_sandbox_closure_ok(F) :- var(F), !.
+petta_sandbox_closure_ok(partial(Base, _)) :- !, atom(Base), user:fun(Base).
+petta_sandbox_closure_ok(_).
+
+petta_sandbox_guard_closure(Name, Arity, OrigName) :-
+    petta_sandbox_copy(user, Name, Arity, OrigName),
+    functor(Head, Name, Arity), Head =.. [Name, F|Rest], OrigHead =.. [OrigName, F|Rest],
+    abolish(Name/Arity),
+    assertz((Head :- ( petta_sandbox_closure_ok(F) -> OrigHead ; petta_sandbox_refuse(partial, target) ))).
+
+%filereader.pl: every `!` form - an expression, or one inside the KB text - is run by process_form/4.
+petta_sandbox_guard_process_form(OrigName) :-
+    petta_sandbox_copy(user, process_form, 4, OrigName),
+    abolish(process_form/4),
+    Orig =.. [OrigName, Space, Mode, Form, Result],
+    assertz((process_form(Space, Mode, Form, Result) :-
+                (   nonvar(Form), Form = parsed(runnable, _, _, _)
+                ->  petta_sandbox_blocking_call(Orig)
+                ;   Orig ))).
+
+%The top-level forms of Text as PeTTa's OWN reader splits them (comments removed): [[bang|fact, FormText], ...].
+petta_sandbox_forms(Text, Pairs) :-
+    metta_string_forms(Text, Forms),
+    findall([Kind, Str],
+            ( member(Form, Forms), Form =.. [Tag, Str, _], ( Tag == runnable -> Kind = bang ; Kind = fact ) ),
+            Pairs).
 """
 
 
 def _install_petta_sandbox(janus: Any) -> None:
-    """Close the hole the text scan above cannot: a symbol built at runtime (`atom_concat("add","-atom")`,
-    bound to a variable, then applied as `($f &self (Hacked yes))`) never appears as the token `add-atom` in
-    the program's TEXT, which is all `petta_refused_forms` can read — but PeTTa's own dispatcher
-    (`translator.pl`'s `reduce/2`) treats a function's identity as an ordinary runtime value, so that
-    symbol runs all the same. The restriction has to live inside the engine, not on the caller's text.
+    """Close, inside the engine, every way a program reaches a Prolog predicate by a name it chooses (the
+    table above). The restriction has to live in the engine, not in the caller's text: a symbol built at run
+    time (`atom_concat "add" "-atom"`, bound to a variable, applied) never appears as a token a scan can read,
+    and PeTTa's own dispatcher treats a function's identity as an ordinary runtime value.
 
-    Redefines the predicates in `_SANDBOX_DELEGATING_PREDICATES` and `_SANDBOX_ALWAYS_PREDICATES` directly,
-    in Prolog, so the block holds no matter how the program's text spells or constructs the call that
-    reaches them — in `kb_text`, in an expression, or inside a `PettaSession`, uniformly, independent of
-    which Python code path concatenated the caller's bytes into which string. Called once per forked child,
-    right after `PeTTa()` consults `main.pl`/`helper.pl` and before anything is loaded or run.
+    An ALLOWLIST, not a denylist, for the names PeTTa registers: every name the LIVE `fun/1` registry holds
+    (read from the engine just constructed, not assumed from `PETTA_KNOWN_FUN_NAMES`) is redefined to throw
+    unless it is in `PETTA_ALLOWED_FUN_NAMES`, so a name this module has never seen — a future PeTTa builtin —
+    is refused without anyone having to name it. `PETTA_ENGINE_INTERNAL_FUN_NAMES` are the exception that
+    cannot be redefined, taken off `fun/1` instead. A `fun/1` name with no Prolog predicate behind it (`let`,
+    `let*`, `concat`, `get-mettatype`, `mm2-exec`, `set_hook` in this checkout: `arity/2` holds nothing) is
+    skipped, because there is nothing to call.
 
-    Raises if any predicate cannot be found or redefined (the child then reports a `kind="start"` error and
-    is discarded, by the same path as any other construction failure): refusing to run a program is safer
-    than running one with this boundary silently missing, for instance after an upstream PeTTa update
-    renames or re-arities one of these predicates.
+    Raises if a predicate cannot be found or redefined (the child then reports a `kind="start"` error and is
+    discarded): refusing to run a program is safer than running one with this boundary silently missing.
 
-    `halt/0` is the one predicate SWI itself will not let any program redefine (confirmed empirically
-    against this PeTTa checkout: `redefine_system_predicate(halt/0)` followed by `asserta/1` still raises
-    `permission_error(modify, static_procedure, halt/0)`), so it is not in either list above. Reaching it
-    (`(call (halt))`) ends the child with exit code 0; `_Child._died()` already reports that as a
-    `kind="crash"` result, the same bounded, already-handled outcome as `halt/1` before this module existed
-    (a halt only ever ends the one process it runs in) — not a new failure mode and not a host escape.
+    `halt/0` is the one predicate SWI will not let any program redefine (`redefine_system_predicate(halt/0)`
+    followed by `asserta/1` still raises `permission_error(modify, static_procedure, halt/0)`). Reaching it
+    (`(call (halt))`) is refused by the `call` rule; if it were reached, the child would end with exit code 0,
+    which `_Child._died()` reports as a `kind="crash"`: a halt only ever ends the one process it runs in.
+
+    Every private name and both state keys carry a fresh random token, so nothing a program could name is
+    shared between children or guessable.
     """
-    janus.consult("petta_sandbox_setup", data=_SANDBOX_SETUP_SRC)
-    for name, arity in _SANDBOX_DELEGATING_PREDICATES:
-        if not janus.query_once("petta_sandbox_guard_delegating(N, A)", {"N": name, "A": arity}):
-            raise RuntimeError(f"could not sandbox the PeTTa predicate '{name}'/{arity}")
-    for name, arity in _SANDBOX_ALWAYS_PREDICATES:
-        if not janus.query_once("petta_sandbox_guard_always(N, A)", {"N": name, "A": arity}):
-            raise RuntimeError(f"could not sandbox the PeTTa predicate '{name}'/{arity}")
+    token = secrets.token_hex(6)
+    janus.consult("petta_sandbox_setup", data=_SANDBOX_SETUP_SRC.replace("@FLAG@", f"petta_sandbox_flag_{token}")
+                  .replace("@NOTE@", f"petta_sandbox_note_{token}"))
+
+    def must(goal: str, bindings: Optional[dict] = None, what: str = "") -> None:
+        # janus answers a goal that failed with {"truth": False}, which is a non-empty (truthy) dict
+        if not janus.query_once(goal, bindings or {}).get("truth"):
+            raise RuntimeError(f"could not sandbox the PeTTa {what or goal}")
+
+    flagged = {name for name, _ in _SANDBOX_FLAGGED_PREDICATES}
+    for name, arity in _SANDBOX_FLAGGED_PREDICATES:
+        must("petta_sandbox_guard_flagged(user, N, A, O)", {"N": name, "A": arity, "O": f"petta_orig_{token}_{name}"},
+             f"predicate '{name}'/{arity}")
+    live_fun_names = {str(n) for n in janus.query_once("petta_sandbox_fun_names(Out)")["Out"]}
+    if not live_fun_names:
+        raise RuntimeError("could not read the PeTTa builtin registry (fun/1 is empty)")
+    for name in sorted(live_fun_names - PETTA_ALLOWED_FUN_NAMES - PETTA_ENGINE_INTERNAL_FUN_NAMES - flagged):
+        arities = janus.query_once("petta_sandbox_reachable_arities(Name, Out)", {"Name": name})["Out"]
+        for raw_arity in arities:
+            must("petta_sandbox_guard_always(N, A)", {"N": name, "A": int(raw_arity)},
+                 f"predicate '{name}'/{int(raw_arity)}")
+    # An ALLOWED name can still carry a generic call-by-name door at an arity nobody meant to allow (see
+    # `petta_sandbox_is_generic_apply`'s docstring: `/` is exactly this, confirmed against the live engine).
+    for name in sorted(live_fun_names & PETTA_ALLOWED_FUN_NAMES):
+        for raw_arity in janus.query_once("petta_sandbox_reachable_arities(Name, Out)", {"Name": name})["Out"]:
+            arity = int(raw_arity)
+            if janus.query_once("petta_sandbox_is_generic_apply(N, A)", {"N": name, "A": arity}).get("truth"):
+                must("petta_sandbox_guard_always(N, A)", {"N": name, "A": arity}, f"predicate '{name}'/{arity}")
+    for name in sorted(live_fun_names & PETTA_ENGINE_INTERNAL_FUN_NAMES):
+        janus.query_once("retractall(fun(N))", {"N": name})
+    for name, arity in _SANDBOX_NONFUN_ALWAYS_PREDICATES:
+        must("petta_sandbox_guard_always(N, A)", {"N": name, "A": arity}, f"predicate '{name}'/{arity}")
+    must("petta_sandbox_guard_space_call", what="predicate 'space_call'/1")
+    must("petta_sandbox_guard_space_arg(N, A, O)", {"N": "get-atoms", "A": 2, "O": f"petta_orig_{token}_get-atoms"},
+         "predicate 'get-atoms'/2")
+    must("petta_sandbox_guard_hooks(O)", {"O": f"petta_orig_{token}_special_builtin_form"},
+         "predicate 'special_builtin_form'/3")
+    for name, arity in _SANDBOX_CLOSURE_PREDICATES:
+        must("petta_sandbox_guard_closure(N, A, O)", {"N": name, "A": arity, "O": f"petta_orig_{token}_{name}"},
+             f"predicate '{name}'/{arity}")
+    must("petta_sandbox_guard_process_form(O)", {"O": f"petta_orig_{token}_process_form"},
+         "predicate 'process_form'/4")
 
 
 # ── forking ───────────────────────────────────────────────────────────────────
@@ -545,9 +833,10 @@ def _describe_status(status: Optional[int]) -> str:
 class _Child:
     """A forked worker process and the parent's end of its pipe. `close()` always reaps it."""
 
-    def __init__(self, pid: int, conn: Connection) -> None:
+    def __init__(self, pid: int, conn: Connection, scratch: Optional[str] = None) -> None:
         self.pid = pid
         self.conn = conn
+        self.scratch = scratch                  # the child's working directory, removed once it is reaped
         self.status: Optional[int] = None      # waitpid status once reaped; -1 when it was reaped elsewhere
 
     # -- the process
@@ -591,6 +880,9 @@ class _Child:
             self.conn.close()
         except Exception:                       # pragma: no cover - closing must never mask the real error
             pass
+        if self.scratch is not None and self.status is not None:
+            shutil.rmtree(self.scratch, ignore_errors=True)
+            self.scratch = None
 
     # -- the pipe
     def send(self, message: dict) -> None:
@@ -623,8 +915,16 @@ class _Child:
         return MettaRuntimeError(f"the PeTTa process ended with {how} before it answered{hint}", kind="crash")
 
 
+#: The directory the forked child works in (set in the child by `_fork_child`, read by `_child_prepare`).
+_CHILD_SCRATCH: Optional[str] = None
+
+
 def _fork_child(target: Callable[..., None], *args: Any) -> _Child:
-    """Fork a child that runs `target(conn, *args)` and never returns into the caller's code."""
+    """Fork a child that runs `target(conn, *args)` and never returns into the caller's code. The child gets a
+    fresh empty directory of its own (private to this process, removed by `_Child.close`): its working
+    directory, home, temp directory and cache directory."""
+    global _CHILD_SCRATCH
+    scratch = tempfile.mkdtemp(prefix="pln-petta-")
     with _FORK_LOCK:
         parent_conn, child_conn = Pipe(duplex=True)
         try:
@@ -636,10 +936,12 @@ def _fork_child(target: Callable[..., None], *args: Any) -> _Child:
         except BaseException:
             parent_conn.close()
             child_conn.close()
+            shutil.rmtree(scratch, ignore_errors=True)
             raise
         if pid == 0:                            # the child
             code = 70
             try:
+                _CHILD_SCRATCH = scratch
                 parent_conn.close()
                 target(child_conn, *args)
                 code = 0
@@ -648,14 +950,88 @@ def _fork_child(target: Callable[..., None], *args: Any) -> _Child:
             finally:
                 os._exit(code)
         child_conn.close()
-    return _Child(pid, parent_conn)
+    return _Child(pid, parent_conn, scratch)
 
 
-def _child_prepare(deadline_s: Optional[float], *, parent_pid: Optional[int]) -> None:
-    """First thing in a forked PeTTa child: cut it off from the parent's terminal and bound it."""
+#: What a PeTTa child keeps of the server's environment, by exact name (and every `LC_*`): what the dynamic
+#: linker and SWI-Prolog need to start. Everything else goes — the server's `.env` puts its API keys in
+#: `os.environ`, and a child has no use for them. `PLN_PETTA_CHILD_ENV_KEEP` (comma-separated names, read from
+#: the server's environment) adds names for a deployment whose SWI-Prolog needs one that is not listed.
+PETTA_CHILD_ENV_KEEP: tuple[str, ...] = (
+    "PATH", "LANG", "LANGUAGE", "TZ", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH",
+    "SWI_HOME_DIR",
+)
+#: Soft limits set in the child on top of the CPU backstop: no core file (it would hold the server's memory),
+#: a bounded number of descriptors, a bounded file size.
+_CHILD_LIMITS: tuple[tuple[str, int], ...] = (
+    ("RLIMIT_CORE", 0), ("RLIMIT_NOFILE", 512), ("RLIMIT_FSIZE", 64 * 1024 * 1024),
+)
+
+
+def _scrub_environment(scratch: Optional[str]) -> None:
+    """Replace the child's environment by the allowlisted names, and point everything that names a place to
+    write (`HOME`, `TMPDIR`, `XDG_CACHE_HOME`, PeTTa's own `PETTA_LOAD_CACHE`) at the child's scratch directory."""
+    keep = set(PETTA_CHILD_ENV_KEEP) | {n.strip() for n in os.environ.get("PLN_PETTA_CHILD_ENV_KEEP", "").split(",")
+                                        if n.strip()}
+    kept = {k: v for k, v in os.environ.items() if k in keep or k.startswith("LC_")}
+    os.environ.clear()                          # unsetenv for each name: the C environment goes too
+    os.environ.update(kept)
+    if scratch:
+        os.environ.update(HOME=scratch, TMPDIR=scratch, XDG_CACHE_HOME=scratch,
+                          PETTA_LOAD_CACHE=os.path.join(scratch, "load-cache"))
+
+
+def _neutralise_inherited_descriptors(devnull: int, keep: tuple[int, ...]) -> None:
+    """Point every inherited descriptor but 0-2, the child's pipe and `devnull` at /dev/null: the parent's
+    sockets, log files and its other children's pipes are not for the child. The numbers stay taken (they are
+    not closed): a Python object the fork copied may still close its descriptor when it is collected, and
+    that must not close one the engine has opened since."""
+    for directory in ("/proc/self/fd", "/dev/fd"):
+        try:
+            numbers = [int(n) for n in os.listdir(directory)]
+            break
+        except (OSError, ValueError):
+            continue
+    else:                                       # pragma: no cover - no way to list them
+        numbers = list(range(3, 256))
+    for fd in numbers:
+        if fd > 2 and fd != devnull and fd not in keep:
+            try:
+                os.dup2(devnull, fd)
+            except OSError:
+                pass
+
+
+def _limit_child_resources() -> None:
+    try:
+        import resource
+    except ImportError:                         # pragma: no cover
+        return
+    for name, soft in _CHILD_LIMITS:
+        res = getattr(resource, name, None)
+        if res is None:                         # pragma: no cover
+            continue
+        try:
+            current, hard = resource.getrlimit(res)
+            wanted = soft if current == resource.RLIM_INFINITY else min(soft, current)
+            if hard != resource.RLIM_INFINITY:
+                wanted = min(wanted, hard)
+            resource.setrlimit(res, (wanted, hard))
+        except (OSError, ValueError):           # pragma: no cover
+            pass
+    try:
+        signal.signal(signal.SIGXFSZ, signal.SIG_IGN)      # an oversized write fails with an error, it does not kill
+    except (OSError, ValueError, AttributeError):          # pragma: no cover
+        pass
+
+
+def _child_prepare(deadline_s: Optional[float], *, parent_pid: Optional[int], keep_fds: tuple[int, ...] = ()) -> None:
+    """First thing in a forked PeTTa child: cut it off from the parent's terminal, descriptors, environment and
+    working directory, and bound it."""
     devnull = os.open(os.devnull, os.O_RDWR)
     for fd in (0, 1, 2):
         os.dup2(devnull, fd)
+    _neutralise_inherited_descriptors(devnull, keep_fds)
     if devnull > 2:
         os.close(devnull)
     sys.stdout = sys.stderr = open(os.devnull, "w")
@@ -665,6 +1041,13 @@ def _child_prepare(deadline_s: Optional[float], *, parent_pid: Optional[int]) ->
             signal.signal(sig, signal.SIG_DFL)
         except (OSError, ValueError):           # pragma: no cover
             pass
+    _scrub_environment(_CHILD_SCRATCH)
+    if _CHILD_SCRATCH:
+        try:
+            os.chdir(_CHILD_SCRATCH)
+        except OSError:                         # pragma: no cover
+            pass
+    _limit_child_resources()
     _set_cpu_backstop(deadline_s)
     if parent_pid is not None and sys.platform.startswith("linux"):
         try:
@@ -708,6 +1091,29 @@ def _clip(text: str, limit: int = _MAX_DETAIL_CHARS) -> str:
 
 # ── the real PeTTa engine (constructed in the child only) ─────────────────────
 
+_REFUSAL_REASONS = {
+    "builtin": "that form is not in the allowed set (core.metta_runtime.PETTA_ALLOWED_FUN_NAMES)",
+    "mutation": "a query may not change the space it reads",
+    "space": "the space it was given is not a space (the name of one begins with '&')",
+    "target": "it may only call a function PeTTa knows, and the one it names is not",
+}
+
+
+class _RefusedBuiltin(RuntimeError):
+    """A sandboxed call reached something a program may not do; raised inside `_PettaEngine._helper`.
+
+    The message names the refused head and the reason and nothing else — no filesystem path, no Prolog
+    internals — so it is safe to show a caller verbatim. `_error_message` (below) recognises this type and
+    reports it under `stage="refused"` regardless of whether it happened during a load or an expression,
+    which `PettaRuntime._error_from`/`PettaSession` map to `MettaRuntimeError(kind="refused")`.
+    """
+
+    def __init__(self, name: str, why: str = "builtin") -> None:
+        self.name = name
+        self.why = why
+        super().__init__(f"the PeTTa runtime refused to run '{name}': {_REFUSAL_REASONS.get(why, why)}")
+
+
 class _PettaEngine:
     """PeTTa through janus. Constructed in the forked child: this is the only code that imports them."""
 
@@ -727,32 +1133,71 @@ class _PettaEngine:
         janus.query_once(f"set_prolog_flag(stack_limit, {int(stack_limit_mb) * 1024 * 1024})")
         self._janus = janus
 
-    def _helper(self, text: str, *, sandboxed: bool) -> Optional[list[str]]:
+    def _raise_if_refused(self) -> None:
+        """Turn a recorded sandbox refusal into `_RefusedBuiltin`, clearing the side channel.
+
+        A LITERAL head call to a guarded predicate raises normally: the `permission_error`
+        `_install_petta_sandbox` throws propagates through `janus.query_once` as a `PrologError`. A
+        DYNAMICALLY-DISPATCHED head (`($f ...)`, `$f` bound to a runtime-built symbol) does not:
+        `translator.pl`'s `reduce/2` — PeTTa's own dynamic dispatcher — calls the resolved goal inside
+        `catch(call(Goal), _, fail)`, a catch-all that turns ANY exception, including this one, into an
+        ordinary Prolog FAILURE. The containing expression then has no solution, `run_metta_helper` returns
+        `[]` the same as a query that legitimately found nothing, and a caller cannot tell a blocked form from
+        a true empty answer. `petta_sandbox_refuse/1` records the refused name in a side channel, `nb_setval`,
+        that `catch/3` cannot unwind — checked here after every `_helper` call, success or failure, so a
+        swallowed refusal still surfaces as `_RefusedBuiltin` instead of a silent `[]`. (A program that
+        catches the refusal itself with MeTTa's `catch` is refused the same way: the note is still there.)"""
+        row = self._janus.query_once("petta_sandbox_last_refusal(N, W)")
+        if row.get("truth"):
+            self._janus.query_once("petta_sandbox_clear_refusal")
+            raise _RefusedBuiltin(str(row["N"]), str(row["W"]))
+
+    def _helper(self, text: str) -> Optional[list[str]]:
         """PeTTa's own `_run_helper`, except that a goal that FAILS is returned as None instead of [].
 
-        `sandboxed` toggles the engine-level guard (`_install_petta_sandbox`) around this one call: on
-        while evaluating a `!` form, off while loading a KB or adding a session's plain facts, so
-        `add-atom`/`remove-atom` keep materialising ordinary ground facts there."""
-        if sandboxed:
-            self._janus.query_once("petta_sandbox_on")
+        Whether a `!` form in `text` runs sandboxed is not decided here: `process_form/4` is wrapped inside
+        the engine (`_install_petta_sandbox`), so every `!` form PeTTa evaluates is, wherever it came from."""
+        self._janus.query_once("petta_sandbox_clear_refusal")
         try:
             answer = self._janus.query_once(
                 "run_metta_helper(Verbose, HelperName, Argument, Results)",
                 {"Verbose": "false", "HelperName": "process_metta_string", "Argument": text},
             )
         finally:
-            if sandboxed:
-                self._janus.query_once("petta_sandbox_off")
-        if answer is None:
+            # A refusal recorded during the call above wins over whatever `answer` says, including a
+            # PrologError already propagating out of the `try` — see `_raise_if_refused`'s docstring.
+            self._raise_if_refused()
+        if not answer.get("truth"):                 # janus answers {"truth": False} to a goal that failed
             return None
         return [str(x) for x in answer.get("Results", [])]
 
     def load(self, kb_text: str) -> None:
-        if self._helper(kb_text, sandboxed=False) is None:
+        """Load `kb_text` in ONE `process_metta_string` call, so PeTTa's own declaration and clause-body
+        prepass ("every function type declaration in the file is visible to every definition in it,
+        independent of order") sees the whole text. A top-level `!` form in it — a caller's `extra_atoms` can
+        hold one, and PeTTa evaluates it during the load like any expression — is run sandboxed by the
+        engine's `process_form/4` wrapper, not by anything this method does: it neither splits the text nor
+        drops a fragment it cannot read (an unbalanced tail is PeTTa's own syntax error, as at HEAD)."""
+        if self._helper(kb_text) is None:
             raise RuntimeError("the load goal failed without raising an error")
 
-    def run(self, text: str, *, sandboxed: bool = True) -> list[str]:
-        out = self._helper(text, sandboxed=sandboxed)
+    def lock(self) -> None:
+        """Keep `add-atom` and its siblings refused for the rest of this child's life. Called by a
+        `run_program` child once its KB is loaded: nothing it evaluates from then on may change the space."""
+        if not self._janus.query_once("petta_sandbox_lock").get("truth"):
+            raise RuntimeError("could not lock the PeTTa space")
+
+    def split_forms(self, text: str) -> list[tuple[str, str]]:
+        """('bang' | 'fact', form text) for each top-level form of `text`, as PeTTa's OWN reader splits it
+        (comments removed; a 'bang' form's text lacks its `!`). A text the reader cannot split raises its
+        syntax error instead of losing the part it could not read."""
+        answer = self._janus.query_once("petta_sandbox_forms(Text, Pairs)", {"Text": text})
+        if not answer.get("truth"):
+            raise RuntimeError("PeTTa's reader could not split the text")
+        return [(str(kind), str(form)) for kind, form in answer["Pairs"]]
+
+    def run(self, text: str) -> list[str]:
+        out = self._helper(text)
         return [] if out is None else out
 
 
@@ -766,6 +1211,12 @@ def _send(conn: Connection, message: dict) -> None:
 
 
 def _error_message(stage: str, exc: BaseException, index: Optional[int] = None) -> dict:
+    """One `stage` always wins over whatever stage the caller passed: `_RefusedBuiltin` is reported as
+    `stage="refused"` whether it surfaced while loading the KB or while evaluating an expression, so
+    `PettaRuntime._error_from`/`PettaSession` can map every refusal to `MettaRuntimeError(kind="refused")`
+    the same way regardless of where in the run it was caught."""
+    if isinstance(exc, _RefusedBuiltin):
+        stage = "refused"
     return {"kind": "error", "stage": stage, "index": index,
             "type": type(exc).__name__, "message": _clip(f"{exc}")}
 
@@ -775,7 +1226,7 @@ def _program_child(conn: Connection, factory: EngineFactory, petta_home: str, st
                    parent_pid: int) -> None:
     """The forked child of `PettaRuntime.run_program`: one load, one call per expression, one message."""
     try:
-        _child_prepare(deadline_s, parent_pid=parent_pid)
+        _child_prepare(deadline_s, parent_pid=parent_pid, keep_fds=(conn.fileno(),))
     except BaseException as exc:                # noqa: BLE001
         _send(conn, _error_message("start", exc))
         return
@@ -792,6 +1243,11 @@ def _program_child(conn: Connection, factory: EngineFactory, petta_home: str, st
         except BaseException as exc:            # noqa: BLE001 - any exception during a load is a failed load
             _send(conn, _error_message("load", exc))
             return
+    try:
+        engine.lock()                           # from here on nothing a program does may change the space
+    except BaseException as exc:                # noqa: BLE001
+        _send(conn, _error_message("start", exc))
+        return
     t2 = time.perf_counter()
     groups: list[list[str]] = []
     for index, expression in enumerate(expressions):
@@ -808,27 +1264,30 @@ def _program_child(conn: Connection, factory: EngineFactory, petta_home: str, st
 
 def _run_text(engine: Any, text: str, tiers: Mapping[str, str]) -> tuple[list[list[str]], int]:
     """Evaluate `text` form by form: one group per `!` form; consecutive facts go in as one chunk, with their
-    stored calls reduced. Returns (groups, number of calls reduced)."""
+    stored calls reduced. Returns (groups, number of calls reduced).
+
+    The forms are the ones PeTTa's own reader finds (`engine.split_forms`), not this module's: a splitter of
+    its own that disagrees with the engine about where a form ends would drop or merge text without a word,
+    and PeTTa raises its syntax error for text it cannot read. Whether a `!` form runs sandboxed is the
+    engine's business (see `_install_petta_sandbox`), so a plain fact needs no flag from here."""
     groups: list[list[str]] = []
     reduced = 0
-    pending: Optional[list[int]] = None          # [start, end] of the facts waiting to be added
+    pending: list[str] = []                      # the facts waiting to be added
 
     def flush() -> None:
-        nonlocal pending, reduced
-        if pending is not None:
-            reduction = reduce_stored_calls(text[pending[0]:pending[1]], tiers)
+        nonlocal reduced
+        if pending:
+            reduction = reduce_stored_calls("\n".join(pending), tiers)
             reduced += reduction.reduced
-            engine.run(reduction.text, sandboxed=False)   # plain facts: add-atom must keep its real behaviour
-            pending = None
+            engine.run(reduction.text)
+            pending.clear()
 
-    for s, e in split_top_level_forms(text):
-        if text[s] == "!":
+    for kind, form in engine.split_forms(text):
+        if kind == "bang":
             flush()
-            groups.append([str(x) for x in engine.run(text[s:e])])   # sandboxed: default True
-        elif pending is None:
-            pending = [s, e]
+            groups.append([str(x) for x in engine.run("!" + form)])
         else:
-            pending[1] = e
+            pending.append(form)
     flush()
     return groups, reduced
 
@@ -837,7 +1296,7 @@ def _session_child(conn: Connection, factory: EngineFactory, petta_home: str, st
                    kb_text: str, tiers: dict[str, str], deadline_s: Optional[float]) -> None:
     """The forked child of a PettaSession: load once, then answer requests until told to stop or orphaned."""
     try:
-        _child_prepare(deadline_s, parent_pid=None)
+        _child_prepare(deadline_s, parent_pid=None, keep_fds=(conn.fileno(),))
         engine = factory(petta_home, stack_limit_mb)
     except BaseException as exc:                # noqa: BLE001
         _send(conn, _error_message("start", exc))
@@ -1080,6 +1539,11 @@ class PettaRuntime:
                                      kind="unavailable", detail=text)
         if stage == "load":
             return MettaRuntimeError(f"PeTTa could not load the knowledge base: {kind_of}", kind="load", detail=text)
+        if stage == "refused":
+            # `text` is `_RefusedBuiltin`'s own message: the refused head's name and nothing else (no
+            # filesystem path, no Prolog internals) — safe to show a caller verbatim, so it is used as-is
+            # rather than wrapped in `kind_of`'s "<type>: <text>" framing.
+            return MettaRuntimeError(text, kind="refused", detail=text)
         index = message.get("index")
         where = f"expression {index + 1}" if isinstance(index, int) else "the program"
         return MettaRuntimeError(f"PeTTa raised while evaluating {where}: {kind_of}", kind="expression", detail=text)

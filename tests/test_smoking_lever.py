@@ -23,7 +23,8 @@ patient with no pack-years measurement honestly gets zero, and — the regressio
 that matters most — that Patient001's and Patient002's answers are byte-identical
 with and without this file.
 
-Skipped automatically if `hyperon` is not installed.
+Runs on the selected runtime (PLN_RUNTIME: hyperon, the default, or petta; tests/runtime_harness.py)
+and is skipped automatically if that runtime is not installed.
 
 Run from the repository root:
     pytest tests/test_smoking_lever.py -q
@@ -34,6 +35,7 @@ import ast
 import re
 import sys
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
@@ -244,33 +246,34 @@ def test_the_marker_catalog_says_what_packyears_now_reaches():
 
 # ── and the engine agrees (real MeTTa) ───────────────────────────────────────
 
-hyperon = pytest.importorskip("hyperon")
-from hyperon import MeTTa  # noqa: E402
+from runtime_harness import Kb, new_kb, require_runtime  # noqa: E402
+
+require_runtime()
 
 
-def _space(files: list[str]) -> MeTTa:
-    m = MeTTa()
-    m.run("\n".join((REPO / f).read_text(encoding="utf-8") for f in files))
-    return m
+def _space(files: list[str]) -> Kb:
+    return new_kb(files)
 
 
 @pytest.fixture(scope="module")
-def before() -> MeTTa:
+def before() -> Iterator[Kb]:
     """The stack WITHOUT the new layer — the regression baseline."""
-    return _space(BASE_FILES)
+    with _space(BASE_FILES) as m:
+        yield m
 
 
 @pytest.fixture(scope="module")
-def kb() -> MeTTa:
+def kb() -> Iterator[Kb]:
     """The stack WITH lifestyle_evidence.metta."""
-    return _space(BASE_FILES + ["lifestyle_evidence.metta"])
+    with _space(BASE_FILES + ["lifestyle_evidence.metta"]) as m:
+        yield m
 
 
-def _run(m: MeTTa, query: str) -> list[str]:
+def _run(m: Kb, query: str) -> list[str]:
     return sorted(str(atom) for result in m.run(query) for atom in result)
 
 
-def _one(m: MeTTa, query: str) -> str:
+def _one(m: Kb, query: str) -> str:
     out = _run(m, query)
     assert len(out) == 1, f"{query} -> {out}"
     return out[0]
@@ -385,7 +388,7 @@ def test_the_curated_kb_is_at_the_engines_ceiling():
     because the headroom shrank to zero, the next curated layer cannot be added
     at all until the layers stop sharing one space.
     """
-    pytest.importorskip("hyperon")
+    require_runtime()
     import subprocess
     import sys
 

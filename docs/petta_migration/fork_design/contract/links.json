@@ -1,0 +1,1282 @@
+{
+ "about": "Every link the legacy chainer (pln_deduction.metta infer/explain) can traverse, extracted by running the repo's own hyperon 0.2.10 on the real stacks. Repo = pln_longevity_petta @ linage2 47130aa (work tree, read-only). Confidences of curated links are the EVALUATED (evidence-confidence <Tier>) values; the atoms store them unevaluated.",
+ "repo_commit": "8a2a6a0",
+ "code_identical_to_linage2_47130aa": true,
+ "chain_discount": 0.9,
+ "chain_discount_file_line": "pln_deduction.metta:87",
+ "stacks": {
+  "patient": [
+   "system_types.metta",
+   "logical_predicates.metta",
+   "epistemic_calibration.metta",
+   "grim_age_core.metta",
+   "grim_age_lu2019_evidence.metta",
+   "evidence_calibration.metta",
+   "hallmarks_core.metta",
+   "hallmarks_lopezotin2023_intervention_evidence.metta",
+   "mechanistic_bridges.metta",
+   "pln_deduction.metta",
+   "pln_intervention_ranking.metta",
+   "pln_abductive_diagnosis.metta",
+   "patient_profile.metta",
+   "pln_counterfactual.metta",
+   "pln_risk_prediction.metta",
+   "lifestyle_evidence.metta",
+   "supplement_evidence.metta",
+   "pln_supplement_recommendation.metta"
+  ],
+  "generic": [
+   "system_types.metta",
+   "logical_predicates.metta",
+   "measurement_types.metta",
+   "epistemic_calibration.metta",
+   "species_taxonomy.metta",
+   "drugage_entries.metta",
+   "grim_age_core.metta",
+   "grim_age_lu2019_evidence.metta",
+   "evidence_calibration.metta",
+   "hallmarks_core.metta",
+   "hallmarks_lopezotin2023_anchors.metta",
+   "hallmarks_lopezotin2023_intervention_evidence.metta",
+   "hallmark_targeting.metta",
+   "mechanistic_bridges.metta",
+   "pln_deduction.metta",
+   "pln_intervention_ranking.metta",
+   "pln_abductive_diagnosis.metta",
+   "drugage_calibration.metta",
+   "lifestyle_evidence.metta",
+   "supplement_evidence.metta",
+   "human_evidence.metta"
+  ],
+  "nhanes_patient": [
+   "system_types.metta",
+   "logical_predicates.metta",
+   "epistemic_calibration.metta",
+   "grim_age_core.metta",
+   "grim_age_lu2019_evidence.metta",
+   "evidence_calibration.metta",
+   "hallmarks_core.metta",
+   "hallmarks_lopezotin2023_intervention_evidence.metta",
+   "mechanistic_bridges.metta",
+   "pln_deduction.metta",
+   "pln_intervention_ranking.metta",
+   "pln_abductive_diagnosis.metta",
+   "patient_profile.metta",
+   "nhanes_reference.metta",
+   "pln_counterfactual.metta",
+   "pln_risk_prediction.metta",
+   "nhanes_baseline.metta"
+  ],
+  "linage2": [
+   "system_types.metta",
+   "logical_predicates.metta",
+   "epistemic_calibration.metta",
+   "grim_age_core.metta",
+   "grim_age_lu2019_evidence.metta",
+   "evidence_calibration.metta",
+   "hallmarks_core.metta",
+   "mechanistic_bridges.metta",
+   "pln_deduction.metta",
+   "patient_profile.metta",
+   "pln_counterfactual.metta",
+   "pln_risk_prediction.metta",
+   "nhanes_baseline.metta",
+   "lifestyle_evidence.metta",
+   "linage2_core.metta",
+   "linage2_fong2025_evidence.metta",
+   "pln_linage2.metta"
+  ],
+  "drugage": [
+   "system_types.metta",
+   "logical_predicates.metta",
+   "epistemic_calibration.metta",
+   "species_taxonomy.metta",
+   "evidence_calibration.metta",
+   "pln_deduction.metta",
+   "pln_intervention_ranking.metta",
+   "drugage_calibration.metta"
+  ],
+  "cellage": [
+   "system_types.metta",
+   "logical_predicates.metta",
+   "epistemic_calibration.metta",
+   "evidence_calibration.metta",
+   "pln_deduction.metta",
+   "cellage_calibration.metta"
+  ]
+ },
+ "link_count": {
+  "total": 31,
+  "curated": 24,
+  "drugage": 1,
+  "linage2": 2,
+  "hazard_ratio": 4
+ },
+ "link_count_by_stack": {
+  "patient": 28,
+  "generic": 29,
+  "nhanes_patient": 23,
+  "linage2": 27,
+  "drugage": 1,
+  "cellage": 0
+ },
+ "primary_stack": "patient = pln_runner.patient_stack(api._runtime_kb_paths()): the shared API stack minus PATIENT_STACK_EXCLUDED; 24 Effect atoms + 4 Lu 2019 records = 28 links. linage2 adds 2 (SmokingCessation->CurrentTobaccoExposure Effect, Fong 2025 LinAgeAccel->AllCauseMortality record) and drops the 3 supplement edges. generic/drugage add Lifespan->Mortality.",
+ "nodes": [
+  {
+   "id": "AgeAccelGrim",
+   "role": "clock",
+   "detail": "composite clock acceleration (the z the risk model reads)",
+   "inherits": [
+    "EpigeneticAgeAcceleration"
+   ],
+   "out_links": 3,
+   "in_links": 0,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "AllCauseMortality",
+   "role": "outcome",
+   "detail": "clinical outcome",
+   "inherits": [
+    "Outcome"
+   ],
+   "out_links": 0,
+   "in_links": 2,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "Autophagy",
+   "role": "mechanism",
+   "detail": "pathway/phenotype",
+   "inherits": [],
+   "out_links": 1,
+   "in_links": 1,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "Berberine",
+   "role": "intervention",
+   "detail": "Supplement",
+   "inherits": [
+    "Supplement"
+   ],
+   "out_links": 1,
+   "in_links": 0,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "CRP",
+   "role": "marker",
+   "detail": "blood/clinical marker",
+   "inherits": [
+    "Biomarker",
+    "ClinicalLabMeasurement"
+   ],
+   "out_links": 0,
+   "in_links": 1,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "CellularSenescence",
+   "role": "mechanism",
+   "detail": "hallmark",
+   "inherits": [
+    "HallmarkOfAging"
+   ],
+   "out_links": 1,
+   "in_links": 4,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "ChronicInflammation",
+   "role": "mechanism",
+   "detail": "hallmark",
+   "inherits": [
+    "HallmarkOfAging"
+   ],
+   "out_links": 4,
+   "in_links": 2,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "CongestiveHeartFailure",
+   "role": "outcome",
+   "detail": "clinical outcome",
+   "inherits": [
+    "Outcome"
+   ],
+   "out_links": 0,
+   "in_links": 1,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "CoronaryHeartDisease",
+   "role": "outcome",
+   "detail": "clinical outcome",
+   "inherits": [
+    "Outcome"
+   ],
+   "out_links": 0,
+   "in_links": 3,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "CurrentTobaccoExposure",
+   "role": "marker",
+   "detail": "exposure",
+   "inherits": [
+    "ExposureBiomarker"
+   ],
+   "out_links": 0,
+   "in_links": 1,
+   "in_patient_stack_graph": false,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "DNAmGDF15",
+   "role": "clock_component",
+   "detail": "GrimAge DNAm surrogate (PartOf GrimAge)",
+   "inherits": [
+    "DNAmProteinSurrogate"
+   ],
+   "out_links": 0,
+   "in_links": 2,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "DNAmPACKYRS",
+   "role": "clock_component",
+   "detail": "GrimAge DNAm surrogate (PartOf GrimAge)",
+   "inherits": [
+    "DNAmExposureSurrogate"
+   ],
+   "out_links": 0,
+   "in_links": 1,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "DNAmPAI1",
+   "role": "clock_component",
+   "detail": "GrimAge DNAm surrogate (PartOf GrimAge)",
+   "inherits": [
+    "DNAmProteinSurrogate"
+   ],
+   "out_links": 1,
+   "in_links": 1,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "DasatinibPlusQuercetin",
+   "role": "intervention",
+   "detail": "CombinationIntervention",
+   "inherits": [
+    "CombinationIntervention"
+   ],
+   "out_links": 1,
+   "in_links": 0,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "DeregulatedNutrientSensing",
+   "role": "mechanism",
+   "detail": "hallmark",
+   "inherits": [
+    "HallmarkOfAging"
+   ],
+   "out_links": 1,
+   "in_links": 0,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "FastingGlucose",
+   "role": "marker",
+   "detail": "blood/clinical marker",
+   "inherits": [
+    "Biomarker"
+   ],
+   "out_links": 1,
+   "in_links": 1,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "Fisetin",
+   "role": "intervention",
+   "detail": "Supplement",
+   "inherits": [
+    "Supplement"
+   ],
+   "out_links": 1,
+   "in_links": 0,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "HbA1c",
+   "role": "marker",
+   "detail": "blood/clinical marker",
+   "inherits": [
+    "Biomarker",
+    "ClinicalLabMeasurement"
+   ],
+   "out_links": 0,
+   "in_links": 1,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "InsulinResistance",
+   "role": "mechanism",
+   "detail": "pathway/phenotype",
+   "inherits": [],
+   "out_links": 3,
+   "in_links": 3,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "Lifespan",
+   "role": "outcome",
+   "detail": "beneficial lifespan phenotype: the DrugAge target (Phenotype in system_types.metta)",
+   "inherits": [],
+   "out_links": 1,
+   "in_links": 0,
+   "in_patient_stack_graph": false,
+   "in_linage2_stack_graph": false
+  },
+  {
+   "id": "LinAgeAccel",
+   "role": "clock",
+   "detail": "composite clock acceleration (the z the risk model reads)",
+   "inherits": [
+    "ClinicalAgeAcceleration"
+   ],
+   "out_links": 1,
+   "in_links": 0,
+   "in_patient_stack_graph": false,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "LowSerumAlbumin",
+   "role": "marker",
+   "detail": "blood/clinical marker",
+   "inherits": [
+    "Biomarker"
+   ],
+   "out_links": 0,
+   "in_links": 1,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "Metformin",
+   "role": "intervention",
+   "detail": "Pharmaceutical",
+   "inherits": [
+    "Pharmaceutical"
+   ],
+   "out_links": 1,
+   "in_links": 0,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "MitochondrialDysfunction",
+   "role": "mechanism",
+   "detail": "hallmark",
+   "inherits": [
+    "HallmarkOfAging"
+   ],
+   "out_links": 1,
+   "in_links": 1,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "Mortality",
+   "role": "outcome",
+   "detail": "harmful terminal outcome of the DrugAge chain ((: Mortality Outcome), drugage_calibration.metta:48)",
+   "inherits": [],
+   "out_links": 0,
+   "in_links": 1,
+   "in_patient_stack_graph": false,
+   "in_linage2_stack_graph": false
+  },
+  {
+   "id": "NMN",
+   "role": "intervention",
+   "detail": "Supplement",
+   "inherits": [
+    "Supplement"
+   ],
+   "out_links": 1,
+   "in_links": 0,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": false
+  },
+  {
+   "id": "Omega3",
+   "role": "intervention",
+   "detail": "Supplement",
+   "inherits": [
+    "Supplement"
+   ],
+   "out_links": 1,
+   "in_links": 0,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": false
+  },
+  {
+   "id": "RDW",
+   "role": "marker",
+   "detail": "blood/clinical marker",
+   "inherits": [
+    "Biomarker"
+   ],
+   "out_links": 0,
+   "in_links": 1,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "Resveratrol",
+   "role": "intervention",
+   "detail": "Supplement",
+   "inherits": [
+    "Supplement"
+   ],
+   "out_links": 1,
+   "in_links": 0,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": false
+  },
+  {
+   "id": "SASP",
+   "role": "mechanism",
+   "detail": "pathway/phenotype",
+   "inherits": [],
+   "out_links": 2,
+   "in_links": 1,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "SmokingCessation",
+   "role": "intervention",
+   "detail": "Lifestyle",
+   "inherits": [
+    "Lifestyle"
+   ],
+   "out_links": 2,
+   "in_links": 0,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "SmokingPackYears",
+   "role": "marker",
+   "detail": "exposure",
+   "inherits": [
+    "ExposureBiomarker"
+   ],
+   "out_links": 1,
+   "in_links": 1,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "Spermidine",
+   "role": "intervention",
+   "detail": "Supplement",
+   "inherits": [
+    "Supplement"
+   ],
+   "out_links": 1,
+   "in_links": 0,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  },
+  {
+   "id": "Triglycerides",
+   "role": "marker",
+   "detail": "blood/clinical marker",
+   "inherits": [
+    "Biomarker"
+   ],
+   "out_links": 0,
+   "in_links": 1,
+   "in_patient_stack_graph": true,
+   "in_linage2_stack_graph": true
+  }
+ ],
+ "links": [
+  {
+   "from": "Autophagy",
+   "to": "CellularSenescence",
+   "sign": "Neg",
+   "strength": 0.6,
+   "confidence": 0.65,
+   "confidence_expr": "(evidence-confidence AnimalStudies_Replicated)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:106",
+   "evidence_category": "AnimalStudies_Replicated",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect Autophagy CellularSenescence Neg (stv 0.6 (evidence-confidence AnimalStudies_Replicated)))"
+  },
+  {
+   "from": "Berberine",
+   "to": "InsulinResistance",
+   "sign": "Neg",
+   "strength": 0.65,
+   "confidence": 0.85,
+   "confidence_expr": "(evidence-confidence MultipleHumanTrials)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:234",
+   "evidence_category": "MultipleHumanTrials",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect Berberine InsulinResistance Neg (stv 0.65 (evidence-confidence MultipleHumanTrials)))"
+  },
+  {
+   "from": "CellularSenescence",
+   "to": "SASP",
+   "sign": "Pos",
+   "strength": 0.85,
+   "confidence": 0.65,
+   "confidence_expr": "(evidence-confidence AnimalStudies_Replicated)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:53",
+   "evidence_category": "AnimalStudies_Replicated",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect CellularSenescence SASP Pos (stv 0.85 (evidence-confidence AnimalStudies_Replicated)))"
+  },
+  {
+   "from": "ChronicInflammation",
+   "to": "CRP",
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65,
+   "confidence_expr": "(evidence-confidence AnimalStudies_Replicated)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:135",
+   "evidence_category": "AnimalStudies_Replicated",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect ChronicInflammation CRP Pos (stv 0.8 (evidence-confidence AnimalStudies_Replicated)))"
+  },
+  {
+   "from": "ChronicInflammation",
+   "to": "DNAmGDF15",
+   "sign": "Pos",
+   "strength": 0.65,
+   "confidence": 0.65,
+   "confidence_expr": "(evidence-confidence AnimalStudies_Replicated)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:137",
+   "evidence_category": "AnimalStudies_Replicated",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect ChronicInflammation DNAmGDF15 Pos (stv 0.65 (evidence-confidence AnimalStudies_Replicated)))"
+  },
+  {
+   "from": "ChronicInflammation",
+   "to": "LowSerumAlbumin",
+   "sign": "Pos",
+   "strength": 0.55,
+   "confidence": 0.6,
+   "confidence_expr": "(evidence-confidence Epidemiological)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:166",
+   "evidence_category": "Epidemiological",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect ChronicInflammation LowSerumAlbumin Pos (stv 0.55 (evidence-confidence Epidemiological)))"
+  },
+  {
+   "from": "ChronicInflammation",
+   "to": "RDW",
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.6,
+   "confidence_expr": "(evidence-confidence Epidemiological)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:164",
+   "evidence_category": "Epidemiological",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect ChronicInflammation RDW Pos (stv 0.5 (evidence-confidence Epidemiological)))"
+  },
+  {
+   "from": "DasatinibPlusQuercetin",
+   "to": "CellularSenescence",
+   "sign": "Neg",
+   "strength": 0.7,
+   "confidence": 0.65,
+   "confidence_expr": "(evidence-confidence AnimalStudies_Replicated)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:71",
+   "evidence_category": "AnimalStudies_Replicated",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect DasatinibPlusQuercetin CellularSenescence Neg (stv 0.7 (evidence-confidence AnimalStudies_Replicated)))"
+  },
+  {
+   "from": "DeregulatedNutrientSensing",
+   "to": "InsulinResistance",
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65,
+   "confidence_expr": "(evidence-confidence AnimalStudies_Replicated)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:203",
+   "evidence_category": "AnimalStudies_Replicated",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect DeregulatedNutrientSensing InsulinResistance Pos (stv 0.8 (evidence-confidence AnimalStudies_Replicated)))"
+  },
+  {
+   "from": "FastingGlucose",
+   "to": "CoronaryHeartDisease",
+   "sign": "Pos",
+   "strength": 0.55,
+   "confidence": 0.6,
+   "confidence_expr": "(evidence-confidence Epidemiological)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:224",
+   "evidence_category": "Epidemiological",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect FastingGlucose CoronaryHeartDisease Pos (stv 0.55 (evidence-confidence Epidemiological)))"
+  },
+  {
+   "from": "Fisetin",
+   "to": "CellularSenescence",
+   "sign": "Neg",
+   "strength": 0.65,
+   "confidence": 0.5,
+   "confidence_expr": "(evidence-confidence AnimalStudies_Single)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:89",
+   "evidence_category": "AnimalStudies_Single",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect Fisetin CellularSenescence Neg (stv 0.65 (evidence-confidence AnimalStudies_Single)))"
+  },
+  {
+   "from": "InsulinResistance",
+   "to": "FastingGlucose",
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.65,
+   "confidence_expr": "(evidence-confidence AnimalStudies_Replicated)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:205",
+   "evidence_category": "AnimalStudies_Replicated",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect InsulinResistance FastingGlucose Pos (stv 0.8 (evidence-confidence AnimalStudies_Replicated)))"
+  },
+  {
+   "from": "InsulinResistance",
+   "to": "HbA1c",
+   "sign": "Pos",
+   "strength": 0.7,
+   "confidence": 0.65,
+   "confidence_expr": "(evidence-confidence AnimalStudies_Replicated)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:207",
+   "evidence_category": "AnimalStudies_Replicated",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect InsulinResistance HbA1c Pos (stv 0.7 (evidence-confidence AnimalStudies_Replicated)))"
+  },
+  {
+   "from": "InsulinResistance",
+   "to": "Triglycerides",
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.6,
+   "confidence_expr": "(evidence-confidence Epidemiological)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:217",
+   "evidence_category": "Epidemiological",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect InsulinResistance Triglycerides Pos (stv 0.5 (evidence-confidence Epidemiological)))"
+  },
+  {
+   "from": "Lifespan",
+   "to": "Mortality",
+   "sign": "Neg",
+   "strength": 1.0,
+   "confidence": 1.0,
+   "confidence_expr": "literal",
+   "source": "drugage",
+   "kind": "Effect",
+   "file_line": "drugage_calibration.metta:226",
+   "evidence_category": "definitional sign adapter (no evidence; stv 1.0 1.0 is neutral)",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "drugage",
+    "generic"
+   ],
+   "atom": "(Effect Lifespan Mortality Neg (stv 1.0 1.0))"
+  },
+  {
+   "from": "Metformin",
+   "to": "InsulinResistance",
+   "sign": "Neg",
+   "strength": 0.75,
+   "confidence": 0.85,
+   "confidence_expr": "(evidence-confidence MultipleHumanTrials)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:232",
+   "evidence_category": "MultipleHumanTrials",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect Metformin InsulinResistance Neg (stv 0.75 (evidence-confidence MultipleHumanTrials)))"
+  },
+  {
+   "from": "MitochondrialDysfunction",
+   "to": "DNAmGDF15",
+   "sign": "Pos",
+   "strength": 0.75,
+   "confidence": 0.65,
+   "confidence_expr": "(evidence-confidence AnimalStudies_Replicated)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:143",
+   "evidence_category": "AnimalStudies_Replicated",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect MitochondrialDysfunction DNAmGDF15 Pos (stv 0.75 (evidence-confidence AnimalStudies_Replicated)))"
+  },
+  {
+   "from": "NMN",
+   "to": "MitochondrialDysfunction",
+   "sign": "Neg",
+   "strength": 0.55,
+   "confidence": 0.7,
+   "confidence_expr": "(evidence-confidence SingleHumanTrial)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "supplement_evidence.metta:98",
+   "evidence_category": "SingleHumanTrial",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "patient"
+   ],
+   "atom": "(Effect NMN MitochondrialDysfunction Neg (stv 0.55 (evidence-confidence SingleHumanTrial)))"
+  },
+  {
+   "from": "Omega3",
+   "to": "ChronicInflammation",
+   "sign": "Neg",
+   "strength": 0.6,
+   "confidence": 0.85,
+   "confidence_expr": "(evidence-confidence MultipleHumanTrials)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "supplement_evidence.metta:91",
+   "evidence_category": "MultipleHumanTrials",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "patient"
+   ],
+   "atom": "(Effect Omega3 ChronicInflammation Neg (stv 0.6 (evidence-confidence MultipleHumanTrials)))"
+  },
+  {
+   "from": "Resveratrol",
+   "to": "CellularSenescence",
+   "sign": "Neg",
+   "strength": 0.5,
+   "confidence": 0.35,
+   "confidence_expr": "(evidence-confidence InVitro)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "supplement_evidence.metta:106",
+   "evidence_category": "InVitro",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "patient"
+   ],
+   "atom": "(Effect Resveratrol CellularSenescence Neg (stv 0.5 (evidence-confidence InVitro)))"
+  },
+  {
+   "from": "SASP",
+   "to": "ChronicInflammation",
+   "sign": "Pos",
+   "strength": 0.85,
+   "confidence": 0.65,
+   "confidence_expr": "(evidence-confidence AnimalStudies_Replicated)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:129",
+   "evidence_category": "AnimalStudies_Replicated",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect SASP ChronicInflammation Pos (stv 0.85 (evidence-confidence AnimalStudies_Replicated)))"
+  },
+  {
+   "from": "SASP",
+   "to": "DNAmPAI1",
+   "sign": "Pos",
+   "strength": 0.7,
+   "confidence": 0.65,
+   "confidence_expr": "(evidence-confidence AnimalStudies_Replicated)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:56",
+   "evidence_category": "AnimalStudies_Replicated",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect SASP DNAmPAI1 Pos (stv 0.7 (evidence-confidence AnimalStudies_Replicated)))"
+  },
+  {
+   "from": "SmokingCessation",
+   "to": "CurrentTobaccoExposure",
+   "sign": "Neg",
+   "strength": 0.95,
+   "confidence": 0.85,
+   "confidence_expr": "(evidence-confidence MultipleHumanTrials)",
+   "source": "linage2",
+   "kind": "Effect",
+   "file_line": "linage2_core.metta:322",
+   "evidence_category": "MultipleHumanTrials",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "linage2"
+   ],
+   "atom": "(Effect SmokingCessation CurrentTobaccoExposure Neg (stv 0.95 (evidence-confidence MultipleHumanTrials)))"
+  },
+  {
+   "from": "SmokingCessation",
+   "to": "SmokingPackYears",
+   "sign": "Neg",
+   "strength": 0.39,
+   "confidence": 0.6,
+   "confidence_expr": "(evidence-confidence Epidemiological)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "lifestyle_evidence.metta:172",
+   "evidence_category": "Epidemiological",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "patient"
+   ],
+   "atom": "(Effect SmokingCessation SmokingPackYears Neg (stv 0.39 (evidence-confidence Epidemiological)))"
+  },
+  {
+   "from": "SmokingPackYears",
+   "to": "DNAmPACKYRS",
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.6,
+   "confidence_expr": "(evidence-confidence Epidemiological)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "lifestyle_evidence.metta:141",
+   "evidence_category": "Epidemiological",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "patient"
+   ],
+   "atom": "(Effect SmokingPackYears DNAmPACKYRS Pos (stv 0.8 (evidence-confidence Epidemiological)))"
+  },
+  {
+   "from": "Spermidine",
+   "to": "Autophagy",
+   "sign": "Pos",
+   "strength": 0.8,
+   "confidence": 0.5,
+   "confidence_expr": "(evidence-confidence AnimalStudies_Single)",
+   "source": "curated",
+   "kind": "Effect",
+   "file_line": "mechanistic_bridges.metta:103",
+   "evidence_category": "AnimalStudies_Single",
+   "traversable_mid_chain": true,
+   "terminal_only": false,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(Effect Spermidine Autophagy Pos (stv 0.8 (evidence-confidence AnimalStudies_Single)))"
+  },
+  {
+   "from": "AgeAccelGrim",
+   "to": "AllCauseMortality",
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85,
+   "confidence_expr": "(evidence-confidence MultipleHumanTrials) via HasEvidenceCategory",
+   "source": "hazard_ratio",
+   "kind": "HasPredictor/HasOutcome/EffectValue record lifted on the fly by link-effect eq.2",
+   "record": "Lu2019_AgeAccelGrim_AllCauseMortality",
+   "hazard_ratio": 1.1,
+   "effect_metric": "hazard_ratio",
+   "effect_scale": "one-year increase in AgeAccelGrim",
+   "file_line": "grim_age_lu2019_evidence.metta:19",
+   "file_lines_all": {
+    "HasPredictor": "grim_age_lu2019_evidence.metta:19",
+    "HasOutcome": "grim_age_lu2019_evidence.metta:20",
+    "EffectValue": "grim_age_lu2019_evidence.metta:22",
+    "HasEvidenceCategory": "evidence_calibration.metta:35"
+   },
+   "evidence_category": "MultipleHumanTrials",
+   "strength_rule": "effect->strength(\"hazard_ratio\", HR) = 0.70 if HR>1.5, 0.60 if HR>1.1, else 0.50 (evidence_calibration.metta:62-64)",
+   "sign_rule": "hr->sign: Neg if HR < 1.0 else Pos (pln_deduction.metta:111)",
+   "traversable_mid_chain": false,
+   "terminal_only": true,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(HasPredictor Lu2019_AgeAccelGrim_AllCauseMortality AgeAccelGrim) (HasOutcome Lu2019_AgeAccelGrim_AllCauseMortality AllCauseMortality) (EffectValue Lu2019_AgeAccelGrim_AllCauseMortality 1.1)"
+  },
+  {
+   "from": "AgeAccelGrim",
+   "to": "CoronaryHeartDisease",
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85,
+   "confidence_expr": "(evidence-confidence MultipleHumanTrials) via HasEvidenceCategory",
+   "source": "hazard_ratio",
+   "kind": "HasPredictor/HasOutcome/EffectValue record lifted on the fly by link-effect eq.2",
+   "record": "Lu2019_AgeAccelGrim_CHD",
+   "hazard_ratio": 1.07,
+   "effect_metric": "hazard_ratio",
+   "effect_scale": "one-year increase in AgeAccelGrim",
+   "file_line": "grim_age_lu2019_evidence.metta:32",
+   "file_lines_all": {
+    "HasPredictor": "grim_age_lu2019_evidence.metta:32",
+    "HasOutcome": "grim_age_lu2019_evidence.metta:33",
+    "EffectValue": "grim_age_lu2019_evidence.metta:35",
+    "HasEvidenceCategory": "evidence_calibration.metta:36"
+   },
+   "evidence_category": "MultipleHumanTrials",
+   "strength_rule": "effect->strength(\"hazard_ratio\", HR) = 0.70 if HR>1.5, 0.60 if HR>1.1, else 0.50 (evidence_calibration.metta:62-64)",
+   "sign_rule": "hr->sign: Neg if HR < 1.0 else Pos (pln_deduction.metta:111)",
+   "traversable_mid_chain": false,
+   "terminal_only": true,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(HasPredictor Lu2019_AgeAccelGrim_CHD AgeAccelGrim) (HasOutcome Lu2019_AgeAccelGrim_CHD CoronaryHeartDisease) (EffectValue Lu2019_AgeAccelGrim_CHD 1.07)"
+  },
+  {
+   "from": "DNAmPAI1",
+   "to": "CoronaryHeartDisease",
+   "sign": "Pos",
+   "strength": 0.6,
+   "confidence": 0.85,
+   "confidence_expr": "(evidence-confidence MultipleHumanTrials) via HasEvidenceCategory",
+   "source": "hazard_ratio",
+   "kind": "HasPredictor/HasOutcome/EffectValue record lifted on the fly by link-effect eq.2",
+   "record": "Lu2019_DNAmPAI1_CHD",
+   "hazard_ratio": 1.31,
+   "effect_metric": "hazard_ratio",
+   "effect_scale": "standard-deviation increase in age-adjusted DNAm PAI-1",
+   "file_line": "grim_age_lu2019_evidence.metta:45",
+   "file_lines_all": {
+    "HasPredictor": "grim_age_lu2019_evidence.metta:45",
+    "HasOutcome": "grim_age_lu2019_evidence.metta:46",
+    "EffectValue": "grim_age_lu2019_evidence.metta:48",
+    "HasEvidenceCategory": "evidence_calibration.metta:38"
+   },
+   "evidence_category": "MultipleHumanTrials",
+   "strength_rule": "effect->strength(\"hazard_ratio\", HR) = 0.70 if HR>1.5, 0.60 if HR>1.1, else 0.50 (evidence_calibration.metta:62-64)",
+   "sign_rule": "hr->sign: Neg if HR < 1.0 else Pos (pln_deduction.metta:111)",
+   "traversable_mid_chain": false,
+   "terminal_only": true,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(HasPredictor Lu2019_DNAmPAI1_CHD DNAmPAI1) (HasOutcome Lu2019_DNAmPAI1_CHD CoronaryHeartDisease) (EffectValue Lu2019_DNAmPAI1_CHD 1.31)"
+  },
+  {
+   "from": "AgeAccelGrim",
+   "to": "CongestiveHeartFailure",
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.85,
+   "confidence_expr": "(evidence-confidence MultipleHumanTrials) via HasEvidenceCategory",
+   "source": "hazard_ratio",
+   "kind": "HasPredictor/HasOutcome/EffectValue record lifted on the fly by link-effect eq.2",
+   "record": "Lu2019_AgeAccelGrim_CHF",
+   "hazard_ratio": 1.1,
+   "effect_metric": "hazard_ratio",
+   "effect_scale": "AgeAccelGrim scale",
+   "file_line": "grim_age_lu2019_evidence.metta:58",
+   "file_lines_all": {
+    "HasPredictor": "grim_age_lu2019_evidence.metta:58",
+    "HasOutcome": "grim_age_lu2019_evidence.metta:59",
+    "EffectValue": "grim_age_lu2019_evidence.metta:61",
+    "HasEvidenceCategory": "evidence_calibration.metta:37"
+   },
+   "evidence_category": "MultipleHumanTrials",
+   "strength_rule": "effect->strength(\"hazard_ratio\", HR) = 0.70 if HR>1.5, 0.60 if HR>1.1, else 0.50 (evidence_calibration.metta:62-64)",
+   "sign_rule": "hr->sign: Neg if HR < 1.0 else Pos (pln_deduction.metta:111)",
+   "traversable_mid_chain": false,
+   "terminal_only": true,
+   "stacks": [
+    "generic",
+    "linage2",
+    "nhanes_patient",
+    "patient"
+   ],
+   "atom": "(HasPredictor Lu2019_AgeAccelGrim_CHF AgeAccelGrim) (HasOutcome Lu2019_AgeAccelGrim_CHF CongestiveHeartFailure) (EffectValue Lu2019_AgeAccelGrim_CHF 1.1)"
+  },
+  {
+   "from": "LinAgeAccel",
+   "to": "AllCauseMortality",
+   "sign": "Pos",
+   "strength": 0.5,
+   "confidence": 0.6,
+   "confidence_expr": "(evidence-confidence Epidemiological) via HasEvidenceCategory",
+   "source": "linage2",
+   "kind": "HasPredictor/HasOutcome/EffectValue record lifted on the fly by link-effect eq.2",
+   "record": "Fong2025_LinAgeAccel_AllCauseMortality",
+   "hazard_ratio": 1.093,
+   "effect_metric": "hazard_ratio",
+   "effect_scale": "one-year increase in the LinAge2 BA-CA delta; by construction equal to the null model's hazard per year of chronological age, derived from the reported mortality rate doubling time of ~7.8 years (2^(1/7.8))",
+   "file_line": "linage2_fong2025_evidence.metta:44",
+   "file_lines_all": {
+    "HasPredictor": "linage2_fong2025_evidence.metta:44",
+    "HasOutcome": "linage2_fong2025_evidence.metta:45",
+    "EffectValue": "linage2_fong2025_evidence.metta:47",
+    "HasEvidenceCategory": "linage2_fong2025_evidence.metta:50"
+   },
+   "evidence_category": "Epidemiological",
+   "strength_rule": "effect->strength(\"hazard_ratio\", HR) = 0.70 if HR>1.5, 0.60 if HR>1.1, else 0.50 (evidence_calibration.metta:62-64)",
+   "sign_rule": "hr->sign: Neg if HR < 1.0 else Pos (pln_deduction.metta:111)",
+   "traversable_mid_chain": false,
+   "terminal_only": true,
+   "stacks": [
+    "linage2"
+   ],
+   "atom": "(HasPredictor Fong2025_LinAgeAccel_AllCauseMortality LinAgeAccel) (HasOutcome Fong2025_LinAgeAccel_AllCauseMortality AllCauseMortality) (EffectValue Fong2025_LinAgeAccel_AllCauseMortality 1.093)"
+  }
+ ],
+ "closure_summary": {
+  "patient": {
+   "nodes": 30,
+   "connected_ordered_pairs": 100,
+   "derivations": 100,
+   "pairs_with_more_than_one_derivation": 0
+  },
+  "linage2": {
+   "nodes": 29,
+   "connected_ordered_pairs": 86,
+   "derivations": 86,
+   "pairs_with_more_than_one_derivation": 0
+  }
+ },
+ "lift_rules": {
+  "effect_atom_shape": {
+   "form": "(Effect <from> <to> <Pos|Neg> (stv <strength literal> (evidence-confidence <Tier>)))",
+   "declared": "(: Effect (-> Atom Atom Atom Atom Atom)) at pln_deduction.metta:57 (Atom-typed args are NOT reduced; the confidence stays an unevaluated lookup until combine-tv multiplies it)",
+   "write_gate": "pln_chat/ontology/expansion_schema.py rejects a literal two-float stv on an Effect; tests/test_smoking_lever.py pins the exact text shape for lifestyle_evidence.metta",
+   "count": {
+    "patient_stack": 24,
+    "linage2_stack": 22,
+    "generic_stack": 25
+   }
+  },
+  "hazard_ratio_lift": {
+   "rule": "link-effect eq.2, pln_deduction.metta:115-117: match (, (HasPredictor $r $a) (HasOutcome $r $c) (EffectValue $r $hr)) -> (signed (hr->sign $hr) (calibrate-tv $s $r))",
+   "calibrate-tv": "evidence_calibration.metta:77-79: (stv (effect->strength (ev-metric) (ev-value)) (category->confidence (ev-category)))",
+   "strength_buckets": "effect->strength(\"hazard_ratio\", HR) = 0.70 if HR>1.5, 0.60 if HR>1.1, else 0.50 (evidence_calibration.metta:62-64)",
+   "caveats": [
+    "HR < 1 gets strength 0.50 and sign Neg: the bucket function was only written for HR > 1 (deduction_layer.md 7.7)",
+    "EffectScale (per SD vs per year) is ignored by calibrate-tv",
+    "only the LAST hop of a chain can be a record: infer steps through Effect atoms only (deduction_layer.md 7.3)"
+   ]
+  },
+  "drugage_lift": {
+   "rows": "per-query slice of DrugAge Experiment rows (never the full dump: hyperon aborts); NOT materialised as Effect atoms",
+   "lift": "drugage_calibration.metta:208-213 drugage-effect: (Effect <compound> Lifespan <lifespan-sign pct> (stv str conf))",
+   "strength": "drugage_calibration.metta:139-144 |pct|/(|pct|+lifespan-halfsat), halfsat=20.0 (:59)",
+   "confidence": "drugage_calibration.metta:173-176 tier x sig-gate; ITP row: ITP_Positive/ITP_Negative 0.90 gate 1.0 (:159-171); non-ITP: clade category via species_taxonomy (:117-130) x sig-gate Significant 1.0 / Unreported 0.6 / NotSignificant 0.4 (:83-85)",
+   "sign": "drugage_calibration.metta:193 lifespan-sign: Neg if pct<0 else Pos (a 0.0 change is Pos with strength 0)",
+   "infer_extension": "drugage_calibration.metta:240-243: a THIRD (= (infer $s $a $c) ...) equation: match (UsesIntervention $r $a) -> let (Effect $x Lifespan $sgn $tv) (drugage-effect $s $r) (combine-hop $sgn $tv (infer $s Lifespan $c)). One derivation per ROW. No matching explain equation.",
+   "fixed_link": "(Effect Lifespan Mortality Neg (stv 1.0 1.0)) at drugage_calibration.metta:226",
+   "python_twin": "pln_chat/ontology/drugage_scoring.py:score_row re-implements strength*tier*gate*chain_discount; it regex-reads chain-discount from pln_deduction.metta (_RE_CHAIN, drugage_scoring.py:56)",
+   "worked_example_real_engine": {
+    "OneDrug (ITP, +13, Significant)": "drugage-effect -> (Effect OneDrug Lifespan Pos (stv 0.3939393939393939 0.9)); infer OneDrug Mortality -> (signed Neg (stv 0.3939393939393939 0.81)); explain -> NOTHING; infer OneDrug Lifespan -> NOTHING",
+    "MultiDrug (3 rows)": "infer MultiDrug Mortality -> 3 derivations: (Pos 0.6 0.18000000000000002) (Neg 0.6666666666666666 0.315) (Neg 0.5 0.81)"
+   }
+  },
+  "cellage_lift": {
+   "rule": "cellage_calibration.metta:126-132 cellage-effect: (Effect <gene> CellularSenescence <senescence-sign> (stv 0.70 0.35)); strength (cellage-curated-strength) 0.70 (:90), tier InVitro 0.35 (:96)",
+   "infer_extension": "NONE. Verified: with the cellage stack + real rows, (infer &self Gene_AKT1 CellularSenescence) and explain both return (). The lifted links are never materialised, so no chain starts at a gene."
+  },
+  "linage2_lift": {
+   "extra_links": "SmokingCessation->CurrentTobaccoExposure Neg (stv 0.95 0.85) linage2_core.metta:322; Fong2025_LinAgeAccel_AllCauseMortality HR 1.093 -> (signed Pos (stv 0.5 0.6)) linage2_fong2025_evidence.metta:43-50",
+   "infer_extension": "NONE. LinAge2 only adds data atoms, and CALLS infer/pos-transmission from pln_linage2.metta:123 and :289.",
+   "patient_atoms_not_links": "LinAgeDelta / LinAgeContribution / MeasuredZ LinAgeAccel are per-request patient atoms (pln_linage2.metta:24-31), not chain links"
+  }
+ }
+}

@@ -47,6 +47,8 @@ import core.pln_runner as pln_runner  # noqa: E402
 from core.metta_runtime import (  # noqa: E402
     HyperonRuntime,
     MettaRuntimeError,
+    PETTA_ALLOWED_FUN_NAMES,
+    PETTA_KNOWN_FUN_NAMES,
     PettaRuntime,
     get_runtime,
     normalise_result,
@@ -208,9 +210,9 @@ class ScriptedEngine:
         self.options = options
         self.kb = ""
         self.facts: list[str] = []
-        #: (text, sandboxed) for every `.run()` call, in order — lets a test check which calls the real
-        #: `_PettaEngine` protocol (`core.metta_runtime`'s `_program_child`/`_run_text`) asks to be guarded.
-        self.sandboxed_calls: list[tuple[str, bool]] = []
+        #: the text of every `.run()` call, in order — lets a test check what `_run_text` sends the engine
+        self.calls: list[str] = []
+        self.locked = False
         if options.get("start_error"):
             raise ImportError("No module named 'janus_swi' (test double)")
         if options.get("pidfile"):
@@ -221,8 +223,16 @@ class ScriptedEngine:
             raise ValueError("Syntax error: failed to process form (test double)")
         self.kb = kb_text
 
-    def run(self, text: str, *, sandboxed: bool = True) -> list[str]:
-        self.sandboxed_calls.append((text, sandboxed))
+    def lock(self) -> None:
+        self.locked = True
+
+    def split_forms(self, text: str) -> list[tuple[str, str]]:
+        """What `_PettaEngine.split_forms` answers (PeTTa's own reader), for the forms the double understands."""
+        return [("bang", text[s + 1:e]) if text[s] == "!" else ("fact", text[s:e])
+                for s, e in split_top_level_forms(text)]
+
+    def run(self, text: str) -> list[str]:
+        self.calls.append(text)
         text = text.strip()
         if not text.startswith("!"):
             self.facts.append(text)
@@ -456,6 +466,28 @@ REFUSED_PROGRAMS = {
     "assertzPredicate": "!(assertzPredicate (Predicate (foo a)))",
     "retractPredicate": "!(retractPredicate (Predicate (foo a)))",
     "import_prolog_function": "!(import_prolog_function foo)",
+    "Predicate": "!(Predicate (foo a))",
+    # The verifier's own finding: fun/1-registered, absent from every refusal list before this change.
+    # Registering a symbol as a translator hook makes PeTTa call it directly, by name, during translation.
+    "add-translator-rule!": "!(add-translator-rule! myHook)",
+    "remove-translator-rule!": "!(remove-translator-rule! myHook)",
+    "change-state!": "!(change-state! &x 1)",
+    "get-state": "!(get-state &x)",
+    "library": "!(library mylib)",
+    "library-import!": "!(library-import! &self mylib)",
+    "argv": "!(argv 0)",
+    # `call`'s sibling: the compiler form that runs a goal built from the program's own data with no
+    # function check (the independent review found it on no list, and the scan the only barrier to it).
+    "translatePredicate": "!(translatePredicate (foo 1))",
+    # PeTTa calls these four itself on every load and query; a program that names them gets a host
+    # predicate called by name (`maplist getenv`, the review's reproduction), a parse or a file oracle.
+    "maplist": '!(maplist getenv ("HOME"))',
+    "foldl": '!(foldl getenv ("HOME") 0)',
+    "sread": '!(sread "(a b)")',
+    "exists_file": '!(exists_file "/etc/hosts")',
+    # Parses text into a term: with the output bound first (`let`), the way to write a `partial(F, Args)`
+    # closure for any F, which `apply_fn1`/`apply_fn2`/.../`apply_fnN` call without checking it is a function.
+    "repra": '!(repra (a b))',
 }
 
 
@@ -608,6 +640,57 @@ def test_the_check_covers_the_atoms_injected_beside_the_query_through_the_real_a
     # of every definition in extra_atoms.
     assert api.metta_run(api.MettaRunRequest(
         metta_query="!(+ 1 2)", extra_atoms="(= (f $x) $x)", allow_definitions=True)).metta_query == "!(+ 1 2)"
+
+
+@real_petta
+def test_a_blocked_form_surfaces_as_an_error_over_http_not_an_empty_answer(monkeypatch, tmp_path):
+    """The real engine, over the real HTTP path (`httpx.ASGITransport`, the pattern `tests/test_api.py`
+    uses) — not a double, not an in-process call to `core.metta_runtime` directly.
+
+    `extra_atoms` declares `atom_concat`, the stand-in head name and the constant the canary uses: exactly
+    how the verifier's own reproduction got a validator-"unknown symbol" 422 out of the way, so the query
+    reaches the real `PettaRuntime` — where this task's engine-level fix, not the validator, is what
+    refuses it. Before that fix, this dynamically-constructed `add-atom` call returned an EMPTY, "ok"-ish
+    answer indistinguishable from a query that legitimately found nothing; here it must come back as a
+    clear HTTP error naming the refused head."""
+    pytest.importorskip("fastapi")
+    httpx = pytest.importorskip("httpx")
+    import asyncio
+    from unittest.mock import Mock
+    import api
+    import core.executor as executor_module
+
+    monkeypatch.setattr(config, "PLN_RUNTIME", "petta")
+    monkeypatch.setattr(config, "LOGS_DIR", tmp_path / "logs")
+    monkeypatch.setattr(executor_module, "PLN_WORKER_POOL_SIZE", 0)   # run inline, in this test process
+    monkeypatch.setattr(api, "log_http_request", Mock())
+    reset_runtime_cache()
+
+    extra_atoms = (
+        "(: atom_concat (-> String String Atom))\n"
+        "(: HttpRefusalCanary (-> Atom Atom))\n"
+        "(: yes Atom)"
+    )
+    query = '!(let $f (atom_concat "add" "-atom") ($f &self (HttpRefusalCanary yes)))'
+
+    async def post() -> "httpx.Response":
+        transport = httpx.ASGITransport(app=api.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            return await client.post(
+                "/metta/run", json={"metta_query": query, "extra_atoms": extra_atoms})
+
+    try:
+        response = asyncio.run(post())
+    finally:
+        reset_runtime_cache()
+
+    # a caller's own program asked for something the runtime does not run: 422, not the 502 of a service fault
+    assert response.status_code == 422, response.text
+    body = response.json()
+    detail = body.get("detail", body)
+    message = detail.get("message", "") if isinstance(detail, dict) else str(detail)
+    assert isinstance(detail, dict) and detail.get("code") == "refused_form", body
+    assert "add-atom" in message and "refus" in message.lower(), body
 
 
 def test_the_other_checks_still_run_under_petta(monkeypatch):
@@ -1077,20 +1160,14 @@ def test_a_session_reduces_stored_calls_in_the_kb_and_in_facts_it_is_given(fake)
         assert session.run("!(facts)") == [["(G (stv 1 0.6))"]]
 
 
-def test_run_text_sandboxes_a_bang_form_but_not_a_plain_fact_add():
-    """`add-atom`/`remove-atom` materialise every ordinary ground fact while an ordinary KB loads
-    (`filereader.pl`), so the engine-level sandbox (`_install_petta_sandbox`) must be OFF for that and ON
-    only while a `!` form is evaluated — this is `_run_text`'s own contract with `_PettaEngine.run`,
-    checked directly against the double (no fork, no real PeTTa needed) rather than through the real
-    Prolog guard, which is checked separately against the real engine."""
+def test_run_text_sends_each_bang_form_alone_and_the_facts_between_them_together():
+    """`_run_text` is what gives a session its one-group-per-`!`-form contract (PeTTa hands back one flat list
+    per call). Whether a `!` form runs sandboxed is no longer decided here — the engine's `process_form/4`
+    wrapper does it for every `!` form, wherever it came from (checked against the real engine below)."""
     engine = ScriptedEngine({})
-    groups, _ = mr._run_text(engine, "(Fact a)\n!(echo 1)\n(Fact b)\n!(echo 2)", {})
+    groups, _ = mr._run_text(engine, "(Fact a)\n(Fact b)\n!(echo 1)\n(Fact c)\n!(echo 2)", {})
     assert groups == [["1"], ["2"]]
-    texts_and_flags = engine.sandboxed_calls
-    plain_calls = [(t, s) for t, s in texts_and_flags if not t.strip().startswith("!")]
-    bang_calls = [(t, s) for t, s in texts_and_flags if t.strip().startswith("!")]
-    assert plain_calls and all(s is False for _, s in plain_calls)     # fact adds: never sandboxed
-    assert bang_calls and all(s is True for _, s in bang_calls)        # `!` forms: sandboxed (the default)
+    assert engine.calls == ["(Fact a)\n(Fact b)", "!(echo 1)", "(Fact c)", "!(echo 2)"]
 
 
 def test_a_session_survives_an_expression_that_raises(fake):
@@ -1205,6 +1282,17 @@ def test_a_runtime_error_becomes_a_runtime_error_result_with_its_text(recording)
     assert (result.status, result.error_code, result.mode) == ("error", "runtime_error", "runtime")
     assert result.error == "PeTTa exceeded the 60 s deadline and was killed"
     assert result.runtime_name == "recording" and not result.ok
+
+
+def test_a_refused_program_is_a_refused_form_not_a_runtime_error(recording):
+    """The program asked for something the PeTTa runtime does not run: its author's fault, a 422 at the HTTP
+    layer. A crash or a deadline stays a `runtime_error` (502)."""
+    recording(error=MettaRuntimeError("the PeTTa runtime refused to run 'match'", kind="refused"))
+    result = pln_runner._runtime_run("!(f)", 0.0, [], None)
+    assert (result.status, result.error_code) == ("error", "refused_form")
+    assert result.error == "the PeTTa runtime refused to run 'match'"
+    recording(error=MettaRuntimeError("the PeTTa process ended with signal 9", kind="crash"))
+    assert pln_runner._runtime_run("!(f)", 0.0, [], None).error_code == "runtime_error"
 
 
 def test_any_exception_the_runtime_raises_is_reported_not_propagated(recording):
@@ -1462,6 +1550,32 @@ def runtime_paths():
 
 
 @real_petta
+def test_petta_known_fun_names_matches_the_live_registry(petta):
+    """Drift detection, not a safety gate: `_install_petta_sandbox` never trusts `PETTA_KNOWN_FUN_NAMES` at
+    run time (it reads the live `fun/1` facts itself, so a name this constant has never seen is still
+    guarded, by construction — see that function's docstring). This exists so an upstream PeTTa update
+    that renames, drops or adds a `fun/1` name is caught here, for review, rather than only ever showing
+    up as "this checkout's documented reachable-heads table is stale".
+
+    Out of process, like every other "import janus directly" check in this file: the parent must never
+    import janus or petta (`test_the_parent_never_imports_janus_or_petta`), so this starts a FRESH
+    process to ask the live engine, the same way `_config_in_subprocess` asks a fresh process about
+    `config` rather than importing it here."""
+    code = (
+        f"import sys; sys.path.insert(0, {str(petta.petta_home / 'python')!r}); "
+        "import janus_swi as janus; from petta import PeTTa; "
+        f"PeTTa(verbose=False, petta_path={str(petta.petta_home)!r}); "
+        "janus.consult('dump_fun_names', data='dump_fun_names(Out) :- findall(N, fun(N), Out).'); "
+        "import json; print(json.dumps(sorted(str(n) for n in janus.query_once('dump_fun_names(Out)')['Out'])))"
+    )
+    proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=30)
+    assert proc.returncode == 0, proc.stderr
+    live = set(json.loads(proc.stdout))
+    assert live == PETTA_KNOWN_FUN_NAMES
+    assert PETTA_ALLOWED_FUN_NAMES <= PETTA_KNOWN_FUN_NAMES
+
+
+@real_petta
 def test_petta_answers_the_five_smoke_queries_of_pln_deduction_as_written(petta, smoke_kb):
     out = petta.run_program(smoke_kb, [q for q, _ in SMOKE])
     assert len(out) == 5
@@ -1589,17 +1703,27 @@ def test_petta_also_refuses_a_literal_add_atom_hidden_in_kb_text(petta):
 
 
 @real_petta
-def test_a_dynamically_constructed_add_atom_does_not_mutate_the_space(petta):
+def test_a_dynamically_constructed_add_atom_is_refused(petta):
     """Finding 1's own reproduction. `petta_refused_forms` reads the program's TEXT, so it can only ever
     see the literal token `add-atom` (asserted below: the scanner finds nothing here) — a symbol PeTTa
     builds at run time with `atom_concat`, bound to a variable, and then applied is invisible to any text
-    scan. The engine-level sandbox (`_install_petta_sandbox`) is what has to stop the mutation itself: PeTTa's
-    own dynamic dispatch (`translator.pl`'s `reduce/2`) wraps a function call in `catch(_, fail)`, so the
-    blocked call comes back as an unanswered `!` form rather than a raised exception — the fact being
-    absent afterward is the proof the mutation did not happen."""
+    scan. The engine-level sandbox (`_install_petta_sandbox`) is what has to stop the mutation itself.
+
+    `reduce/2` (PeTTa's own dynamic dispatcher) calls the resolved goal inside `catch(_, _, fail)`, which
+    would otherwise turn the guard's `throw` into an ordinary Prolog FAILURE — an unanswered `!` form the
+    caller cannot tell from a query that legitimately found nothing. `_PettaEngine._raise_if_refused`
+    reads a side channel the guard sets before it throws, so this still surfaces as a proper
+    `MettaRuntimeError(kind="refused")` naming `add-atom`, not a silently empty `[[], []]` (what this
+    exact reproduction returned before that fix existed).
+
+    That the fact was NOT added is checked where a check can see it, in a session (the next test):
+    `run_program` starts a new child for every call and raises at the refusal, so a second call to it
+    could never see this child's space, whatever this child did."""
     expr = '!(let $f (atom_concat "add" "-atom") ($f &self (HackedA yes)))'
     assert petta_refused_forms(expr) == []
-    assert petta.run_program("", [expr, "!(match &self (HackedA $x) $x)"]) == [[], []]
+    with pytest.raises(MettaRuntimeError) as err:
+        petta.run_program("", [expr, "!(match &self (HackedA $x) $x)"])
+    assert err.value.kind == "refused" and "add-atom" in str(err.value)
 
 
 @real_petta
@@ -1607,14 +1731,19 @@ def test_a_dynamically_constructed_callpredicate_cannot_reach_shell(petta):
     """`callPredicate`/`Predicate` are PeTTa's own "call any Prolog predicate by name" doors (`metta.pl`'s
     "Prolog interop" section) — reachable even when neither the name the caller wrote nor the predicate it
     ends up calling (`shell`) ever appears as a literal token next to anything suspicious, so the text scan
-    cannot catch this construction either. The engine-level sandbox blocks `shell` (and `callPredicate`
-    itself) unconditionally, so the call never runs."""
+    cannot catch this construction either. The engine-level sandbox refuses `Predicate` itself (it has no
+    legitimate use outside this exact pairing — see `PETTA_ALLOWED_FUN_NAMES`), so the goal `callPredicate`
+    would have invoked is never even built; `shell` and `callPredicate` are both refused unconditionally
+    too, so any of the three names being reached stops the call."""
     expr = ('!(let $cp (atom_concat "callPre" "dicate") '
             '(let $pr (atom_concat "Predi" "cate") '
             '(let $sh (atom_concat "she" "ll") '
             '($cp ($pr ($sh "true" 0))))))')
     assert petta_refused_forms(expr) == []
-    assert petta.run_program("", [expr]) == [[]]
+    with pytest.raises(MettaRuntimeError) as err:
+        petta.run_program("", [expr])
+    assert err.value.kind == "refused"
+    assert any(name in str(err.value) for name in ("Predicate", "callPredicate", "shell"))
 
 
 @real_petta
@@ -1783,12 +1912,78 @@ def test_assert_inside_a_real_session_is_refused_before_it_can_halt(petta):
 def test_a_dynamically_constructed_symbol_cannot_mutate_a_real_session(petta):
     """Finding 4's deeper concern, through a session rather than `run_program`: the text scan added for
     finding 4 only catches the literal spelling. The engine-level sandbox is what actually has to hold for
-    a session's `run()` text too, since a session can live across many calls and its space has no reset."""
+    a session's `run()` text too, since a session can live across many calls and its space has no reset.
+    The refusal surfaces as `MettaRuntimeError(kind="refused")` (see the `run_program` version of this
+    test for why that needs its own fix, not just the guard itself), and the session survives it — nothing
+    was ever sent to the real `add-atom/3`, so there is nothing to recover from."""
     with petta.session("(Foo a)") as session:
         expr = '!(let $f (atom_concat "add" "-atom") ($f &self (HackedA yes)))'
         assert petta_refused_forms(expr) == []
-        assert session.run(expr) == [[]]
-        assert session.run("!(match &self (HackedA $x) $x)") == [[]]   # the fact was never added
+        with pytest.raises(MettaRuntimeError) as err:
+            session.run(expr)
+        assert err.value.kind == "refused" and "add-atom" in str(err.value)
+        assert session.run("!(match &self (HackedA $x) $x)") == [[]]   # the fact was never added, session alive
+
+
+# ─── every reachable head not on the allowlist, built several ways, refused ───
+#
+# `PETTA_ALLOWED_FUN_NAMES` is what `_install_petta_sandbox` checks; this table exists so the ENGINE-level
+# refusal (not the text scan, which these constructions mostly defeat on purpose) is proven against a
+# representative spread of the generic-dispatch primitives `reachable_heads.md`'s review catalogued —
+# `atom_concat`+`let`, `chain` (PeTTa's own `let_bind` lowering, a different argument order than `let`),
+# `let*`, `case`, `superpose` of a literal head, and `quote`/`eval` of a literal head — each against a
+# head drawn from a different safety class (a space mutator, the verifier's own translator-hook finding,
+# the halt-on-failure pair, process-global state, and a non-`fun/1` host predicate reachable only through
+# a generic-dispatch primitive). Every canary is harmless: a `&self`-scoped fact that is never actually
+# added (the whole point is that it ISN'T), or a call PeTTa itself would refuse before touching the host.
+_DYNAMIC_REFUSAL_CANARIES = [
+    ("atom_concat+let, add-atom (a space mutator)",
+     '!(let $f (atom_concat "add" "-atom") ($f &self (DynHead1 yes)))', "add-atom"),
+    ("chain (let_bind, Pat-Val-Body order), add-atom",
+     '!(chain $f (atom_concat "add" "-atom") ($f &self (DynHead2 yes)))', "add-atom"),
+    ("let*, change-state! (process-global state)",
+     '!(let* (($f (atom_concat "change-" "state!"))) ($f &dyn3 1))', "change-state!"),
+    ("case, add-translator-rule! (the verifier's finding, spelled literally in a branch)",
+     "!((case 1 ((1 add-translator-rule!) (2 remove-translator-rule!))) myDynHook4)",
+     "add-translator-rule!"),
+    ("superpose of one literal head, assert (halts on failure)",
+     '!(let $f (superpose (assert)) ($f (== 1 2)))', "assert"),
+    ("quote/eval of a literal head, shell (not fun/1 — reachable only through a generic primitive)",
+     '!(eval (quote (shell "true" 0)))', "shell"),
+]
+
+
+@pytest.mark.parametrize("label, expr, head", _DYNAMIC_REFUSAL_CANARIES, ids=[c[0] for c in _DYNAMIC_REFUSAL_CANARIES])
+@real_petta
+def test_every_construction_style_is_refused_as_an_expression(petta, label, expr, head):
+    with pytest.raises(MettaRuntimeError) as err:
+        petta.run_program("", [expr])
+    assert err.value.kind == "refused" and head in str(err.value), (label, str(err.value))
+
+
+@pytest.mark.parametrize("label, expr, head", _DYNAMIC_REFUSAL_CANARIES, ids=[c[0] for c in _DYNAMIC_REFUSAL_CANARIES])
+@real_petta
+def test_every_construction_style_is_refused_hidden_in_kb_text(petta, label, expr, head):
+    """The same canaries, placed where a caller's own `extra_atoms` lands: concatenated into `kb_text`
+    ahead of a harmless query, not passed as a separate expression. PeTTa evaluates any top-level `!` form
+    found anywhere in `kb_text` during the load — `petta_refused_forms_in_kb`'s whole reason to exist —
+    and the engine-level guard holds there exactly as it does for an expression."""
+    with pytest.raises(MettaRuntimeError) as err:
+        petta.run_program(expr + "\n(Harmless fact)", ["!(match &self (Harmless $x) $x)"])
+    assert err.value.kind == "refused" and head in str(err.value), (label, str(err.value))
+
+
+@pytest.mark.parametrize("label, expr, head", _DYNAMIC_REFUSAL_CANARIES, ids=[c[0] for c in _DYNAMIC_REFUSAL_CANARIES])
+@real_petta
+def test_every_construction_style_is_refused_inside_a_session(petta, label, expr, head):
+    """A session's `run()` text is a THIRD place caller bytes reach the engine (`PettaRuntime.run_program`
+    and `kb_text` are the other two); same guard, same construction styles, and the session survives —
+    confirmed once per canary, not just for the `add-atom` case the earlier dedicated test covers."""
+    with petta.session("(Foo a)") as session:
+        with pytest.raises(MettaRuntimeError) as err:
+            session.run(expr)
+        assert err.value.kind == "refused" and head in str(err.value), (label, str(err.value))
+        assert session.run("!(== 1 1)") == [["True"]]          # the session is still alive and answering
 
 
 

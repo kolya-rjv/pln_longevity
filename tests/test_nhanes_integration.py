@@ -25,7 +25,8 @@ Everything here is SYNTHETIC. The ETL is run against values that are arbitrary b
 construction; no NHANES data is present in this repository and none is downloaded. The
 numbers asserted below are properties of the fixture, never claims about any population.
 
-Needs `hyperon` and `pandas`; skipped automatically without them.
+Needs `pandas` and the selected runtime (PLN_RUNTIME: hyperon, the default, or petta; tests/runtime_harness.py);
+skipped automatically without them.
 
 Run:  pytest tests/ -v       (from the repo root)
 """
@@ -35,6 +36,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
@@ -43,11 +45,12 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "tests"))
 
 pytest.importorskip("pandas")
-pytest.importorskip("hyperon")
-from hyperon import MeTTa  # noqa: E402
 
 from nhanes_common import DEFAULT_BYTE_BUDGET  # noqa: E402
 from nhanes_xport_writer import NUM, write_xport  # noqa: E402
+from runtime_harness import Kb, new_kb, require_runtime  # noqa: E402
+
+require_runtime()
 
 # Dependency-ordered load. nhanes_reference.metta sits after patient_profile.metta (it
 # holds the record types and standardize-z, which the patient layer's derived-z calls),
@@ -131,17 +134,15 @@ def etl_output(tmp_path_factory) -> dict:
 
 
 @pytest.fixture(scope="module")
-def kb(etl_output) -> MeTTa:
+def kb(etl_output) -> Iterator[Kb]:
     """The full inference stack plus the ETL-generated reference records, one space.
 
     Loaded by reading the file text and running it, NOT via `import!`: in hyperon 0.2.10
     `(import! &self <path>)` silently yields nothing here, so every match would come back
     empty and the tests would pass vacuously.
     """
-    text = "\n".join((REPO / f).read_text(encoding="utf-8") for f in KB_FILES)
-    text += "\n" + etl_output["text"]
     # A patient known only by RAW lab values -- the case this whole layer exists for.
-    text += """
+    extra = etl_output["text"] + """
 (InstanceOf PatientRaw PatientProfile)
 (PatientAge     PatientRaw 58)
 (PatientSex     PatientRaw Male)
@@ -154,17 +155,16 @@ def kb(etl_output) -> MeTTa:
 (PatientSex     PatientOld Male)
 (MeasuredRaw PatientOld HbA1c 6.400000)
 """
-    metta = MeTTa()
-    metta.run(text)
-    return metta
+    with new_kb(KB_FILES, extra) as metta:
+        yield metta
 
 
-def _results(kb: MeTTa, query: str) -> list:
+def _results(kb: Kb, query: str) -> list:
     out = kb.run(query)
     return list(out[0]) if out and out[0] else []
 
 
-def _one_number(kb: MeTTa, query: str) -> float:
+def _one_number(kb: Kb, query: str) -> float:
     res = _results(kb, query)
     assert len(res) == 1, f"expected exactly one result for {query}, got {res}"
     return float(str(res[0]))
@@ -306,11 +306,14 @@ _STACK_WITH_BASELINE = KB_FILES + ["pln_counterfactual.metta", "pln_risk_predict
                                    "nhanes_baseline.metta"]
 
 
-def _space(extra: str, files=None) -> MeTTa:
-    text = "\n".join((REPO / f).read_text(encoding="utf-8") for f in (files or KB_FILES))
-    metta = MeTTa()
-    metta.run(text + "\n" + extra)
-    return metta
+def _space(extra: str, files=None) -> Kb:
+    return new_kb(files or KB_FILES, extra)
+
+
+def _answers(extra: str, query: str, files=None) -> list:
+    """`_results` of `query` in a throw-away space holding `extra` on top of the stack, released at once."""
+    with _space(extra, files) as kb:
+        return _results(kb, query)
 
 
 _PATIENT = ("(InstanceOf PX PatientProfile)(PatientAge PX 58)(PatientSex PX Male)"
@@ -324,17 +327,16 @@ def _ref(rid: str, mean: str, sd: str) -> str:
 
 
 def test_one_reference_cell_resolves():
-    kb = _space(_ref("RA", "5.400000", "0.500000") + _PATIENT)
-    assert _results(kb, "!(patient-z &self PX HbA1c)")
+    assert _answers(_ref("RA", "5.400000", "0.500000") + _PATIENT, "!(patient-z &self PX HbA1c)")
 
 
 def test_two_reference_cells_decline_rather_than_pick_one():
     """Single-valued is not enough: it must be single-MEANING. Taking the first cell made
     the answer depend on the order records happened to appear in a generated file."""
     both = _ref("RA", "5.400000", "0.500000") + _ref("RB", "5.900000", "1.000000")
-    assert _results(_space(both + _PATIENT), "!(patient-z &self PX HbA1c)") == []
+    assert _answers(both + _PATIENT, "!(patient-z &self PX HbA1c)") == []
     reversed_order = _ref("RB", "5.900000", "1.000000") + _ref("RA", "5.400000", "0.500000")
-    assert _results(_space(reversed_order + _PATIENT), "!(patient-z &self PX HbA1c)") == []
+    assert _answers(reversed_order + _PATIENT, "!(patient-z &self PX HbA1c)") == []
 
 
 def _baseline(rid: str, horizon: str, risk: str) -> str:
@@ -347,24 +349,23 @@ def _baseline(rid: str, horizon: str, risk: str) -> str:
 
 
 def test_one_baseline_record_resolves():
-    kb = _space(_baseline("NB_A", "120", "0.214324"), _STACK_WITH_BASELINE)
-    assert _results(kb, "!(patient-baseline &self Patient001 AllCauseMortality)")
+    assert _answers(_baseline("NB_A", "120", "0.214324"),
+                    "!(patient-baseline &self Patient001 AllCauseMortality)", _STACK_WITH_BASELINE)
 
 
 def test_two_horizons_decline_rather_than_serve_the_shorter_one():
     """A 60-month baseline must never be served into a rule documented as ten-year."""
     both = _baseline("NB_A", "120", "0.214324") + _baseline("NB_B", "60", "0.094011")
-    assert _results(_space(both, _STACK_WITH_BASELINE),
-                    "!(patient-baseline &self Patient001 AllCauseMortality)") == []
+    assert _answers(both, "!(patient-baseline &self Patient001 AllCauseMortality)",
+                    _STACK_WITH_BASELINE) == []
     flipped = _baseline("NB_B", "60", "0.094011") + _baseline("NB_A", "120", "0.214324")
-    assert _results(_space(flipped, _STACK_WITH_BASELINE),
-                    "!(patient-baseline &self Patient001 AllCauseMortality)") == []
+    assert _answers(flipped, "!(patient-baseline &self Patient001 AllCauseMortality)",
+                    _STACK_WITH_BASELINE) == []
 
 
 def test_curated_chd_baseline_is_unaffected_by_ambiguous_mortality_records():
     both = _baseline("NB_A", "120", "0.214324") + _baseline("NB_B", "60", "0.094011")
-    kb = _space(both, _STACK_WITH_BASELINE)
-    chd = _results(kb, "!(patient-baseline &self Patient001 CoronaryHeartDisease)")
+    chd = _answers(both, "!(patient-baseline &self Patient001 CoronaryHeartDisease)", _STACK_WITH_BASELINE)
     assert len(chd) == 1 and float(str(chd[0])) == pytest.approx(0.08)
 
 

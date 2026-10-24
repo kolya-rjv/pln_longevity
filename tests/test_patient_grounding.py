@@ -15,7 +15,8 @@ assert that:
     additively on top of the population protective score (Demo 2 f(patient
     factors)).
 
-Skipped automatically if `hyperon` is not installed.
+Runs on the selected runtime (PLN_RUNTIME: hyperon, the default, or petta; tests/runtime_harness.py)
+and is skipped automatically if that runtime is not installed.
 
 Run:  pytest tests/ -v       (from the repo root)
 """
@@ -23,11 +24,13 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
-hyperon = pytest.importorskip("hyperon")
-from hyperon import MeTTa  # noqa: E402
+from runtime_harness import Kb, new_kb, require_runtime
+
+require_runtime()
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -57,22 +60,20 @@ _HYP_RE = re.compile(
 
 
 @pytest.fixture(scope="module")
-def kb() -> MeTTa:
+def kb() -> Iterator[Kb]:
     """A MeTTa interpreter with the full KB + patient layer in one shared space."""
-    text = "\n".join((REPO / f).read_text(encoding="utf-8") for f in KB_FILES)
-    m = MeTTa()
-    m.run(text)
-    return m
+    with new_kb(KB_FILES) as m:
+        yield m
 
 
-def _one(kb: MeTTa, query: str) -> str:
+def _one(kb: Kb, query: str) -> str:
     """Run a query expected to return exactly one atom; return it as a string."""
     res = kb.run(query)
     assert res and res[0], f"no result for {query}: {res}"
     return str(res[0][0])
 
 
-def _num(kb: MeTTa, query: str) -> float:
+def _num(kb: Kb, query: str) -> float:
     return float(_one(kb, query))
 
 
@@ -124,7 +125,7 @@ def test_patient_observations_are_the_elevated_markers(kb):
 
 # ── Demo 1 grounded: diagnose straight from the patient profile ──────────────────
 
-def _diagnose_patient(kb: MeTTa) -> list[dict]:
+def _diagnose_patient(kb: Kb) -> list[dict]:
     out = _one(
         kb,
         "!(diagnose-patient &self Patient001 "
@@ -178,7 +179,7 @@ def test_patient_relevance_ranks_by_targeting_the_patients_markers(kb):
     assert ela == pytest.approx(0.0)
 
 
-def _ranked(kb: MeTTa, query: str) -> list[tuple[str, float]]:
+def _ranked(kb: Kb, query: str) -> list[tuple[str, float]]:
     out = _one(kb, query)
     return [(m.group(1), float(m.group(2)))
             for m in re.finditer(r"\(scored\s+(\S+)\s+([-\d.eE]+)", out)]

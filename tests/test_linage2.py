@@ -36,6 +36,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Iterator
 from unittest.mock import Mock
 
 import pytest
@@ -73,6 +74,8 @@ from core.pln_runner import (  # noqa: E402
     linage2_patient_kb,
     merge_run_results,
 )
+
+from runtime_compare import assert_same_answers, petta_only  # noqa: E402
 
 FIXTURE = REPO / "tests" / "fixtures" / "linage2_response.json"
 HAZARD_PER_YEAR = 1.093          # linage2_fong2025_evidence.metta
@@ -417,25 +420,37 @@ def test_the_layer_is_absent_from_the_shared_execution_space():
         or (REPO / "build" / "nhanes_mortality_baseline.metta").exists()
 
 
-hyperon = pytest.importorskip("hyperon", reason="the MeTTa tests need the engine")
-from hyperon import MeTTa  # noqa: E402
+from runtime_harness import Kb, new_kb, on_petta, require_runtime  # noqa: E402
+
+require_runtime(reason="the MeTTa tests need the engine")
+
+#: `linage-biomarker-causes` is a deduped `collapse` over the hallmarks: a SET of causes. hyperon returns its
+#: members in the order recorded here; PeTTa in assertion order, i.e. the other way round. Nothing reads the
+#: position of a cause (pln_linage2.metta: "deduped ... a cause reached by two paths is one cause").
+_CAUSES = r"\(ChronicInflammation CellularSenescence\)"
+if on_petta():
+    _CAUSES = r"\((?:ChronicInflammation CellularSenescence|CellularSenescence ChronicInflammation)\)"
 
 
-def _space(extra: str, *more_files: Path) -> MeTTa:
-    text = "\n".join(p.read_text(encoding="utf-8") for p in [*LINAGE2_PATIENT_STACK, *more_files])
-    m = MeTTa()
-    m.run(text + "\n" + extra)
-    return m
+def _same_members(got: str, recorded: str) -> bool:
+    """hyperon: the recorded string, exactly. PeTTa: the same members of the tuple, in any order."""
+    if got == recorded or not on_petta():
+        return got == recorded
+    return got.startswith("(") and sorted(got[1:-1].split()) == sorted(recorded[1:-1].split())
 
 
-def _one(m: MeTTa, query: str) -> str:
+def _space(extra: str, *more_files: Path) -> Kb:
+    return new_kb([*LINAGE2_PATIENT_STACK, *more_files], extra)
+
+
+def _one(m: Kb, query: str) -> str:
     res = m.run(query)
     assert res and res[0], f"no result for {query}: {res}"
     assert len(res[0]) == 1, f"expected one result for {query}: {res}"
     return str(res[0][0])
 
 
-def _empty(m: MeTTa, query: str) -> bool:
+def _empty(m: Kb, query: str) -> bool:
     res = m.run(query)
     return res == [[]] or all(len(g) == 0 for g in res)
 
@@ -447,15 +462,17 @@ def _num(text: str, field: str) -> float:
 
 
 @pytest.fixture(scope="module")
-def smoker() -> tuple[MeTTa, dict]:
+def smoker() -> Iterator[tuple[Kb, dict]]:
     built = build_patient(_patient())
-    return _space(built.atoms), built.linage2.as_dict()
+    with _space(built.atoms) as m:
+        yield m, built.linage2.as_dict()
 
 
 @pytest.fixture(scope="module")
-def never_smoker() -> MeTTa:
+def never_smoker() -> Iterator[Kb]:
     built = build_patient(_patient(id="N58", smoking="NeverSmoker"))
-    return _space(built.atoms)
+    with _space(built.atoms) as m:
+        yield m
 
 
 def test_the_decomposition_totals_reproduce_the_delta_exactly(smoker):
@@ -500,8 +517,28 @@ def test_the_witness_reads_the_patients_own_values(smoker):
     assert _one(m, "!(linage-witnessed &self Caller_W58 CRP)") == "False"
     assert _one(m, "!(linage-witnessed &self Caller_W58 FastingGlucose)") == "False"   # no z sent
     assert _one(m, "!(linage-witnessed &self Caller_W58 CurrentTobaccoExposure)") == "True"
-    assert _one(m, "!(linage-biomarker-causes &self CRP)") == "(ChronicInflammation CellularSenescence)"
+    causes = _one(m, "!(linage-biomarker-causes &self CRP)")
+    assert _same_members(causes, "(ChronicInflammation CellularSenescence)"), causes
     assert _one(m, "!(linage-biomarker-causes &self HbA1c)") == "(DeregulatedNutrientSensing)"
+
+
+#: A second chain from ChronicInflammation to CRP, beside the direct one the KB has: `infer` then yields one result
+#: per path, so the hallmark is reached twice. (For every readout in the KB as shipped each hallmark has exactly one
+#: positive chain, so the dedupe in `linage-biomarker-causes` cannot be seen without this: removing it left every
+#: other test green on both runtimes.)
+_TWO_CHAINS = """
+(Effect ChronicInflammation TestMediator Pos (stv 0.6 0.8))
+(Effect TestMediator CRP Pos (stv 0.6 0.8))
+"""
+
+
+def test_a_cause_reached_by_two_paths_is_one_cause():
+    with _space(_TWO_CHAINS) as m:
+        chains = _one(m, "!(collapse (infer &self ChronicInflammation CRP))")
+        assert chains.count("(signed Pos") == 2, chains                  # the fixture does what it says
+        causes = _one(m, "!(linage-biomarker-causes &self CRP)")
+        assert _same_members(causes, "(ChronicInflammation CellularSenescence)"), causes
+        assert len(causes[1:-1].split()) == 2, causes                    # ChronicInflammation once, not twice
 
 
 def test_the_hazard_is_the_fong_2025_hr_to_the_power_of_the_delta(smoker):
@@ -584,19 +621,19 @@ def _baseline_records() -> str:
 
 def test_with_a_data_backed_baseline_the_risk_is_the_survival_form():
     built = build_patient(_patient())
-    m = _space(built.atoms + "\n" + _baseline_records())
-    out = _one(m, "!(linage-risk-patient &self Caller_W58)")
-    mult = HAZARD_PER_YEAR ** built.linage2.delta_years
-    expected = 1.0 - (1.0 - 0.0812) ** mult
-    assert _num(out, "baseline") == pytest.approx(0.0812)
-    assert _num(out, "multiplier") == pytest.approx(mult, rel=1e-6)
-    assert _num(out, "point") == pytest.approx(expected, rel=1e-6)
-    assert "(clock LinAge2)" in out
-    lo, hi = map(float, re.search(r"\(ci ([-\d.eE]+) ([-\d.eE]+)\)", out).groups())
-    assert lo < expected < hi <= 1.0
-    proj = _one(m, "!(linage-project-risk-patient &self Caller_W58 SmokingCessation)")
-    assert _num(proj, "reduction") > 0 and _num(proj, "point") < expected
-    assert "(Via (SerumCotinine))" in proj
+    with _space(built.atoms + "\n" + _baseline_records()) as m:
+        out = _one(m, "!(linage-risk-patient &self Caller_W58)")
+        mult = HAZARD_PER_YEAR ** built.linage2.delta_years
+        expected = 1.0 - (1.0 - 0.0812) ** mult
+        assert _num(out, "baseline") == pytest.approx(0.0812)
+        assert _num(out, "multiplier") == pytest.approx(mult, rel=1e-6)
+        assert _num(out, "point") == pytest.approx(expected, rel=1e-6)
+        assert "(clock LinAge2)" in out
+        lo, hi = map(float, re.search(r"\(ci ([-\d.eE]+) ([-\d.eE]+)\)", out).groups())
+        assert lo < expected < hi <= 1.0
+        proj = _one(m, "!(linage-project-risk-patient &self Caller_W58 SmokingCessation)")
+        assert _num(proj, "reduction") > 0 and _num(proj, "point") < expected
+        assert "(Via (SerumCotinine))" in proj
 
 
 @pytest.mark.slow
@@ -642,6 +679,7 @@ def test_the_scoped_stack_keeps_a_head_symbol_margin():
     )
 
 
+@pytest.mark.hyperon_only                 # the control is a hyperon abort; PeTTa has none (the companion is below)
 @pytest.mark.slow
 def test_the_shared_space_survives_a_patient_with_a_linage2_result():
     """The crash this split exists for, measured in a subprocess because hyperon
@@ -687,6 +725,47 @@ def test_the_shared_space_survives_a_patient_with_a_linage2_result():
             f"atoms (rc={full.returncode}); the control is void, so this test no longer "
             f"proves the split is what saves it. stderr: {full.stderr[-400:]}"
         )
+
+
+@petta_only
+@pytest.mark.slow
+def test_the_shared_space_answers_a_patient_with_a_linage2_result_with_or_without_the_split_on_petta():
+    """The PeTTa companion of the test above. PeTTa has no abort: diagnose-patient, predict-risk-patient and
+    recommend-supplements-patient answer with every atom of a LinAge2 patient in the shared space, and give
+    the same atoms as with `shared_atoms` (the layer's atoms are not read by these forms), so the split
+    changes no answer here; it is only not needed."""
+    probe = "\n".join([
+        "import sys, json",
+        f"sys.path.insert(0, {str(PLN_CHAT)!r}); sys.path.insert(0, {str(REPO / 'tests')!r})",
+        "import api",
+        "from core.patient_builder import build_patient",
+        "from core.pln_runner import run_query",
+        "import test_linage2 as t",
+        "built = build_patient(t._patient(markers={'HbA1c': 1.6, 'CRP': 0.3, 'AgeAccelGrim': 1.6}))",
+        "atoms = built.shared_atoms if sys.argv[1] == 'shared' else built.atoms",
+        "kb = api._runtime_kb_paths()",
+        "out = {}",
+        "for q in ('!(diagnose-patient &self Caller_W58 (CellularSenescence ChronicInflammation InsulinResistance))',",
+        "          '!(predict-risk-patient &self Caller_W58)',",
+        "          '!(recommend-supplements-patient &self Caller_W58)'):",
+        "    r = run_query(q, kb_files=kb, extra_atoms=atoms)",
+        "    assert r.status == 'ok', (q, r.status, r.error)",
+        "    out[q] = [x.atom for x in r.results]",
+        "print('RESULT ' + json.dumps(out))",
+    ])
+
+    def run(which: str) -> dict:
+        done = subprocess.run([sys.executable, "-c", probe, which],
+                              capture_output=True, text=True, timeout=900, cwd=str(REPO))
+        lines = [ln for ln in done.stdout.splitlines() if ln.startswith("RESULT ")]
+        assert done.returncode == 0 and lines, f"{which}: rc={done.returncode} {done.stderr[-800:]}"
+        return json.loads(lines[0][7:])
+
+    shared, full = run("shared"), run("full")
+    assert shared.keys() == full.keys() and len(shared) == 3
+    for form in shared:
+        assert shared[form], form
+        assert_same_answers(full[form], shared[form], what=form)
 
 
 # ═══════════════════════════ HTTP ════════════════════════════════════════════
@@ -978,20 +1057,22 @@ def test_a_heart_risk_pair_for_a_patient_with_no_grimage_is_labelled_all_cause(m
 # ═══════════ RDW and low albumin: two more readouts of chronic inflammation (#7) ═══════════
 
 @pytest.fixture(scope="module")
-def inflamed() -> MeTTa:
+def inflamed() -> Iterator[Kb]:
     """The fixture patient with an RDW z of 2.7 and an albumin DEFICIT z of 1.7 (the tab smoker's), CRP normal."""
     built = build_patient(_patient(id="R58", markers={"HbA1c": 1.6, "CRP": 0.3, "RDW": 2.7, "LowSerumAlbumin": 1.7}))
     assert built.witnesses == ["HbA1c", "LowSerumAlbumin", "RDW"]
-    return _space(built.atoms)
+    with _space(built.atoms) as m:
+        yield m
 
 
 def test_an_elevated_rdw_and_a_low_albumin_are_credited_to_inflammation_and_senescence(inflamed):
     out = _one(inflamed, "!(linage-decomposition-patient &self Caller_R58)")
     for symbol, readout in (("RedCellDistributionWidth", "RDW"), ("SerumAlbumin", "LowSerumAlbumin")):
         assert re.search(rf"\(Contribution {symbol} \(years [-\d.]+\) Measured \(ReadsOut {readout} \(witnessed True\)\) "
-                         rf"\(DrivenBy \(ChronicInflammation CellularSenescence\)\)\)", out), (symbol, out)
-    assert _one(inflamed, "!(linage-biomarker-causes &self RDW)") == "(ChronicInflammation CellularSenescence)"
-    assert _one(inflamed, "!(linage-biomarker-causes &self LowSerumAlbumin)") == "(ChronicInflammation CellularSenescence)"
+                         rf"\(DrivenBy {_CAUSES}\)\)", out), (symbol, out)
+    for readout in ("RDW", "LowSerumAlbumin"):
+        causes = _one(inflamed, f"!(linage-biomarker-causes &self {readout})")
+        assert _same_members(causes, "(ChronicInflammation CellularSenescence)"), (readout, causes)
 
 
 def test_a_positive_contribution_is_not_credited_without_the_patients_own_z(smoker):

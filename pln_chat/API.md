@@ -224,6 +224,7 @@ under `pln_execution`.
 | `PLN_RUNTIME`                    | hyperon | the MeTTa engine: `hyperon` \| `petta` \| `auto` (hyperon when importable, else petta) |
 | `PETTA_HOME`                     | `<repo>/.petta/PeTTa` | the PeTTa checkout (`src/main.pl`, `python/`); only read for `petta` |
 | `PETTA_STACK_LIMIT_MB`           | 2048    | SWI-Prolog stack limit of a PeTTa process; a runaway recursion dies of it |
+| `PLN_PETTA_CHILD_ENV_KEEP`       | (none)  | extra environment variable names a PeTTa child keeps (comma-separated); it keeps `PATH`, `LANG`, `LC_*` and the library-path and `SWI_HOME_DIR` names and drops the rest, API keys included |
 | `PLN_MAX_RANK_COMPOUNDS`         | 60      | cap on a ranking's compound pool, at every entrance    |
 | `PLN_MAX_METTA_SORT_COMPOUNDS`   | 10      | the much smaller cap for `strategy="metta_sort"`       |
 | `PLN_MAX_ONTOLOGY_FILES`         | 64      | cap on an `ontology_files` selection (deduped)        |
@@ -323,6 +324,7 @@ never noticed. Every failure now carries its own status and a structured
 | `upstream_error`          | 502    | any other OpenAI-side failure                      |
 | `bad_json`                | 502    | the model answered with something unparseable      |
 | `runtime_error`           | 502    | the MeTTa runtime raised (hyperon: an exception; PeTTa: a failed load, an expression that raised, a process that died or — in inline mode, or a late `run_query_parts` part — was killed at its deadline) |
+| `refused_form`            | 422    | PeTTa only: the program asked for something the PeTTa runtime does not run (a form outside its allowed set, a change to the space, a call by name); the program is at fault, a retry gives the same answer |
 | `pln_worker_crashed`      | 500    | the MeTTa WORKER process itself died (under hyperon, almost always a hyperon abort; under petta a PeTTa-internal crash is already `runtime_error` and never reaches this, so this means the worker process itself died) |
 | `missing_api_key` / `auth`| 503    | the service has no usable OpenAI credential        |
 | `drugage_build_missing`   | 503    | `build/drugage_etl.metta` has not been generated   |
@@ -1165,38 +1167,97 @@ cost of `import hyperon` and constructing `MeTTa()` — previously excluded. Mea
 about 15-17 ms on the first query, 11-12 ms on later ones (import stays cached, construction does not); a
 few ms either way does not change what the service answers, only this one timing field.
 
-**What is refused under petta, and how.** `/metta/run`, `/query` and the chat
-tab reject a program that uses `add-atom`, `remove-atom`, a `(= …)`
-definition, `assert`, `test`, `halt`, `import!`, `git-import!`,
-`cached-import!`, `include`, `py-call`, `py-atom`, `py-dot`, `shell`,
-`load_metta_file`, `load_metta_file_cached`, `process_metta_string`,
-`new-space`, `bind!`, `call`, `callPredicate`, `assertaPredicate`,
-`assertzPredicate`, `retractPredicate` or `import_prolog_function`: they
-change PeTTa's process-global space (and `remove-atom` retracts every
-identical copy), halt the process, or reach the host — the last several are
-PeTTa's own "call any Prolog predicate by name" doors, the same shape of
-escape as `py-call` under a different name. The check is by symbol, so
-`(let $f add-atom …)` is refused too; a pattern that merely reads equations,
-`(match &self (= (f $x) $v) …)`, is not. `PettaRuntime.run_program` and
-`PettaSession` refuse the same forms in `kb_text` and in a session's text as
-well as in an expression.
+**What the petta runtime does not run: the engine decides, the text scan explains.**
+PeTTa compiles MeTTa to Prolog, so a program that can make it call a predicate
+by a name the program chooses can read the server's files and environment or
+change the space it shares with every later query. Three layers, innermost
+first (`core/metta_runtime.py`, "the engine-level sandbox", has the table of
+every such route and the one place each is closed).
 
-That text scan is a fast, friendly 422/`kind="refused"` for the literal
-spelling — it is **not** the actual security boundary. A symbol PeTTa builds
-at run time (`(let $f (atom_concat "add" "-atom") ($f &self …))`) never
-appears as the token `add-atom` in any text a scan can read, and PeTTa's own
-dispatcher treats a function's identity as an ordinary runtime value, so that
-symbol runs all the same. The real boundary is inside the engine: right after
-each forked child's `PeTTa()` consults `main.pl`/`helper.pl`, before anything
-is loaded or run, it redefines every one of the predicates above directly in
-Prolog (`_install_petta_sandbox`) — `add-atom`/`remove-atom` keep their real
-behaviour while an ordinary KB's own facts load, and are refused only while a
-`!` form is actually being evaluated; every other predicate above has no
-legitimate role in loading or running this repo's knowledge bases and is
-refused unconditionally, for the whole life of the child. This holds no
-matter how the program's text spells or constructs the call, and regardless
-of which Python code path concatenated the caller's bytes into `kb_text`, an
-expression, or a session. Under hyperon the validator is unchanged.
+1. **The engine.** `_install_petta_sandbox` runs in each forked child before
+   anything is loaded, and closes each route where it happens, so how the text
+   spelled the call, how it was assembled (`atom_concat`, `cons-atom`, then
+   `eval`), and how it arrived (a query, `extra_atoms`, a session) do not
+   matter:
+   - *Calling a function by name* (`($f …)`, `map-atom`, a closure) runs only a
+     name PeTTa lists as a function. PeTTa registers 148 names; 116 of them are
+     allowed (`PETTA_ALLOWED_FUN_NAMES`: arithmetic, comparison, logic,
+     list/tuple, string/repr and type introspection, `eval`/`reduce`, and the
+     two space reads `match` and `get-atoms`); 22 are refused (`add-atom` and
+     `remove-atom` while a `!` form runs, because an ordinary KB's facts need
+     them to load; the other 20 always: `assert` and `test` which halt the
+     process, `change-state!`, `get-state`, `bind!`, `add-translator-rule!`,
+     `remove-translator-rule!`, `callPredicate`, `Predicate`,
+     `assertaPredicate`, `assertzPredicate`, `retractPredicate`,
+     `import_prolog_function`, `import!`, `cached-import!`, `library-import!`,
+     `library`, `py-call`, `argv`, and `repra`, which can parse text into a term and
+     so write a closure that names any predicate); 4 PeTTa calls itself on every
+     load (`maplist`, `foldl`, `sread`, `exists_file`) and so cannot be redefined,
+     and are taken off the function list instead, which makes them plain data
+     to a program (`maplist getenv …` reached any two-argument Prolog
+     predicate); and 6 have no Prolog predicate behind them (`let`, `let*`,
+     `concat`, `get-mettatype`, `mm2-exec`, `set_hook`). The allowlist is
+     compared with PeTTa's own registry when the child starts, so a builtin a
+     later PeTTa adds is refused without anyone naming it. Checked by ARITY too,
+     not only by name: `/` is allowed as PeTTa's own division (arity 3), but SWI's
+     `library(yall)` (loaded for lambdas) also exports `/` as a generic
+     "apply a goal" operator at every other arity, and PeTTa's own startup scan
+     folded those into the same registered name. Every arity of an allowed name
+     that resolves to `library(yall)` is refused the same as an unallowed name,
+     whatever the name; division itself is untouched.
+   - *`call` and `translatePredicate`* build a goal from the program's own data
+     and run it. They are compiler forms, so no predicate can be redefined to
+     stop them; the form is refused at compile time unless the target it names
+     is a function PeTTa knows (PeTTa's own rewrites of `unique`, `union`, … are
+     `(call (superpose …))` and keep working).
+   - *`match` and `get-atoms`* turn their space argument into a predicate name
+     (`(match getenv (HOME $v) $v)` was a call of `getenv/2`; the same for
+     `read_file_to_string`, `directory_files`, …). They accept only the name of
+     a space, an atom beginning with `&`.
+   - *Changing the space*: `add-atom`, `remove-atom` and the `-proven` pair PeTTa
+     emits for a typed space refuse while a `!` form runs (a `!` form inside
+     `kb_text`/`extra_atoms` included), and for good once a `run_program` child
+     has loaded its KB.
+   - `shell` and `halt` are refused as a second line.
+
+   A refusal reaches the caller as a 422, `refused_form` (below).
+2. **The child.** It is a fork of the API process, so it starts out holding the
+   server's secrets and sockets. `_child_prepare` replaces its environment by a
+   short allowlist (API keys and every other variable are gone; `HOME`,
+   `TMPDIR` and PeTTa's own cache directory point into its private working
+   directory), points every inherited descriptor except its own pipe at
+   `/dev/null`, makes it work in an empty directory of its own (removed with
+   it), and sets no core file, at most 512 descriptors and a bounded file size.
+3. **The text scan** (`PETTA_REFUSED_FORMS`, `petta_refused_forms`; the
+   validator and the runtime both apply it) gives the literal spelling a fast
+   422 with the form's name. It reads symbols the way PeTTa's own reader does
+   (a quote inside a token is an ordinary character, a comment takes its newline
+   with it), checked against that reader on a corpus. It is not a boundary and
+   nothing relies on it being one.
+
+Under hyperon the validator is unchanged. **Not done:** an operating-system
+profile for the child (seccomp, `sandbox_init`) differs per platform and could
+not be tested on more than one; a deployment that wants a third line should run
+the API in a container with the platform's default seccomp profile.
+Any other host predicate is reachable only through one of the routes above, and
+`shell`/`halt` are the only ones guarded by name as well: PeTTa and janus call
+`open`, `getenv` and the like themselves on every load, so redefining them
+breaks the engine and protects nothing a program can name.
+
+**How a refusal is reported.** `422`, code `refused_form`, with the refused
+head and the reason in `message` (no filesystem path, no Prolog internals):
+the program is at fault, not the service, and a retry gives the same answer
+(a crash or a deadline stays `runtime_error`, 502). The literal spelling is
+refused earlier, by the validator or the scan, with the same status. A refused
+DYNAMICALLY-CONSTRUCTED head needs one more mechanism: PeTTa's own dynamic
+dispatcher (`reduce/2`) calls the resolved goal inside a catch-all that turns
+ANY exception into an ordinary Prolog failure, so the expression would have no
+solution and `run_program` would answer empty, indistinguishable from a query
+that found nothing. The guard also records the refused name in a side channel
+(`nb_setval`, under a per-child random name) a `catch/3` cannot unwind;
+`PettaRuntime`/`PettaSession` check it after every call and raise
+`MettaRuntimeError(kind="refused")` instead, so a blocked form is never read as
+"no answer" (not even when the program catches the exception itself).
 
 
 ## Examples
