@@ -35,6 +35,22 @@ Why PeTTa runs in a forked child, once per program
   (`PETTA_STACK_LIMIT_MB`), sets an RLIMIT_CPU backstop a little past the deadline, and on Linux asks to be
   SIGKILLed when its parent dies. The executor SIGKILLs a worker at its deadline, and the worker's PeTTa
   child would otherwise run on, unreaped and unbounded, with nobody to read its answer.
+* Memory is bounded by `PETTA_MEMORY_LIMIT_MB` (default 512), in two ways, and `PETTA_STACK_LIMIT_MB` is NOT
+  one of them: it caps SWI-Prolog's own stacks, and a string or an atom lives on the heap, outside them. A
+  ~900-byte program of `let*`/`atom_concat` doubles a string 22 times and takes 1 GB in half a second under a
+  64 MB stack limit, with every builtin it uses allowed. (1) A watchdog thread in the child samples its
+  peak resident set every 5 ms and ends the process (exit code 73, which the parent reports as
+  `kind="memory"`) once it has grown by more than the limit since `_child_prepare`. It runs on every
+  platform, needs no parent, and binds an orphaned child too; janus releases the GIL while Prolog runs, which
+  is what lets a thread see a Prolog program growing (checked). The child calls `gc.freeze()` first: on macOS a
+  fork maps the server's heap lazily, and one garbage collection in the child would otherwise count all of it as
+  growth. It is a sample, not a wall: a single call that
+  allocates more than the limit between two samples (about 5 ms) is not stopped by it. (2) On Linux the
+  kernel is asked for the wall: `RLIMIT_AS` at the address space the child had when it was prepared, plus the
+  limit, plus 1 GB for what the libraries and the allocator reserve and never use. macOS refuses a
+  finite `RLIMIT_AS` (EINVAL, checked), so there only the watchdog applies. Neither replaces a memory limit
+  on the whole worker pool (a cgroup, `docker --memory`, systemd `MemoryMax=`): N children each at the limit
+  are still N times the limit.
 * Its stdin, stdout and stderr are /dev/null: PeTTa prints traces (`println!`, warnings) at the file
   descriptor level, below Python's `sys.stdout`, and they must reach neither the server's log nor a test's
   captured output. Errors travel through the pipe, not through stderr.
@@ -95,6 +111,7 @@ Nothing in this module imports hyperon, janus or petta at import time.
 """
 from __future__ import annotations
 
+import gc
 import importlib.util
 import json
 import logging
@@ -120,7 +137,8 @@ __all__ = [
     "normalise_result", "reduce_stored_calls", "read_tier_table", "Reduction",
     "split_top_level_forms", "petta_refused_forms", "petta_refused_forms_in_kb", "PETTA_REFUSED_FORMS",
     "PETTA_KNOWN_FUN_NAMES", "PETTA_ALLOWED_FUN_NAMES", "PETTA_ENGINE_INTERNAL_FUN_NAMES",
-    "petta_strip_comments", "petta_tokens",
+    "petta_strip_comments", "petta_tokens", "petta_symbols",
+    "resolve_memory_limit_mb", "DEFAULT_MEMORY_LIMIT_MB", "MIN_MEMORY_LIMIT_MB",
     "RUNTIME_NAMES",
 ]
 
@@ -135,6 +153,49 @@ BACKSTOP_GRACE_S = 10.0
 _EXIT_WAIT_S = 5.0
 #: Longest piece of an underlying error text kept in a MettaRuntimeError message.
 _MAX_DETAIL_CHARS = 1500
+#: How much a PeTTa child's peak resident set may grow after it is prepared, in MB (`PETTA_MEMORY_LIMIT_MB`).
+#: Measured: every PeTTa test in the suite, the PLN chainer lane included, passes with 128; all 33 `.metta` files
+#: of the repository loaded together peak at 116 MB in all. This is four times the larger figure. A deployment
+#: that loads much bigger knowledge bases (ETL output) raises it: a KB costs about 0.2 MB per KB of text.
+DEFAULT_MEMORY_LIMIT_MB = 512
+#: The smallest limit that is honoured: a child imports janus and consults PeTTa (30-60 MB) before it runs
+#: anything, so a smaller number would stop every program. A smaller value is raised to this one.
+MIN_MEMORY_LIMIT_MB = 128
+#: The child's exit code when its own watchdog ended it for using too much memory (70 and 71 are taken).
+_EXIT_MEMORY = 73
+#: How often the child looks at its own memory.
+_MEMORY_POLL_S = 0.005
+#: On Linux the address-space limit is the child's size when prepared + the memory limit + this. The libraries a
+#: child maps after it is prepared (SWI-Prolog, PeTTa's) and the 64 MB glibc reserves per allocation arena are
+#: address space nobody uses; the limit is a backstop behind the watchdog and must not stop an honest program,
+#: so it is generous.
+_ADDRESS_SPACE_SLACK_MB = 1024
+
+
+def resolve_memory_limit_mb(value: Optional[int] = None) -> int:
+    """The memory limit of a PeTTa child, in MB; 0 means none.
+
+    `value` (a constructor argument) wins; otherwise `PETTA_MEMORY_LIMIT_MB` from the server's environment,
+    otherwise `DEFAULT_MEMORY_LIMIT_MB`. A value below `MIN_MEMORY_LIMIT_MB` is raised to it, 0 switches the limit
+    off (for a deployment that bounds memory some other way), and an environment value that is not a whole
+    number, or is negative, is ignored with a warning: an unreadable setting falls back to the protected
+    default, never to no protection. A negative argument is a programming error and raises."""
+    if value is None:
+        raw = os.environ.get("PETTA_MEMORY_LIMIT_MB", "").strip()
+        if not raw:
+            return DEFAULT_MEMORY_LIMIT_MB
+        try:
+            value = int(raw)
+        except ValueError:
+            value = -1
+        if value < 0:
+            _LOG.warning("PETTA_MEMORY_LIMIT_MB=%r is not a whole number of megabytes, 0 or more; using %d",
+                         raw, DEFAULT_MEMORY_LIMIT_MB)
+            return DEFAULT_MEMORY_LIMIT_MB
+    value = int(value)
+    if value < 0:
+        raise ValueError(f"the memory limit of a PeTTa child is 0 (none) or more megabytes; got {value}")
+    return 0 if value == 0 else max(MIN_MEMORY_LIMIT_MB, value)
 
 
 class MettaRuntimeError(RuntimeError):
@@ -143,7 +204,8 @@ class MettaRuntimeError(RuntimeError):
     `str(error)` is safe to show a caller: it says what happened and keeps the underlying engine text
     (clipped). `kind` is one of: `unavailable` (the runtime cannot start here), `load` (the knowledge base
     did not load), `expression` (an expression raised), `timeout` (the deadline killed the run), `crash`
-    (the interpreter process died without an answer), `refused` (the program uses a form the PeTTa runtime
+    (the interpreter process died without an answer), `memory` (the process grew past
+    `PETTA_MEMORY_LIMIT_MB` and was stopped), `refused` (the program uses a form the PeTTa runtime
     does not run), `session` (a session was closed or lost), `runtime` (anything else, notably every
     hyperon exception). `detail` is the underlying text on its own.
     """
@@ -487,7 +549,33 @@ _REFUSED_ANYWHERE = frozenset(PETTA_REFUSED_FORMS) - {"="}
 #:   `a"b`, `add-atom` and `c"d`. These two expressions are that reading; `tests/test_metta_runtime.py` checks
 #:   them against the engine's own reader on a corpus of nasty texts.
 _PETTA_STRIP_RE = re.compile(r'"(?:[^"\\]|\\[\s\S])*"|;[^\n]*\n?')
-_PETTA_TOKEN_RE = re.compile(r'(?P<string>"(?:[^"\\]|\\[\s\S])*")|(?P<paren>[()])|(?P<symbol>[^\s()]+)')
+#: ... and which characters end a token, and which are skipped BEFORE one, are two different sets. `parser.pl`'s
+#: `token//1` ends a token at a space, tab, newline, carriage return or parenthesis and at nothing else, so
+#: `b"<U+2029>"` is ONE token whatever the Unicode says about U+2029, and the quote inside it starts no string.
+#: The whitespace skipped between elements, `blanks//0` (SWI-Prolog's `code_type(C, space)`), is wider and not
+#: the same everywhere: the vertical tab and form feed on every platform, then (build and platform dependent)
+#: U+001C-U+001F, U+0085, U+00A0, U+1680, U+2000-U+200A, U+2028, U+2029, U+202F, U+205F and U+3000 (SWI-Prolog 10
+#: on macOS skips all of them but U+001C-U+001F and U+0085). It matters in one place: a `"` after such a
+#: character starts a string if the character is a blank and is part of a token if it is not, and a string hides
+#: whatever it holds. `tests/test_petta_sandbox.py` checks both lists against the engine it runs on.
+_PETTA_SURE_BLANKS = "\x0b\x0c"
+_PETTA_MAYBE_BLANKS = "\x1c-\x1f\x85\xa0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000"
+
+
+def _petta_token_re(skipped: str) -> "re.Pattern[str]":
+    """The tokens of a form when `blanks//0` skips `skipped` (a regex character-class body) before an element:
+    a string, a parenthesis, or a symbol that does not START with such a character and then runs on to the next
+    space, tab, newline, carriage return or parenthesis."""
+    return re.compile(r'(?P<string>"(?:[^"\\]|\\[\s\S])*")|(?P<paren>[()])|(?P<symbol>[^ \t\r\n()' + skipped
+                      + r'][^ \t\r\n()]*)')
+
+
+#: the widest reading of `blanks//0` (every character that might be one is one) and the narrowest (only those
+#: that always are)
+_PETTA_TOKEN_RE = _petta_token_re(_PETTA_SURE_BLANKS + _PETTA_MAYBE_BLANKS)
+_PETTA_TOKEN_RE_NARROW = _petta_token_re(_PETTA_SURE_BLANKS)
+_PETTA_MAYBE_BLANK_RE = re.compile("[" + _PETTA_MAYBE_BLANKS + "]")
+_PETTA_ODD_SPACE_RE = re.compile("[" + _PETTA_SURE_BLANKS + _PETTA_MAYBE_BLANKS + "]")
 
 
 def petta_strip_comments(text: str) -> str:
@@ -498,8 +586,42 @@ def petta_strip_comments(text: str) -> str:
 
 
 def petta_tokens(text: str) -> list[tuple[str, str]]:
-    """('string' | 'paren' | 'symbol', text) for each token PeTTa's reader sees in `text`, comments aside."""
+    """('string' | 'paren' | 'symbol', text) for each token PeTTa's reader sees in `text`, comments aside.
+
+    One reading: the widest one of `blanks//0` (see `_PETTA_MAYBE_BLANKS`). A name check must not rest on it
+    alone; `petta_symbols` and everything built on it read the text every way the engine might."""
     return [(m.lastgroup, m.group()) for m in _PETTA_TOKEN_RE.finditer(petta_strip_comments(text))]
+
+
+def _petta_token_readings(text: str) -> list[list[tuple[str, str]]]:
+    """The token sequences of `text` under every reading of the whitespace PeTTa's reader might skip, each with
+    a symbol that holds odd whitespace also split at it (`a<vertical tab>add-atom` is one atom for the reader;
+    the scan reports `add-atom` too, the safe way round). A text with no such character has one reading."""
+    stripped = petta_strip_comments(text)
+    if not _PETTA_ODD_SPACE_RE.search(stripped):
+        return [[(m.lastgroup, m.group()) for m in _PETTA_TOKEN_RE.finditer(stripped)]]
+    patterns = [_PETTA_TOKEN_RE]
+    if _PETTA_MAYBE_BLANK_RE.search(stripped):
+        patterns.append(_PETTA_TOKEN_RE_NARROW)
+    readings = []
+    for pattern in patterns:
+        tokens: list[tuple[str, str]] = []
+        for m in pattern.finditer(stripped):
+            if m.lastgroup == "symbol" and _PETTA_ODD_SPACE_RE.search(m.group()):
+                tokens.extend(("symbol", piece) for piece in m.group().split())
+            else:
+                tokens.append((m.lastgroup, m.group()))
+        readings.append(tokens)
+    return readings
+
+
+def petta_symbols(text: str) -> frozenset[str]:
+    """Every symbol PeTTa's reader could see in `text` (comments and strings aside) under any reading of the
+    whitespace its `blanks//0` skips; a symbol that holds odd whitespace stands for the pieces it splits into. A
+    name the reader finds is never missing from this set; it can hold a few names the reader does not see (a
+    piece of such a symbol, or text with an odd space character before a quote, where whether the quote opens a
+    string depends on the SWI-Prolog build), which is the safe direction for a refusal."""
+    return frozenset(tok for tokens in _petta_token_readings(text) for kind, tok in tokens if kind == "symbol")
 
 
 def petta_refused_forms(text: str) -> list[str]:
@@ -515,18 +637,19 @@ def petta_refused_forms(text: str) -> list[str]:
     and the engine (`_install_petta_sandbox`) refuses what the program does, whatever it is spelled like.
     """
     found: set[str] = set()
-    depth = 0
-    previous = ""
-    for kind, tok in petta_tokens(text):
-        if kind == "string":
-            continue
-        if kind == "paren":
-            depth = depth + 1 if tok == "(" else max(0, depth - 1)
-        elif tok in _REFUSED_ANYWHERE:
-            found.add(tok)
-        elif tok == "=" and previous == "(" and depth == 1:
-            found.add("=")
-        previous = tok
+    for tokens in _petta_token_readings(text):
+        depth = 0
+        previous = ""
+        for kind, tok in tokens:
+            if kind == "string":
+                continue
+            if kind == "paren":
+                depth = depth + 1 if tok == "(" else max(0, depth - 1)
+            elif tok in _REFUSED_ANYWHERE:
+                found.add(tok)
+            elif tok == "=" and previous == "(" and depth == 1:
+                found.add("=")
+            previous = tok
     return sorted(found)
 
 
@@ -539,7 +662,7 @@ def petta_refused_forms_in_kb(text: str) -> list[str]:
     A caller-supplied `=` REDEFINITION is `core.metta_validator.validate`'s job: it checks the caller's own
     query/`extra_atoms` text specifically, before it is concatenated into a `kb_text` that also holds the
     trusted ontology files, where `petta_refused_forms`'s top-level check still applies."""
-    return sorted({tok for kind, tok in petta_tokens(text) if kind == "symbol" and tok in _REFUSED_ANYWHERE})
+    return sorted(petta_symbols(text) & _REFUSED_ANYWHERE)
 
 
 def _refuse_if_forbidden(text: str, where: str, *, scan: Callable[[str], list[str]] = petta_refused_forms) -> None:
@@ -850,6 +973,7 @@ class _Child:
     def __init__(self, pid: int, conn: Connection, scratch: Optional[str] = None) -> None:
         self.pid = pid
         self.conn = conn
+        self.memory_limit_mb = 0                # what the runtime asked of it, for the message when it is stopped
         self.scratch = scratch                  # the child's working directory, removed once it is reaped
         self.status: Optional[int] = None      # waitpid status once reaped; -1 when it was reaped elsewhere
 
@@ -926,6 +1050,11 @@ class _Child:
         hint = ""
         if self.status is not None and self.status >= 0 and os.WIFEXITED(self.status) and os.WEXITSTATUS(self.status) == 1:
             hint = " (PeTTa's `test` and `assert` end the process with code 1)"
+        if self.status is not None and self.status >= 0 and os.WIFEXITED(self.status) \
+                and os.WEXITSTATUS(self.status) == _EXIT_MEMORY:
+            limit = f"{self.memory_limit_mb} MB" if self.memory_limit_mb else "its memory limit"
+            return MettaRuntimeError(f"the PeTTa process used more than {limit} of memory and was stopped",
+                                     kind="memory", detail=how)
         return MettaRuntimeError(f"the PeTTa process ended with {how} before it answered{hint}", kind="crash")
 
 
@@ -1016,11 +1145,76 @@ def _neutralise_inherited_descriptors(devnull: int, keep: tuple[int, ...]) -> No
                 pass
 
 
-def _limit_child_resources() -> None:
+def _address_space_bytes() -> Optional[int]:
+    """This process's virtual size, from /proc (Linux); None where there is no such file."""
+    try:
+        with open("/proc/self/statm", "rb") as handle:
+            return int(handle.read().split()[0]) * os.sysconf("SC_PAGE_SIZE")
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def _limit_address_space(memory_limit_mb: int) -> None:
+    """Linux: have the KERNEL refuse an allocation that takes the child past its address space now + the memory
+    limit + `_ADDRESS_SPACE_SLACK_MB`. This is the wall; `_start_memory_watchdog` is the sampler in front of it.
+    A no-op elsewhere: macOS answers a finite RLIMIT_AS with EINVAL."""
+    if memory_limit_mb <= 0 or not sys.platform.startswith("linux"):
+        return
+    try:
+        import resource
+        res = getattr(resource, "RLIMIT_AS", None)
+        used = _address_space_bytes()
+        if res is None or used is None:
+            return
+        wanted = used + (memory_limit_mb + _ADDRESS_SPACE_SLACK_MB) * 1024 * 1024
+        current, hard = resource.getrlimit(res)
+        if current != resource.RLIM_INFINITY:
+            wanted = min(wanted, current)
+        if hard != resource.RLIM_INFINITY:
+            wanted = min(wanted, hard)
+        resource.setrlimit(res, (wanted, hard))
+    except (OSError, ValueError, ImportError):  # pragma: no cover - a kernel that refuses; the watchdog remains
+        pass
+
+
+def _peak_rss_bytes() -> Optional[int]:
+    """This process's peak resident set in bytes (`ru_maxrss` is bytes on macOS and kilobytes elsewhere)."""
+    try:
+        import resource
+        value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return int(value if sys.platform == "darwin" else value * 1024)
+    except Exception:                           # pragma: no cover
+        return None
+
+
+def _start_memory_watchdog(memory_limit_mb: int) -> None:
+    """Child only. A thread that ends the process with `_EXIT_MEMORY` once its peak resident set is more than
+    `memory_limit_mb` above what it was now. `_exit` ends the process at once, whatever the main thread is
+    doing, which is the point: a janus call cannot be interrupted politely, and janus lets go of the GIL while
+    Prolog runs, so this thread keeps running while a program grows."""
+    if memory_limit_mb <= 0:
+        return
+    baseline = _peak_rss_bytes()
+    if baseline is None:                        # pragma: no cover - a platform without getrusage
+        return
+    ceiling = baseline + memory_limit_mb * 1024 * 1024
+
+    def watch() -> None:
+        while True:
+            time.sleep(_MEMORY_POLL_S)
+            peak = _peak_rss_bytes()
+            if peak is not None and peak > ceiling:
+                os._exit(_EXIT_MEMORY)
+
+    threading.Thread(target=watch, name="petta-memory-watchdog", daemon=True).start()
+
+
+def _limit_child_resources(memory_limit_mb: int = DEFAULT_MEMORY_LIMIT_MB) -> None:
     try:
         import resource
     except ImportError:                         # pragma: no cover
         return
+    _limit_address_space(memory_limit_mb)
     for name, soft in _CHILD_LIMITS:
         res = getattr(resource, name, None)
         if res is None:                         # pragma: no cover
@@ -1039,9 +1233,15 @@ def _limit_child_resources() -> None:
         pass
 
 
-def _child_prepare(deadline_s: Optional[float], *, parent_pid: Optional[int], keep_fds: tuple[int, ...] = ()) -> None:
+def _child_prepare(deadline_s: Optional[float], *, parent_pid: Optional[int], keep_fds: tuple[int, ...] = (),
+                   memory_limit_mb: int = DEFAULT_MEMORY_LIMIT_MB) -> None:
     """First thing in a forked PeTTa child: cut it off from the parent's terminal, descriptors, environment and
-    working directory, and bound it."""
+    working directory, and bound it (CPU time, files, descriptors and memory: `memory_limit_mb`, 0 for none)."""
+    # The child shares the server's heap copy-on-write. Where a fork maps pages lazily (macOS: measured, a child's
+    # first full garbage collection added the whole 585 MB of a 400 MB server heap to its resident set) a
+    # collection that walks every inherited object would be counted as the PROGRAM's growth and stop an honest
+    # child. Frozen objects are never walked, and never copied by a collection either.
+    gc.freeze()
     devnull = os.open(os.devnull, os.O_RDWR)
     for fd in (0, 1, 2):
         os.dup2(devnull, fd)
@@ -1061,8 +1261,9 @@ def _child_prepare(deadline_s: Optional[float], *, parent_pid: Optional[int], ke
             os.chdir(_CHILD_SCRATCH)
         except OSError:                         # pragma: no cover
             pass
-    _limit_child_resources()
+    _limit_child_resources(memory_limit_mb)
     _set_cpu_backstop(deadline_s)
+    _start_memory_watchdog(memory_limit_mb)
     if parent_pid is not None and sys.platform.startswith("linux"):
         try:
             import ctypes
@@ -1090,12 +1291,8 @@ def _set_cpu_backstop(deadline_s: Optional[float]) -> None:
 
 
 def _peak_rss_mb() -> Optional[float]:
-    try:
-        import resource
-        value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-        return round(value / 1e6 if sys.platform == "darwin" else value / 1024.0, 1)
-    except Exception:                           # pragma: no cover
-        return None
+    peak = _peak_rss_bytes()
+    return None if peak is None else round(peak / 1e6, 1)
 
 
 def _clip(text: str, limit: int = _MAX_DETAIL_CHARS) -> str:
@@ -1237,10 +1434,11 @@ def _error_message(stage: str, exc: BaseException, index: Optional[int] = None) 
 
 def _program_child(conn: Connection, factory: EngineFactory, petta_home: str, stack_limit_mb: int,
                    kb_text: str, expressions: list[str], deadline_s: Optional[float],
-                   parent_pid: int, after_load: Optional[Callable[[Any], Optional[dict]]] = None) -> None:
+                   parent_pid: int, after_load: Optional[Callable[[Any], Optional[dict]]] = None,
+                   memory_limit_mb: int = DEFAULT_MEMORY_LIMIT_MB) -> None:
     """The forked child of `PettaRuntime.run_program`: one load, one call per expression, one message."""
     try:
-        _child_prepare(deadline_s, parent_pid=parent_pid, keep_fds=(conn.fileno(),))
+        _child_prepare(deadline_s, parent_pid=parent_pid, keep_fds=(conn.fileno(),), memory_limit_mb=memory_limit_mb)
     except BaseException as exc:                # noqa: BLE001
         _send(conn, _error_message("start", exc))
         return
@@ -1322,10 +1520,11 @@ def _run_text(engine: Any, text: str, tiers: Mapping[str, str]) -> tuple[list[li
 
 
 def _session_child(conn: Connection, factory: EngineFactory, petta_home: str, stack_limit_mb: int,
-                   kb_text: str, tiers: dict[str, str], deadline_s: Optional[float]) -> None:
+                   kb_text: str, tiers: dict[str, str], deadline_s: Optional[float],
+                   memory_limit_mb: int = DEFAULT_MEMORY_LIMIT_MB) -> None:
     """The forked child of a PettaSession: load once, then answer requests until told to stop or orphaned."""
     try:
-        _child_prepare(deadline_s, parent_pid=None, keep_fds=(conn.fileno(),))
+        _child_prepare(deadline_s, parent_pid=None, keep_fds=(conn.fileno(),), memory_limit_mb=memory_limit_mb)
         engine = factory(petta_home, stack_limit_mb)
     except BaseException as exc:                # noqa: BLE001
         _send(conn, _error_message("start", exc))
@@ -1444,7 +1643,8 @@ class PettaSession:
         self._tiers = read_tier_table(kb_text)
         budget = runtime._budget(deadline_s)
         self._child = runtime._fork(_session_child, runtime._engine_factory, str(runtime.petta_home),
-                                    runtime.stack_limit_mb, reduction.text, self._tiers, budget)
+                                    runtime.stack_limit_mb, reduction.text, self._tiers, budget,
+                                    runtime.memory_limit_mb)
         try:
             message = self._child.wait_message(None if budget is None else time.monotonic() + budget)
             if message is None:
@@ -1527,10 +1727,12 @@ class PettaRuntime:
     enforces_deadline = True
 
     def __init__(self, petta_home: Optional[os.PathLike | str] = None, stack_limit_mb: Optional[int] = None,
-                 engine_factory: Optional[EngineFactory] = None) -> None:
+                 engine_factory: Optional[EngineFactory] = None, memory_limit_mb: Optional[int] = None) -> None:
         import config
         self.petta_home = Path(petta_home if petta_home is not None else config.PETTA_HOME)
         self.stack_limit_mb = int(stack_limit_mb if stack_limit_mb is not None else config.PETTA_STACK_LIMIT_MB)
+        #: how far a child's resident set may grow, in MB (0: no limit); `PETTA_MEMORY_LIMIT_MB` unless given
+        self.memory_limit_mb = resolve_memory_limit_mb(memory_limit_mb)
         #: how the child builds its engine; tests inject a double (the child is forked, so a closure is fine)
         self._engine_factory: EngineFactory = engine_factory or _PettaEngine
         self.reduced_calls = 0
@@ -1553,10 +1755,12 @@ class PettaRuntime:
 
     def _fork(self, target: Callable[..., None], *args: Any) -> _Child:
         try:
-            return _fork_child(target, *args)
+            child = _fork_child(target, *args)
         except OSError as exc:
             raise MettaRuntimeError(f"could not start a PeTTa process: {exc}", kind="unavailable",
                                     detail=str(exc)) from exc
+        child.memory_limit_mb = self.memory_limit_mb
+        return child
 
     def _error_from(self, message: dict) -> MettaRuntimeError:
         stage, text = message.get("stage"), message.get("message", "")
@@ -1607,7 +1811,7 @@ class PettaRuntime:
         started = time.monotonic()
         deadline = None if budget is None else started + budget
         child = self._fork(_program_child, self._engine_factory, str(self.petta_home), self.stack_limit_mb,
-                           reduction.text, exprs, budget, os.getpid(), after_load)
+                           reduction.text, exprs, budget, os.getpid(), after_load, self.memory_limit_mb)
         self.last_pid = child.pid
         forked = time.monotonic()
         try:
@@ -1706,6 +1910,6 @@ def get_runtime(name: Optional[str] = None) -> Runtime:
 
 
 def reset_runtime_cache() -> None:
-    """Forget the cached instances (tests that change PETTA_HOME or the stack limit)."""
+    """Forget the cached instances (tests that change PETTA_HOME, the stack limit or the memory limit)."""
     with _RUNTIMES_LOCK:
         _RUNTIMES.clear()

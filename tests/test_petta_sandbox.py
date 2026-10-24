@@ -31,18 +31,19 @@ from unittest.mock import Mock
 import pytest
 
 from test_metta_runtime import (  # noqa: E402  (also puts pln_chat on sys.path)
-    REPO, PLN_CHAT, ScriptedEngine, real_petta, requires_petta,
+    REPO, PLN_CHAT, ScriptedEngine, process_is_reaped, real_petta, requires_petta, wait_until,
 )
 
 import config  # noqa: E402
 import core.metta_runtime as mr  # noqa: E402
 from core.metta_runtime import (  # noqa: E402
     MettaRuntimeError, PETTA_ALLOWED_FUN_NAMES, PETTA_ENGINE_INTERNAL_FUN_NAMES, PETTA_KNOWN_FUN_NAMES,
-    PettaRuntime, petta_refused_forms, petta_refused_forms_in_kb, petta_tokens, reset_runtime_cache,
+    PettaRuntime, petta_refused_forms, petta_refused_forms_in_kb, petta_symbols, petta_tokens, reset_runtime_cache,
     split_top_level_forms,
 )
 
 PETTA_HOME = Path(config.PETTA_HOME)
+PETTA_REFUSED_FORMS_WITHOUT_EQUALS = tuple(name for name in mr.PETTA_REFUSED_FORMS if name != "=")
 
 
 # ═══════════════════════ the text scan reads what PeTTa's reader reads ════════════════════════
@@ -64,6 +65,24 @@ PETTA_HOME = Path(config.PETTA_HOME)
     # an escaped quote does not end the string
     ('(Note "a \\" add-atom")', []),
     ("(a b) ; add-atom in a comment\n(c d)", []),
+    # --- the final review's two misses (4 of ~100k fuzzed texts), and the shapes behind them.
+    # PeTTa's token ends only at a space, tab, newline, carriage return or parenthesis: U+2029 inside a token is
+    # an ordinary character, so the quote after it is MID-token and `add-atom` is an atom of its own.
+    ('(f b"\u2029" add-atom "x")', ["add-atom"]),
+    ('(f b"\u2003" translatePredicate "x")', ["translatePredicate"]),
+    # a quote after a character that is a blank on some SWI-Prolog builds and not on others (U+001D is not one on
+    # macOS) starts a string only on the builds where it is: the scan reads both ways and refuses either
+    ('(\x1d" py-atom ")', ["py-atom"]),
+    ('(\u2003"a add-atom ")', ["add-atom"]),
+    # ... but a quote after a space every build skips (the vertical tab, the form feed) does start a string
+    ('(\x0b"add-atom")', []),
+    ('(\x0c"add-atom")', []),
+    # an odd space before a name is skipped, inside a token it is not (and the scan splits there too: safe way round)
+    ('(\x0badd-atom)', ["add-atom"]),
+    ('(a\x0badd-atom)', ["add-atom"]),
+    ('(\u3000add-atom)', ["add-atom"]),
+    # the quote is mid-token after a token character, whatever follows it
+    ('(a\u2003"x add-atom")', []),
 ])
 def test_the_scan_reads_symbols_the_way_petta_reads_them(text, expected):
     assert petta_refused_forms(text) == expected
@@ -166,7 +185,7 @@ def test_the_scan_finds_exactly_the_symbols_the_engines_reader_finds():
         if found is None:
             continue
         parsed += 1
-        scan = {tok for kind, tok in petta_tokens(text) if kind == "symbol"}
+        scan = petta_symbols(text)
         exotic_whitespace = any(ch.isspace() and ch not in " \t\r\n" for ch in text)
         for name in probes:
             if name in found:
@@ -175,6 +194,132 @@ def test_the_scan_finds_exactly_the_symbols_the_engines_reader_finds():
                 assert name not in scan, (name, text, found, sorted(scan))
         holding += any(name in found for name in probes)
     assert parsed > 400 and holding > 100, (parsed, holding)           # the corpus is not vacuous
+
+
+def test_a_character_that_is_not_a_token_end_does_not_end_the_token():
+    """`parser.pl`'s `token//1` is `string_without(" \\t\\r\\n()")`: the one thing Unicode whitespace does not do."""
+    assert petta_tokens('(f b"\u2029" c)') == [
+        ("paren", "("), ("symbol", "f"), ("symbol", 'b"\u2029"'), ("symbol", "c"), ("paren", ")")]
+    assert petta_symbols('(f b"\u2029" c)') == {"f", 'b"', '"', "c"}              # ... and the scan splits at it: safe way round
+
+
+def test_the_whitespace_lists_cover_exactly_what_python_calls_whitespace():
+    """The scan splits an odd symbol with `str.split()`, so every character Python calls whitespace has to be in
+    one of the lists (or be one of the four a token ends at), and no other."""
+    odd = {c for c in map(chr, range(0x110000)) if mr._PETTA_ODD_SPACE_RE.match(c)}
+    assert odd | set(" \t\r\n") == {c for c in map(chr, range(0x110000)) if c.isspace()}
+    assert set(mr._PETTA_SURE_BLANKS) <= odd and not set(" \t\r\n") & odd
+
+
+def test_the_symbols_are_a_superset_of_the_one_reading_and_equal_when_the_text_has_no_odd_space():
+    plain = '(f "a b" c"d e) (= (g $x) (h $x))'
+    assert petta_symbols(plain) == {tok for kind, tok in petta_tokens(plain) if kind == "symbol"}
+    odd = '(f \x1d"q add-atom ")'
+    assert {tok for kind, tok in petta_tokens(odd) if kind == "symbol"} <= petta_symbols(odd)
+    assert "add-atom" in petta_symbols(odd) and "add-atom" not in {t for k, t in petta_tokens(odd) if k == "symbol"}
+
+
+def test_the_equals_rule_still_reads_a_top_level_definition_only():
+    assert petta_refused_forms("(= (f $x) 1)") == ["="]
+    assert petta_refused_forms("(match &self (= (f $x) $v) $v)") == []
+    assert petta_refused_forms("(\x0b= (f $x) 1)") == ["="]                  # the odd space is skipped
+    assert petta_refused_forms("(a\x0b= (f $x) 1)") == []                    # inside a token it is not a definition
+
+
+def test_a_text_without_any_odd_space_is_scanned_once():
+    """The common case pays nothing for the extra readings (every real knowledge base is plain ASCII spaces)."""
+    plain = open(REPO / "linage2_core.metta", encoding="utf-8").read()
+    assert len(mr._petta_token_readings(plain)) == 1
+    assert len(mr._petta_token_readings(plain + "\x1d")) == 2
+
+
+def test_no_knowledge_base_file_of_the_repository_is_refused_by_the_scan():
+    """Over-refusing is the safe direction only for text nobody trusts: the repository's own files must scan clean
+    (their `=` definitions are not refused in a KB, and none holds a refused name outside a string)."""
+    for path in sorted(REPO.glob("*.metta")) + sorted((PLN_CHAT / "ontology").glob("**/*.metta")):
+        text = path.read_text(encoding="utf-8")
+        assert petta_refused_forms_in_kb(text) == [], path.name
+
+
+def _exotic_corpus() -> list[str]:
+    """Shapes that make a scanner and PeTTa's reader disagree about whether a quote opens a string, built from
+    every character that is whitespace to Python and a name the scan refuses. The first four are the texts the
+    final review's fuzzer found (out of ~100k)."""
+    found_by_the_review = [
+        '(|.,(\x1d" py-atom)\n!("a b"maplist+;;repratranslateP"redicate)achange-state!remove-atom)\n!(!\\;p;\ny-dotgit-import!)',
+        '(\u200b{@git-import!map;\nlist["a b"\u2029"proces\u2003s_metta_string1a() (0foldl)  ()(callPredicate)library-import!]re"move-translator-rule!);c\n',
+    ]
+    odd = [c for c in map(chr, range(0x110000)) if mr._PETTA_ODD_SPACE_RE.match(c)] + ["\u200b", "\ufeff", "\x00"]
+    names = ["add-atom", "py-atom", "callPredicate", "translatePredicate", "shell"]
+    shapes = ['(f b"{c}" {n} "x")', '({c}"q {n} ")', '(a{c}"q" {n} "z")', "({c}{n})", '(x {c}"{n}")', '("{c}" {n})',
+              '(f {c}"a" {n} "b")', '(f "a"{c}{n})', '(f b"{c}c" {n} "d e")']
+    return found_by_the_review + [shape.format(c=c, n=n) for c in odd for n in names for shape in shapes]
+
+
+# the scan as it was before the final review's fix: a token ended at ANY Unicode whitespace
+_NAIVE_TOKEN_RE = re.compile(r'(?P<string>"(?:[^"\\]|\\[\s\S])*")|(?P<paren>[()])|(?P<symbol>[^\s()]+)')
+
+
+def test_the_two_texts_the_reviews_fuzzer_found_are_refused_now():
+    """Seed 11 of `fuzz_reader.py` (80 000 texts compared with PeTTa's own reader) found these two: the reader sees
+    `py-atom` and `callPredicate` as atoms, the earlier scan saw them inside a string."""
+    first, second = _exotic_corpus()[:2]
+    for text, name in ((first, "py-atom"), (second, "callPredicate")):
+        naive = {m.group() for m in _NAIVE_TOKEN_RE.finditer(mr.petta_strip_comments(text)) if m.lastgroup == "symbol"}
+        assert name not in naive                                         # what the earlier scan did
+        assert name in petta_refused_forms(text) and name in petta_refused_forms_in_kb(text)
+
+
+@real_petta
+def test_the_scan_misses_no_name_the_engines_reader_finds_around_odd_whitespace():
+    """Every refused name the engine's own reader finds as an atom of one of these texts is a symbol of the scan,
+    for the kb scan and for the expression scan. The earlier scan (`_NAIVE_TOKEN_RE`: a token ended at any Unicode
+    whitespace, so a quote after one opened a string) hid a name from itself in a few hundred of them, including the
+    two texts of the final review: the reader read the quote as part of a token and the name as an atom."""
+    texts = _exotic_corpus()
+    atoms, _ = _engines_reading(texts)
+    refused = set(PETTA_REFUSED_FORMS_WITHOUT_EQUALS)
+    parsed = seen = missed_before = 0
+    for text, found in zip(texts, atoms):
+        if found is None:
+            continue
+        parsed += 1
+        naive = {m.group() for m in _NAIVE_TOKEN_RE.finditer(mr.petta_strip_comments(text)) if m.lastgroup == "symbol"}
+        for name in refused & set(found):
+            seen += 1
+            missed_before += name not in naive
+            assert name in petta_symbols(text), (name, text)
+            assert name in petta_refused_forms_in_kb(text) and name in petta_refused_forms(text), (name, text)
+    assert parsed > 1000 and seen > 700, (parsed, seen)
+    assert missed_before > 20, missed_before                 # the corpus holds the shapes that mattered, not only easy ones
+
+
+@real_petta
+def test_the_blank_lists_describe_the_engine_this_suite_runs_on():
+    """`blanks//0` is SWI-Prolog's `code_type(C, space)`, and which characters that holds depends on the build.
+    The scan's two readings assume it holds every character of `_PETTA_SURE_BLANKS` and nothing outside the lists
+    plus the four a token ends at. If a SWI-Prolog ever breaks that, this is the test that says so."""
+    child = mr._fork_child(_space_child, str(PETTA_HOME))
+    try:
+        message = child.wait_message(time.monotonic() + 120)
+    finally:
+        child.close()
+    assert message and message.get("kind") == "result", message
+    swi = {chr(code) for code in message["space"]}
+    odd = {c for c in map(chr, range(0x110000)) if mr._PETTA_ODD_SPACE_RE.match(c)}
+    assert set(mr._PETTA_SURE_BLANKS) | set(" \t\r\n") <= swi, sorted(hex(ord(c)) for c in swi)
+    assert swi <= odd | set(" \t\r\n"), sorted(hex(ord(c)) for c in swi - odd)
+
+
+def _space_child(conn, home: str) -> None:
+    mr._child_prepare(None, parent_pid=None, keep_fds=(conn.fileno(),))
+    sys.path.insert(0, f"{home}/python")
+    import janus_swi as janus
+    from petta import PeTTa
+    PeTTa(verbose=False, petta_path=home)
+    janus.consult("space_probe", data="petta_space_chars(L) :- findall(C, (between(0, 1114111, C), code_type(C, space)), L).")
+    conn.send_bytes(json.dumps({"kind": "result", "space": list(janus.query_once("petta_space_chars(L)")["L"])}).encode("utf-8"))
+
 
 
 @real_petta
@@ -940,6 +1085,95 @@ def test_query_answers_a_refused_program_with_422_and_the_stage_it_died_in(monke
     assert "add-atom" in detail["message"]
 
 
+# ═══════════════════ memory: a legal program must not take the host ═══════════════════
+#
+# The final review: a ~900-byte program of `let*`/`atom_concat` doubles a string 22 times. Every builtin it uses is
+# allowed, nothing in it is a refused form, and it took 1 GB in half a second under a 64 MB Prolog stack limit (a
+# string is on the heap, outside the stacks). A child had no memory limit of its own. `PETTA_MEMORY_LIMIT_MB` is
+# it; the double-based tests of the mechanism are in `tests/test_metta_runtime.py`.
+
+def _doubling_program(doublings: int) -> str:
+    seed = "0123456789" * 6
+    steps = " ".join(f"($s{i} (atom_concat $s{i - 1} $s{i - 1}))" for i in range(1, doublings + 1))
+    return f'!(let $s0 "{seed}" (let* ({steps}) (size-atom (cons-atom $s{doublings} ()))))'
+
+
+@real_petta
+def test_the_program_is_legal_and_grows_far_past_the_stack_limit_when_nothing_stops_it():
+    """The control: without a memory limit the review's program runs to the end, under a 64 MB stack limit and
+    the 128 MB the next test stops it at. (If this ever stops growing, the next test proves nothing.)"""
+    program = _doubling_program(20)
+    assert petta_refused_forms(program) == [] and petta_refused_forms_in_kb(program) == []
+    rt = PettaRuntime(stack_limit_mb=64, memory_limit_mb=0)
+    assert rt.run_program("", [program], deadline_s=60) == [["1"]]
+    assert rt.last_run["peak_rss_mb"] > 200, rt.last_run
+
+
+@real_petta
+def test_the_review_reproduction_is_stopped_by_the_memory_limit_the_environment_names(monkeypatch):
+    """Through the environment variable, the way a deployment sets it: the runtime a request builds reads it."""
+    monkeypatch.setenv("PETTA_MEMORY_LIMIT_MB", "128")
+    rt = PettaRuntime(stack_limit_mb=64)
+    assert rt.memory_limit_mb == 128
+    started = time.monotonic()
+    with pytest.raises(MettaRuntimeError) as err:
+        rt.run_program("", [_doubling_program(20)], deadline_s=60)
+    assert err.value.kind == "memory" and "128 MB" in str(err.value), str(err.value)
+    assert time.monotonic() - started < 20
+    assert wait_until(lambda: process_is_reaped(rt.last_pid), 5)
+    assert rt.run_program("(Foo a)", ["!(match &self (Foo $x) $x)"]) == [["a"]]        # the next program is unaffected
+
+
+@real_petta
+def test_the_default_limit_stops_the_programs_original_size(monkeypatch):
+    """The review's own 22 doublings (987 MiB) end under the default."""
+    monkeypatch.delenv("PETTA_MEMORY_LIMIT_MB", raising=False)
+    rt = PettaRuntime(stack_limit_mb=64)
+    assert rt.memory_limit_mb == mr.DEFAULT_MEMORY_LIMIT_MB
+    with pytest.raises(MettaRuntimeError) as err:
+        rt.run_program("", [_doubling_program(22)], deadline_s=60)
+    assert err.value.kind == "memory"
+
+
+@real_petta
+def test_the_memory_limit_holds_for_a_session_and_for_a_program_in_the_knowledge_base(monkeypatch):
+    """A `!` form in `kb_text`/`extra_atoms` runs during the load, in the same child."""
+    monkeypatch.setenv("PETTA_MEMORY_LIMIT_MB", "128")
+    with pytest.raises(MettaRuntimeError) as err:
+        PettaRuntime().run_program(_doubling_program(20), ["!(+ 1 2)"], deadline_s=60)
+    assert err.value.kind == "memory"
+    with PettaRuntime().session("(Fact a)") as session:
+        with pytest.raises(MettaRuntimeError) as err:
+            session.run(_doubling_program(20))
+        assert err.value.kind == "memory"
+
+
+@real_petta
+def test_real_workloads_fit_in_far_less_than_the_default_limit():
+    """The default is not tight: the whole repository's knowledge base (33 files) in one child, with a query that
+    uses it, stays under a quarter of it."""
+    kb = "\n".join(path.read_text(encoding="utf-8") for path in sorted(REPO.glob("*.metta")))
+    rt = PettaRuntime()
+    assert rt.run_program(kb, ["!(+ 1 2)"], deadline_s=120) == [["3"]]
+    assert rt.last_run["peak_rss_mb"] < mr.DEFAULT_MEMORY_LIMIT_MB / 2, rt.last_run
+
+
+@real_petta
+def test_the_review_reproduction_over_http_is_a_502_and_the_server_goes_on(monkeypatch, tmp_path):
+    """`/metta/run` takes up to 200 000 bytes of query; the program is 900. The symbol it needs is declared in
+    `extra_atoms`, the documented way to introduce one, so the validator lets it through. The caller gets the
+    service's `runtime_error` (a resource limit is not the caller's syntax error) and the next request is served."""
+    monkeypatch.setenv("PETTA_MEMORY_LIMIT_MB", "128")
+    body = {"metta_query": _doubling_program(20), "extra_atoms": "(: atom_concat (-> String String String))"}
+    response = _post_metta_run(monkeypatch, tmp_path, body)
+    assert response.status_code == 502, response.text
+    detail = _detail(response)
+    assert detail.get("code") == "runtime_error" and "memory" in detail.get("message", ""), response.text
+    assert str(REPO) not in response.text
+    follow_up = _post_metta_run(monkeypatch, tmp_path, {"metta_query": "!(+ 1 2)"})
+    assert follow_up.status_code == 200 and follow_up.json()["pln_results"][0]["atom"] == "3"
+
+
 # ═══════════════════════ the validator and the documentation ═══════════════════════
 
 def test_under_hyperon_a_head_ending_in_a_bang_reads_as_it_always_did():
@@ -962,6 +1196,15 @@ def test_the_validator_names_a_builtin_head_that_extra_atoms_declared():
     inventory = RuntimeInventory(functions={"maplist": 2, "getenv": 1})
     result = validate('(maplist getenv ("X"))', OntologyRegistry(), inventory, runtime="petta")
     assert not result.valid and any("maplist" in issue for issue in result.issues)
+
+
+def test_the_api_doc_says_what_the_memory_limit_is_and_is_not():
+    text = " ".join((PLN_CHAT / "API.md").read_text(encoding="utf-8").split())
+    assert "`PETTA_MEMORY_LIMIT_MB`" in text and f"| {mr.DEFAULT_MEMORY_LIMIT_MB} |" in text.replace("`", "")
+    row = next(line for line in (PLN_CHAT / "API.md").read_text(encoding="utf-8").splitlines()
+               if line.startswith("| `PETTA_STACK_LIMIT_MB`"))
+    assert "not a memory limit" in row.lower() or "does not bound" in row.lower()
+    assert "cgroup" in text and "RLIMIT_AS" in text and "macOS" in text
 
 
 def test_the_api_doc_states_the_counts_the_module_computes():

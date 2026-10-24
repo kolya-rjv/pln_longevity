@@ -223,7 +223,8 @@ under `pln_execution`.
 | `PLN_MAX_INFLIGHT_QUERIES`       | 0       | admission limit; 0 derives 4x `PLN_WORKER_POOL_SIZE`  |
 | `PLN_RUNTIME`                    | hyperon | the MeTTa engine: `hyperon` \| `petta` \| `auto` (hyperon when importable, else petta) |
 | `PETTA_HOME`                     | `<repo>/.petta/PeTTa` | the PeTTa checkout (`src/main.pl`, `python/`); only read for `petta` |
-| `PETTA_STACK_LIMIT_MB`           | 2048    | SWI-Prolog stack limit of a PeTTa process; a runaway recursion dies of it |
+| `PETTA_STACK_LIMIT_MB`           | 2048    | SWI-Prolog's stack limit in a PeTTa process; a runaway recursion dies of it. **It does not bound memory** (a string or an atom is on the heap, outside the stacks): that is `PETTA_MEMORY_LIMIT_MB` |
+| `PETTA_MEMORY_LIMIT_MB`          | 512     | how far a PeTTa process's memory may grow while it runs one program (MB); past it the process is ended and the request is a `502 runtime_error`. Raised to 128 when smaller; `0` turns it off; an unreadable value is ignored with a warning and the default applies. See "What the memory limit is, and is not" |
 | `PLN_PETTA_CHILD_ENV_KEEP`       | (none)  | extra environment variable names a PeTTa child keeps (comma-separated); it keeps `PATH`, `LANG`, `LC_*` and the library-path and `SWI_HOME_DIR` names and drops the rest, API keys included |
 | `PLN_MAX_RANK_COMPOUNDS`         | 60      | cap on a ranking's compound pool, at every entrance    |
 | `PLN_MAX_METTA_SORT_COMPOUNDS`   | 10      | the much smaller cap for `strategy="metta_sort"`       |
@@ -323,7 +324,7 @@ never noticed. Every failure now carries its own status and a structured
 | `connection`              | 502    | could not reach upstream                           |
 | `upstream_error`          | 502    | any other OpenAI-side failure                      |
 | `bad_json`                | 502    | the model answered with something unparseable      |
-| `runtime_error`           | 502    | the MeTTa runtime raised (hyperon: an exception; PeTTa: a failed load, an expression that raised, a process that died or — in inline mode, or a late `run_query_parts` part — was killed at its deadline) |
+| `runtime_error`           | 502    | the MeTTa runtime raised (hyperon: an exception; PeTTa: a failed load, an expression that raised, a process that died, one that used more than `PETTA_MEMORY_LIMIT_MB` of memory, or — in inline mode, or a late `run_query_parts` part — one killed at its deadline) |
 | `refused_form`            | 422    | PeTTa only: the program asked for something the PeTTa runtime does not run (a form outside its allowed set, a change to the space, a call by name); the program is at fault, a retry gives the same answer |
 | `pln_worker_crashed`      | 500    | the MeTTa WORKER process itself died (under hyperon, almost always a hyperon abort; under petta a PeTTa-internal crash is already `runtime_error` and never reaches this, so this means the worker process itself died) |
 | `missing_api_key` / `auth`| 503    | the service has no usable OpenAI credential        |
@@ -1138,7 +1139,8 @@ stack) to load the knowledge base, and a child peak RSS of 33-110 MB. A whole
 
 **Deadlines and crashes.** The child is killed with SIGKILL at the deadline
 (`PLN_QUERY_TIMEOUT_SECONDS`), also in inline mode (`PLN_WORKER_POOL_SIZE=0`),
-where hyperon cannot be stopped; it is capped by `PETTA_STACK_LIMIT_MB` and,
+where hyperon cannot be stopped; its Prolog stacks are capped by `PETTA_STACK_LIMIT_MB`,
+its memory by `PETTA_MEMORY_LIMIT_MB` (below), and,
 if the process that started it disappears (the executor SIGKILLs a worker at
 its own deadline, which leaves the worker's PeTTa child behind), by a CPU-time
 backstop ten CPU seconds past the deadline (and on Linux by
@@ -1227,22 +1229,71 @@ every such route and the one place each is closed).
    `TMPDIR` and PeTTa's own cache directory point into its private working
    directory), points every inherited descriptor except its own pipe at
    `/dev/null`, makes it work in an empty directory of its own (removed with
-   it), and sets no core file, at most 512 descriptors and a bounded file size.
+   it), and sets no core file, at most 512 descriptors and a bounded file size,
+   and a memory limit (next).
 3. **The text scan** (`PETTA_REFUSED_FORMS`, `petta_refused_forms`; the
    validator and the runtime both apply it) gives the literal spelling a fast
    422 with the form's name. It reads symbols the way PeTTa's own reader does
-   (a quote inside a token is an ordinary character, a comment takes its newline
-   with it), checked against that reader on a corpus. It is not a boundary and
-   nothing relies on it being one.
+   (a quote inside a token is an ordinary character, a token ends only at a
+   space, tab, newline, carriage return or parenthesis, a comment takes its
+   newline with it), checked against that reader on a corpus and by a
+   differential fuzz. The one thing it cannot know is which Unicode spaces the
+   reader skips between two elements (SWI-Prolog's `code_type(C, space)`, which
+   depends on the build): it reads the text both ways and refuses a name either
+   reading shows, so it can refuse a name hidden inside a string behind such a
+   character, and cannot miss one. It is not a boundary and nothing relies on it
+   being one.
 
 Under hyperon the validator is unchanged. **Not done:** an operating-system
 profile for the child (seccomp, `sandbox_init`) differs per platform and could
 not be tested on more than one; a deployment that wants a third line should run
-the API in a container with the platform's default seccomp profile.
+the API in a container with the platform's default seccomp profile, with a
+memory limit on the container (below).
+
 Any other host predicate is reachable only through one of the routes above, and
 `shell`/`halt` are the only ones guarded by name as well: PeTTa and janus call
 `open`, `getenv` and the like themselves on every load, so redefining them
 breaks the engine and protects nothing a program can name.
+
+**What the memory limit is, and is not.** A program the sandbox accepts in full
+can still be made to take the machine's memory: about 900 bytes of `let*` and
+`atom_concat` double a string 22 times, every builtin in it is allowed, and the
+child held 1 GB after half a second under a 64 MB `PETTA_STACK_LIMIT_MB` (a
+string is on the heap; the stack limit covers only Prolog's stacks). Each
+PeTTa child is therefore bounded in memory, by `PETTA_MEMORY_LIMIT_MB`
+(default 512: every PeTTa test in the suite, the PLN chainer lane included,
+passes with 128, and all 33 `.metta` files of the repository loaded together
+peak at about 116 MB. A deployment that loads much bigger ETL files raises it:
+a knowledge base costs about 0.2 MB per KB of text):
+
+- *A watchdog in the child, on every platform.* A thread samples the child's
+  peak resident set every 5 ms and ends the process, with an exit code the
+  parent reports as `kind="memory"` (`502 runtime_error`, "the PeTTa process
+  used more than N MB of memory and was stopped"), once it has grown by more
+  than the limit since the child was prepared. It needs no parent, so an
+  orphaned child has it too. It is a sample, not a wall: it ends a child about
+  5 ms and some tens of MB after the limit, and it cannot stop a single call
+  that allocates and touches more than the limit between two samples. None
+  of the allowed builtins tried does: `atom_concat`, the fastest allocator
+  found, at most doubles a string per call, and big integers and lists live on
+  the Prolog stacks, which `PETTA_STACK_LIMIT_MB` bounds.
+- *The kernel's wall, on Linux only.* `RLIMIT_AS` is set at the child's
+  address space when it was prepared plus the limit plus 1 GB (the libraries
+  a child maps later and the allocator reserve address space nobody uses), so
+  an allocation past that fails in the child. **This has not been run against
+  a Linux kernel**: the development machine is a Mac, where the kernel refuses
+  a finite `RLIMIT_AS` (EINVAL), and the calculation is checked against a
+  double. On macOS only the watchdog applies.
+- *Not covered, and not claimed.* The limit is per child. N concurrent
+  children (`PLN_WORKER_POOL_SIZE`, plus the inline mode's one) can use N times
+  it, and the hyperon runtime, which runs in the worker process itself, has no
+  limit but the executor's kill at the deadline. The memory of the whole
+  service has to be capped from outside: a cgroup (`MemoryMax=` under systemd,
+  `docker run --memory`, a Kubernetes memory limit) around the API and its
+  workers, so that the kernel kills one service before it takes the machine.
+  Anyone who exposes the API to callers the operator does not otherwise trust
+  should set that, and should treat `PETTA_MEMORY_LIMIT_MB` as what keeps one
+  request from being the whole of it.
 
 **How a refusal is reported.** `422`, code `refused_form`, with the refused
 head and the reason in `message` (no filesystem path, no Prolog internals):

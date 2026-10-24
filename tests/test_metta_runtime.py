@@ -21,6 +21,7 @@ No test calls a model.
 """
 from __future__ import annotations
 
+import gc
 import json
 import math
 import multiprocessing
@@ -270,6 +271,11 @@ class ScriptedEngine:
             return ["true", "false", "(f true)", '"true"', "trueish", "(x False)"]
         if verb == "many":
             return [f"(r {i})" for i in range(int(arg))]
+        if verb == "grow":                                  # take `arg` MB of the heap and touch every page of it
+            self.ballast = bytearray(int(arg) * 1024 * 1024)
+            for offset in range(0, len(self.ballast), 1024):
+                self.ballast[offset] = 1
+            return [str(len(self.ballast) >> 20)]
         raise AssertionError(f"the double does not know {text!r}")
 
 
@@ -1105,6 +1111,252 @@ def test_an_orphaned_child_stops_by_itself(fake, tmp_path, monkeypatch):
             os.kill(int(pidfile.read_text()), signal.SIGKILL)
         except (OSError, ValueError):
             pass
+
+
+# ═══════════════════ memory: a legal program must not take the host ═══════════
+#
+# The final security review: a ~900-byte program of `let*`/`atom_concat` doubles a string 22 times and takes 1 GB
+# in half a second with every builtin it uses allowed, under a 64 MB Prolog stack limit (a string is on the heap,
+# not on the stacks). The child had no memory limit of its own. The real-PeTTa version of this is in
+# `tests/test_petta_sandbox.py`; these tests use the double, whose `grow` verb takes real memory.
+
+def with_memory_limit(tmp_path, limit_mb, **options) -> PettaRuntime:
+    return PettaRuntime(petta_home=tmp_path, stack_limit_mb=64, memory_limit_mb=limit_mb,
+                        engine_factory=scripted(**options))
+
+
+def test_a_child_that_takes_too_much_memory_is_stopped_and_reported(tmp_path):
+    rt = with_memory_limit(tmp_path, 128)
+    started = time.monotonic()
+    with pytest.raises(MettaRuntimeError) as err:
+        rt.run_program("", ["!(grow 300)", "!(echo not-reached)"])
+    assert err.value.kind == "memory" and "128 MB" in str(err.value), str(err.value)
+    assert time.monotonic() - started < 10
+    assert wait_until(lambda: process_is_reaped(rt.last_pid), 3)
+
+
+def test_a_child_inside_the_limit_is_left_alone(tmp_path):
+    rt = with_memory_limit(tmp_path, 400)
+    assert rt.run_program("", ["!(grow 100)", "!(echo after)"]) == [["100"], ["after"]]
+    assert rt.last_run["peak_rss_mb"] > 100
+
+
+def test_the_limit_is_what_the_child_grows_by_not_what_the_server_already_held(tmp_path):
+    """The child is a fork of a server that may hold hundreds of MB (on Linux a fork counts them in its own
+    resident set): the limit is counted from the size the child has when it is prepared."""
+    held = bytearray(300 * 1024 * 1024)
+    for offset in range(0, len(held), 1024):
+        held[offset] = 1
+    assert with_memory_limit(tmp_path, 128).run_program("", ["!(grow 50)"]) == [["50"]]
+    del held
+
+
+def test_the_ceiling_is_the_size_at_preparation_plus_the_limit():
+    """What the child already holds when `_child_prepare` runs (here 200 MB, on Linux a fork's share of the
+    server) does not count against it: growing by 50 MB under a 128 MB limit is fine, growing by 200 MB is not."""
+    def child_target(conn, growth_mb):
+        held = bytearray(200 * 1024 * 1024)
+        for offset in range(0, len(held), 1024):
+            held[offset] = 1
+        mr._child_prepare(None, parent_pid=None, keep_fds=(conn.fileno(),), memory_limit_mb=128)
+        more = bytearray(growth_mb * 1024 * 1024)
+        for offset in range(0, len(more), 1024):
+            more[offset] = 1
+        time.sleep(0.3)
+        mr._send(conn, {"kind": "result", "growth": growth_mb})
+
+    child = mr._fork_child(child_target, 50)
+    try:
+        assert child.wait_message(time.monotonic() + 20) == {"kind": "result", "growth": 50}
+    finally:
+        child.close()
+    child = mr._fork_child(child_target, 200)
+    child.memory_limit_mb = 128
+    try:
+        with pytest.raises(MettaRuntimeError) as err:
+            child.wait_message(time.monotonic() + 20)
+        assert err.value.kind == "memory"
+    finally:
+        child.close()
+
+
+def test_a_garbage_collection_in_the_child_does_not_count_the_servers_heap_as_growth():
+    """Measured on macOS: a forked child maps its parent's heap lazily, and its first full collection walks every
+    inherited object, so a 400 MB server heap became 585 MB of the child's own resident set and an honest program
+    was stopped under a 128 MB limit (the full suite at 128 MB failed one test that way). `gc.freeze()` in
+    `_child_prepare` keeps the inherited objects out of the collector's reach. (On Linux a fork has the pages
+    resident already and the baseline counts them, so this passes there either way.)"""
+    heap = [(i, str(i), [i]) for i in range(1_000_000)]
+
+    def child_target(conn):
+        mr._child_prepare(None, parent_pid=None, keep_fds=(conn.fileno(),), memory_limit_mb=128)
+        gc.collect()
+        time.sleep(0.3)                                      # long enough for the watchdog to look many times
+        mr._send(conn, {"kind": "result", "objects": len(heap)})
+
+    child = mr._fork_child(child_target)
+    try:
+        assert child.wait_message(time.monotonic() + 60) == {"kind": "result", "objects": 1_000_000}
+    finally:
+        child.close()
+        del heap
+
+
+def test_a_limit_of_zero_means_no_limit(tmp_path):
+    rt = with_memory_limit(tmp_path, 0)
+    assert rt.memory_limit_mb == 0
+    assert rt.run_program("", ["!(grow 300)"]) == [["300"]]
+
+
+def test_a_session_child_is_stopped_too_and_its_session_is_closed(tmp_path):
+    session = with_memory_limit(tmp_path, 128).session("")
+    pid = session._child.pid
+    with pytest.raises(MettaRuntimeError) as err:
+        session.run("!(grow 300)")
+    assert err.value.kind == "memory" and wait_until(lambda: process_is_reaped(pid), 3)
+    with pytest.raises(MettaRuntimeError, match="closed"):
+        session.run("!(echo x)")
+
+
+def test_the_child_ends_itself_the_parent_only_reads_the_status():
+    """The watchdog lives in the child (so an orphan has it too). Nothing here supervises the child but the
+    pipe: it ends with the exit code the parent maps to `kind="memory"`."""
+    def grower(conn, limit_mb):
+        mr._child_prepare(None, parent_pid=None, keep_fds=(conn.fileno(),), memory_limit_mb=limit_mb)
+        ballast = bytearray(300 * 1024 * 1024)
+        for offset in range(0, len(ballast), 1024):
+            ballast[offset] = 1
+        time.sleep(30)
+
+    child = mr._fork_child(grower, 128)
+    child.memory_limit_mb = 128
+    try:
+        with pytest.raises(MettaRuntimeError) as err:
+            child.wait_message(time.monotonic() + 20)
+        assert err.value.kind == "memory" and "128 MB" in str(err.value)
+        assert os.WIFEXITED(child.status) and os.WEXITSTATUS(child.status) == mr._EXIT_MEMORY
+    finally:
+        child.close()
+
+
+def test_a_limit_of_zero_starts_no_watchdog():
+    before = {t.name for t in threading.enumerate()}
+    mr._start_memory_watchdog(0)
+    assert {t.name for t in threading.enumerate()} == before
+
+
+@pytest.mark.parametrize("env, expected", [
+    (None, mr.DEFAULT_MEMORY_LIMIT_MB), ("", mr.DEFAULT_MEMORY_LIMIT_MB), ("2048", 2048), (" 700 ", 700),
+    ("0", 0),                                               # switched off on purpose
+    ("64", mr.MIN_MEMORY_LIMIT_MB),                         # too small to start a child at all: raised
+    ("-5", mr.DEFAULT_MEMORY_LIMIT_MB), ("1GB", mr.DEFAULT_MEMORY_LIMIT_MB), ("1.5", mr.DEFAULT_MEMORY_LIMIT_MB),
+])
+def test_the_memory_limit_comes_from_PETTA_MEMORY_LIMIT_MB(monkeypatch, env, expected):
+    """An unreadable setting falls back to the PROTECTED default, never to no protection."""
+    if env is None:
+        monkeypatch.delenv("PETTA_MEMORY_LIMIT_MB", raising=False)
+    else:
+        monkeypatch.setenv("PETTA_MEMORY_LIMIT_MB", env)
+    assert mr.resolve_memory_limit_mb() == expected
+    assert PettaRuntime().memory_limit_mb == expected
+
+
+def test_an_unreadable_memory_limit_is_logged(monkeypatch, caplog):
+    monkeypatch.setenv("PETTA_MEMORY_LIMIT_MB", "1GB")
+    with caplog.at_level("WARNING", logger=mr.__name__):
+        mr.resolve_memory_limit_mb()
+    assert "PETTA_MEMORY_LIMIT_MB" in caplog.text and "1GB" in caplog.text
+
+
+def test_an_argument_wins_over_the_environment_and_a_negative_one_is_refused(monkeypatch):
+    monkeypatch.setenv("PETTA_MEMORY_LIMIT_MB", "900")
+    assert PettaRuntime(memory_limit_mb=300).memory_limit_mb == 300
+    with pytest.raises(ValueError):
+        PettaRuntime(memory_limit_mb=-1)
+
+
+def test_the_default_limit_is_well_below_the_default_stack_limit_which_bounds_no_heap():
+    """The stack limit (2048 MB unless the environment lowers it) does not bound the heap; the default memory limit
+    is a few times the heaviest real knowledge base and ends a runaway before the stack limit would."""
+    assert mr.MIN_MEMORY_LIMIT_MB <= mr.DEFAULT_MEMORY_LIMIT_MB <= 512
+
+
+class _RecordedLimits:
+    """`resource.setrlimit` as a recording double, for the Linux-only address-space wall: this suite also runs on
+    a Mac, where the kernel refuses a finite RLIMIT_AS (EINVAL), so the calculation is checked against a double."""
+
+    def __init__(self, monkeypatch, *, size=3 * 1024 ** 3, soft=None, hard=None, platform="linux"):
+        import resource
+        self.resource = resource
+        self.calls = []
+        monkeypatch.setattr(sys, "platform", platform)
+        monkeypatch.setattr(mr, "_address_space_bytes", lambda: size)
+        monkeypatch.setattr(resource, "getrlimit", lambda res: (
+            resource.RLIM_INFINITY if soft is None else soft, resource.RLIM_INFINITY if hard is None else hard))
+        monkeypatch.setattr(resource, "setrlimit", lambda res, limits: self.calls.append((res, limits)))
+
+
+def test_on_linux_the_kernel_is_asked_for_a_wall_above_the_watchdog(monkeypatch):
+    recorded = _RecordedLimits(monkeypatch)
+    mr._limit_address_space(256)
+    wanted = 3 * 1024 ** 3 + (256 + mr._ADDRESS_SPACE_SLACK_MB) * 1024 * 1024
+    assert recorded.calls == [(recorded.resource.RLIMIT_AS, (wanted, recorded.resource.RLIM_INFINITY))]
+    assert wanted > 3 * 1024 ** 3 + 256 * 1024 * 1024               # the sampler's ceiling is below the wall
+
+
+def test_the_address_space_wall_never_raises_a_limit_that_was_already_lower(monkeypatch):
+    recorded = _RecordedLimits(monkeypatch, soft=2 * 1024 ** 3, hard=5 * 1024 ** 3)
+    mr._limit_address_space(256)
+    assert recorded.calls == [(recorded.resource.RLIMIT_AS, (2 * 1024 ** 3, 5 * 1024 ** 3))]
+    recorded = _RecordedLimits(monkeypatch, hard=3 * 1024 ** 3 + 1)
+    mr._limit_address_space(256)
+    assert recorded.calls[0][1][0] == 3 * 1024 ** 3 + 1
+
+
+@pytest.mark.parametrize("platform, limit, size", [
+    ("darwin", 256, 3 * 1024 ** 3),                         # macOS answers a finite RLIMIT_AS with EINVAL
+    ("linux", 0, 3 * 1024 ** 3),                            # no limit asked for
+    ("linux", 256, None),                                   # no /proc: nothing to add the allowance to
+])
+def test_no_address_space_wall_where_it_cannot_be_set(monkeypatch, platform, limit, size):
+    recorded = _RecordedLimits(monkeypatch, platform=platform, size=size)
+    mr._limit_address_space(limit)
+    assert recorded.calls == []
+
+
+def test_a_kernel_that_refuses_the_address_space_wall_does_not_stop_the_child(monkeypatch):
+    recorded = _RecordedLimits(monkeypatch)
+    import resource
+
+    def refuse(res, limits):
+        raise ValueError("current limit exceeds maximum limit")
+    monkeypatch.setattr(resource, "setrlimit", refuse)
+    mr._limit_address_space(256)                            # no exception: the watchdog is still there
+    assert recorded.calls == []
+
+
+def test_the_child_limits_include_the_address_space_wall_and_the_documented_ones(monkeypatch):
+    asked = []
+    monkeypatch.setattr(mr, "_limit_address_space", lambda limit: asked.append(limit))
+    import resource
+    monkeypatch.setattr(resource, "setrlimit", lambda *a: None)          # this is the test process, not a child
+    monkeypatch.setattr(signal, "signal", lambda *a: None)
+    mr._limit_child_resources(300)
+    assert asked == [300]
+    assert dict(mr._CHILD_LIMITS)["RLIMIT_CORE"] == 0
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="/proc/self/statm is Linux's")
+def test_the_address_space_of_this_process_is_read_from_proc():
+    assert mr._address_space_bytes() > 10 * 1024 * 1024
+    assert mr._address_space_bytes() >= (mr._peak_rss_bytes() or 0) // 2
+
+
+def test_the_peak_resident_set_is_a_number_of_bytes():
+    peak = mr._peak_rss_bytes()
+    assert peak and 5 * 1024 * 1024 < peak < 64 * 1024 ** 3
+    assert abs(mr._peak_rss_mb() - peak / 1e6) < 50
+
 
 
 # ═══════════════════════ sessions, against the double ═════════════════════════

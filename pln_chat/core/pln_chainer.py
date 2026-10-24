@@ -120,7 +120,9 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional, Sequence
 
-from core.metta_runtime import petta_refused_forms_in_kb, petta_strip_comments, petta_tokens, split_top_level_forms
+from core.metta_runtime import (
+    petta_refused_forms_in_kb, petta_strip_comments, petta_symbols, petta_tokens, split_top_level_forms,
+)
 
 __all__ = [
     "PlnChainerError", "PlnInputError", "ChainSettings", "Link", "Route", "SourceStatus", "SourcePlan", "ChainTable", "Prepared",
@@ -329,8 +331,9 @@ def audit_symbols() -> frozenset:
 
 def answer_head_in(text: str) -> bool:
     """Does `text` (a query, a caller's atoms, a knowledge-base file) use the symbol PLNAnswer? Comments and
-    strings aside, read the way PeTTa reads symbols."""
-    return any(kind == "symbol" and tok == ANSWER_HEAD for kind, tok in petta_tokens(text))
+    strings aside, read the way PeTTa reads symbols, under every reading of the whitespace its reader might skip
+    (`core.metta_runtime.petta_symbols`): a spelling the reader could see is never let through."""
+    return ANSWER_HEAD in petta_symbols(text)
 
 
 def answer_head_refusal(text: str) -> Optional[str]:
