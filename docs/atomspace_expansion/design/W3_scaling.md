@@ -1,6 +1,7 @@
 # W3: PeTTa and hyperon against a synthetic Layer A of 100, 300 and 1,000 abstracts
 
-Measured 2026-11-03 on this work tree (branch `claude/gpt6-temperature`, `1a5fc78`; PeTTa `fea8317` at
+Measured 2026-11-03 on this work tree (then on branch `claude/gpt6-temperature`, `1a5fc78`; repo line citations
+below are to `d21ae14`, the base of both that branch and `claude/atomspace-expansion-design`; PeTTa `fea8317` at
 `/Users/kolya/PycharmProjects/pln_longevity_petta/.petta/PeTTa`, SWI-Prolog 10.0.2, hyperon 0.2.10, macOS arm64,
 48 GiB). No LLM was called, nothing was installed, both API keys were unset in every child, and a write guard over
 this tree, the PeTTa tree and the venv found no change after any run. Numbers are in `W3_scaling_summary.json`
@@ -38,7 +39,7 @@ The parser layout, one fresh child per load (`load_s` and peak RSS as the child 
   density the median query is 1.8 to 2.3 ms; the slowest is an open 4-hop pattern at 129 to 167 ms.
 - The curated stack is undisturbed: with Layer A loaded beside the generic stack (`generic+parser`, 15.5 to 16.2 s,
   4,324 MB at N=1,000) its control query still returns its 16 rows.
-- Two heavier layouts overflow the 2,048 MB Prolog stack (the repo default, `config.py:159`) at N=1,000 real
+- Two heavier layouts overflow the 2,048 MB Prolog stack (the repo default, `config.py:154`) at N=1,000 real
   density (on the hand-made seed only the second does) and load at 8,192 MB: the parse plus its type definitions (29 to 30 s, 5,074 MB) and the parse plus the sentence text as
   SentenceLinks (26 to 27 s, 9,050 MB). Keeping provenance text in the same space more than doubles memory.
 - Memory grows faster than linearly: about 2.9 MB per real-density abstract from 100 to 300 and 4.1 MB from 300 to
