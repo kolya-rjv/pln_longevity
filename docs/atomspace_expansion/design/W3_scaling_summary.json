@@ -1,0 +1,1440 @@
+{
+ "schema": "w3.summary/1",
+ "built_from": "$SP/w3",
+ "runs": {
+  "runs_w1": {
+   "exemplar": "$SP/w1/exemplar.metta",
+   "layer": {
+    "100": {
+     "n": 100,
+     "stmts_per_abstract": 40.68,
+     "distinct_concepts": 1709,
+     "loads": {
+      "parser": {
+       "mb": 0.9,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.6189,
+       "peak_rss_mb": 173.9
+      },
+      "parser_stmt": {
+       "mb": 0.91,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.63,
+       "peak_rss_mb": 173.9
+      },
+      "parser_eq": {
+       "mb": 0.91,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.6357,
+       "peak_rss_mb": 173.3
+      },
+      "parser_eqx": {
+       "mb": 0.92,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.6338,
+       "peak_rss_mb": 173.6
+      },
+      "parser+sentlinks": {
+       "mb": 1.66,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.0459,
+       "peak_rss_mb": 321.4
+      },
+      "typedefs+parser": {
+       "mb": 1.09,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.0921,
+       "peak_rss_mb": 313.0
+      },
+      "lib": {
+       "mb": 0.04,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.0359,
+       "peak_rss_mb": 35.8
+      },
+      "lib_eq": {
+       "mb": 0.07,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.0652,
+       "peak_rss_mb": 46.4
+      },
+      "generic": {
+       "mb": 0.18,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.1165,
+       "peak_rss_mb": 48.3
+      },
+      "generic+parser": {
+       "mb": 1.08,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.7808,
+       "peak_rss_mb": 323.2
+      },
+      "library": {
+       "mb": 0.01,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.0437,
+       "peak_rss_mb": 28.5
+      },
+      "library+lib": {
+       "mb": 0.05,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.0798,
+       "peak_rss_mb": 37.8
+      },
+      "library+lib_eq": {
+       "mb": 0.08,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.1084,
+       "peak_rss_mb": 48.1
+      }
+     },
+     "match": {
+      "queries": 683,
+      "errors": 0,
+      "not_found": 0,
+      "median_s": 0.00029,
+      "max_s": 0.00128,
+      "session_reopens": 0
+     },
+     "controls": {
+      "generic": [
+       16
+      ],
+      "generic+parser": [
+       16,
+       1
+      ]
+     },
+     "derive": {
+      "chains": 116,
+      "not_derived": 0,
+      "max_abs_err": 0.0,
+      "max_median_s_by_rendering_hops": {
+       "lib/h1": 0.00154,
+       "lib/h2": 0.00293,
+       "lib/h3": 0.00479,
+       "lib/h4": 0.00585,
+       "lib_eq/h1": 0.00634,
+       "lib_eq/h2": 0.01558,
+       "lib_eq/h3": 0.10093,
+       "lib_eq/h4": 0.0445
+      },
+      "slowest": {
+       "chain": "C019",
+       "rendering": "lib_eq",
+       "hops": 3,
+       "links": 26,
+       "rung": 256,
+       "median_s": 0.10093
+      }
+     },
+     "derive_sweep_extra_beliefs_max_s": {},
+     "skipped": 0
+    },
+    "300": {
+     "n": 300,
+     "stmts_per_abstract": 39.2,
+     "distinct_concepts": 4534,
+     "loads": {
+      "parser": {
+       "mb": 2.63,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.9571,
+       "peak_rss_mb": 598.9
+      },
+      "parser_stmt": {
+       "mb": 2.68,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.9813,
+       "peak_rss_mb": 600.7
+      },
+      "parser_eq": {
+       "mb": 2.65,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.984,
+       "peak_rss_mb": 599.9
+      },
+      "parser_eqx": {
+       "mb": 2.67,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 2.0231,
+       "peak_rss_mb": 600.4
+      },
+      "parser+sentlinks": {
+       "mb": 4.82,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 3.1728,
+       "peak_rss_mb": 1158.6
+      },
+      "typedefs+parser": {
+       "mb": 3.17,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 3.5607,
+       "peak_rss_mb": 631.3
+      },
+      "lib": {
+       "mb": 0.08,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.0831,
+       "peak_rss_mb": 47.1
+      },
+      "lib_eq": {
+       "mb": 0.17,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.1507,
+       "peak_rss_mb": 66.5
+      },
+      "generic": {
+       "mb": 0.18,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.1159,
+       "peak_rss_mb": 49.1
+      },
+      "generic+parser": {
+       "mb": 2.81,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 2.1343,
+       "peak_rss_mb": 639.3
+      },
+      "library": {
+       "mb": 0.01,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.0424,
+       "peak_rss_mb": 28.5
+      },
+      "library+lib": {
+       "mb": 0.09,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.1227,
+       "peak_rss_mb": 47.1
+      },
+      "library+lib_eq": {
+       "mb": 0.17,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.1955,
+       "peak_rss_mb": 65.5
+      }
+     },
+     "match": {
+      "queries": 683,
+      "errors": 0,
+      "not_found": 0,
+      "median_s": 0.00035,
+      "max_s": 0.00204,
+      "session_reopens": 0
+     },
+     "controls": {
+      "generic": [
+       16
+      ],
+      "generic+parser": [
+       16,
+       1
+      ]
+     },
+     "derive": {
+      "chains": 116,
+      "not_derived": 0,
+      "max_abs_err": 0.0,
+      "max_median_s_by_rendering_hops": {
+       "lib/h1": 0.00185,
+       "lib/h2": 0.00398,
+       "lib/h3": 0.00773,
+       "lib/h4": 0.0054,
+       "lib_eq/h1": 0.05956,
+       "lib_eq/h2": 1.35108,
+       "lib_eq/h3": 2.84424,
+       "lib_eq/h4": 0.80362
+      },
+      "slowest": {
+       "chain": "C030",
+       "rendering": "lib_eq",
+       "hops": 3,
+       "links": 44,
+       "rung": 256,
+       "median_s": 2.85374
+      }
+     },
+     "derive_sweep_extra_beliefs_max_s": {
+      "0": 0.00586,
+      "256": 0.06184,
+      "1024": 0.22644
+     },
+     "skipped": 4
+    },
+    "1000": {
+     "n": 1000,
+     "stmts_per_abstract": 39.115,
+     "distinct_concepts": 13668,
+     "loads": {
+      "parser": {
+       "mb": 8.79,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 6.9309,
+       "peak_rss_mb": 2291.8
+      },
+      "parser_stmt": {
+       "mb": 8.94,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 7.0136,
+       "peak_rss_mb": 2292.2
+      },
+      "parser_eq": {
+       "mb": 8.83,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 7.3581,
+       "peak_rss_mb": 2293.0
+      },
+      "parser_eqx": {
+       "mb": 8.87,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 7.6538,
+       "peak_rss_mb": 2291.8
+      },
+      "parser+sentlinks": {
+       "mb": 16.1,
+       "ok_at_2gb_stack": false,
+       "ok": true,
+       "load_s": 11.6436,
+       "peak_rss_mb": 4436.2
+      },
+      "typedefs+parser": {
+       "mb": 10.54,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 13.2917,
+       "peak_rss_mb": 2342.3
+      },
+      "lib": {
+       "mb": 0.25,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.2381,
+       "peak_rss_mb": 102.3
+      },
+      "lib_eq": {
+       "mb": 0.37,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.366,
+       "peak_rss_mb": 102.4
+      },
+      "generic": {
+       "mb": 0.18,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.1151,
+       "peak_rss_mb": 48.3
+      },
+      "generic+parser": {
+       "mb": 8.97,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 7.0917,
+       "peak_rss_mb": 2397.8
+      },
+      "library": {
+       "mb": 0.01,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.0423,
+       "peak_rss_mb": 28.5
+      },
+      "library+lib": {
+       "mb": 0.25,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.2856,
+       "peak_rss_mb": 102.1
+      },
+      "library+lib_eq": {
+       "mb": 0.38,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.4126,
+       "peak_rss_mb": 103.1
+      }
+     },
+     "match": {
+      "queries": 683,
+      "errors": 0,
+      "not_found": 0,
+      "median_s": 0.00059,
+      "max_s": 0.00555,
+      "session_reopens": 0
+     },
+     "controls": {
+      "generic": [
+       16
+      ],
+      "generic+parser": [
+       16,
+       1
+      ]
+     },
+     "derive": {
+      "chains": 116,
+      "not_derived": 0,
+      "max_abs_err": 0.0,
+      "max_median_s_by_rendering_hops": {
+       "lib/h1": 0.01456,
+       "lib/h2": 0.02493,
+       "lib/h3": 0.05541,
+       "lib/h4": 0.01362,
+       "lib_eq/h1": 0.35389,
+       "lib_eq/h2": 9.00633,
+       "lib_eq/h3": 43.02632,
+       "lib_eq/h4": 3.15427
+      },
+      "slowest": {
+       "chain": "C020",
+       "rendering": "lib_eq",
+       "hops": 3,
+       "links": 125,
+       "rung": 2048,
+       "median_s": 43.3733
+      }
+     },
+     "derive_sweep_extra_beliefs_max_s": {},
+     "skipped": 0
+    }
+   },
+   "hyperon_A": {
+    "controls": {
+     "control_generic_pair": "ok",
+     "control_full_pair": "abort"
+    },
+    "probes": {
+     "N100_alone_last": [
+      11904,
+      "abort"
+     ],
+     "N100_alone_var": [
+      11904,
+      "abort"
+     ],
+     "N100_generic_last": [
+      11904,
+      "ok"
+     ],
+     "N100_generic_pair": [
+      11904,
+      "ok"
+     ],
+     "N300_alone_last": [
+      34393,
+      "abort"
+     ],
+     "N300_alone_var": [
+      34393,
+      "abort"
+     ],
+     "N300_generic_last": [
+      34393,
+      "ok"
+     ],
+     "N300_generic_pair": [
+      34393,
+      "ok"
+     ],
+     "N1000_alone_last": [
+      112788,
+      "ok"
+     ],
+     "N1000_alone_var": [
+      112788,
+      "abort"
+     ],
+     "N1000_generic_last": [
+      112788,
+      "ok"
+     ],
+     "N1000_generic_pair": [
+      112788,
+      "ok"
+     ]
+    },
+    "bisect": {
+     "bisect_alone_k1": [
+      195,
+      999,
+      "ok"
+     ],
+     "bisect_alone_k2": [
+      387,
+      1187,
+      "ok"
+     ],
+     "bisect_alone_k4": [
+      665,
+      1465,
+      "ok"
+     ],
+     "bisect_alone_k8": [
+      1182,
+      1981,
+      "abort"
+     ],
+     "bisect_alone_k6": [
+      914,
+      1713,
+      "ok"
+     ],
+     "bisect_alone_k7": [
+      1085,
+      1884,
+      "abort"
+     ],
+     "bisect_generic_k1": [
+      195,
+      999,
+      "ok"
+     ],
+     "bisect_generic_k2": [
+      387,
+      1187,
+      "abort"
+     ]
+    },
+    "edge": {
+     "alone": {
+      "largest_prefix_answering": 6,
+      "smallest_prefix_aborting": 7,
+      "abstracts_in_file": 100,
+      "keys_at_largest": 914,
+      "keys_at_smallest_abort": 1085
+     },
+     "generic": {
+      "largest_prefix_answering": 1,
+      "smallest_prefix_aborting": 2,
+      "abstracts_in_file": 100,
+      "keys_at_largest": 999,
+      "keys_at_smallest_abort": 1187
+     }
+    }
+   },
+   "lib_render_N1000": {
+    "counts": {
+     "not_an_Implication (facts, events, attitudes: no rule to render)": 29547,
+     "conclusion_conjunct_not_(Pred $same_var concept) (existential var or instance)": 5164,
+     "multi_premise (event bridges)": 6297
+    },
+    "rendered_links": 3271,
+    "eq_instantiated_links": 0,
+    "nodes": 3865,
+    "duplicate_src_dst_links": 69,
+    "stmts_in": 39115
+   },
+   "compare_flags": {
+    "gap_over_10pct": 48,
+    "gap_over_10pct_below_floor": 235,
+    "nondeterministic": 0,
+    "missing_in_a_run": 2870
+   }
+  },
+  "runs_terra": {
+   "exemplar": "$SP/w3/real/exemplar_terra.metta",
+   "layer": {
+    "100": {
+     "n": 100,
+     "stmts_per_abstract": 73.82,
+     "distinct_concepts": 3127,
+     "loads": {
+      "parser": {
+       "mb": 1.96,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.4075,
+       "peak_rss_mb": 591.8
+      },
+      "parser_stmt": {
+       "mb": 1.99,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.4213,
+       "peak_rss_mb": 591.0
+      },
+      "parser_eq": {
+       "mb": 1.98,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.4253,
+       "peak_rss_mb": 590.0
+      },
+      "parser_eqx": {
+       "mb": 2.0,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.4378,
+       "peak_rss_mb": 589.9
+      },
+      "parser+sentlinks": {
+       "mb": 3.98,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 2.4833,
+       "peak_rss_mb": 1150.1
+      },
+      "typedefs+parser": {
+       "mb": 2.3,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 2.4778,
+       "peak_rss_mb": 600.3
+      },
+      "lib": {
+       "mb": 0.18,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.1701,
+       "peak_rss_mb": 65.8
+      },
+      "lib_eq": {
+       "mb": 0.21,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.2025,
+       "peak_rss_mb": 65.5
+      },
+      "generic": {
+       "mb": 0.18,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.1152,
+       "peak_rss_mb": 48.2
+      },
+      "generic+parser": {
+       "mb": 2.14,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.5499,
+       "peak_rss_mb": 617.3
+      },
+      "library": {
+       "mb": 0.01,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.0426,
+       "peak_rss_mb": 28.6
+      },
+      "library+lib": {
+       "mb": 0.19,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.2166,
+       "peak_rss_mb": 65.8
+      },
+      "library+lib_eq": {
+       "mb": 0.22,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.235,
+       "peak_rss_mb": 68.3
+      }
+     },
+     "match": {
+      "queries": 683,
+      "errors": 0,
+      "not_found": 0,
+      "median_s": 0.00038,
+      "max_s": 0.00262,
+      "session_reopens": 0
+     },
+     "controls": {
+      "generic": [
+       16
+      ],
+      "generic+parser": [
+       16,
+       1
+      ]
+     },
+     "derive": {
+      "chains": 116,
+      "not_derived": 0,
+      "max_abs_err": 0.0,
+      "max_median_s_by_rendering_hops": {
+       "lib/h1": 0.00136,
+       "lib/h2": 0.00231,
+       "lib/h3": 0.00438,
+       "lib/h4": 0.00696,
+       "lib_eq/h1": 0.00381,
+       "lib_eq/h2": 0.01658,
+       "lib_eq/h3": 0.03949,
+       "lib_eq/h4": 0.07534
+      },
+      "slowest": {
+       "chain": "C024",
+       "rendering": "lib_eq",
+       "hops": 4,
+       "links": 38,
+       "rung": 256,
+       "median_s": 0.07545
+      }
+     },
+     "derive_sweep_extra_beliefs_max_s": {},
+     "skipped": 0
+    },
+    "300": {
+     "n": 300,
+     "stmts_per_abstract": 71.253,
+     "distinct_concepts": 8388,
+     "loads": {
+      "parser": {
+       "mb": 5.71,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 4.3249,
+       "peak_rss_mb": 1170.4
+      },
+      "parser_stmt": {
+       "mb": 5.8,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 4.402,
+       "peak_rss_mb": 1170.9
+      },
+      "parser_eq": {
+       "mb": 5.76,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 4.368,
+       "peak_rss_mb": 1170.2
+      },
+      "parser_eqx": {
+       "mb": 5.79,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 4.4165,
+       "peak_rss_mb": 1170.6
+      },
+      "parser+sentlinks": {
+       "mb": 11.6,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 7.7387,
+       "peak_rss_mb": 2301.2
+      },
+      "typedefs+parser": {
+       "mb": 6.68,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 7.1984,
+       "peak_rss_mb": 1193.8
+      },
+      "lib": {
+       "mb": 0.54,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.5755,
+       "peak_rss_mb": 176.0
+      },
+      "lib_eq": {
+       "mb": 0.59,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.5754,
+       "peak_rss_mb": 176.7
+      },
+      "generic": {
+       "mb": 0.18,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.1164,
+       "peak_rss_mb": 48.4
+      },
+      "generic+parser": {
+       "mb": 5.89,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 4.5445,
+       "peak_rss_mb": 1242.5
+      },
+      "library": {
+       "mb": 0.01,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.0427,
+       "peak_rss_mb": 28.4
+      },
+      "library+lib": {
+       "mb": 0.55,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.6424,
+       "peak_rss_mb": 176.1
+      },
+      "library+lib_eq": {
+       "mb": 0.59,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.6125,
+       "peak_rss_mb": 176.2
+      }
+     },
+     "match": {
+      "queries": 683,
+      "errors": 0,
+      "not_found": 0,
+      "median_s": 0.00064,
+      "max_s": 0.01341,
+      "session_reopens": 0
+     },
+     "controls": {
+      "generic": [
+       16
+      ],
+      "generic+parser": [
+       16,
+       1
+      ]
+     },
+     "derive": {
+      "chains": 116,
+      "not_derived": 0,
+      "max_abs_err": 0.0,
+      "max_median_s_by_rendering_hops": {
+       "lib/h1": 0.00272,
+       "lib/h2": 0.00547,
+       "lib/h3": 0.00552,
+       "lib/h4": 0.00571,
+       "lib_eq/h1": 0.01379,
+       "lib_eq/h2": 0.37995,
+       "lib_eq/h3": 0.12704,
+       "lib_eq/h4": 0.02786
+      },
+      "slowest": {
+       "chain": "C015",
+       "rendering": "lib_eq",
+       "hops": 2,
+       "links": 38,
+       "rung": 256,
+       "median_s": 0.37995
+      }
+     },
+     "derive_sweep_extra_beliefs_max_s": {
+      "0": 0.00581,
+      "256": 0.06034,
+      "1024": 0.2378,
+      "4096": 0.93972
+     },
+     "skipped": 0
+    },
+    "1000": {
+     "n": 1000,
+     "stmts_per_abstract": 70.494,
+     "distinct_concepts": 25193,
+     "loads": {
+      "parser": {
+       "mb": 18.93,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 17.0466,
+       "peak_rss_mb": 4047.8
+      },
+      "parser_stmt": {
+       "mb": 19.21,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 16.2093,
+       "peak_rss_mb": 4093.1
+      },
+      "parser_eq": {
+       "mb": 19.04,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 16.0616,
+       "peak_rss_mb": 4093.4
+      },
+      "parser_eqx": {
+       "mb": 19.15,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 15.9585,
+       "peak_rss_mb": 4092.6
+      },
+      "parser+sentlinks": {
+       "mb": 38.15,
+       "ok_at_2gb_stack": false,
+       "ok": true,
+       "load_s": 26.9937,
+       "peak_rss_mb": 8937.3
+      },
+      "typedefs+parser": {
+       "mb": 22.11,
+       "ok_at_2gb_stack": false,
+       "ok": true,
+       "load_s": 31.5287,
+       "peak_rss_mb": 5070.7
+      },
+      "lib": {
+       "mb": 1.75,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.7582,
+       "peak_rss_mb": 330.0
+      },
+      "lib_eq": {
+       "mb": 1.87,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 2.0121,
+       "peak_rss_mb": 597.8
+      },
+      "generic": {
+       "mb": 0.18,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.1154,
+       "peak_rss_mb": 48.3
+      },
+      "generic+parser": {
+       "mb": 19.11,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 16.0578,
+       "peak_rss_mb": 4327.5
+      },
+      "library": {
+       "mb": 0.01,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.0427,
+       "peak_rss_mb": 28.4
+      },
+      "library+lib": {
+       "mb": 1.75,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.7964,
+       "peak_rss_mb": 329.7
+      },
+      "library+lib_eq": {
+       "mb": 1.88,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 2.019,
+       "peak_rss_mb": 598.1
+      }
+     },
+     "match": {
+      "queries": 564,
+      "errors": 0,
+      "not_found": 0,
+      "median_s": 0.001975,
+      "max_s": 0.13129,
+      "session_reopens": 119
+     },
+     "controls": {
+      "generic": [
+       16
+      ],
+      "generic+parser": [
+       16,
+       1
+      ]
+     },
+     "derive": {
+      "chains": 116,
+      "not_derived": 0,
+      "max_abs_err": 0.0,
+      "max_median_s_by_rendering_hops": {
+       "lib/h1": 0.00662,
+       "lib/h2": 0.01255,
+       "lib/h3": 0.01178,
+       "lib/h4": 0.00498,
+       "lib_eq/h1": 0.20049,
+       "lib_eq/h2": 1.6076,
+       "lib_eq/h3": 0.90681,
+       "lib_eq/h4": 1.36911
+      },
+      "slowest": {
+       "chain": "C026",
+       "rendering": "lib_eq",
+       "hops": 2,
+       "links": 46,
+       "rung": 256,
+       "median_s": 1.6076
+      }
+     },
+     "derive_sweep_extra_beliefs_max_s": {},
+     "skipped": 119
+    }
+   },
+   "hyperon_A": {
+    "controls": {
+     "control_generic_pair": "ok",
+     "control_full_pair": "abort"
+    },
+    "probes": {
+     "N100_alone_last": [
+      21199,
+      "ok"
+     ],
+     "N100_alone_var": [
+      21199,
+      "abort"
+     ],
+     "N100_generic_last": [
+      21199,
+      "abort"
+     ],
+     "N100_generic_pair": [
+      21199,
+      "ok"
+     ],
+     "N300_alone_last": [
+      60058,
+      "ok"
+     ],
+     "N300_alone_var": [
+      60058,
+      "abort"
+     ],
+     "N300_generic_last": [
+      60058,
+      "abort"
+     ],
+     "N300_generic_pair": [
+      60058,
+      "ok"
+     ],
+     "N1000_alone_last": [
+      195604,
+      "abort"
+     ],
+     "N1000_alone_var": [
+      195604,
+      "abort"
+     ],
+     "N1000_generic_last": [
+      195604,
+      "abort"
+     ],
+     "N1000_generic_pair": [
+      195604,
+      "ok"
+     ]
+    },
+    "bisect": {
+     "bisect_alone_k1": [
+      465,
+      1259,
+      "ok"
+     ],
+     "bisect_alone_k2": [
+      732,
+      1523,
+      "ok"
+     ],
+     "bisect_alone_k4": [
+      1195,
+      1981,
+      "abort"
+     ],
+     "bisect_alone_k3": [
+      1032,
+      1820,
+      "abort"
+     ],
+     "bisect_generic_k1": [
+      465,
+      1259,
+      "abort"
+     ]
+    },
+    "edge": {
+     "alone": {
+      "largest_prefix_answering": 2,
+      "smallest_prefix_aborting": 3,
+      "abstracts_in_file": 100,
+      "keys_at_largest": 732,
+      "keys_at_smallest_abort": 1032
+     },
+     "generic": {
+      "largest_prefix_answering": 0,
+      "smallest_prefix_aborting": 1,
+      "abstracts_in_file": 100,
+      "keys_at_largest": null,
+      "keys_at_smallest_abort": 1259
+     }
+    }
+   },
+   "lib_render_N1000": {
+    "counts": {
+     "not_an_Implication (facts, events, attitudes: no rule to render)": 33213,
+     "premise_not_(Pred $var concept)": 1704,
+     "multi_premise (event bridges)": 15279,
+     "conclusion_conjunct_not_(Pred $same_var concept) (existential var or instance)": 26167,
+     "no_renderable_conclusion": 2247
+    },
+    "rendered_links": 22705,
+    "eq_instantiated_links": 0,
+    "nodes": 13239,
+    "duplicate_src_dst_links": 1665,
+    "stmts_in": 70494
+   },
+   "compare_flags": {
+    "gap_over_10pct": 101,
+    "gap_over_10pct_below_floor": 622,
+    "nondeterministic": 0,
+    "missing_in_a_run": 5460
+   },
+   "layer_1000_rerun_fixed_harness": {
+    "A": {
+     "n": 1000,
+     "stmts_per_abstract": 70.494,
+     "distinct_concepts": 25193,
+     "loads": {
+      "parser": {
+       "mb": 18.93,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 15.8193,
+       "peak_rss_mb": 4093.1
+      },
+      "parser_stmt": {
+       "mb": 19.21,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 15.9002,
+       "peak_rss_mb": 4094.1
+      },
+      "parser_eq": {
+       "mb": 19.04,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 15.8698,
+       "peak_rss_mb": 4097.3
+      },
+      "parser_eqx": {
+       "mb": 19.15,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 16.0351,
+       "peak_rss_mb": 4094.9
+      },
+      "parser+sentlinks": {
+       "mb": 38.15,
+       "ok_at_2gb_stack": false,
+       "ok": true,
+       "load_s": 26.8436,
+       "peak_rss_mb": 9049.7
+      },
+      "typedefs+parser": {
+       "mb": 22.11,
+       "ok_at_2gb_stack": false,
+       "ok": true,
+       "load_s": 29.3741,
+       "peak_rss_mb": 5073.3
+      },
+      "lib": {
+       "mb": 1.75,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.7235,
+       "peak_rss_mb": 329.1
+      },
+      "lib_eq": {
+       "mb": 1.87,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.9121,
+       "peak_rss_mb": 598.2
+      },
+      "generic": {
+       "mb": 0.18,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.1159,
+       "peak_rss_mb": 48.8
+      },
+      "generic+parser": {
+       "mb": 19.11,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 15.5489,
+       "peak_rss_mb": 4324.0
+      },
+      "library": {
+       "mb": 0.01,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.0425,
+       "peak_rss_mb": 28.6
+      },
+      "library+lib": {
+       "mb": 1.75,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.7678,
+       "peak_rss_mb": 329.3
+      },
+      "library+lib_eq": {
+       "mb": 1.88,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.9472,
+       "peak_rss_mb": 599.7
+      }
+     },
+     "match": {
+      "queries": 683,
+      "errors": 0,
+      "not_found": 0,
+      "median_s": 0.00226,
+      "max_s": 0.16688,
+      "session_reopens": 0
+     },
+     "controls": {
+      "generic": [
+       16
+      ],
+      "generic+parser": [
+       16,
+       1
+      ]
+     },
+     "derive": {
+      "chains": 116,
+      "not_derived": 0,
+      "max_abs_err": 0.0,
+      "max_median_s_by_rendering_hops": {
+       "lib/h1": 0.00674,
+       "lib/h2": 0.01356,
+       "lib/h3": 0.01196,
+       "lib/h4": 0.00507,
+       "lib_eq/h1": 0.20088,
+       "lib_eq/h2": 1.58077,
+       "lib_eq/h3": 0.90817,
+       "lib_eq/h4": 1.31109
+      },
+      "slowest": {
+       "chain": "C026",
+       "rendering": "lib_eq",
+       "hops": 2,
+       "links": 46,
+       "rung": 256,
+       "median_s": 1.58077
+      }
+     },
+     "derive_sweep_extra_beliefs_max_s": {},
+     "skipped": 0
+    },
+    "B": {
+     "n": 1000,
+     "stmts_per_abstract": 70.494,
+     "distinct_concepts": 25193,
+     "loads": {
+      "parser": {
+       "mb": 18.93,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 15.5018,
+       "peak_rss_mb": 4093.9
+      },
+      "parser_stmt": {
+       "mb": 19.21,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 15.7734,
+       "peak_rss_mb": 4094.7
+      },
+      "parser_eq": {
+       "mb": 19.04,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 15.9077,
+       "peak_rss_mb": 4095.6
+      },
+      "parser_eqx": {
+       "mb": 19.15,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 16.1283,
+       "peak_rss_mb": 4092.3
+      },
+      "parser+sentlinks": {
+       "mb": 38.15,
+       "ok_at_2gb_stack": false,
+       "ok": true,
+       "load_s": 26.2853,
+       "peak_rss_mb": 9051.9
+      },
+      "typedefs+parser": {
+       "mb": 22.11,
+       "ok_at_2gb_stack": false,
+       "ok": true,
+       "load_s": 29.8548,
+       "peak_rss_mb": 5074.6
+      },
+      "lib": {
+       "mb": 1.75,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.7219,
+       "peak_rss_mb": 328.1
+      },
+      "lib_eq": {
+       "mb": 1.87,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.9498,
+       "peak_rss_mb": 597.2
+      },
+      "generic": {
+       "mb": 0.18,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.1153,
+       "peak_rss_mb": 48.7
+      },
+      "generic+parser": {
+       "mb": 19.11,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 16.213,
+       "peak_rss_mb": 4324.9
+      },
+      "library": {
+       "mb": 0.01,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 0.0437,
+       "peak_rss_mb": 28.6
+      },
+      "library+lib": {
+       "mb": 1.75,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 1.8566,
+       "peak_rss_mb": 331.7
+      },
+      "library+lib_eq": {
+       "mb": 1.88,
+       "ok_at_2gb_stack": true,
+       "ok": true,
+       "load_s": 2.0015,
+       "peak_rss_mb": 598.1
+      }
+     },
+     "match": {
+      "queries": 683,
+      "errors": 0,
+      "not_found": 0,
+      "median_s": 0.00176,
+      "max_s": 0.12881,
+      "session_reopens": 0
+     },
+     "controls": {
+      "generic": [
+       16
+      ],
+      "generic+parser": [
+       16,
+       1
+      ]
+     },
+     "derive": {
+      "chains": 116,
+      "not_derived": 0,
+      "max_abs_err": 0.0,
+      "max_median_s_by_rendering_hops": {
+       "lib/h1": 0.00673,
+       "lib/h2": 0.01262,
+       "lib/h3": 0.01234,
+       "lib/h4": 0.00502,
+       "lib_eq/h1": 0.22591,
+       "lib_eq/h2": 1.66537,
+       "lib_eq/h3": 1.06846,
+       "lib_eq/h4": 1.47075
+      },
+      "slowest": {
+       "chain": "C026",
+       "rendering": "lib_eq",
+       "hops": 2,
+       "links": 46,
+       "rung": 256,
+       "median_s": 1.66537
+      }
+     },
+     "derive_sweep_extra_beliefs_max_s": {},
+     "skipped": 0
+    }
+   }
+  }
+ },
+ "petta_hazards": {
+  "hazards": 23,
+  "loaded": 23,
+  "queries": 28,
+  "matched": 28,
+  "head_position_collisions": [
+   "and",
+   "append",
+   "empty",
+   "eval",
+   "exp",
+   "first",
+   "last",
+   "length",
+   "let",
+   "log",
+   "max",
+   "member",
+   "min",
+   "msort",
+   "not",
+   "or",
+   "reverse",
+   "sort",
+   "sqrt",
+   "superpose"
+  ],
+  "kb_scan_refuses": [
+   "argv",
+   "assert",
+   "call",
+   "foldl",
+   "halt",
+   "include",
+   "library",
+   "maplist",
+   "repra",
+   "shell",
+   "sread",
+   "test"
+  ]
+ }
+}
