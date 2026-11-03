@@ -16,8 +16,13 @@ LOGS_DIR = BASE_DIR / "logs"
 # ── OpenAI ─────────────────────────────────────────────────────────────────────
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 DEFAULT_MODEL: str = os.getenv("PLN_MODEL", "gpt-5.4-mini")
-AVAILABLE_MODELS: list[str] = ["gpt-5.4-mini", "gpt-5.4", "gpt-4o", "gpt-4-turbo"]
-DEFAULT_TEMPERATURE: float = 0.2
+# gpt-6-astra is left out on purpose: at $10 / $50 per million tokens one query with the
+# full ~62k-token knowledge prompt costs about $0.70, five times gpt-6.1-sol.
+AVAILABLE_MODELS: list[str] = ["gpt-5.4-mini", "gpt-5.4", "gpt-6.1-terra", "gpt-6.1-sol", "gpt-6-luna",
+                               "gpt-4o", "gpt-4-turbo"]
+# The gpt-6 models refuse any temperature but 1 (a 400; checked live, 2026-11-02), and every
+# older model takes 1 too, so 1 is the default for the translator and the expander alike.
+DEFAULT_TEMPERATURE: float = 1.0
 OPENAI_TIMEOUT_SECONDS: float = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60"))
 OPENAI_MAX_RETRIES: int = max(0, int(os.getenv("OPENAI_MAX_RETRIES", "1")))
 # The model that reads the My Patient text (core/patient_extract.py) has its own

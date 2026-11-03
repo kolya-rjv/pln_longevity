@@ -1719,7 +1719,7 @@ class ExpandRequest(BaseModel):
         description="Stem for a new .metta file, used when target_file isn't an existing file.",
     )
     model: str = Field(default=DEFAULT_MODEL)
-    temperature: float = Field(default=0.1, ge=0.0, le=1.0)
+    temperature: float = Field(default=DEFAULT_TEMPERATURE, ge=0.0, le=1.0)
     apply: bool = Field(
         default=False,
         description="If true, write the extracted entries to disk immediately. "

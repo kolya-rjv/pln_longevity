@@ -801,7 +801,7 @@ with gr.Blocks(
                         minimum=0.0, maximum=1.0, step=0.05,
                         value=DEFAULT_TEMPERATURE,
                         label="Temperature",
-                        info="Lower = more deterministic MeTTa output.",
+                        info="gpt-6 models accept only 1; lower values work on older models only.",
                     )
 
                     gr.Markdown("### Result Filtering")
@@ -929,9 +929,9 @@ with gr.Blocks(
                     )
                     exp_temperature_slider = gr.Slider(
                         minimum=0.0, maximum=1.0, step=0.05,
-                        value=0.1,
+                        value=DEFAULT_TEMPERATURE,
                         label="Temperature",
-                        info="Lower = more consistent MeTTa syntax.",
+                        info="gpt-6 models accept only 1; lower values work on older models only.",
                     )
 
             # Show/hide the "new filename" box based on dropdown selection
