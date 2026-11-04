@@ -1,0 +1,73 @@
+{
+  "files": [
+    "cellage_calibration.metta",
+    "drugage_calibration.metta",
+    "drugage_entries.metta",
+    "drugage_etl_short.metta",
+    "epistemic_calibration.metta",
+    "evidence_calibration.metta",
+    "grim_age_core.metta",
+    "grim_age_lu2019_evidence.metta",
+    "hallmark_targeting.metta",
+    "hallmarks_core.metta",
+    "hallmarks_lopezotin2023_anchors.metta",
+    "hallmarks_lopezotin2023_intervention_evidence.metta",
+    "human_evidence.metta",
+    "lifestyle_evidence.metta",
+    "linage2_core.metta",
+    "linage2_fong2025_evidence.metta",
+    "logical_predicates.metta",
+    "measurement_types.metta",
+    "mechanistic_bridges.metta",
+    "nhanes_baseline.metta",
+    "nhanes_reference.metta",
+    "patient_profile.metta",
+    "pln_abductive_diagnosis.metta",
+    "pln_counterfactual.metta",
+    "pln_deduction.metta",
+    "pln_intervention_ranking.metta",
+    "pln_linage2.metta",
+    "pln_risk_prediction.metta",
+    "pln_supplement_recommendation.metta",
+    "species_taxonomy.metta",
+    "supplement_evidence.metta",
+    "system_types.metta",
+    "build/cellage_expression.metta",
+    "build/cellage_genes.metta",
+    "build/cellage_metadata.metta",
+    "build/drugage_etl.metta",
+    "build/genage_human_etl.metta",
+    "build/genage_models_etl.metta"
+  ],
+  "source_forms": 85481,
+  "unique_forms": 82243,
+  "synthetic_atoms": 0,
+  "memory_limit_mb": 2048,
+  "deadline_s": 120,
+  "kb_bytes": 4339924,
+  "preparation_s": 1.47,
+  "status": "passed",
+  "answers": [
+    [
+      "(signed Pos (stv 0.357 0.29089125000000005))"
+    ],
+    [
+      "3423"
+    ],
+    [
+      "927"
+    ],
+    [
+      "\"GHR\""
+    ]
+  ],
+  "runtime": {
+    "total_s": 14.4268,
+    "fork_s": 0.0022,
+    "engine_s": 0.3529,
+    "load_s": 13.7945,
+    "queries_s": 0.196,
+    "peak_rss_mb": 1240.0
+  },
+  "elapsed_s": 16.943
+}

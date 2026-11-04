@@ -22,8 +22,11 @@ from typing import Optional
 from config import ONTOLOGY_DIR, PLN_QUERY_TIMEOUT_SECONDS, PLN_RUNTIME_AVAILABLE
 from core import pln_chainer
 from core.metta_runtime import MettaRuntimeError, get_runtime
+from core.knowledge_base import full_kb_paths, unique_fact_blocks, uses_full_kb
 
 # ── Scoped DrugAge inference stack ───────────────────────────────────────────────
+# All scoped stacks below apply to Hyperon. PeTTa expands every execution to the
+# complete application KB in _runtime_run, including generated and custom data.
 # The MINIMAL set of hand-written layers needed to lift + rank DrugAge rows,
 # loaded into a QUERY-SCOPED space alongside a filtered row slice (see
 # run_drugage_ranking). It deliberately EXCLUDES grim_age / hallmarks /
@@ -115,6 +118,8 @@ def nhanes_patient_kb(*generated: Path) -> list[Path]:
     are skipped rather than raising, so a partial ETL run still works for what it did
     produce.
     """
+    if uses_full_kb():
+        return full_kb_paths(p for p in generated if p.exists())
     return list(NHANES_PATIENT_STACK) + [p for p in generated if p.exists()]
 
 
@@ -152,7 +157,9 @@ PATIENT_STACK_EXCLUDED: tuple[str, ...] = (
 
 
 def patient_stack(runtime_paths: list[Path]) -> list[Path]:
-    """The runtime stack, in its order, minus PATIENT_STACK_EXCLUDED."""
+    """The full PeTTa KB, or Hyperon's runtime stack minus PATIENT_STACK_EXCLUDED."""
+    if uses_full_kb():
+        return full_kb_paths(runtime_paths)
     return [p for p in runtime_paths if p.name not in PATIENT_STACK_EXCLUDED]
 
 
@@ -195,7 +202,9 @@ _STRING_RE = re.compile(r'"(?:[^"\\]|\\.)*"')
 
 
 def generic_stack(runtime_paths: list[Path]) -> list[Path]:
-    """The runtime stack, in its order, minus GENERIC_STACK_EXCLUDED."""
+    """The full PeTTa KB, or Hyperon's runtime stack minus GENERIC_STACK_EXCLUDED."""
+    if uses_full_kb():
+        return full_kb_paths(runtime_paths)
     return [p for p in runtime_paths if p.name not in GENERIC_STACK_EXCLUDED]
 
 
@@ -239,7 +248,9 @@ _HUMAN_EVIDENCE_FORM_RE = re.compile(r"^\s*!?\s*\(\s*human-evidence(?:-intervent
 
 
 def human_evidence_stack(runtime_paths: list[Path]) -> list[Path]:
-    """The runtime stack's human-evidence files, in its order."""
+    """The full PeTTa KB, or Hyperon's human-evidence files in runtime order."""
+    if uses_full_kb():
+        return full_kb_paths(runtime_paths)
     return [p for p in runtime_paths if p.name in HUMAN_EVIDENCE_FILES]
 
 
@@ -330,6 +341,8 @@ def linage2_patient_kb(*generated: Path) -> list[Path]:
     baseline to multiply.
     """
     extras = [LINAGE2_GENERATED_BASELINE, *generated]
+    if uses_full_kb():
+        return full_kb_paths(p for p in extras if p.exists())
     seen: set[Path] = set()
     out = list(LINAGE2_PATIENT_STACK)
     for p in extras:
@@ -815,8 +828,11 @@ def _runtime_run(
             return PLNRunResult(status="empty", mode="runtime")
         normalized = "\n".join(expressions)
 
-        # Concatenate every KB file's content into one block. A missing or
-        # unreadable file is skipped rather than aborting the whole query.
+        runtime = get_runtime()
+        runtime_name = runtime.name
+        # PeTTa always sees the complete application KB, including generated data,
+        # even when a specialized caller supplies a legacy Hyperon stack.
+        kb_files = full_kb_paths(kb_files or []) if runtime_name == "petta" else (kb_files or [])
         kb_blocks: list[str] = []
         kb_names: list[str] = []
         for path in (kb_files or []):
@@ -824,13 +840,16 @@ def _runtime_run(
                 kb_blocks.append(path.read_text(encoding="utf-8"))
                 kb_names.append(path.name)
             except OSError:
-                pass
+                if runtime_name == "petta":
+                    raise  # a partial KB must never masquerade as the full one
         # A caller-supplied slice (e.g. a filtered set of DrugAge rows selected
         # per-query) is injected into the SAME space after the files. This is how
         # a query-scoped space is assembled without loading a whole ETL dump.
         if extra_atoms:
             kb_blocks.append(extra_atoms)
             kb_names.append("extra_atoms")
+        if runtime_name == "petta":
+            kb_blocks = unique_fact_blocks(kb_blocks)
         kb_text = "\n".join(kb_blocks)
 
         # Log the query (and which KB files were loaded) for debugging. The KB

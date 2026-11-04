@@ -35,7 +35,7 @@ Why PeTTa runs in a forked child, once per program
   (`PETTA_STACK_LIMIT_MB`), sets an RLIMIT_CPU backstop a little past the deadline, and on Linux asks to be
   SIGKILLed when its parent dies. The executor SIGKILLs a worker at its deadline, and the worker's PeTTa
   child would otherwise run on, unreaped and unbounded, with nobody to read its answer.
-* Memory is bounded by `PETTA_MEMORY_LIMIT_MB` (default 512), in two ways, and `PETTA_STACK_LIMIT_MB` is NOT
+* Memory is bounded by `PETTA_MEMORY_LIMIT_MB` (default 2048), in two ways, and `PETTA_STACK_LIMIT_MB` is NOT
   one of them: it caps SWI-Prolog's own stacks, and a string or an atom lives on the heap, outside them. A
   ~900-byte program of `let*`/`atom_concat` doubles a string 22 times and takes 1 GB in half a second under a
   64 MB stack limit, with every builtin it uses allowed. (1) A watchdog thread in the child samples its
@@ -154,10 +154,10 @@ _EXIT_WAIT_S = 5.0
 #: Longest piece of an underlying error text kept in a MettaRuntimeError message.
 _MAX_DETAIL_CHARS = 1500
 #: How much a PeTTa child's peak resident set may grow after it is prepared, in MB (`PETTA_MEMORY_LIMIT_MB`).
-#: Measured: every PeTTa test in the suite, the PLN chainer lane included, passes with 128; all 33 `.metta` files
-#: of the repository loaded together peak at 116 MB in all. This is four times the larger figure. A deployment
-#: that loads much bigger knowledge bases (ETL output) raises it: a KB costs about 0.2 MB per KB of text.
-DEFAULT_MEMORY_LIMIT_MB = 512
+#: The complete local application KB, including build/ ETL data (~85k forms),
+#: peaks around 1.2 GB. Leave headroom for queries; larger datasets can raise this
+#: with PETTA_MEMORY_LIMIT_MB. This bounds each child, not the whole service.
+DEFAULT_MEMORY_LIMIT_MB = 2048
 #: The smallest limit that is honoured: a child imports janus and consults PeTTa (30-60 MB) before it runs
 #: anything, so a smaller number would stop every program. A smaller value is raised to this one.
 MIN_MEMORY_LIMIT_MB = 128

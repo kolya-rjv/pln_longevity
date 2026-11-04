@@ -1275,10 +1275,9 @@ def test_an_argument_wins_over_the_environment_and_a_negative_one_is_refused(mon
         PettaRuntime(memory_limit_mb=-1)
 
 
-def test_the_default_limit_is_well_below_the_default_stack_limit_which_bounds_no_heap():
-    """The stack limit (2048 MB unless the environment lowers it) does not bound the heap; the default memory limit
-    is a few times the heaviest real knowledge base and ends a runaway before the stack limit would."""
-    assert mr.MIN_MEMORY_LIMIT_MB <= mr.DEFAULT_MEMORY_LIMIT_MB <= 512
+def test_the_default_memory_limit_can_hold_the_full_generated_knowledge_base():
+    """The full generated KB peaks around 1.2 GB, outside the Prolog stack limit."""
+    assert 1536 <= mr.DEFAULT_MEMORY_LIMIT_MB <= 2048
 
 
 class _RecordedLimits:

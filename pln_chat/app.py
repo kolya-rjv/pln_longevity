@@ -13,6 +13,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 import gradio as gr
+from core.knowledge_base import full_kb_paths, uses_full_kb
 
 from config import (
     AVAILABLE_MODELS,
@@ -172,7 +173,8 @@ _DEFAULT_SELECTION = (
 # mis-matches) once a space exceeds a few thousand atoms, and the ~107 KB
 # drugage_etl_short.metta dump trips it — which otherwise crashes the whole app
 # on the first query. Excluded files stay available for queries in stub mode.
-# EXECUTION RUNS THE CURATED STACK, not every .metta in the repo root.
+# HYPERON runs the curated stack below. PeTTa discovers all root/build/custom
+# KB files through core.knowledge_base, without this size cap or query scoping.
 #
 # This used to load every discovered file under PLN_MAX_KB_FILE_BYTES, and that left the
 # engine with almost no room: hyperon 0.2.10 aborts the process — a non-unwinding Rust
@@ -196,6 +198,9 @@ _DEFAULT_SELECTION = (
 # Files outside the stack stay discoverable and queryable in stub mode, and any feature
 # needing one at runtime should follow CELLAGE_STACK and scope its own space.
 def _runtime_kb_paths() -> list[Path]:
+    """All application KB files on PeTTa; the capped curated set on Hyperon."""
+    if uses_full_kb():
+        return full_kb_paths()
     kept: list[Path] = []
     oversized: list[str] = []
     for name in _INFERENCE_STACK:
@@ -242,8 +247,9 @@ def _linage2_context() -> tuple:
 
 
 def _generic_kb(metta_query: str) -> list[Path]:
-    """As api._generic_kb: the human-evidence stack, the patient stack, or the generic
-    stack — never the full shared space (core.pln_runner, "Generic stack")."""
+    """PeTTa: the full KB. Hyperon: choose a scoped stack safe for the query."""
+    if uses_full_kb():
+        return full_kb_paths()
     if is_human_evidence_program(metta_query):
         return human_evidence_stack(_ALL_KB_PATHS)
     if reads_patients(metta_query) or needs_patient_layers(metta_query, _ALL_KB_PATHS):
@@ -275,7 +281,7 @@ def _build_context(selected_files: list[str]) -> tuple[OntologyRegistry, dict[st
 
 def _runtime_inventory():
     """What the EXECUTION KB actually holds (see ontology/inventory.py)."""
-    return inventory_for(_ALL_KB_PATHS)
+    return inventory_for(full_kb_paths() if uses_full_kb() else _ALL_KB_PATHS)
 
 
 # ── Core chat handler ──────────────────────────────────────────────────────────
@@ -371,9 +377,10 @@ def chat(
             # in the shared space, both in ONE offloaded task, answers in program
             # order (api._run_linage2_program).
             linage_registry, linage_inventory = with_injected(*_linage2_context(), full_atoms)
-            shared_registry, shared_inventory = with_injected(registry, inventory, shared_atoms)
+            execution_registry = load_specific_files(full_kb_paths())[0] if uses_full_kb() else registry
+            shared_registry, shared_inventory = with_injected(execution_registry, inventory, shared_atoms)
             linage_kb = linage2_patient_kb()
-            if split.mixed:
+            if split.mixed and not uses_full_kb():
                 validation = merge_validation_results(
                     validate(validation_text(full_atoms, split.linage2),
                              linage_registry, linage_inventory),
@@ -411,15 +418,17 @@ def chat(
                         extra_atoms=full_atoms,
                     ),
                 )
-            validation.warnings.extend(nesting_warnings(split))
+            if not uses_full_kb():
+                validation.warnings.extend(nesting_warnings(split))
         else:
             # The inventory is what tells a real symbol (MTORC1, Mouse) from an
             # invented one, and a populated predicate from a declared-but-empty
             # one — the UI used the registry alone and inherited both errors.
             # The patient enters only a program that reads patients (patient_atoms_for):
             # the full shared space aborts holding a caller when one enumerates them.
-            generic_atoms = patient_atoms_for(translation.metta_query, shared_atoms)
-            shared_registry, shared_inventory = with_injected(registry, inventory, generic_atoms)
+            generic_atoms = full_atoms if uses_full_kb() else patient_atoms_for(translation.metta_query, shared_atoms)
+            execution_registry = load_specific_files(full_kb_paths())[0] if uses_full_kb() else registry
+            shared_registry, shared_inventory = with_injected(execution_registry, inventory, generic_atoms)
             validation = validate(validation_text(generic_atoms, translation.metta_query),
                                   shared_registry, shared_inventory)
             generic_kb = _generic_kb(translation.metta_query)

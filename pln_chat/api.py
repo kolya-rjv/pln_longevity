@@ -123,6 +123,7 @@ from core.drugage_router import (
 )
 from core.llm_translator import translate
 from core.metta_runtime import get_runtime
+from core.knowledge_base import full_kb_paths, uses_full_kb
 from core.metta_validator import ValidationResult, merge_validation_results, validate
 from core.pln_runner import (
     CELLAGE_STACK,
@@ -245,7 +246,8 @@ def _default_selection(choices: list[str]) -> list[str]:
 # once a space exceeds a few thousand atoms, and e.g. the ~107 KB
 # drugage_etl_short.metta dump trips it. Mirrors app.py's _runtime_kb_paths();
 # excluded files stay queryable in stub mode and are listed by GET /ontology/files.
-# EXECUTION RUNS THE CURATED STACK, not every .metta in the repo root.
+# HYPERON runs the curated stack below. PeTTa discovers all root/build/custom
+# KB files through core.knowledge_base, without this size cap or query scoping.
 #
 # This used to load every discovered file under PLN_MAX_KB_FILE_BYTES, which left the
 # engine almost no room: hyperon 0.2.10 aborts the process — a non-unwinding Rust panic in
@@ -269,6 +271,9 @@ def _default_selection(choices: list[str]) -> list[str]:
 # Mirrors app.py; keep in sync. Files outside the stack stay discoverable and queryable in
 # stub mode, and a feature needing one at runtime should scope its own space.
 def _runtime_kb_paths() -> list[Path]:
+    """All application KB files on PeTTa; the capped curated set on Hyperon."""
+    if uses_full_kb():
+        return full_kb_paths()
     discovered = _discover_metta_files()
     kept: list[Path] = []
     for name in _INFERENCE_STACK:
@@ -3212,11 +3217,13 @@ def _offloaded_run(
 
 
 def _generic_kb(metta_query: str) -> list[Path]:
-    """Where a program that is not a LinAge2 or DrugAge form runs. Never the full shared
+    """PeTTa always uses the full KB. On Hyperon, never the full shared
     space: it holds more distinct key atoms than hyperon 0.2.10 can read back
     (core.pln_runner, "Generic stack"). A program made only of human-evidence forms runs
     in their stack; one that names a patient, reads patient facts or uses a patient
     layer's form in the patient stack; every other program in the generic stack."""
+    if uses_full_kb():
+        return full_kb_paths()
     runtime = _runtime_kb_paths()
     if is_human_evidence_program(metta_query):
         return human_evidence_stack(runtime)
@@ -3236,6 +3243,8 @@ def _validate_generic_with(
     atoms injected into it. Without them a caller's own patient id (Caller_W58) is
     "not found in loaded ontology", and every answer about that patient carried a
     validation issue on /query."""
+    if uses_full_kb():
+        registry = _runtime_registry()
     merged, inventory = with_injected(registry, _runtime_inventory(), injected)
     return validate(validation_text(injected, metta_query), merged, inventory)
 
@@ -3268,6 +3277,17 @@ def _run_linage2_program(
     422 before anything runs (/metta/run); otherwise the verdict travels with the
     answer (/query).
     """
+    if uses_full_kb():
+        atoms = _join_atoms(linage_atoms, extra_atoms)
+        validation = _validate_linage2_query(metta_query, atoms)
+        if strict and not validation.valid:
+            raise HTTPException(status_code=422, detail={
+                "code": "invalid_metta_query", "message": "MeTTa validation failed against the full KB.",
+                "issues": validation.issues,
+            })
+        return "linage2", validation, _offloaded_run(
+            metta_query, confidence_threshold, full_kb_paths(), atoms
+        )
     if not split.mixed:
         validation = _validate_linage2_query(metta_query, linage_atoms)
     else:
@@ -3504,8 +3524,8 @@ def query(req: QueryRequest) -> QueryResponse:
         # The shared space gets the patient WITHOUT its LinAge2 atoms: with them
         # it aborts on the patient forms (BuiltPatient.shared_atoms) — and only when
         # the program reads patients (patient_atoms_for).
-        shared = patient_atoms_for(translation.metta_query,
-                                   patient.shared_atoms if patient is not None else None)
+        shared = (patient.atoms if patient else None) if uses_full_kb() else patient_atoms_for(
+            translation.metta_query, patient.shared_atoms if patient is not None else None)
         validation = _validate_generic_with(translation.metta_query, registry, shared)
         pln_result = _offloaded_run(
             translation.metta_query, req.confidence_threshold,
@@ -3646,7 +3666,7 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
     # abort that space on the patient forms (BuiltPatient.shared_atoms), and only
     # for a program that reads patients (patient_atoms_for); the caller's own
     # extra_atoms always.
-    patient_shared = patient.shared_atoms if patient else None
+    patient_shared = (patient.atoms if uses_full_kb() else patient.shared_atoms) if patient else None
     injected_shared = _join_atoms(patient_shared, req.extra_atoms)
 
     def validate_generic(metta_query: str) -> ValidationResult:
@@ -3708,7 +3728,8 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
             )
         pln_result = _offloaded_run(
             req.metta_query, req.confidence_threshold, _generic_kb(req.metta_query),
-            _join_atoms(patient_atoms_for(req.metta_query, patient_shared), req.extra_atoms),
+            _join_atoms(patient_shared if uses_full_kb() else patient_atoms_for(req.metta_query, patient_shared),
+                        req.extra_atoms),
         )
 
     if pln_result.status == "error":

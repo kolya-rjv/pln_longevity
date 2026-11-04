@@ -39,8 +39,8 @@ from ontology.registry import OntologyRegistry  # noqa: E402
 @pytest.fixture(autouse=True)
 def deterministic_asgi_execution(monkeypatch):
     """Run sync endpoints inline and suppress real log writes in HTTP tests."""
-    async def run_inline(function, *args, **kwargs):
-        return function(*args, **kwargs)
+    async def run_inline(func, *args, **kwargs):
+        return func(*args, **kwargs)
 
     monkeypatch.setattr(api_module, "log_http_request", Mock())
     # PLN work normally runs in a worker PROCESS (core/executor.py). A child

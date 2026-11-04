@@ -224,7 +224,7 @@ under `pln_execution`.
 | `PLN_RUNTIME`                    | hyperon | the MeTTa engine: `hyperon` \| `petta` \| `auto` (hyperon when importable, else petta) |
 | `PETTA_HOME`                     | `<repo>/.petta/PeTTa` | the PeTTa checkout (`src/main.pl`, `python/`); only read for `petta` |
 | `PETTA_STACK_LIMIT_MB`           | 2048    | SWI-Prolog's stack limit in a PeTTa process; a runaway recursion dies of it. **It does not bound memory** (a string or an atom is on the heap, outside the stacks): that is `PETTA_MEMORY_LIMIT_MB` |
-| `PETTA_MEMORY_LIMIT_MB`          | 512     | how far a PeTTa process's memory may grow while it runs one program (MB); past it the process is ended and the request is a `502 runtime_error`. Raised to 128 when smaller; `0` turns it off; an unreadable value is ignored with a warning and the default applies. See "What the memory limit is, and is not" |
+| `PETTA_MEMORY_LIMIT_MB`          | 2048    | how far a PeTTa process's memory may grow while it runs one program (MB); past it the process is ended and the request is a `502 runtime_error`. Raised to 128 when smaller; `0` turns it off; an unreadable value is ignored with a warning and the default applies. See "What the memory limit is, and is not" |
 | `PLN_PETTA_CHILD_ENV_KEEP`       | (none)  | extra environment variable names a PeTTa child keeps (comma-separated); it keeps `PATH`, `LANG`, `LC_*` and the library-path and `SWI_HOME_DIR` names and drops the rest, API keys included |
 | `PLN_MAX_RANK_COMPOUNDS`         | 60      | cap on a ranking's compound pool, at every entrance    |
 | `PLN_MAX_METTA_SORT_COMPOUNDS`   | 10      | the much smaller cap for `strategy="metta_sort"`       |
@@ -1098,9 +1098,12 @@ MeTTa runs on **hyperon-experimental 0.2.10** unless told otherwise. With
 `PLN_RUNTIME=petta` it runs on [PeTTa](https://github.com/trueagi-io/PeTTa)
 instead, MeTTa compiled to SWI-Prolog, through the single seam
 `pln_chat/core/metta_runtime.py` (`get_runtime().run_program(kb_text,
-expressions)`). Nothing else changes: the stacks, the routing, the validator's
-symbol checks, the executor and every response shape are the same, and
-`GET /health` reports which engine answered:
+expressions)`). PeTTa loads the complete application KB for every execution:
+all `.metta` files in the repository root, `build/`, and the custom ontology
+directory, without the Hyperon file-size cap or query-dependent stack exclusions.
+The same space contains all loaded facts, rules and request-specific patient data.
+Mixed LinAge2/generic programs run together in that one space. Hyperon retains its
+scoped stacks. `GET /health` reports which engine answered:
 
 ```
 "runtime_name": "hyperon"        # or "petta"; `auto` is reported as the one it resolved to
@@ -1128,9 +1131,10 @@ a process of its own: each `run_program` forks a fresh child that imports janus
 and PeTTa, loads the knowledge base once, evaluates each `!` expression with its
 own call (which keeps the per-expression result grouping) and sends the strings
 back; the child is then gone. The API process never imports janus or PeTTa
-(forking after SWI-Prolog has started is unsafe), and a program that runs in two
-stacks (`run_query_parts`, the LinAge2 mixed program) gets one child per stack
-and one shared deadline. Measured on the development Mac (arm64, SWI-Prolog
+(forking after SWI-Prolog has started is unsafe). Explicit `run_query_parts`
+calls still get one child per part and one shared deadline, but each PeTTa child
+loads the complete KB. The following timings describe the historical, smaller
+stacks, not the current full-KB execution. Measured on the development Mac (arm64, SWI-Prolog
 10.0.2): 1-3 ms to fork, 0.14 s to import janus and consult PeTTa's `main.pl`
 (0.024 + 0.118 s), then 0.04 s (the ten-file smoke stack) to 0.32 s (the LinAge2
 stack) to load the knowledge base, and a child peak RSS of 33-110 MB. A whole
@@ -1261,10 +1265,9 @@ can still be made to take the machine's memory: about 900 bytes of `let*` and
 child held 1 GB after half a second under a 64 MB `PETTA_STACK_LIMIT_MB` (a
 string is on the heap; the stack limit covers only Prolog's stacks). Each
 PeTTa child is therefore bounded in memory, by `PETTA_MEMORY_LIMIT_MB`
-(default 512: every PeTTa test in the suite, the PLN chainer lane included,
-passes with 128, and all 33 `.metta` files of the repository loaded together
-peak at about 116 MB. A deployment that loads much bigger ETL files raises it:
-a knowledge base costs about 0.2 MB per KB of text):
+(default 2048 MB). The full local KB including generated ETL data has about
+82,000 unique top-level forms and peaks around 1.2 GB on Linux; larger datasets
+may need a higher operator-set limit:
 
 - *A watchdog in the child, on every platform.* A thread samples the child's
   peak resident set every 5 ms and ends the process, with an exit code the
