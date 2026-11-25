@@ -243,6 +243,8 @@ class ChainSettings:
     #: strength shrinks by (1 - e/p) per hop); 'capped' q = min(1, p + e), reported |s1 - s0| (the earlier mapping, whose
     #: difference is p per hop only while p <= 1 - e: a strength above 0.98 is shrunk to 0.98; kept as a negative control)
     mapping: str = "affine"
+    #: record the reasoning trace (core/pln_trace.py): which conclusions the program read and how each was derived
+    trace: bool = False
 
     def __post_init__(self):
         if self.ruleset not in RULESETS:
@@ -267,7 +269,8 @@ def settings_from_config() -> ChainSettings:
         chain_confidence=str(getattr(config, "PLN_CHAIN_CONFIDENCE", "legacy")),
         max_steps=int(getattr(config, "PLN_MAX_STEPS", 0)),
         queue_size=int(getattr(config, "PLN_QUEUE_SIZE", 256)),
-        ruleset=str(getattr(config, "PLN_RULESET", "restricted")))
+        ruleset=str(getattr(config, "PLN_RULESET", "restricted")),
+        trace=bool(getattr(config, "PLN_TRACE", False)))
 
 
 # ── s-expressions ──────────────────────────────────────────────────────────────
@@ -1033,6 +1036,9 @@ class ChainTable:
     skipped: list[dict] = field(default_factory=list)
     derive_runs: int = 0
     derive_s: float = 0.0
+    #: kept for the reasoning trace only (`settings.trace`): the encoding and, per source, the level-1 and level-0 beliefs
+    encoding: Any = None
+    beliefs: dict[str, tuple[list, list]] = field(default_factory=dict)
 
     @property
     def complete(self) -> bool:
@@ -1085,14 +1091,16 @@ class _Encoding:
             tgt = f"({'End' if link.terminal else 'State'} {self.opaque[link.dst]})"
             if link.sign == "Neg":
                 tgt = f"(Not {tgt})"
-            if mapping == "affine":
-                q = leak + (1.0 - leak) * link.strength
-            elif mapping == "capped":
-                q = min(1.0, link.strength + leak)
-            else:
-                q = link.strength
             self.sentence[link.id] = (f"(Sentence ((Implication (State {self.opaque[link.src]}) {tgt}) "
-                                      f"(stv {fnum(q)} {fnum(link.confidence)})) ({link.id}))")
+                                      f"(stv {fnum(self.q(link))} {fnum(link.confidence)})) ({link.id}))")
+
+    def q(self, link: Link) -> float:
+        """The strength the link's sentence is stored with."""
+        if self.mapping == "affine":
+            return self.leak + (1.0 - self.leak) * link.strength
+        if self.mapping == "capped":
+            return min(1.0, link.strength + self.leak)
+        return link.strength
 
     def premise(self, source: str, level: float) -> str:
         return f"(Sentence ((State {self.opaque[source]}) (stv {fnum(level)} 1.0)) (0))"
@@ -1459,6 +1467,8 @@ def compute_table(ev: Evaluate, links: Sequence[Link], *, leak: float, discount:
     enc = _Encoding(link_list, leak, st.mapping)
     table = ChainTable(link_list, nodes if nodes is not None else {k: k for k in enc.opaque}, leak, discount, st,
                        skipped=list(skipped or []))
+    if st.trace:
+        table.encoding = enc
     out_by = out_edges(link_list)
     srcs = sorted({l.src for l in link_list}) if sources is None else sorted(set(sources))
     if plans is None and not (st.control or st.ruleset == "full" or st.on_incomplete != "retry"):
@@ -1511,6 +1521,8 @@ def compute_table(ev: Evaluate, links: Sequence[Link], *, leak: float, discount:
         stray: list = []
         routes = _routes(enc, source, b1, b0, discount, st, stray)
         table.routes[source] = routes
+        if st.trace:
+            table.beliefs[source] = (b1, b0)
         table.status[source] = SourceStatus(
             source, complete, bq, tq, cap, L, attempts, (len(b1), len(b0)), (len(t1), len(t0_)),
             (n1, n0) if n1 is not None else None, len(routes), len(stray))
@@ -1594,13 +1606,67 @@ class ChainStep:
         #: them and stops cleanly, with a named error, before the parent would kill it
         self.deadline_s = deadline_s
         self.table: Optional[ChainTable] = None        # set in the process that ran the step (the child)
+        #: the reasoning trace (core/pln_trace.py): built in the child by `finish`, handed to the parent's copy by `receive`
+        self.trace: Optional[dict] = None
+        self._calls: dict[tuple[str, str], dict] = {}
+        self._overflow = False
+        self._trace_error: Optional[str] = None
+        self._started = 0.0
 
     def __call__(self, engine: Any) -> dict:
         """Run the step on `engine` (`.run(text)`, `.load(text)`); returns the table's summary, plain JSON (it travels
         over the child's pipe, where a value json cannot write would kill the reply)."""
         import json
+        self._started = time.monotonic()
         summary = self._run(engine)
+        if self.settings.trace:
+            try:
+                # after the facts are in and before the program runs, so what is recorded is the program's own calls
+                engine.watch_calls(("infer", "explain"))
+            except Exception as exc:                # noqa: BLE001 - a trace never fails an answer
+                self._trace_error = f"{type(exc).__name__}: {exc}"[:300]
         return json.loads(json.dumps(summary, default=str))
+
+    # -- the reasoning trace: three calls of the PeTTa child, none of which may fail the request
+    def after_expression(self, engine: Any, index: int) -> None:
+        """Collect the `infer`/`explain` calls expression `index` made."""
+        if not self.settings.trace or self._trace_error:
+            return
+        try:
+            calls, overflow = engine.drain_calls()
+            self._overflow = self._overflow or overflow
+            for source, target, answered in calls:
+                key = (serialize(parse_sexpr(source)), serialize(parse_sexpr(target)))
+                call = self._calls.setdefault(key, {"source": key[0], "target": key[1], "answered": False, "expressions": set()})
+                call["answered"] = call["answered"] or answered
+                call["expressions"].add(index)
+        except Exception as exc:                    # noqa: BLE001
+            self._trace_error = f"{type(exc).__name__}: {exc}"[:300]
+
+    def finish(self, engine: Any) -> Optional[dict]:
+        """The trace, as plain JSON, once the program has run."""
+        if not self.settings.trace:
+            return None
+        import json
+        from core import pln_trace
+        budget = request_budget_s() if self.deadline_s is None else float(self.deadline_s)
+        try:
+            if self._trace_error:
+                raise PlnChainerError(self._trace_error)
+            if self.table is None:
+                raise PlnChainerError("the derivation kept no table")
+            if budget > 0 and time.monotonic() - self._started > 0.9 * budget:
+                raise PlnChainerError("no time left in the request to build it")
+            trace = pln_trace.build_trace(
+                self.table, list(self._calls.values()),
+                lambda exprs: engine.run_each(["!" + e for e in exprs]), self._overflow)
+            return json.loads(json.dumps(trace, default=str))
+        except Exception as exc:                    # noqa: BLE001
+            return {"chainer": "pln", "error": f"{exc}"[:300], "conclusions": []}
+
+    def receive(self, stats: dict) -> None:
+        """The parent's copy of the step gets what the child's copy built."""
+        self.trace = stats.get("trace")
 
     def _run(self, engine: Any) -> dict:
         t0 = time.perf_counter()

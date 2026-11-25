@@ -146,6 +146,17 @@ def _ruleset_choice() -> str:
     return choice
 
 PLN_RULESET: str = _under_pln_only("PLN_RULESET", "restricted", _ruleset_choice)
+
+# The reasoning trace (PLN_CHAINER=pln; core/pln_trace.py): which conclusions a program read through infer/explain, the rule
+# applications that derived each, and the evidence behind every link. Recorded for every query while on (the default) and
+# written to the session log; a caller chooses how much of it to see (`trace_level`, the "PLN trace" setting of the chat).
+def _trace_choice() -> bool:
+    choice = os.getenv("PLN_TRACE", "on").strip().lower() or "on"
+    if choice not in ("on", "off", "true", "false", "1", "0"):
+        raise ValueError(f"PLN_TRACE must be on or off; got {choice!r}")
+    return choice in ("on", "true", "1")
+
+PLN_TRACE: bool = _under_pln_only("PLN_TRACE", True, _trace_choice)
 # The PeTTa checkout: it holds src/main.pl, python/helper.pl and python/petta/. scripts/setup_petta.sh clones
 # the pinned commit to <repo>/.petta/PeTTa, which is the default. Only read when PLN_RUNTIME needs PeTTa.
 PETTA_HOME: Path = Path(os.getenv("PETTA_HOME") or (ONTOLOGY_DIR / ".petta" / "PeTTa"))
