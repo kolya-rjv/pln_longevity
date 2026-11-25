@@ -77,6 +77,7 @@ from core.pln_runner import (
     run_query,
     run_query_parts,
 )
+from core.pln_trace import LEVEL_LABELS
 from patient_tab import build_tab as build_patient_tab, render_banner as render_patient_banner
 from utils.formatting import format_bot_response
 from utils.logging import log_query, log_turn
@@ -297,6 +298,7 @@ def chat(
     show_explanation: bool,
     show_debug: bool,
     patient_state: Optional[dict] = None,
+    trace_level: int = 0,
 ) -> tuple[list[dict], str]:
     if not user_message.strip():
         return history, ""
@@ -466,6 +468,7 @@ def chat(
         show_metta=show_metta,
         show_explanation=show_explanation,
         show_debug=show_debug,
+        trace_level=int(trace_level or 0),
     )
     # The same qualification the REST surfaces attach. A lever the named patient
     # cannot pull returns a number the engine cannot gate
@@ -825,13 +828,19 @@ with gr.Blocks(
                     show_metta_toggle       = gr.Checkbox(value=SHOW_METTA_DEFAULT,       label="Show MeTTa query")
                     show_explanation_toggle = gr.Checkbox(value=SHOW_EXPLANATION_DEFAULT, label="Show explanation")
                     show_debug_toggle       = gr.Checkbox(value=SHOW_DEBUG_DEFAULT,        label="Show debug info")
+                    trace_level_dropdown    = gr.Dropdown(
+                        choices=list(LEVEL_LABELS),
+                        value=0,
+                        label="PLN trace",
+                        info="How each PLN conclusion was derived: its path, the rule applied at every step, the evidence.",
+                    )
 
             # ── Chat event wiring ──────────────────────────────────────────
             _chat_inputs = [
                 user_input, chatbot,
                 ontology_checkboxes, model_dropdown, temperature_slider,
                 confidence_slider, show_metta_toggle, show_explanation_toggle, show_debug_toggle,
-                patient_state,
+                patient_state, trace_level_dropdown,
             ]
             _chat_outputs = [chatbot, user_input]
 

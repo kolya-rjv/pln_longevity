@@ -4,6 +4,7 @@ from __future__ import annotations
 from core.llm_translator import TranslationResult
 from core.metta_validator import ValidationResult
 from core.pln_runner import PLNRunResult
+from core.pln_trace import render_trace, unavailable_reason
 
 
 def format_bot_response(
@@ -13,6 +14,7 @@ def format_bot_response(
     show_metta: bool,
     show_explanation: bool,
     show_debug: bool,
+    trace_level: int = 0,
 ) -> str:
     parts: list[str] = []
 
@@ -59,6 +61,12 @@ def format_bot_response(
                 else:
                     result_lines.append(f"- `{r.atom}`")
             parts.append("\n".join(result_lines))
+
+    # The reasoning trace of the PLN part (core/pln_trace.py)
+    if trace_level and translation.metta_query and pln_result.status != "error":
+        trace_text = render_trace(pln_result.trace, trace_level, unavailable_reason())
+        if trace_text:
+            parts.append(trace_text)
 
     # Debug / token usage
     if show_debug:

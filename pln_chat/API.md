@@ -1343,9 +1343,20 @@ PLN_RUNTIME=petta PLN_CHAINER=pln python app.py
 | `PLN_QUEUE_SIZE` | integer >= 16, 256 | K, the size of BOTH queues of `PLN.Derive` for the first attempt. A source whose walks need more starts at the first of 256, 2048, 16384 that fits; one that still drops something fails the request; one whose walks cannot fit 16384 at all is refused before any derivation (below) |
 | `PLN_MAX_STEPS` | integer, 0 | tasks one run may expand; 0 = 4 x K of the attempt; clamped to 1..1,000,000. Environment only: no request can set it |
 | `PLN_RULESET` | `restricted` (default), `full` | `full` is a **research lane**: all seventeen rules with uniform node probabilities on a fixed 150/100/400 budget. It concludes things no link licenses and its tables are `partial` by design; do not serve with it |
+| `PLN_TRACE` | `on` (default), `off` | record the reasoning trace of every query (below). Environment only |
 
-These four are read only under `PLN_CHAINER=pln`. Under the default chainer a malformed value (an empty `PLN_QUEUE_SIZE=`, a typo) is
+These five are read only under `PLN_CHAINER=pln`. Under the default chainer a malformed value (an empty `PLN_QUEUE_SIZE=`, a typo) is
 ignored with a logged warning, so it cannot stop the legacy service from starting; under `pln` it is a configuration error at start.
+
+**The reasoning trace.** `trace_level` on `POST /query` and `POST /metta/run` (and "PLN trace" in the chat) says how much of it to
+return: `0` none (default), `1` the route of every conclusion the program read, `2` plus every rule application along it with its
+truth values, `3` plus the evidence behind each link (file:line, tier, hazard-ratio record, DrugAge rows and papers). `/query` puts it
+in `answer`; both return it as `pln_trace`. Each Modus Ponens and Negation-elimination step shows the truth values `PLN.Derive` left in
+its belief list, for both runs (the intervention at level 1 and 0), and is recomputed with the library's own `Truth_*` function
+(`checked`; totals in `check`). `readout` is this application's conversion of the two levels into the reported `(stv s c)`, which is
+not a PLN rule. `no_route` lists the pairs the program asked about that are not connected. The calls are recorded inside the engine, so a
+ranking or a diagnosis is covered as far as it calls `infer`; what it does with the conclusions afterwards, and a plain `match`, is not PLN
+inference and is not traced. The whole trace goes to the session log whatever the level. Under the legacy chainer there is none.
 
 **What a request sees.** The same `(signed Pos|Neg (stv s c))` and `(Chain (n0 .. nk) (signed ..))` shapes, from the same
 `(infer &self A C)` and `(explain &self A C)` calls: no consumer changed. Every pinned sign, strength, confidence, chain and

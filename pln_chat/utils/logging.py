@@ -54,6 +54,10 @@ def log_turn(user_message: str, translation, pln_result) -> None:
         "pln_mode":    getattr(pln_result, "mode", ""),
         "error":       getattr(translation, "error", None),
     }
+    # The whole reasoning trace, whatever the caller asked to see: it is what makes a logged answer auditable later.
+    trace = getattr(pln_result, "trace", None)
+    if isinstance(trace, dict):
+        record["pln_trace"] = trace
     _append_record(record)
 
 

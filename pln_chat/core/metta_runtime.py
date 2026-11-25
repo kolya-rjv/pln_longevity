@@ -96,7 +96,9 @@ before the space is locked. `core.pln_chainer` is that caller: its step loads th
 facts (the space accepts no `add-atom` once locked, and consumers bind the source of an `infer` while they
 evaluate, so the answers have to be there before the first query). The step receives the engine (`.run(text)`,
 `.load(text)`), runs inside the sandbox like any program, and may return a small JSON-able summary, which comes
-back as `last_run["chain"]`. If it raises, the request fails with `MettaRuntimeError(kind="chain")`. Nothing
+back as `last_run["chain"]`. If it raises, the request fails with `MettaRuntimeError(kind="chain")`. A step may
+also have `after_expression(engine, index)`, `finish(engine)` (its result comes back as `last_run["trace"]`) and, in
+the parent, `receive(stats)`: the reasoning trace of core/pln_trace.py, which by contract never raises. Nothing
 else uses the hook; without it (every request under PLN_CHAINER=legacy) this module behaves exactly as before.
 HyperonRuntime and sessions have no hook: a request that asks for one on hyperon is refused.
 
@@ -867,6 +869,27 @@ petta_sandbox_guard_process_form(OrigName) :-
                 ->  petta_sandbox_blocking_call(Orig)
                 ;   Orig ))).
 
+%The reasoning trace (core/pln_trace.py): Name/4 (a three-argument MeTTa function and its result) is replaced by a
+%wrapper that notes the second and third argument of each call, and of each solution, and otherwise runs the
+%original clauses. A note is kept once per distinct pair, at most 2000 in all. It records and never decides: a pair that is not
+%ground is not noted, and the wrapper succeeds, fails and throws exactly as the original does.
+:- dynamic '@CALLS@'/3.
+petta_trace_note(Kind, A, C) :-
+    (   \+ ground(A-C) -> true
+    ;   '@CALLS@'(Kind, A, C) -> true
+    ;   flag('@CALLS@', N, N), N >= 2000 -> flag('@CALLS@', _, 1000000)
+    ;   flag('@CALLS@', M, M + 1), assertz('@CALLS@'(Kind, A, C)) ).
+petta_trace_watch(Name, OrigName) :-
+    petta_sandbox_copy(user, Name, 4, OrigName),
+    Head =.. [Name, S, A, C, R], Orig =.. [OrigName, S, A, C, R],
+    abolish(Name/4),
+    dynamic(Name/4),
+    assertz((Head :- ( petta_trace_note(call, A, C), Orig, petta_trace_note(exit, A, C) ))).
+petta_trace_drain(Calls, Over) :-
+    findall([Kind, SA, SC], ( '@CALLS@'(Kind, A, C), swrite(A, SA), swrite(C, SC) ), Calls),
+    flag('@CALLS@', N, 0), ( N >= 1000000 -> Over = 1 ; Over = 0 ),
+    retractall('@CALLS@'(_, _, _)).
+
 %The top-level forms of Text as PeTTa's OWN reader splits them (comments removed): [[bang|fact, FormText], ...].
 petta_sandbox_forms(Text, Pairs) :-
     metta_string_forms(Text, Forms),
@@ -903,7 +926,7 @@ def _install_petta_sandbox(janus: Any) -> None:
     """
     token = secrets.token_hex(6)
     janus.consult("petta_sandbox_setup", data=_SANDBOX_SETUP_SRC.replace("@FLAG@", f"petta_sandbox_flag_{token}")
-                  .replace("@NOTE@", f"petta_sandbox_note_{token}"))
+                  .replace("@NOTE@", f"petta_sandbox_note_{token}").replace("@CALLS@", f"petta_trace_calls_{token}"))
 
     def must(goal: str, bindings: Optional[dict] = None, what: str = "") -> None:
         # janus answers a goal that failed with {"truth": False}, which is a non-empty (truthy) dict
@@ -1398,6 +1421,28 @@ class _PettaEngine:
         if not self._janus.query_once("petta_sandbox_lock").get("truth"):
             raise RuntimeError("could not lock the PeTTa space")
 
+    def watch_calls(self, names: Sequence[str]) -> None:
+        """Record the calls of these three-argument MeTTa functions (those the KB defines) for `drain_calls`."""
+        token = secrets.token_hex(6)
+        for name in names:
+            if self._janus.query_once("current_predicate(N/4)", {"N": name}).get("truth"):
+                if not self._janus.query_once("petta_trace_watch(N, O)", {"N": name, "O": f"petta_traced_{token}_{name}"}).get("truth"):
+                    raise RuntimeError(f"could not record the calls of {name}")
+
+    def drain_calls(self) -> tuple[list[tuple[str, str, bool]], bool]:
+        """([(second argument, third argument, answered)], whether calls were left out) since the last drain, in call order."""
+        row = self._janus.query_once("petta_trace_drain(Calls, Over)")
+        if not row.get("truth"):
+            raise RuntimeError("could not read the recorded calls")
+        seen: dict[tuple[str, str], bool] = {}
+        for kind, a, c in row["Calls"]:
+            key = (str(a), str(c))
+            seen[key] = seen.get(key, False) or str(kind) == "exit"
+        return [(a, c, answered) for (a, c), answered in seen.items()], bool(row["Over"])
+
+    def run_each(self, expressions: Sequence[str]) -> list[list[str]]:
+        return [self.run(e) for e in expressions]
+
     def split_forms(self, text: str) -> list[tuple[str, str]]:
         """('bang' | 'fact', form text) for each top-level form of `text`, as PeTTa's OWN reader splits it
         (comments removed; a 'bang' form's text lacks its `!`). A text the reader cannot split raises its
@@ -1480,12 +1525,17 @@ def _program_child(conn: Connection, factory: EngineFactory, petta_home: str, st
         except BaseException as exc:            # noqa: BLE001
             _send(conn, _error_message("expression", exc, index))
             return
+        if hasattr(after_load, "after_expression"):
+            after_load.after_expression(engine, index)
     t3 = time.perf_counter()
     stats = {"engine_s": round(t1 - t0, 4), "load_s": round(t2 - t1 - chain_s, 4),
              "queries_s": round(t3 - t2, 4), "peak_rss_mb": _peak_rss_mb()}
     if after_load is not None:
         stats["chain_s"] = round(chain_s, 4)
         stats["chain"] = chain
+    if hasattr(after_load, "finish"):
+        stats["trace"] = after_load.finish(engine)
+        stats["trace_s"] = round(time.perf_counter() - t3, 4)
     _send(conn, {"kind": "result", "groups": groups, "stats": stats})
 
 
@@ -1829,6 +1879,8 @@ class PettaRuntime:
         self.last_raw = raw
         self.last_run = {"total_s": round(time.monotonic() - started, 4), "fork_s": round(forked - started, 4),
                          **message.get("stats", {})}
+        if hasattr(after_load, "receive"):
+            after_load.receive(message.get("stats", {}))
         return [[normalise_result(s) for s in group] for group in raw]
 
     def session(self, kb_text: str, deadline_s: Optional[float] = None) -> PettaSession:

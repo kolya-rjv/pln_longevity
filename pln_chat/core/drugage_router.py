@@ -476,6 +476,7 @@ def _render(
         results=atoms,
         query_time_ms=result.query_time_ms,
         mode=result.mode,
+        trace=result.trace,
     )
 
 

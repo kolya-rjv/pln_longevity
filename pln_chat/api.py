@@ -143,6 +143,7 @@ from core.pln_runner import (
 from core.linage2_builder import feature_listing as linage2_feature_listing
 from core.patient_extract import OpenAIExtractor
 from core.patient_read import read_patient
+from core.pln_trace import limit_trace
 from core.patient_context import (
     build_caller_patient,
     patient_atoms_for,
@@ -1188,6 +1189,13 @@ class QueryRequest(BaseModel):
     show_metta: bool = Field(default=True, description="Include the generated MeTTa query in `answer`.")
     show_explanation: bool = Field(default=True, description="Include the NL explanation in `answer`.")
     show_debug: bool = Field(default=False, description="Include token usage / raw LLM response in `answer`.")
+    trace_level: int = Field(
+        default=0, ge=0, le=3,
+        description="How much of the PLN reasoning trace to return: 0 none, 1 the route of every "
+                    "conclusion read, 2 plus the rule applied at each step with its truth values, "
+                    "3 plus the evidence behind each link. Recorded only under PLN_CHAINER=pln; "
+                    "under the legacy chainer `pln_trace` stays null.",
+    )
 
     @field_validator("model")
     @classmethod
@@ -1249,6 +1257,12 @@ class QueryResponse(BaseModel):
     pln_error: Optional[str] = Field(
         default=None,
         description="Set when pln_status is 'error' (the `answer` text also embeds this).",
+    )
+    pln_trace: Optional[dict] = Field(
+        default=None,
+        description="The reasoning trace at the requested `trace_level` (null at level 0, under the "
+                    "legacy chainer and when PLN_TRACE is off). Covers conclusions read through "
+                    "infer/explain; scoring done afterwards and plain lookups are not traced.",
     )
     routed: Optional[str] = Field(
         default=None,
@@ -1332,6 +1346,13 @@ class MettaRunRequest(BaseModel):
                     "files and before the query runs — e.g. a scratch fact to test a "
                     "hypothetical without writing it to a .metta file.",
     )
+    trace_level: int = Field(
+        default=0, ge=0, le=3,
+        description="How much of the PLN reasoning trace to return: 0 none, 1 the route of every "
+                    "conclusion read, 2 plus the rule applied at each step with its truth values, "
+                    "3 plus the evidence behind each link. Recorded only under PLN_CHAINER=pln; "
+                    "under the legacy chainer `pln_trace` stays null.",
+    )
 
 
     @field_validator("ontology_files")
@@ -1369,6 +1390,12 @@ class MettaRunResponse(BaseModel):
         default=None,
         description="Set when pln_status is 'error' — e.g. the DrugAge ETL "
                     "output hasn't been generated yet, or the hyperon runtime raised.",
+    )
+    pln_trace: Optional[dict] = Field(
+        default=None,
+        description="The reasoning trace at the requested `trace_level` (null at level 0, under the "
+                    "legacy chainer and when PLN_TRACE is off). Covers conclusions read through "
+                    "infer/explain; scoring done afterwards and plain lookups are not traced.",
     )
     routed: Optional[str] = Field(
         default=None,
@@ -3549,6 +3576,7 @@ def query(req: QueryRequest) -> QueryResponse:
         show_metta=req.show_metta,
         show_explanation=req.show_explanation,
         show_debug=req.show_debug,
+        trace_level=req.trace_level,
     )
 
     known_ids = _known_patient_ids() | (
@@ -3628,6 +3656,7 @@ def query(req: QueryRequest) -> QueryResponse:
             for r in pln_result.results
         ],
         pln_error=pln_result.error,
+        pln_trace=limit_trace(pln_result.trace, req.trace_level),
         routed=routed,
         usage=translation.usage,
         error=translation.error,
@@ -3778,6 +3807,7 @@ def metta_run(req: MettaRunRequest) -> MettaRunResponse:
             for r in pln_result.results
         ],
         pln_error=pln_result.error,
+        pln_trace=limit_trace(pln_result.trace, req.trace_level),
         routed=routed,
     )
 

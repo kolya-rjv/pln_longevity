@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Optional
 
 from config import ONTOLOGY_DIR, PLN_QUERY_TIMEOUT_SECONDS, PLN_RUNTIME_AVAILABLE
-from core import pln_chainer
+from core import pln_chainer, pln_trace
 from core.metta_runtime import MettaRuntimeError, get_runtime
 from core.knowledge_base import full_kb_paths, unique_fact_blocks, uses_full_kb
 
@@ -380,6 +380,8 @@ class PLNRunResult:
     #: Which MeTTa runtime produced a "runtime"-mode result ("hyperon" | "petta"); None for stub results and
     #: for results built outside the runner. Not part of any API response: /health reports `runtime_name`.
     runtime_name: Optional[str] = None
+    #: The reasoning trace (core/pln_trace.py). Only under PLN_CHAINER=pln with PLN_TRACE on; None otherwise.
+    trace: Optional[dict] = None
 
     @property
     def ok(self) -> bool:
@@ -728,6 +730,7 @@ def merge_run_results(
         query_time_ms=sum(part.query_time_ms for part in parts),
         mode=parts[0].mode,
         runtime_name=parts[0].runtime_name,
+        trace=pln_trace.merge_traces([part.trace for part in parts], positions),
     )
 
 
@@ -909,6 +912,7 @@ def _runtime_run(
             query_time_ms=elapsed,
             mode="runtime",
             runtime_name=runtime_name,
+            trace=getattr(run_kwargs.get("after_load"), "trace", None),
         )
     except Exception as exc:   # noqa: BLE001
         return PLNRunResult(
@@ -1104,6 +1108,7 @@ def run_drugage_ranking(
             status="empty",
             mode=raw.mode,
             query_time_ms=raw.query_time_ms,
+            trace=raw.trace,
         ), rows
 
     ranked_tuple = "(" + " ".join(sc.atom for sc in kept) + ")"
@@ -1115,6 +1120,7 @@ def run_drugage_ranking(
         results=results,
         query_time_ms=raw.query_time_ms,
         mode=raw.mode,
+        trace=raw.trace,
     ), rows
 
 
